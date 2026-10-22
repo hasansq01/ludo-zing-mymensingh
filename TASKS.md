@@ -198,6 +198,20 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Bars polish (2026-10-22, user's marked screenshot): blue replaced by the café palette (honey/peach bars, peach-cream
+      tiles, coral Home, teal "+", plum tracks); top row in three groups (cream profile capsule, coin pill, cream gear
+      tile); five equal tab columns (no negative margins, Home raised by transform inside its column); badges centred
+      above their icons; checked 320x568 to 1366x768 + landscape: equal tabs, gaps >= 5px, labels whole, badges clear of
+      icons, top groups apart; all actions tested. Approved by the user; home baseline updated 2026-10-22 (APPROVALS.md).
+      Not deployed.
+- [x] Top + bottom bars redesign (2026-10-22, user's filled-game-UI reference; supersedes the unapproved cream nav of the
+      same day): full-width solid blue bars painted on the home layer (`.home::before` top incl. safe area, `.home::after`
+      bottom incl. safe area), so the header / tab bar boxes and every locked number stay the same. Top row restyled for
+      blue (white name, navy XP / coin tracks, green "+", gold gear). Bottom: filled blue tiles with white labels, Home the
+      raised coral active tile (transform, slightly wider), new outlined/shaded icons, glossy Free / Soon badges, press +
+      tap flash (invisible when animations are frozen / reduced). Labels whole 320 px to the 220 px landscape frame; top
+      row no overlap; profile, coins +, settings and all 5 tabs tested. **Home baseline not updated: awaiting approval.**
+      Not deployed.
 - [ ] Optional: drop Orbitron from the font list (unused since the splash redesign; needs a build with network for fonts).
 - [ ] Online play (placeholder "coming soon").
 - [ ] Real share and FB group actions, or remove them (share toast still mentions Facebook).

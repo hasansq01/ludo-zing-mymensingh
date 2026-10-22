@@ -165,6 +165,13 @@ body.room-dark .tap{color:var(--gold-hi);text-shadow:0 0 6px rgba(30,15,45,.9)}
 .home{position:fixed;inset:0;z-index:4;container-type:size;display:flex;flex-direction:column;align-items:center;
   background:linear-gradient(180deg,rgba(255,244,234,.62) 0%,rgba(255,244,234,.12) 30%,rgba(255,244,234,0) 50%,rgba(255,244,234,0) 80%,rgba(255,240,232,.55) 100%)}
 
+/* the two solid bars (filled game-UI style, in the café palette: honey / peach), painted edge to edge on the home layer
+   behind the content: top = safe area + the player row (ends 5px under it); bottom = the tab tiles + safe area.
+   Neither changes layout (the header and tab bar boxes, and every locked number, stay as approved). */
+.home{--th:62px}
+.home::before,.home::after{content:"";position:absolute;z-index:-1;left:0;right:0;pointer-events:none;background:linear-gradient(180deg,#ffdca8 0%,#ffcb8f 55%,#f9b97c 100%)}
+.home::before{top:0;height:calc(env(safe-area-inset-top,0px) + 70px);box-shadow:inset 0 -3px 0 #e99a5e,0 3px 0 rgba(150,80,40,.18),0 6px 14px rgba(110,60,40,.16)}
+.home::after{bottom:0;height:calc(env(safe-area-inset-bottom,0px) + var(--th) + 16px);box-shadow:inset 0 3px 0 rgba(255,244,226,.9),0 -3px 0 rgba(150,80,40,.18),0 -6px 14px rgba(110,60,40,.16)}
 .home-wrap{box-sizing:border-box;flex:1;width:100%;max-width:480px;display:flex;flex-direction:column;gap:14px;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px calc(12px + 4cqh);min-height:0;overflow-y:auto;overflow-x:hidden}   /* game buttons sit 12px + 4% of the screen height above the tab bar */
 .cap{font-family:var(--font-display);font-weight:400;letter-spacing:.03em;color:var(--ink);text-shadow:var(--halo)}
 
@@ -175,9 +182,11 @@ body.room-dark .tap{color:var(--gold-hi);text-shadow:0 0 6px rgba(30,15,45,.9)}
    the level star on its left end; coins as a recessed plum track with the coin overlapping its left end and the teal
    "+" its right end; honey gear. Never wraps or scrolls; the player section flexes and the name truncates. */
 .h-top{height:50px;flex:none;display:flex;align-items:center}
-.h-bar{box-sizing:border-box;width:calc(100% + 8px);height:56px;margin:0 -4px;padding:0 8px 0 9px;display:flex;align-items:center;gap:8px;flex:none;
-  background:#ffd6b3;border-radius:16px;box-shadow:inset 0 2px 0 rgba(255,255,255,.55),inset 0 -3px 0 #f2b07f,0 3px 8px rgba(74,43,61,.18);container-type:inline-size}
-.profile{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:7px;padding:0;background:none;border:0;border-radius:10px;color:var(--ink);text-align:left}
+.h-bar{box-sizing:border-box;width:calc(100% + 8px);height:56px;margin:0 -4px;padding:0 4px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none;
+  background:none;container-type:inline-size}   /* sits on the solid honey top bar (.home::before); three groups, evenly spaced */
+/* group 1: the player, in a soft cream capsule */
+.profile{flex:1 1 auto;min-width:0;max-width:210px;display:flex;align-items:center;gap:8px;padding:3px 12px 3px 3px;border-radius:14px;color:var(--ink);text-align:left;
+  background:rgba(255,250,242,.72);border:1.5px solid rgba(255,255,255,.9);box-shadow:inset 0 -2px 0 rgba(233,154,94,.3),0 2px 4px rgba(150,80,40,.12)}
 .pava{display:grid;flex:none;border:2.5px solid #fff;border-radius:10px;background:#fff6ec;box-shadow:0 2px 0 rgba(74,43,61,.22)}
 .pava .avatar{width:36px;height:36px;border-radius:7px}
 .pinfo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -188,19 +197,21 @@ body.room-dark .tap{color:var(--gold-hi);text-shadow:0 0 6px rgba(30,15,45,.9)}
 .lvstar b{position:relative;top:1px;font-size:.66rem;font-weight:900;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
 .pxp{flex:1 1 auto;min-width:22px;max-width:118px;height:13px;margin-left:-11px;padding:2px 2px 2px 11px;box-sizing:border-box;border-radius:999px;background:var(--ink);box-shadow:inset 0 2px 2px rgba(0,0,0,.35)}
 .pxp i{display:block;height:100%;min-width:3px;border-radius:999px;background:var(--gold-hi)}
-.h-right{flex:none;display:flex;align-items:center;gap:6px}
+.h-right{flex:none;display:flex;align-items:center;gap:10px}   /* group 2 (coins) and group 3 (settings) */
 .h-bar .coins{position:relative;height:30px;gap:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none}
 .h-bar .coin{position:relative;z-index:1;width:30px;height:30px;filter:drop-shadow(0 1px 0 rgba(74,43,61,.35))}
 .h-bar .coins b{display:block;box-sizing:border-box;min-width:4.6em;height:22px;line-height:22px;margin:0 -13px;padding:0 17px 0 18px;border-radius:999px;
   background:var(--ink);box-shadow:inset 0 2px 2px rgba(0,0,0,.35);color:#fff6e6;font-size:.86rem;font-weight:900;text-align:right;white-space:nowrap}
 .h-bar .plus{position:relative;z-index:1;width:26px;height:26px;border-radius:8px;border:2px solid #fff;background:#2fb39c;color:#fff;font-size:1.2rem;font-weight:900;
-  box-shadow:inset 0 -3px 0 #1d8a78,0 2px 0 rgba(74,43,61,.25)}
+  text-shadow:0 1px 0 rgba(15,90,80,.45);box-shadow:inset 0 -3px 0 #1d8a78,0 2px 0 rgba(120,60,30,.22)}
 .h-bar .plus:active{transform:translateY(1px);box-shadow:inset 0 -1px 0 #1d8a78}
-.h-bar .icon-btn.sq{width:36px;height:36px;border-radius:12px;background:none;border:0;box-shadow:none;color:var(--ink)}
-.h-bar .icon-btn.sq svg{width:30px;height:30px;filter:drop-shadow(0 1.5px 0 rgba(74,43,61,.3))}
+/* group 3: settings, in a cream tile like the profile capsule */
+.h-bar .icon-btn.sq{width:38px;height:38px;border-radius:12px;color:var(--ink);background:rgba(255,250,242,.72);border:1.5px solid rgba(255,255,255,.9);box-shadow:inset 0 -2px 0 rgba(233,154,94,.3),0 2px 4px rgba(150,80,40,.12)}
+.h-bar .icon-btn.sq svg{width:26px;height:26px;filter:drop-shadow(0 1.5px 0 rgba(120,60,30,.3))}
+.h-bar .icon-btn.sq svg path{stroke:#b5701c;stroke-width:1.2}
 .h-bar .icon-btn.sq svg path{fill:var(--gold)}
 .h-bar .icon-btn.sq svg circle{fill:#fff6e6}
-@container (max-width:330px){.h-bar{gap:5px;padding:0 6px 0 7px}.h-bar .profile{gap:5px}.h-right{gap:4px}.h-bar .coins b{min-width:4em}.pxp{max-width:60px}}   /* 320px phones: tighter */
+@container (max-width:330px){.h-bar{gap:8px;padding:0 2px}.h-bar .profile{gap:6px;padding-right:8px}.h-right{gap:8px}.h-bar .coins b{min-width:3.6em}.pxp{max-width:52px}}   /* 320px phones: tighter, groups still apart */
 @container (max-width:250px){.plvl{display:none}}   /* very narrow: level row goes before coins or settings */
 .coins{display:flex;align-items:center;gap:6px;padding:4px 4px 4px 6px;border-radius:16px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow-sm),var(--gloss)}
 .coins b{min-width:2.6em;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
@@ -297,21 +308,40 @@ body.sl-3d .sl-top h2{color:#fff;text-shadow:0 2px 0 rgba(40,80,30,.55),0 0 10px
 .m-online{background:radial-gradient(circle at 50% 35%,#cfcfcf,#9a9a9a 70%,#7d7d7d)}
 .soon-tag{position:absolute;top:8px;right:8px;z-index:2;padding:2px 8px;border-radius:999px;background:var(--lavender);color:#fff;font-size:.62rem;font-weight:900;letter-spacing:.04em;border:1.5px solid rgba(255,255,255,.8)}
 
-.tabbar{box-sizing:border-box;width:100%;max-width:480px;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;gap:4px;padding:10px 8px calc(env(safe-area-inset-bottom,0px) + 8px)}
-.tab{position:relative;height:62px;border-radius:14px 14px 10px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  background:linear-gradient(180deg,#fffdf9,#fbeee4);border:1px solid var(--line);box-shadow:0 3px 0 rgba(110,60,90,.12),var(--shadow-sm),var(--gloss)}
-.tab svg{width:28px;height:28px}
-.tab{min-width:0}
+/* Bottom navigation (2026-10-22): one solid honey bar (.home::after, edge to edge incl. the safe area) holding five equal
+   tab columns; the tab bar's own box, and with it the locked gap above it and the table framing, stays as approved.
+   Inactive tabs are filled peach-cream tiles, Home the raised coral one: raised by a transform and 14px taller, but always
+   inside its own column, so it never touches its neighbours. --th (set on .home) is the inactive tile height. */
+.tabbar{position:relative;box-sizing:border-box;width:100%;max-width:480px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;gap:7px;padding:10px 10px calc(env(safe-area-inset-bottom,0px) + 8px)}
+.tab{position:relative;height:var(--th);min-width:0;padding:0 3px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  background:linear-gradient(180deg,#fff8ee 0%,#ffe9d2 100%);border:1.5px solid #f3c497;
+  box-shadow:inset 0 1.5px 0 #fff,0 3px 0 #dc9a62,0 4px 8px rgba(130,70,30,.14);
+  transition:transform .12s ease,box-shadow .12s ease;-webkit-tap-highlight-color:transparent}
+.tab:active{transform:translateY(2px) scale(.95);box-shadow:inset 0 1.5px 0 #fff,0 1px 0 #dc9a62,0 2px 4px rgba(130,70,30,.14)}
+.tab svg{width:28px;height:28px;flex:none;overflow:visible;filter:drop-shadow(0 1.5px 1px rgba(110,60,40,.25))}/* tap flash: invisible unless its animation runs, so a frozen (test mode) or reduced-motion page never keeps a white overlay */
+.tab.tap::after{content:"";position:absolute;inset:-1.5px;border-radius:inherit;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.85),rgba(255,255,255,0) 72%);animation:tabFlash .36s ease-out}
+@keyframes tabFlash{from{opacity:1}to{opacity:0}}
+.tabbar{container-type:inline-size}
+@container (max-width:340px){.tabbar{gap:5px;padding-left:6px;padding-right:6px}.tabbar .tab{padding:0 1px}.tabbar .tab span{font-size:.5rem;letter-spacing:0}}   /* small phones: every label whole */
+@container (max-width:250px){.tabbar .tab span{font-size:.45rem;letter-spacing:0}.tabbar .tab{padding:0 1px}}   /* the narrow landscape frame */
+@media (prefers-reduced-motion:reduce){.tab,.tab:active{transition:none}.tab.tap::after{animation:none}}
 .tab span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-height:520px){.modes{gap:10px}.mode{height:46px;gap:6px}.mart{width:32px;height:32px;border-radius:10px}.mart svg{width:27px;height:24px}
-  .tab span{font-size:.5rem;letter-spacing:.02em}.tab svg{width:22px;height:22px}.tabbar{gap:2px;padding-left:4px;padding-right:4px}}
-.tab span{font-size:.62rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.tab.soon svg{opacity:.75;filter:saturate(.7)}
-.soon-chip{position:absolute;top:-9px;right:-2px;padding:1px 6px;border-radius:999px;background:var(--lavender);color:#fff;font-style:normal;font-size:.56rem;font-weight:900;letter-spacing:.04em;border:1.5px solid rgba(255,255,255,.85)}
-.tab.on{height:76px;background:linear-gradient(180deg,#ffc27a,#ff8f6b);border:2px solid #fff;box-shadow:0 4px 0 #e0705a,0 8px 22px rgba(255,130,100,.4),var(--gloss)}
-.tab.on span{color:#fff}
-.tab.on svg{animation:bounce 2.4s ease-in-out infinite}
-.free-bubble{position:absolute;top:-16px;left:50%;transform:translateX(-50%);padding:2px 8px;border-radius:999px;background:linear-gradient(#53d769,#2aa845);color:#fff;font-style:normal;font-size:.66rem;font-weight:900;border:1.5px solid #fff;animation:hopy 1.6s ease-in-out infinite;white-space:nowrap}
+  .tab span{font-size:.5rem;letter-spacing:.02em}.tab svg{width:22px;height:22px}.tab.on svg{width:27px;height:27px}.tabbar{gap:5px;padding-left:5px;padding-right:5px}}
+.tab span{font-size:.6rem;font-weight:900;letter-spacing:.035em;line-height:1.1;text-transform:uppercase;color:#8a4a2c}
+.tab.soon svg{opacity:.85;filter:saturate(.8) drop-shadow(0 1.5px 1px rgba(110,60,40,.25))}
+/* Home: the active tab, warm coral, 14px taller (it sets the bar's locked height) and raised 4px, inside its own column */
+.tab.on{height:calc(var(--th) + 14px);transform:translateY(-4px);border-radius:16px;
+  background:linear-gradient(180deg,#ffb48a 0%,#ff8a6a 55%,#f26b52 100%);border:2px solid #fff;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 4px 0 #c9553c,0 7px 14px rgba(230,100,70,.38)}
+.tab.on:active{transform:translateY(-2px) scale(.97);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 2px 0 #c9553c,0 4px 8px rgba(230,100,70,.32)}
+.tab.on svg{position:relative;width:32px;height:32px;animation:bounce 2.4s ease-in-out infinite;filter:drop-shadow(0 2px 1.5px rgba(150,50,25,.35))}
+.tab.on span{position:relative;color:#fff;text-shadow:0 1.5px 0 rgba(170,60,30,.55)}/* game badges: small glossy pills with a hard bottom edge, sitting on the tab's top edge */
+.free-bubble,.soon-chip{position:absolute;z-index:2;padding:2px 7px 3px;border-radius:999px;color:#fff;font-style:normal;font-size:.56rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;line-height:1.1;white-space:nowrap;border:1.5px solid #fff}
+.free-bubble{top:-9px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,#72e88c,#22a447);text-shadow:0 1px 0 rgba(10,90,30,.5);
+  box-shadow:0 2px 0 #178037,0 3px 6px rgba(20,120,50,.3);animation:hopy 1.6s ease-in-out infinite}
+.soon-chip{top:-9px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,#cbb8ff,#8e6fee);text-shadow:0 1px 0 rgba(70,40,150,.5);box-shadow:0 2px 0 #6a4fc8,0 3px 6px rgba(90,60,180,.3)}
 
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 104px);transform:translateX(-50%);z-index:30;max-width:calc(100% - 32px);padding:10px 18px;border-radius:999px;background:rgba(74,43,61,.94);color:#fff;font-weight:800;font-size:.9rem;text-align:center;box-shadow:var(--shadow);animation:toastin .25s ease}
 .fly-coin{position:fixed;z-index:40;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none;transition:transform .75s cubic-bezier(.5,-0.3,.6,1),opacity .2s .65s}
@@ -733,7 +763,8 @@ body.jungle-ready .sl.is-landing{background:transparent}
   .side{gap:12px}
   .logo-block .brand-logo{max-width:190px}
   .mode{height:56px}.mart{width:38px;height:38px}.mart svg{width:32px;height:29px}
-  .tab{height:56px}.tab.on{height:68px}
+  .home{--th:56px}.tab.on{height:68px}
+  .free-bubble,.soon-chip{top:-12px}   /* shorter tiles: the badge stays clear of the icon */
 }
 
 /* ---------- in-game HUD (mobile first: corner player cards, dice beside the active player) ---------- */
@@ -1087,11 +1118,11 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
   </div>
 
   <nav class="tabbar" aria-label="Lobby">
-    <button class="tab" id="btnSnake" type="button"><svg viewBox="0 0 32 32"><g transform="rotate(-18 22 16)"><rect x="18" y="3" width="2.5" height="26" rx="1" fill="#b8692e"/><rect x="25" y="3" width="2.5" height="26" rx="1" fill="#b8692e"/><g fill="#e8a05a"><rect x="19" y="8" width="7" height="2"/><rect x="19" y="14" width="7" height="2"/><rect x="19" y="20" width="7" height="2"/></g></g><path d="M6 28C2 21 15 20 11 14S6 6 13 5" stroke="#2fbf4a" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="14" cy="5" r="3.5" fill="#2fbf4a"/><circle cx="15" cy="4" r="1" fill="#fff"/></svg><span>Snake</span></button>
-    <button class="tab" id="tabInv" type="button"><svg viewBox="0 0 32 32"><rect x="5" y="5" width="22" height="22" rx="6" fill="#fdfaf2" stroke="#d9c9ae" stroke-width="1.5"/><g fill="#22263f"><circle cx="11" cy="11" r="2.2"/><circle cx="21" cy="11" r="2.2"/><circle cx="16" cy="16" r="2.2"/><circle cx="11" cy="21" r="2.2"/><circle cx="21" cy="21" r="2.2"/></g></svg><span>Inventory</span></button>
-    <button class="tab on" type="button" aria-current="page"><svg viewBox="0 0 32 32"><path d="M4 15L16 5l12 10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 14v13h18V14L16 6.5z" fill="#fff8ec"/><rect x="13" y="18" width="6" height="9" rx="1.5" fill="#e5484d"/><rect x="9" y="16" width="3.5" height="3.5" fill="#5bb8ff"/><rect x="19.5" y="16" width="3.5" height="3.5" fill="#5bb8ff"/></svg><span>Home</span></button>
-    <button class="tab" id="tabShop" type="button"><em class="free-bubble" id="shopFree">Free</em><svg viewBox="0 0 32 32"><rect x="6" y="14" width="20" height="13" rx="1.5" fill="#fff8ec"/><rect x="13" y="19" width="6" height="8" fill="#b8692e"/><path d="M4 9h24l-2 6H6z" fill="#e5484d"/><path d="M9 9l-1 6M14 9v6M18 9v6M23 9l1 6" stroke="#fff" stroke-width="2"/><rect x="5" y="6" width="22" height="3.5" rx="1.5" fill="#c62f34"/></svg><span>Shop</span></button>
-    <button class="tab soon" id="btnOnline" type="button"><em class="soon-chip">Soon</em><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#5b8fd9"/><g fill="none" stroke="#dbe8ff" stroke-width="1.6"><circle cx="16" cy="16" r="11"/><ellipse cx="16" cy="16" rx="5" ry="11"/><line x1="5" y1="16" x2="27" y2="16"/></g></svg><span>Online</span></button>
+    <button class="tab" id="btnSnake" type="button"><svg viewBox="0 0 32 32" aria-hidden="true"><g transform="rotate(-16 22 16)" stroke="#6b3a1e" stroke-width="1.2" stroke-linejoin="round"><rect x="17.5" y="2.5" width="3.2" height="27" rx="1.4" fill="#d98b45"/><rect x="25" y="2.5" width="3.2" height="27" rx="1.4" fill="#d98b45"/><g fill="#f3c27c"><rect x="20" y="7.5" width="5.5" height="2.4" rx=".8"/><rect x="20" y="14" width="5.5" height="2.4" rx=".8"/><rect x="20" y="20.5" width="5.5" height="2.4" rx=".8"/></g></g><path d="M5.5 28.5C1.5 22 14.5 20.5 10.5 14.5S5 6.5 12.5 5" stroke="#1f7a33" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M5.5 28.5C1.5 22 14.5 20.5 10.5 14.5S5 6.5 12.5 5" stroke="#43c95c" stroke-width="4.6" fill="none" stroke-linecap="round"/><path d="M6.6 26C4.7 22.4 12.6 20.6 9.7 15.6" stroke="#a8f0b4" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="13.6" cy="5" r="4" fill="#43c95c" stroke="#1f7a33" stroke-width="1.2"/><circle cx="14.7" cy="4" r="1.35" fill="#fff"/><circle cx="15" cy="4.1" r=".65" fill="#1d2240"/><path d="M17.4 5.9l1.9.5-1 1.1" stroke="#e5484d" stroke-width=".9" fill="none" stroke-linecap="round"/></svg><span>Snake</span></button>
+    <button class="tab" id="tabInv" type="button"><svg viewBox="0 0 32 32" aria-hidden="true"><g transform="rotate(-8 16 16)"><rect x="5" y="6" width="22" height="22" rx="6" fill="#d8c2a8"/><rect x="5" y="4.2" width="22" height="22" rx="6" fill="#fffaf1" stroke="#7a5a48" stroke-width="1.3"/><path d="M8.5 7.6q7.5-2.2 15 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/><g fill="#2b2f4a"><circle cx="11" cy="10.2" r="2.1"/><circle cx="21" cy="10.2" r="2.1"/><circle cx="11" cy="20.2" r="2.1"/><circle cx="21" cy="20.2" r="2.1"/></g><circle cx="16" cy="15.2" r="2.2" fill="#e5484d"/></g></svg><span>Inventory</span></button>
+    <button class="tab on" type="button" aria-current="page"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="20.6" y="5.6" width="3.6" height="6.4" rx=".8" fill="#c97a4a" stroke="#8a3b2a" stroke-width="1"/><path d="M6.5 14.5V27a1.5 1.5 0 0 0 1.5 1.5h16a1.5 1.5 0 0 0 1.5-1.5V14.5L16 6.4z" fill="#fff8ec" stroke="#8a3b2a" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.8 15.6L16 4.6l13.2 11" fill="none" stroke="#8a3b2a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.8 15.6L16 4.6l13.2 11" fill="none" stroke="#e5484d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><rect x="13" y="19" width="6" height="9.5" rx="2" fill="#f2a24a" stroke="#8a3b2a" stroke-width="1.1"/><circle cx="17.2" cy="24" r=".8" fill="#8a3b2a"/><rect x="8.6" y="16.6" width="3.8" height="3.8" rx=".8" fill="#7cc4ff" stroke="#8a3b2a" stroke-width="1"/><rect x="19.6" y="16.6" width="3.8" height="3.8" rx=".8" fill="#7cc4ff" stroke="#8a3b2a" stroke-width="1"/></svg><span>Home</span></button>
+    <button class="tab" id="tabShop" type="button"><em class="free-bubble" id="shopFree">Free</em><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="13.5" width="20" height="14.5" rx="1.6" fill="#fff8ec" stroke="#7a3a2a" stroke-width="1.2"/><rect x="12.6" y="19" width="6.8" height="9" rx="1" fill="#c97a4a" stroke="#7a3a2a" stroke-width="1"/><path d="M4 9h24l-1.5 5.5h-21z" fill="#e5484d" stroke="#7a3a2a" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 9.6h6v4.4h-5.6zM22 9.6h5.2l-1.2 4.4h-4z" fill="#fff"/><path d="M5.5 14.5a2.6 2.6 0 0 0 5.2 0a2.6 2.6 0 0 0 5.3 0a2.6 2.6 0 0 0 5.3 0a2.6 2.6 0 0 0 5.2 0" fill="#e5484d" stroke="#7a3a2a" stroke-width="1.2" stroke-linejoin="round"/><rect x="4.5" y="5.4" width="23" height="3.8" rx="1.6" fill="#c62f34" stroke="#7a3a2a" stroke-width="1.2"/><circle cx="25.4" cy="24.6" r="4.2" fill="#ffd56a" stroke="#b07a1a" stroke-width="1.2"/><path d="M25.4 22.4v4.4" stroke="#b07a1a" stroke-width="1.3" stroke-linecap="round"/></svg><span>Shop</span></button>
+    <button class="tab soon" id="btnOnline" type="button"><em class="soon-chip">Soon</em><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16.5" r="11.5" fill="#4fd3f2" stroke="#0d2f6e" stroke-width="1.5"/><path d="M9 10.5c2.5-.5 3.5 1.5 5.5 1s1.5 3-1 4-1 4-3.5 4.5c-1.6-2.4-2.6-6.1-1-9.5z" fill="#6fd27a"/><path d="M19 8.5c2 .3 4.6 2 5.6 4.4-1.6.6-2.4-.6-3.6.4s.4 3-1.6 3.4-2.4-2-1.4-3.6-.8-3 1-4.6z" fill="#6fd27a"/><path d="M18.5 22.5c1.5-1 3.5-.5 4.5.5-1 1.6-2.6 2.8-4.4 3.3-.6-1.2-.9-2.8-.1-3.8z" fill="#6fd27a"/><g fill="none" stroke="#dbe9ff" stroke-width="1" opacity=".7"><ellipse cx="16" cy="16.5" rx="5" ry="11.5"/><path d="M4.5 16.5h23"/></g><path d="M8.6 9.6a10 10 0 0 1 6-3.6" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".85"/></svg><span>Online</span></button>
   </nav>
 </div>
 
@@ -4610,6 +4641,12 @@ function maybeAutoDaily() {
 }
 initTabs($('setTabs'), t => { showPane($('setTabs'), $('setPane'), t, true); sfx('select'); });
 $('coinPlus').addEventListener('click', () => { shopTab = 'coins'; renderShop(); $('shopPane').scrollTop = 0; openSheet('shopSheet'); });   // "Get coins" opens on Coins
+// bottom navigation: a quick light flash on the tapped tab (the press itself is CSS :active)
+document.querySelector('.tabbar').addEventListener('click', e => {
+  const t = e.target.closest('.tab'); if (!t) return;
+  t.classList.remove('tap'); void t.offsetWidth; t.classList.add('tap');
+  clearTimeout(t._tap); t._tap = setTimeout(() => t.classList.remove('tap'), 400);
+});
 $('tabShop').addEventListener('click', () => { shopTab = 'rooms'; renderShop(); $('shopPane').scrollTop = 0; openSheet('shopSheet'); });
 $('tabInv').addEventListener('click', () => { invTab = 'rooms'; renderInv(); $('invPane').scrollTop = 0; openSheet('invSheet'); });
 /* ---------- Snakes & Ladders ----------

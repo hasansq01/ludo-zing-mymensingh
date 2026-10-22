@@ -263,13 +263,19 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 - Fixed camera; diamond board; cups never in the player's way.
 - Ludo-King-style HUD: player cards in the four corners, clockwise from the viewer's bottom-left. Each card shows name,
   finished-pawn pips and progress %. Your card uses your profile name and avatar. The dice moves into the active player's card.
-- Home top bar (`.h-top` > `.h-bar`, ids unchanged), styled after the user's casual-game HUD reference in our colours:
-  one solid peach (#ffd6b3) 56px row, 12px from the screen edges, light top / darker bottom edge. White-framed avatar;
-  name (display font, ellipsis) over a recessed plum XP track with a honey level star on its left end
-  (`renderProfileChip` fills `#profileLvl`/`#profileXp` from `levelInfo`); coins as a recessed plum track (cream number,
-  `fmtCoins`: 12.5K / 1.2M) with the coin overlapping its left end and a teal white-bordered "+" its right end; honey
-  gear with plum outline, no background. `.h-top` keeps the old 50px layout height so nothing below
-  moves. Container queries tighten gaps under 330px and hide the level row under 250px. No secondary currency exists.
+- Home bars (approved 2026-10-22, baseline updated): both are solid, full-width honey/peach bars painted on the home
+  layer (`.home::before` = top incl. safe area, ends 5px under the player row; `.home::after` = bottom, the tab tiles +
+  16px + safe area), so the `.h-top` (50px) and `.tabbar` boxes, and every locked number, are unchanged.
+  Top row (`.h-top` > `.h-bar`, ids unchanged): three groups spaced apart: a cream profile capsule (white-framed avatar,
+  name in ink with ellipsis, plum XP track with the honey level star on its left end; `renderProfileChip` fills
+  `#profileLvl`/`#profileXp`), the coin group (coin overlapping a plum track, `fmtCoins` 12.5K / 1.2M, teal "+"), and
+  the honey gear in a cream tile. Container queries tighten under 330px and hide the level row under 250px. No
+  secondary currency exists.
+  Bottom bar: five equal columns (`repeat(5,minmax(0,1fr))`, 7px gaps; 5px on small phones / landscape). Inactive tabs
+  are peach-cream tiles (`--th` on `.home`: 62px, 56px under 740px height); Home is the coral active tile, 14px taller
+  (it sets the bar's locked height) and raised by a 4px transform inside its column. Outlined/shaded icons; Free / Soon
+  badges centred above their icons (higher on short screens). Press = CSS :active; tap flash = `.tap` class removed by a
+  400ms timer, invisible when animations are frozen (test mode) or reduced.
 - Lively home: logo, top bar, daily spin, free coins, FB group, share, only two premium mode tiles
   (vs Computer, Pass & Play), bottom tab bar (Snake & Ladder, Inventory, Home, Shop, Online), café table visible behind.
 - Snakes & Ladders (Snake tab, `SL` module, `#slPage`): full-screen page over the lobby (`body.sl-open` hides the home

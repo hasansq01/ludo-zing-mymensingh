@@ -2,3 +2,4 @@
 - 2026-10-19 20:12 - Approved by the user on 2026-10-19: restyled reference-style top bar (solid peach single-row HUD: framed avatar, name, level star on plum XP track, coin track with teal plus, honey gear). Only the bar region changed (x 12-377, y 9-64); layout and locked numbers unchanged.
 - 2026-10-21 01:32 - Approved by the user on 2026-10-21: logo word KING changed to ZING (game renamed Ludo Zing Mymensingh)
 - 2026-10-21 11:19 - Approved by the user on 2026-10-21: Rewards (Daily Reward) button replaces FB Group in the left side column; FB Group stays in Settings > Community
+- 2026-10-22 15:48 - User approved the polished warm top and bottom bars (honey/peach filled bars, three top groups, five equal tabs, raised coral Home) on 2026-10-22.
