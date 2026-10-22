@@ -1,0 +1,9 @@
+# Keep text files exactly as they are on disk (LF), on every machine and in GitHub Desktop
+* text=auto eol=lf
+
+# Binary assets: never touched by line-ending conversion or text diffs
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.woff2 binary
+*.zip binary
