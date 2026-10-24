@@ -1,0 +1,33 @@
+{
+  // Ludo Zing online rooms. One Durable Object (class Room, SQLite storage) per room code, plus the admin console
+  // (ADMIN_API.md): D1 "ludo-zing-admin" for stats / bans / config, the console UI from ./admin at /admin.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ludo-zing-rooms",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-15",
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ludo-zing-admin",
+      "database_id": "6b675ae8-0565-49e8-900a-963392491294",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // The console files are served by the Worker at /admin/* (src/index.ts strips the /admin prefix and asks ASSETS),
+  // so every request reaches the Worker first: nothing in ./admin is reachable outside /admin.
+  "assets": {
+    "directory": "./admin",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  // Daily at 03:17 UTC: prune events / login_attempts older than 30 days, reconcile rooms rows of vanished rooms.
+  "triggers": { "crons": ["17 3 * * *"] },
+  "observability": { "enabled": true }
+  // Secret (not here): ADMIN_PASSWORD (tools/cf.sh secret put ADMIN_PASSWORD; locally .dev.vars).
+}

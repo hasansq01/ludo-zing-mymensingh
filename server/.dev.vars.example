@@ -1,0 +1,2 @@
+# Local secrets for `npx wrangler dev` (copy to .dev.vars, which is git-ignored). Deployed: tools/cf.sh secret put ADMIN_PASSWORD
+ADMIN_PASSWORD=dev-password-change-me

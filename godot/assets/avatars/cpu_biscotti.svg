@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 120 120">
+<!-- Biscotti: a golden almond biscotti slice dipped in chocolate (café mascot) -->
+<ellipse cx="60" cy="114" rx="40" ry="6.5" fill="#461e28" fill-opacity="0.18"/>
+<g transform="rotate(-7 60 68)">
+<path d="M34 20C40 15 80 15 86 20C93 25 94 34 93 46L91 106C90.6 112 86 115 80 115H40C34 115 29.4 112 29 106L27 46C26 34 27 25 34 20Z" fill="#c98544"/>
+<path d="M38 25C44 21.6 76 21.6 82 25C87.4 28.6 88 36 87.4 46L85.8 104C85.6 108 83 110 79 110H41C37 110 34.4 108 34.2 104L32.6 46C32 36 32.6 28.6 38 25Z" fill="#f2cb88"/>
+<path d="M27 46C26 34 27 25 34 20C30 28 30.6 40 32.6 46L34.2 104C34.4 108 37 110 41 110L40 115C34 115 29.4 112 29 106Z" fill="#461e28" fill-opacity="0.12"/>
+<g fill="#fbeacb">
+<ellipse cx="44" cy="33" rx="5" ry="3.2" transform="rotate(-25 44 33)"/>
+<ellipse cx="76" cy="31" rx="4.6" ry="3" transform="rotate(20 76 31)"/>
+<ellipse cx="80" cy="56" rx="3.6" ry="2.4" transform="rotate(-35 80 56)"/>
+<ellipse cx="39" cy="60" rx="3.8" ry="2.4" transform="rotate(30 39 60)"/>
+<ellipse cx="62" cy="27" rx="3.4" ry="2.2" transform="rotate(5 62 27)"/>
+</g>
+<g fill="#dca25e">
+<ellipse cx="44" cy="33" rx="2.4" ry="1.2" transform="rotate(-25 44 33)"/>
+<ellipse cx="76" cy="31" rx="2.2" ry="1.1" transform="rotate(20 76 31)"/>
+</g>
+<path d="M29.8 86C40 82 48 89 60 85C72 81 80 88 90.2 84.6L91 106C90.6 112 86 115 80 115H40C34 115 29.4 112 29 106Z" fill="#6b3a1e"/>
+<path d="M29.8 86C40 82 48 89 60 85C72 81 80 88 90.2 84.6L90.3 88C80 91 72 84.6 60 88.6C48 92.4 40 85.6 29.9 89.4Z" fill="#8a5232"/>
+<path d="M40 97H50M64 102H74" stroke="#9c6440" stroke-width="2.4" stroke-linecap="round"/>
+<ellipse cx="48" cy="58" rx="4.4" ry="5.4" fill="#3a2230"/>
+<ellipse cx="72" cy="58" rx="4.4" ry="5.4" fill="#3a2230"/>
+<circle cx="49.5" cy="55.8" r="1.6" fill="#ffffff"/>
+<circle cx="73.5" cy="55.8" r="1.6" fill="#ffffff"/>
+<path d="M52 68Q60 75 68 68" fill="none" stroke="#3a2230" stroke-width="3" stroke-linecap="round"/>
+<circle cx="40" cy="67" r="5" fill="#ff8f9b" opacity="0.5"/>
+<circle cx="80" cy="67" r="5" fill="#ff8f9b" opacity="0.5"/>
+</g>
+</svg>

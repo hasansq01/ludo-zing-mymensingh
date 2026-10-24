@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="432" height="432" viewBox="0 0 432 432">
+<defs>
+  <clipPath id="clipf"><rect width="300" height="300" rx="30"/></clipPath>
+  <linearGradient id="sheenf" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+    <stop offset="0.45" stop-color="#ffffff" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000000" stop-opacity="0.10"/>
+  </linearGradient>
+  <linearGradient id="facef" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0" stop-color="#ffffff"/>
+    <stop offset="1" stop-color="#e7dfcf"/>
+  </linearGradient>
+  <linearGradient id="glossf" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="pipf" cx="0.4" cy="0.35" r="0.7">
+    <stop offset="0" stop-color="#3a4a70"/>
+    <stop offset="1" stop-color="#1f2a44"/>
+  </radialGradient>
+</defs>
+<g transform="translate(102 96) scale(0.76)">
+  <rect x="4" y="12" width="300" height="300" rx="30" fill="#000" opacity="0.28"/>
+  <g clip-path="url(#clipf)">
+    <rect width="300" height="300" fill="#fbf3e0"/>
+    <rect x="0" y="0" width="120" height="120" fill="#e5484d"/>
+    <rect x="20" y="20" width="80" height="80" rx="16" fill="#fbf3e0"/>
+    <circle cx="42" cy="42" r="11" fill="#e5484d"/>
+    <circle cx="78" cy="42" r="11" fill="#e5484d"/>
+    <circle cx="42" cy="78" r="11" fill="#e5484d"/>
+    <circle cx="78" cy="78" r="11" fill="#e5484d"/>
+    <rect x="180" y="0" width="120" height="120" fill="#2fa86b"/>
+    <rect x="200" y="20" width="80" height="80" rx="16" fill="#fbf3e0"/>
+    <circle cx="222" cy="42" r="11" fill="#2fa86b"/>
+    <circle cx="258" cy="42" r="11" fill="#2fa86b"/>
+    <circle cx="222" cy="78" r="11" fill="#2fa86b"/>
+    <circle cx="258" cy="78" r="11" fill="#2fa86b"/>
+    <rect x="180" y="180" width="120" height="120" fill="#f4c430"/>
+    <rect x="200" y="200" width="80" height="80" rx="16" fill="#fbf3e0"/>
+    <circle cx="222" cy="222" r="11" fill="#f4c430"/>
+    <circle cx="258" cy="222" r="11" fill="#f4c430"/>
+    <circle cx="222" cy="258" r="11" fill="#f4c430"/>
+    <circle cx="258" cy="258" r="11" fill="#f4c430"/>
+    <rect x="0" y="180" width="120" height="120" fill="#3b7be0"/>
+    <rect x="20" y="200" width="80" height="80" rx="16" fill="#fbf3e0"/>
+    <circle cx="42" cy="222" r="11" fill="#3b7be0"/>
+    <circle cx="78" cy="222" r="11" fill="#3b7be0"/>
+    <circle cx="42" cy="258" r="11" fill="#3b7be0"/>
+    <circle cx="78" cy="258" r="11" fill="#3b7be0"/>
+    <rect x="20" y="140" width="100" height="20" fill="#e5484d"/>
+    <rect x="20" y="120" width="20" height="20" fill="#e5484d"/>
+    <rect x="140" y="20" width="20" height="100" fill="#2fa86b"/>
+    <rect x="160" y="20" width="20" height="20" fill="#2fa86b"/>
+    <rect x="180" y="140" width="100" height="20" fill="#f4c430"/>
+    <rect x="260" y="160" width="20" height="20" fill="#f4c430"/>
+    <rect x="140" y="180" width="20" height="100" fill="#3b7be0"/>
+    <rect x="120" y="260" width="20" height="20" fill="#3b7be0"/>
+    <path d="M0 140H120M180 140H300M140 0V120M140 180V300M0 160H120M180 160H300M160 0V120M160 180V300M20 120V180M200 120V180M120 20H180M120 200H180M40 120V180M220 120V180M120 40H180M120 220H180M60 120V180M240 120V180M120 60H180M120 240H180M80 120V180M260 120V180M120 80H180M120 260H180M100 120V180M280 120V180M120 100H180M120 280H180M0 120H120M0 180H120M180 120H300M180 180H300M120 0V120M180 0V120M120 180V300M180 180V300" stroke="#e3d3b0" stroke-width="1.6" fill="none"/>
+    <path d="M120 120L150 150L120 180Z" fill="#e5484d"/>
+    <path d="M120 120L180 120L150 150Z" fill="#2fa86b"/>
+    <path d="M180 120L180 180L150 150Z" fill="#f4c430"/>
+    <path d="M120 180L150 150L180 180Z" fill="#3b7be0"/>
+    <rect width="300" height="300" fill="url(#sheenf)"/>
+  </g>
+  <rect x="1.5" y="1.5" width="297" height="297" rx="28.5" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3"/>
+  <g transform="translate(212 212) rotate(-14)">
+    <rect x="-50" y="-44" width="112" height="112" rx="26" fill="#000000" opacity="0.30"/>
+    <rect x="-56" y="-52" width="112" height="112" rx="26" fill="#c9bca2"/>
+    <rect x="-56" y="-58" width="112" height="112" rx="26" fill="url(#facef)"/>
+    <rect x="-46" y="-52" width="92" height="40" rx="18" fill="url(#glossf)" opacity="0.85"/>
+    <g transform="translate(0 -2)"><circle cx="-26" cy="-30" r="10.5" fill="url(#pipf)"/><circle cx="-26" cy="0" r="10.5" fill="url(#pipf)"/><circle cx="-26" cy="30" r="10.5" fill="url(#pipf)"/><circle cx="26" cy="-30" r="10.5" fill="url(#pipf)"/><circle cx="26" cy="0" r="10.5" fill="url(#pipf)"/><circle cx="26" cy="30" r="10.5" fill="url(#pipf)"/></g>
+  </g>
+</g>
+</svg>

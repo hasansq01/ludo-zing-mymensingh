@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="798" viewBox="0 0 320 266"><defs>
+    <linearGradient id="lgGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6b0"/><stop offset=".45" stop-color="#ffd23a"/><stop offset="1" stop-color="#f08c00"/></linearGradient>
+    <linearGradient id="lgRibbon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5a5a"/><stop offset="1" stop-color="#c3141b"/></linearGradient>
+    <radialGradient id="lgBubble" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9e4dc"/></radialGradient>
+    <linearGradient id="lgCrown" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3a0"/><stop offset="1" stop-color="#f2a000"/></linearGradient>
+  </defs>
+    <!-- mini board platform with pawns -->
+    <g transform="translate(0 14)">
+    <g>
+      <polygon points="30,206 160,180 290,206 160,236" fill="#8a2a1e" transform="translate(0 9)"/>
+      <polygon points="30,206 160,180 160,206" fill="#e5484d"/>
+      <polygon points="160,180 290,206 160,206" fill="#2fa86b"/>
+      <polygon points="290,206 160,236 160,206" fill="#f4c430"/>
+      <polygon points="160,236 30,206 160,206" fill="#3b7be0"/>
+      <polygon points="30,206 160,180 290,206 160,236" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      <polygon points="116,206 160,197 204,206 160,215" fill="#fff8ec"/>
+    </g>
+    <!-- pawns on the board -->
+    <g transform="translate(66 214)"><ellipse rx="13" ry="4" fill="#000000" fill-opacity="0.25"/><path d="M-11 0h22l-4-9h-14z" fill="#1f8a52"/><path d="M-7 -9l3-17h8l3 17z" fill="#2fa86b"/><circle cy="-31" r="9" fill="#2fa86b"/><circle cx="-3" cy="-34" r="3" fill="#8fe0b4"/></g>
+    <g transform="translate(256 212)"><ellipse rx="13" ry="4" fill="#000000" fill-opacity="0.25"/><path d="M-11 0h22l-4-9h-14z" fill="#b8282d"/><path d="M-7 -9l3-17h8l3 17z" fill="#e5484d"/><circle cy="-31" r="9" fill="#e5484d"/><circle cx="-3" cy="-34" r="3" fill="#ffaaa8"/></g>
+    <g transform="translate(118 244)"><ellipse rx="12" ry="4" fill="#000000" fill-opacity="0.25"/><path d="M-10 0h20l-4-8h-12z" fill="#2a63bf"/><path d="M-6 -8l3-15h6l3 15z" fill="#3b7be0"/><circle cy="-27" r="8" fill="#3b7be0"/><circle cx="-3" cy="-30" r="2.5" fill="#a9c8ff"/></g>
+
+    </g>
+
+    <!-- dice and crowns -->
+    <g transform="translate(160 6) rotate(-8 0 22)">
+      <polygon points="0,0 20,10 0,20 -20,10" fill="#ff6b6b" stroke="#7a0f12" stroke-width="2" stroke-linejoin="round"/>
+      <polygon points="-20,10 0,20 0,42 -20,32" fill="#d92b2f" stroke="#7a0f12" stroke-width="2" stroke-linejoin="round"/>
+      <polygon points="0,20 20,10 20,32 0,42" fill="#b51d22" stroke="#7a0f12" stroke-width="2" stroke-linejoin="round"/>
+      <ellipse cx="0" cy="10" rx="3.4" ry="2" fill="#fff"/>
+      <circle cx="-14" cy="18" r="2.2" fill="#fff"/><circle cx="-6" cy="34" r="2.2" fill="#fff"/>
+      <circle cx="6" cy="22" r="2.2" fill="#fff"/><circle cx="10" cy="27" r="2.2" fill="#fff"/><circle cx="14" cy="32" r="2.2" fill="#fff"/>
+    </g>
+    <g transform="translate(58 34) rotate(-12)"><path d="M-14 8l-3-17 9 8 8-13 8 13 9-8-3 17z" fill="url(#lgCrown)" stroke="#8a4a00" stroke-width="2.5" stroke-linejoin="round"/><circle cy="2" r="2.6" fill="#e5484d"/></g>
+    <g transform="translate(262 34) rotate(12)"><path d="M-14 8l-3-17 9 8 8-13 8 13 9-8-3 17z" fill="url(#lgCrown)" stroke="#8a4a00" stroke-width="2.5" stroke-linejoin="round"/><circle cy="2" r="2.6" fill="#3b7be0"/></g>
+
+    <!-- LUDO bubbles -->
+    <g font-family="Lilita One, Arial Rounded MT Bold, sans-serif" font-size="34" text-anchor="middle">
+      <g transform="translate(85 74)"><circle r="28" fill="#e5484d"/><circle r="22" fill="url(#lgBubble)"/></g>
+      <g transform="translate(135 70)"><circle r="28" fill="#2fa86b"/><circle r="22" fill="url(#lgBubble)"/></g>
+      <g transform="translate(185 70)"><circle r="28" fill="#f4b400"/><circle r="22" fill="url(#lgBubble)"/></g>
+      <g transform="translate(235 74)"><circle r="28" fill="#3b7be0"/><circle r="22" fill="url(#lgBubble)"/></g>
+    </g>
+
+    <!-- ZING: dark extrusion, outline, gold face -->
+    <g font-family="Lilita One, Arial Rounded MT Bold, sans-serif" font-size="80" text-anchor="middle" letter-spacing="2">
+      
+      
+      
+    </g>
+
+    <!-- MYMENSINGH ribbon -->
+    <g>
+      <path d="M48 176l-16 13 16 13h16v-26z" fill="#9c0f14"/>
+      <path d="M272 176l16 13-16 13h-16v-26z" fill="#9c0f14"/>
+      <path d="M58 172h204l-6 15 6 15H58l6-15z" fill="url(#lgRibbon)" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
+      
+    </g>
+  </svg>

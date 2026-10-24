@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 120 120">
+<!-- Espresso: a dapper little demitasse with a curly moustache (café mascot) -->
+<path d="M60 32C55 26 64 22 59 14" fill="none" stroke="#fff8ec" stroke-width="3.4" stroke-linecap="round" opacity="0.85"/>
+<path d="M72 33C69 29 75 26 72 21" fill="none" stroke="#fff8ec" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+<ellipse cx="60" cy="110" rx="48" ry="9" fill="#461e28" fill-opacity="0.18"/>
+<ellipse cx="60" cy="106" rx="48" ry="10" fill="#e9d6c2"/>
+<ellipse cx="60" cy="104" rx="46" ry="8.6" fill="#fffaf3"/>
+<ellipse cx="60" cy="103" rx="26" ry="4.4" fill="#e9d6c2"/>
+<path d="M90 56C104 54 108 64 104 74C100 82 92 84 86 82" fill="none" stroke="#e9d6c2" stroke-width="9" stroke-linecap="round"/>
+<path d="M90 56C104 54 108 64 104 74C100 82 92 84 86 82" fill="none" stroke="#fffaf3" stroke-width="5" stroke-linecap="round"/>
+<path d="M26 46H94C94 80 84 101 60 101C36 101 26 80 26 46Z" fill="#fffaf3"/>
+<path d="M26 46H40C40 76 46 96 60 101C36 101 26 80 26 46Z" fill="#461e28" fill-opacity="0.1"/>
+<path d="M27.4 62H92.6L92 66H28Z" fill="#e5484d"/>
+<ellipse cx="60" cy="46" rx="34" ry="8.6" fill="#ead8c6"/>
+<ellipse cx="60" cy="46" rx="29.6" ry="6.4" fill="#4a2614"/>
+<ellipse cx="60" cy="46.4" rx="23" ry="4.2" fill="#c98a4a"/>
+<ellipse cx="61" cy="46.6" rx="14" ry="2.4" fill="#e0aa6c"/>
+<path d="M42 72.6Q48 69.6 53 72.4" fill="none" stroke="#3a2230" stroke-width="3" stroke-linecap="round"/>
+<path d="M67 72.4Q72 69.6 78 72.6" fill="none" stroke="#3a2230" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="48" cy="78.4" rx="4" ry="4.4" fill="#3a2230"/>
+<ellipse cx="72" cy="78.4" rx="4" ry="4.4" fill="#3a2230"/>
+<circle cx="49.3" cy="76.6" r="1.4" fill="#ffffff"/>
+<circle cx="73.3" cy="76.6" r="1.4" fill="#ffffff"/>
+<path d="M60 86.4C56 83 49 83.4 46.4 87.4C45 89.6 42.4 89.4 41.6 87.4C41.4 91.8 46.6 93.4 51 91.2C55 89.4 58 88.4 60 89.4C62 88.4 65 89.4 69 91.2C73.4 93.4 78.6 91.8 78.4 87.4C77.6 89.4 75 89.6 73.6 87.4C71 83.4 64 83 60 86.4Z" fill="#3a2230"/>
+<circle cx="38.6" cy="85" r="4.4" fill="#ff8f9b" opacity="0.45"/>
+<circle cx="81.4" cy="85" r="4.4" fill="#ff8f9b" opacity="0.45"/>
+</svg>

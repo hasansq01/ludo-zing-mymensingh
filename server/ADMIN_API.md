@@ -1,0 +1,126 @@
+# Ludo Zing admin console: contract v1
+
+A small "Nakama Console"-style admin for the Cloudflare room server. Served by the same Worker:
+
+- `GET /admin` (and `/admin/*`): the console web app (static files in `server/admin/`, Workers static assets).
+  Every request reaches the Worker first (`run_worker_first: true`); it strips `/admin` and asks the `ASSETS`
+  binding, so `admin/js/app.js` is `/admin/js/app.js`, `/admin` and `/admin/` are `admin/index.html`, an
+  extensionless path that is not a file also gets `index.html`, and nothing in `admin/` is reachable outside
+  `/admin`. Everything in `server/admin/` is public except what `admin/.assetsignore` lists (`dev/`).
+  Console files and API responses carry `Content-Security-Policy: default-src 'self'; script-src 'self';
+  style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';
+  base-uri 'none'; form-action 'self'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (set by
+  the Worker; no `_headers` file); API responses are `Cache-Control: no-store`, HTML `no-cache`.
+- `/admin/api/*`: JSON API, session cookie required (except `login`).
+- Data: Cloudflare **D1** database `ludo-zing-admin` (binding `DB`), migrations in `server/migrations/`.
+  Room Durable Objects write to D1 only on key events (never per game action) to stay inside the free plan
+  (100k row writes / 5M reads per day).
+
+## Auth
+
+- Secret `ADMIN_PASSWORD` (set by the owner: `tools/cf.sh secret put ADMIN_PASSWORD`; locally `.dev.vars`).
+  If it is not set, every `/admin/api/*` call answers `503 {"error":"admin_disabled"}` and the console shows how to
+  set it.
+- `POST /admin/api/login {password}` → `204` + cookie `lz_admin=<exp>.<hmac>` (`exp` in epoch seconds;
+  HMAC-SHA256 over `exp`, base64url, with the key SHA-256("lz-admin-session-v1:" + ADMIN_PASSWORD);
+  `HttpOnly; Secure; SameSite=Strict; Path=/admin; Max-Age=43200`). Wrong password → `401 bad_password`.
+  Login rate limit: 5 **failed** attempts per IP (`CF-Connecting-IP`) per 10 min → `429 rate_limited`, even with
+  the right password (failures are rows in D1 table `login_attempts`). Changing the password invalidates all
+  sessions. (`Secure` cookies work on `http://localhost`, not on a LAN IP over plain http.)
+- `POST /admin/api/logout` → `204`, clears the cookie. `GET /admin/api/me` → `{ok: true}` or `401`.
+- Every state-changing admin call (POST/PUT/PATCH/DELETE, `login` and `logout` included) must send header
+  `X-Admin: 1` (CSRF guard; checked before the session, else `403 csrf`) and is written to `admin_log` (actions:
+  `login`, `logout`, `room.close`, `room.kick`, `player.ban`, `player.unban`, `player.note`, `config.update`;
+  `detail` is JSON).
+
+## D1 schema (migrations/0001_init.sql)
+
+```
+players(pid TEXT PRIMARY KEY, name TEXT, avatar TEXT, frame TEXT, first_seen INTEGER, last_seen INTEGER,
+        rooms INTEGER DEFAULT 0, matches INTEGER DEFAULT 0, wins INTEGER DEFAULT 0,
+        banned INTEGER DEFAULT 0, ban_reason TEXT, note TEXT,
+        last_room TEXT /* code of the latest join: where a ban kicks them */)
+rooms(code TEXT PRIMARY KEY, created_at INTEGER, updated_at INTEGER, host_pid TEXT, host_name TEXT,
+      status TEXT,            -- lobby | playing | over | closed
+      members INTEGER, online INTEGER, settings TEXT /* json {teams, pair_ask} */, closed_reason TEXT)
+matches(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, started_at INTEGER, ended_at INTEGER,
+        players TEXT /* json [{pid, name, color, bot}] */, teams INTEGER, pair_ask INTEGER,
+        winner INTEGER, finished TEXT /* json [colours] */, actions INTEGER,
+        result TEXT /* playing | over | abandoned | closed */)
+events(id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER, level TEXT /* info | warn | error */, kind TEXT,
+       code TEXT, pid TEXT, msg TEXT)
+config(key TEXT PRIMARY KEY, value TEXT)
+admin_log(id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER, ip TEXT, action TEXT, target TEXT, detail TEXT)
+login_attempts(ip TEXT, at INTEGER)                 -- failed logins only
+player_days(day TEXT /* YYYY-MM-DD UTC */, pid TEXT, PRIMARY KEY (day, pid))   -- overview players_active
+```
+Indexes on rooms(status, updated_at), rooms(created_at), matches(started_at), matches(code, started_at),
+events(at), players(last_seen), players(first_seen), login_attempts(ip, at).
+Times are epoch ms. Events, login_attempts and player_days older than 30 days are pruned by a daily Cron Trigger
+(03:17 UTC), which also closes rooms rows still marked live after 3 h without an update whose Durable Object is
+gone (`closed_reason` `gone`, a playing match → `abandoned`).
+
+## What the Room DO writes
+
+- create (`init`) → rooms insert (status lobby). Every rooms write is an upsert of the whole row.
+- member joins / leaves / goes offline or online, host or settings change → rooms.members/online/host/settings
+  update (debounced: at most one write per room per 5 s, plus a final one; a status change is written at once).
+- hello → players upsert (name, avatar, frame, last_seen, last_room; rooms+1 on the first join of a room) and a
+  `player_days` row for today. A reconnect within 60 s of the last upsert of that pid is not written again.
+- start → matches insert (result playing; `players` = every seat, `bot: false`), rooms.status = playing. A match is
+  identified by (code, started_at).
+- over → matches update (ended_at, winner, finished, actions = number of actions, result over),
+  players.matches+1 and last_seen for every seat, wins+1 for the winning colour(s) (teams: both partners) unless
+  that seat left the match; rooms.status = over.
+- room deleted by cleanup → rooms.status = closed, `closed_reason` `stale` (2 h without action) or `empty`
+  (10 min without a connection); a match still playing → result abandoned. Admin close: `closed_reason` = the
+  given reason, a playing match → result closed.
+- errors worth seeing → events: `error` kind `exception` (a handler threw; message + stack), `storage` (a storage
+  write / setAlarm failed), `worker` (the Worker's router threw); `warn` kind `banned` (a banned pid's hello was
+  refused). At most 20 events per room object per minute.
+- D1 failures never break gameplay: writes are fire-and-forget (`ctx.waitUntil`), in order per room, logged to
+  console on failure. The two D1 reads on the gameplay path (ban check on hello, turn timers on start) time out
+  after 2 s and fail open (not banned / default timers).
+
+## Enforcement (read by the server)
+
+- `config.maintenance = "1"`: `POST /v1/rooms` → `503 {"error":"maintenance","msg": <motd or default>}`; existing
+  rooms keep working. The game shows the message.
+- `config.maintenance` is read through a per-isolate cache (10 s for `POST /v1/rooms`, 60 s for `/v1/config`);
+  an admin PUT clears the cache of the isolate that served it.
+- Banned pid: `hello` → `error {code: "banned", msg}` and the socket closes (4003). Checked against D1 on hello
+  (one read; the DO caches per pid for 60 s). A ban also reaches the room in `players.last_room`: that member gets
+  `error banned` + close 4003 and is removed (in a match their seat becomes a bot for good). Unban clears that
+  room's cache; another room may keep refusing the pid for up to 60 s.
+- Turn timers: `config.turn_roll_s`, `turn_choose_s`, `turn_pair_s` (integers, 5–120) override the defaults
+  (15 / 20 / 10) for matches started after the change.
+- Public `GET /v1/config` → `{"motd": "", "maintenance": false}` (cached 60 s) so the game can show a message of
+  the day on Home.
+
+## Admin API
+
+All list endpoints take `limit` (default 50, max 200) and `cursor` (opaque string from the previous page's
+`next`), return `{items: [...], next: string | null}`. Rows are the D1 columns as named in the schema, with the JSON
+text columns parsed (`rooms.settings` → object, `matches.players` / `matches.finished` → arrays); 0/1 flags stay
+integers. Day boundaries (`today`, `days`) are UTC.
+
+| method | path | result |
+|---|---|---|
+| GET | `/admin/api/overview` | `{now, live: {rooms_lobby, rooms_playing, members_online}, today: {rooms, matches, players_active, new_players}, days: [{day: "YYYY-MM-DD", rooms, matches, players_active}] (last 14 days, oldest first), recent_events: [event] (last 10 warn/error), maintenance: bool}` |
+| GET | `/admin/api/rooms?status=&q=` | rooms rows (q: code prefix, case-insensitive, or host name substring), newest (created_at) first |
+| GET | `/admin/api/rooms/:code` | `{now, room: row \| null, live: snapshot \| null, matches: [match] (last 20)}`; `live` comes from the DO: `{code, status, host, created, touched, sockets, members: [{id, pid, name, avatar, frame, online, color}], settings, match: {n, state, seats: [{color, id, name, avatar, frame, bot, online, pid, left}], deadline, started_at} \| null}` (null if the DO no longer exists; `match` is kept after over); 404 if neither exists |
+| POST | `/admin/api/rooms/:code/close` `{reason}` (required, 3–140 chars) | closes every socket (`error not_found` + 4004), deletes the DO's storage, rooms.status = closed → `{ok: true, live: bool}` (live: a room was running) |
+| POST | `/admin/api/rooms/:code/kick` `{member_id}` | that member gets `error {code: "kicked"}` and is removed (in a match: the seat becomes a bot for good), socket closed (4002) → `{ok: true}`; 404 if no such member. `member_id` = `live.members[].id`; `members[].color` −1 = no colour; `match.deadline` 0 = none |
+| GET | `/admin/api/players?q=&banned=1` | players rows (q: name substring, case-insensitive, or pid prefix; banned=0/1), last_seen desc |
+| GET | `/admin/api/players/:pid` | `{player: row, matches: [match] (last 20)}` |
+| POST | `/admin/api/players/:pid/ban` `{reason}` (required, 3–200 chars) / `.../unban` | updates players → `{ok: true, kicked: bool, player}` (unban: `{ok: true, player}`); ban also kicks them from the room of their latest join if they are still in it (best effort); 404 for an unknown pid |
+| PATCH | `/admin/api/players/:pid` `{note}` (string ≤ 500, or null / "" to clear) | updates the note → `{ok: true, player}` |
+| GET | `/admin/api/matches?code=&pid=&result=` | matches rows, newest (id) first |
+| GET | `/admin/api/events?level=&kind=` | events rows, newest first |
+| GET | `/admin/api/config` | `{maintenance: bool, motd: string, turn_roll_s, turn_choose_s, turn_pair_s}` (unset → defaults false, "", 15, 20, 10) |
+| PUT | `/admin/api/config` | same shape (partial ok) → the full config; validated (maintenance bool, motd string ≤ 140 chars, turn_* integers 5–120, unknown fields rejected) |
+| GET | `/admin/api/audit` | admin_log rows, newest first |
+
+Errors: `{error: "<code>", msg?}`: 400 `bad_request` (bad input, bad limit / cursor / filter value), 401
+`unauthorized` (no session) / `bad_password`, 403 `csrf` (missing X-Admin), 404 `not_found`, 405 `method`,
+429 `rate_limited`, 503 `admin_disabled`.

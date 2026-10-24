@@ -85,6 +85,18 @@ Last reviewed: 2026-10-19.
       fonts load, no console errors; welcome, home top bar, Settings and Profile checked at 390x844.
 
 ## In progress
+- [ ] **Godot / Android port** (decided 2026-10-23, see PROJECT_CONTEXT.md):
+  - [x] Step 1: Godot 4.7.2 installed; `godot/` project; Ludo + Snakes & Ladders rules ported as pure modules;
+        272/272 headless checks pass (`tools/godot-test.sh`); planted rule bugs are caught.
+  - [x] Step 2 (2026-10-24): playable Android build. 3D café (five rooms), Ludo board + pawns, Snakes & Ladders 3D
+        board, 3D dice, splash, home, setup, HUDs, pause / win, settings, profile, how to play, sound + music, saves,
+        shop / inventory, daily reward / spin / free coins; Android export pipeline (`tools/android-build.sh`);
+        lighting matched to the web render by pixel sampling; tested on the Android emulator (taps + autoplay soak).
+  - [x] Step 3: online friend rooms for Ludo on Cloudflare Workers + Durable Objects (`server/`, live; tested with
+        unit/parity/room tests, simulated 2–4 player games incl. drop/rejoin on production, and the Android release
+        APK on the emulator against production).
+  - [ ] Step 4: quick match, accounts (Google sign-in) and server-side coins; Snakes & Ladders online.
+  - [ ] Step 5: Play Store release.
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
       be updated (screenshot differs 5.35%, only in the bar region x 12-377, y 9-64; all layout checks and locked
       numbers pass).

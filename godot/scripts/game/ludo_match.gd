@@ -1,0 +1,1161 @@
+class_name LudoMatch
+extends Node
+## Runs one Ludo game: feeds dice rolls and taps to LudoRules, animates the events on the board, plays the
+## computer players and writes the event line (index.html: beginTurn, roll, move, gameOver).
+## All waits count only unpaused time, so computer turns hold while the pause menu is open (and while the tutorial
+## holds a note).
+##
+## Pace (× the speed pref; a tap during a computer's turn fast-forwards ×FF until your next turn):
+##   computer roll wait 0.35 s, computer move wait 0.25 s, your auto-move 0.15 s, pawn step 0.11 s (0.22 s out of
+##   the base), pause after a turn 0.3 s (0.5 s before an extra turn), "no move" / three 6s hold 0.9 s.
+## Moves (Decision 3): every legal unit glows; a tap on any glowing pawn moves its unit (a paired pawn moves the
+## pair). Pairs form by themselves; with the house rule "Ask before pairing" an inline prompt asks (your turn only).
+## The match is saved after every turn (MatchStore) and can be resumed (resume()); save_match() saves it now.
+## The guided first match (Tutorial): start_tutorial(), or start(..., {tutorial = true}); it feeds the dice and
+## narrows the moves through the hooks below (tut.*) and is never saved. While it runs the HUD is in its tutorial
+## mode (a quiet event line: the coach bubble is the one voice) and the game waits while a coach note is held or the
+## skip question is open (tut.holding()).
+##
+## Online (friend rooms, server/PROTOCOL.md): start_online(start_or_sync, net). The server is authoritative and
+## this match is a replica: your dice tap sends `roll`, a pawn tap `move`, the pair prompt `pair` (nothing is
+## applied locally); every `act` from the server (yours, a friend's, a bot's) is queued (NetLudo) and played in
+## order through the same path as offline play (the dice tumble, then LudoRules.apply_roll / move / answer_pair,
+## then _after_roll / _after_move animate the events), faster while acts are waiting. After each act the state
+## hash is checked; a mismatch (or a gap) sends sync_req and the `sync` replaces the state and re-lays the board.
+## No local AI or dice, no pause (the server keeps time), no MatchStore save; the HUD shows the server's turn timer,
+## offline / bot badges, "Reconnecting…" and, when a bot took your seat, the "I’m back" prompt.
+
+signal finished(result: Dictionary)
+## result (ResultScreen-ready): {game "ludo", title, sub, standings [{color, name, kind "you"|"cpu"|"human", cpu_id,
+##   place, finished, progress}], human_won, reward, teams, color (the winner), winners, xp_before, xp_after}
+
+const CPU_ROLL_WAIT := 0.35
+const CPU_MOVE_WAIT := 0.25
+const AUTO_MOVE_WAIT := 0.15
+const AFTER_TURN := 0.3
+const AFTER_EXTRA := 0.5
+const HOLD := 0.9                         # "no move" / three 6s / need a 6
+const FF := 0.35                          # fast-forward factor after a tap during a computer's turn
+const DICE_SEC := 0.75                    # Dice3D.roll's length at speed 1
+const HIT_STOP := 0.08                    # s of stillness when a capture lands (real time)
+const SHAKE_PX := 5.0
+const ELEVATION := 70.0                   # 3D view camera elevation (degrees; TableWorld's default is 62)
+const BOARD_GUTTER := 4.0                 # px kept free at the screen sides in the 3D view (by the coloured
+const BOARD_FIT := 8.0                    # board's corners: half side 7.5 plus a little of the frame, 8.4)
+
+var app: Node                            # main.gd: sheet layer, paused flag, speed
+var board: LudoBoard
+var world: TableWorld
+var hud: LudoHUD
+var S := {}
+var players := []
+var teams := false
+var opts := {}                           # {bot_level, pair_ask}
+var _id := 0
+var _busy := false                       # an animation or prompt is running: ignore taps and dice
+var rng := RandomNumberGenerator.new()
+var autoplay := false                   # debug builds only (user://autoplay.txt): humans play like computers
+var save_matches := true                 # MatchStore after every turn (off for autoplay / previews)
+var _ff := 1.0
+var _view := {on = false, zoom = 1.0, y = 0.0}   # the 3D view framing for this screen size
+var _view_key := ""
+var _shake_tw: Tween
+var tut: Tutorial                        # the guided first match while it runs (null otherwise)
+# online (start_online)
+const NET_CATCHUP := 0.45                 # pace while server acts are queued behind the one playing
+const NET_XP_WIN := 100                   # online games give XP, no coins (the economy stays offline for now)
+const NET_XP_PLAY := 40
+var online := false
+var net: Object                           # NetClient (anything with send_msg(Dictionary) -> bool)
+var ns: NetLudo
+var _net_pumping := false
+var _net_info := {}                       # the move's info, kept for the pair answer that follows it
+var _net_sent := -1                       # n of our last request (one request per step: no double taps)
+var _net_prompt := -1                     # n the pair prompt was opened at (-1: none)
+var _ended := false
+var _net_ready := false                   # the board is up: queued acts may play
+
+## Old callers (device tests): true when tap points are printed. Use TapLog.enabled().
+static func tap_log() -> bool:
+	return TapLog.enabled()
+
+func _init(app_: Node, world_: TableWorld, hud_: LudoHUD) -> void:
+	app = app_
+	world = world_
+	board = world_.board
+	hud = hud_
+
+func _ready() -> void:
+	rng.randomize()
+	hud.dice_pressed.connect(_on_dice)
+	if hud.has_signal("away_pressed"):
+		hud.away_pressed.connect(_net_back)
+
+## A dice tap counts only on a human's turn, while nothing is animating and no sheet is open.
+func _on_dice() -> void:
+	if S.is_empty() or S.phase != "roll" or _busy or autoplay or app.paused or _sheet_open():
+		return
+	if not LudoRules.is_human(S, S.turn) or (online and not ns.my_turn()):
+		return
+	roll()
+
+## Colour c is you (online: your seat; offline: the only human at the table).
+func _you(c: int) -> bool:
+	return NetLudo.you(S, c)
+
+## Loud sounds and haptics for this colour's actions (offline: humans; online: you).
+func _loud(c: int) -> bool:
+	return c == ns.me if online else LudoRules.is_human(S, c)
+
+func _sheet_open() -> bool:
+	return app.has_method("_top_sheet") and app._top_sheet() != null
+
+func live(id: int) -> bool:
+	return id == _id and not S.is_empty() and is_inside_tree()
+
+func _speed() -> float:
+	return float(app.speed) * _ff
+
+## Seconds of unpaused time, scaled by the game speed (and the fast-forward).
+func wait(sec: float) -> void:
+	var left: float = sec * _speed()
+	while left > 0.0 and is_inside_tree():
+		await get_tree().process_frame
+		if (online or not app.paused) and not _held():   # online the server keeps time: no pause
+			left -= get_process_delta_time()
+
+## The board walk's hold (offline: the pause menu holds pawns mid-walk).
+func _holding() -> bool:
+	return app.paused and not online
+
+## The tutorial holds the game (a coach note to read, the skip question).
+func _held() -> bool:
+	return tut != null and is_instance_valid(tut) and tut.holding()
+
+## A new game. opts: {bot_level ("easy" | "normal" | "hard"), pair_ask} (default: the Settings prefs);
+## {tutorial = true (, then = "cpu" | "local")}: the guided first match instead (start_tutorial).
+func start(players_: Array, teams_ := false, opts_ := {}) -> void:
+	if bool(opts_.get("tutorial", false)):
+		await start_tutorial(str(opts_.get("then", "cpu")))
+		return
+	_end_tutorial()
+	_offline()
+	hud.tutorial = false
+	opts = {
+		bot_level = str(opts_.get("bot_level", Save.prefs.get("bot_level", "normal"))),
+		pair_ask = bool(opts_.get("pair_ask", Save.prefs.get("pair_ask", true))),
+	}
+	players = players_.duplicate()
+	var s := LudoRules.new_game(players, teams_, {pair_ask = opts.pair_ask})
+	var nm: Variant = opts_.get("names")                 # Pass & Play: the names typed in setup, by colour
+	if nm is Array and (nm as Array).size() == 4 and players.count("human") > 1:
+		for c in 4:
+			if players[c] == "human" and str(nm[c]) != "":
+				s.names[c] = str(nm[c])
+	await _open(s, true)
+
+## The guided first match (Tutorial): you vs one Easy computer on a staged board with scripted dice and coach
+## marks. `then`: where "Play a real game" leads afterwards ("cpu": a game vs the computer; "local": the Pass &
+## Play setup).
+func start_tutorial(then := "cpu") -> void:
+	_end_tutorial()
+	_offline()
+	opts = {bot_level = "easy", pair_ask = false, then = then}
+	players = Tutorial.PLAYERS.duplicate()
+	hud.tutorial = true
+	tut = Tutorial.new(self)
+	add_child(tut)
+	tut.attach(hud)
+	await _open(Tutorial.new_state(), true)
+
+## The tutorial's way out: "play" (a real game) or "home". Uses main's start_ludo / setup / go_home when there.
+func tutorial_exit(what: String) -> void:
+	var then := str(opts.get("then", "cpu"))
+	_end_tutorial()
+	if what == "home":
+		if app.has_method("go_home"):
+			app.go_home()
+		else:
+			stop()
+		return
+	if then == "local" and app.has_method("_open_setup"):
+		if app.has_method("go_home"):
+			app.go_home()
+		app.call("_open_setup", "ludo", "local")
+		return
+	var cfg := {game = "ludo", players = ["human", "cpu", "cpu", "cpu"], teams = false,
+		bot_level = str(Save.prefs.get("bot_level", "normal"))}
+	if app.has_method("setup_config"):
+		var all: Variant = Save.prefs.get("last_setup", {})
+		var per: Variant = (all as Dictionary).get("ludo", {}) if all is Dictionary else {}
+		var d: Variant = (per as Dictionary).get("cpu", {}) if per is Dictionary else {}
+		cfg = app.call("setup_config", "ludo", "cpu", d if d is Dictionary else {})
+	if app.has_method("start_ludo"):
+		app.call("start_ludo", cfg)
+	else:
+		stop()
+		start(cfg.players, bool(cfg.teams), {bot_level = cfg.bot_level})
+
+func _end_tutorial() -> void:
+	if tut:
+		tut.cancel()
+		tut.queue_free()
+	tut = null
+	if hud:
+		hud.tutorial = false
+		hud.coach = null
+
+## Continues a saved match (MatchStore.load()): {S, players, teams, opts}, or a bare rules state.
+func resume(state: Dictionary) -> void:
+	_end_tutorial()
+	_offline()
+	hud.tutorial = false
+	var s: Dictionary = state.get("S", state)
+	if s.is_empty() or not s.has("tok") or s.get("phase", "") == "over":
+		MatchStore.clear("ludo")
+		return
+	s = MatchStore.ints(s)
+	players = state.get("players", s.players).duplicate()
+	var o: Dictionary = state.get("opts", {})
+	opts = {bot_level = str(o.get("bot_level", Save.prefs.get("bot_level", "normal"))), pair_ask = bool(s.get("pair_ask", false))}
+	if not s.has("finished"):
+		s.finished = []
+	await _open(s, false)
+
+func _open(s: Dictionary, fresh: bool) -> void:
+	_id += 1
+	var id := _id
+	_net_prompt = -1
+	hud.cancel_pair()
+	S = s
+	teams = S.teams
+	_ff = 1.0
+	_ended = false
+	_busy = true                             # nothing is tappable until the first turn begins
+	board.cancel_all()
+	board.speed = _speed()
+	board.set_movable([])
+	board.relayout(S)
+	hud.setup(S)
+	hud.dice.set_active(false)
+	_view_key = ""
+	_frame_view(true)
+	world.view_game(S.view, Save.prefs.cam == "top")
+	_apply_view()
+	if S.teams and fresh:
+		hud.say("Teams: Red + Yellow vs Green + Blue", 2.2, "info")
+		await wait(1.0)
+		if not live(id):
+			return
+	if online:
+		_net_open(id)
+		return
+	match str(S.phase):
+		"choose", "pick":                    # (matches are saved at the start of a turn; older states may differ)
+			S.phase = "choose"
+			S.pick = ""
+			_busy = false
+			hud.update(S, S.turn)
+			await _choose(id, S.turn)
+		"pair_ask":                          # the move is kept; the pawns stay single
+			await _after_move(id, S.turn, LudoRules.answer_pair(S, false), {})
+		_:
+			S.phase = "roll"
+			_begin_turn()
+
+## Leaving the game (main: Home, a new game): the saved match goes too.
+func stop() -> void:
+	if not S.is_empty() and tut == null and not online:
+		MatchStore.clear("ludo")
+	_end_tutorial()
+	_offline()
+	_id += 1
+	S = {}
+	_busy = false
+	_ff = 1.0
+	hud.cancel_pair()
+	board.cancel_all()
+	board.set_movable([])
+
+# ---------- the 3D view framing ----------
+
+## The 3D view (not Top View): a more top-down camera (ELEVATION) with the board's corners BOARD_GUTTER px from
+## the screen sides, centred in the band between the tile rows and clear of the tiles. Applied every frame, so it
+## also holds when Settings switches the camera back from Top View.
+func _process(_d: float) -> void:
+	if S.is_empty():
+		return
+	_frame_view(false)
+	_apply_view()
+
+func _apply_view() -> void:
+	if not _view.on or Save.prefs.cam == "top" or world.orbit:
+		return
+	world.cam_target_el = deg_to_rad(ELEVATION)
+	world.cam_target_zoom = _view.zoom
+	world.view_target_y = _view.y
+
+func _frame_view(force: bool) -> void:
+	var vp := world.get_viewport().get_visible_rect().size
+	var key := "%d:%d:%d:%d" % [int(vp.x), int(vp.y), int(hud.safe_top), int(S.get("view", 0))]
+	if key == _view_key and not force:
+		return
+	_view_key = key
+	var band := hud.board_band()
+	world.top_band = band.size.y
+	if band.size.y <= 0:
+		_view.on = false
+		return
+	var cam := world.camera
+	var saved := [world.cam_az, world.cam_el, world.cam_zoom, world.cam_roll, world.view_y]
+	var seat := TableWorld.seat_az(int(S.view))
+	world.cam_az = seat
+	world.cam_el = deg_to_rad(ELEVATION)
+	world.cam_roll = 0.0
+	var rects: Array = hud.tile_rects()
+	var fits := func(zoom: float) -> Array:   # [fits, view_y]
+		world.cam_zoom = zoom
+		world.view_y = 0.0
+		world._update_camera(true)
+		var bb := _board_box(cam)
+		var c := Vector3(0, LudoBoard.TOP, 0)
+		var ppu := (cam.unproject_position(c) - cam.unproject_position(c + cam.global_transform.basis.y)).length()
+		var vy := ((band.position.y + band.size.y / 2.0) - bb.get_center().y) / maxf(ppu, 0.001)
+		world.view_y = vy
+		world._update_camera(true)
+		bb = _board_box(cam)
+		var ok := bb.position.x >= BOARD_GUTTER and bb.end.x <= vp.x - BOARD_GUTTER and bb.size.y <= band.size.y + 60.0
+		if ok:
+			for p in _board_outline(cam):
+				for r: Rect2 in rects:
+					if r.has_point(p):
+						ok = false
+		return [ok, vy]
+	var lo := 0.6
+	var hi := 2.2
+	for it in 22:
+		var mid := (lo + hi) / 2.0
+		if fits.call(mid)[0]:
+			hi = mid
+		else:
+			lo = mid
+	var res: Array = fits.call(hi)
+	_view = {on = true, zoom = hi, y = res[1]}
+	world.cam_az = saved[0]; world.cam_el = saved[1]; world.cam_zoom = saved[2]; world.cam_roll = saved[3]; world.view_y = saved[4]
+	world._update_camera(true)
+
+## Screen box of the board (half side BOARD_FIT) as the camera sees it now.
+func _board_box(cam: Camera3D) -> Rect2:
+	var r := Rect2()
+	var pts := _board_outline(cam)
+	for k in pts.size():
+		r = Rect2(pts[k], Vector2.ZERO) if k == 0 else r.expand(pts[k])
+	return r
+
+func _board_outline(cam: Camera3D) -> Array:
+	var out := []
+	var h := BOARD_FIT
+	var corners := [Vector3(-h, 0, -h), Vector3(h, 0, -h), Vector3(h, 0, h), Vector3(-h, 0, h)]
+	for k in 4:
+		var a: Vector3 = corners[k]
+		var b: Vector3 = corners[(k + 1) % 4]
+		for j in 12:
+			out.append(cam.unproject_position(a.lerp(b, j / 12.0) + Vector3(0, LudoBoard.TOP, 0)))
+	return out
+
+# ---------- turns ----------
+
+## A turn this device plays by itself (a computer, or autoplay). Never online: the server plays bots.
+func _cpu_turn(c: int) -> bool:
+	if online:
+		return false
+	return not LudoRules.is_human(S, c) or autoplay
+
+## The idle line for the current phase, so the bar never shows stale text.
+func _idle_line() -> void:
+	if S.is_empty() or S.phase == "over":
+		return
+	var c: int = S.turn
+	if online and not ns.my_turn():
+		hud.idle(_net_wait_line(c))
+		return
+	if _cpu_turn(c) and not autoplay:
+		hud.idle("[b]%s[/b] is thinking…" % LudoRules.pname(S, c))
+		return
+	var you := _you(c)
+	match str(S.phase):
+		"roll":
+			if LudoRules.waiting_six(S, c):
+				hud.idle(("Roll a 6 to help " if you else "[b]%s[/b]: roll a 6 to help " % LudoRules.pname(S, c)) + _name_of(LudoRules.mate_of(c)))
+			elif you:
+				hud.idle("Your turn — tap the dice")
+			else:
+				hud.idle("[b]%s[/b]’s turn — tap the dice" % LudoRules.pname(S, c))
+		"choose":
+			hud.idle("Tap a glowing pawn")
+		"pair_ask":
+			hud.idle("")                     # the inline prompt asks the question itself
+		_:
+			hud.idle("")
+
+func _name_of(c: int) -> String:
+	return GameTopBar.who(LudoRules.pname(S, c), c)
+
+func _begin_turn() -> void:
+	var id := _id
+	var c: int = S.turn
+	_busy = false
+	if LudoRules.is_human(S, c) and not autoplay and not online:
+		_ff = 1.0                            # your turn: back to the normal pace
+	board.speed = _speed()
+	board.set_movable([])
+	hud.update(S, c)
+	_idle_line()
+	if online:
+		return                               # the server says who rolls; nothing is played here
+	_save()
+	if tut and tut.on_turn(c):
+		return                               # the tutorial's closing card holds the turn
+	if _cpu_turn(c):
+		await wait(CPU_ROLL_WAIT)
+		if live(id) and S.phase == "roll":
+			roll()
+
+## Roll the dice for the player whose turn it is (the human's dice tap, or a computer turn).
+func roll(forced := 0) -> void:
+	if S.is_empty() or S.phase != "roll" or _busy or app.paused:
+		return
+	if online:
+		_net_request("roll")                 # the server rolls; its act plays the dice (_net_act)
+		return
+	var id := _id
+	var c: int = S.turn
+	_busy = true
+	hud.dice.set_active(false)
+	if forced <= 0 and tut:
+		forced = tut.roll_for(c)
+		tut.on_rolled(c)
+	var v := forced if forced > 0 else rng.randi_range(1, 6)
+	await _tumble(c, v)
+	if not live(id):
+		return
+	var ev := LudoRules.apply_roll(S, v)
+	await _after_roll(id, c, v, ev)   # stays busy until the next turn begins or a human has to choose
+
+## The dice tumble to v for colour c (sound, a haptic on loud rolls).
+func _tumble(c: int, v: int) -> void:
+	var soft := not _loud(c)
+	var k := _speed()
+	var dur := DICE_SEC * maxf(k, 0.05)
+	Sound.sfx("roll", {dur = dur, soft = soft})
+	if not soft:
+		get_tree().create_timer(dur * Sound.IMPACT_AT).timeout.connect(func(): Haptics.light())
+	await hud.dice.roll(v, k)
+
+func _after_roll(id: int, c: int, v: int, ev: Array) -> void:
+	var soft := not _loud(c)
+	var you := _you(c)
+	var who := "You" if you else "[b]%s[/b]" % LudoRules.pname(S, c)
+	for e in ev:
+		match e.type:
+			"three_sixes":
+				Sound.sfx("error", {soft = soft})
+				if _loud(c):
+					Haptics.error()
+				hud.say("%s rolled three 6s. Turn lost." % who, HOLD * 2.0, "event")
+				await wait(HOLD)
+			"need_six":
+				hud.say("%s %s a 6 to help %s." % [who, "need" if you else "needs", _name_of(LudoRules.mate_of(c))], HOLD * 2.0)
+				await wait(HOLD)
+			"free_hand":
+				print("[ludo] free hand: %s now moves %s" % [LudoRules.pname(S, c), LudoRules.pname(S, e.mate)])
+				Sound.sfx("six", {soft = soft})
+				hud.say("Six! %s now %s %s." % [who, "move" if you else "moves", _name_of(e.mate)], 2.0, "event")
+			"stuck":
+				hud.say("%s rolled %d. %s" % [who, v, e.reason], HOLD * 2.0)
+				await wait(HOLD)
+			"turn":
+				if live(id):
+					_begin_turn()
+				return
+			"pick", "choose":
+				if v == 6:
+					Sound.sfx("six", {soft = soft})
+				await _choose(id, c)
+				return
+		if not live(id):
+			return
+
+## Phase "choose": computers pick a move; for you every legal unit glows (or the only sensible move goes by itself).
+func _choose(id: int, c: int) -> void:
+	var mc := LudoRules.mover_of(S, c)
+	_busy = false                            # move() takes over; dice taps stay ignored (phase "choose")
+	if _cpu_turn(c):
+		_idle_line()
+		await wait(CPU_MOVE_WAIT)
+		if live(id) and S.phase == "choose":
+			await move(LudoRules.pick_ai(S, LudoRules.units(S).map(func(u): return u.token), rng, opts.get("bot_level", "normal") if not LudoRules.is_human(S, c) else "normal"))
+		return
+	if online and not ns.my_turn():
+		_idle_line()                         # someone else chooses: their move comes from the server
+		return
+	var only: Array = tut.allowed(c) if tut else []
+	if not only.is_empty():                  # the tutorial: just the lesson's pawn glows (no auto-move)
+		board.set_movable(only.map(func(j): return mc * 4 + j), mc)
+		_idle_line()
+		return
+	var auto := LudoRules.auto_move_token(S)
+	if auto >= 0:
+		await wait(AUTO_MOVE_WAIT)
+		if live(id) and S.phase == "choose":
+			await move(auto)
+		return
+	var keys := []
+	for u in LudoRules.units(S):
+		for j in u.tokens:
+			keys.append(mc * 4 + j)
+	board.set_movable(keys, mc)
+	_idle_line()
+	if TapLog.enabled():                     # device tests: where to tap, in screen pixels
+		for key in keys:
+			TapLog.point(board.pawn_target(key), world.camera)
+
+## The human answered the old Single / Pair question (legacy; the step no longer appears).
+func choose_pick(kind: String) -> void:
+	if S.is_empty() or _busy or app.paused or not LudoRules.choose_pick(S, kind):
+		return
+	await _choose(_id, S.turn)
+
+## A tap on the board: move the tapped glowing pawn's unit. During a computer's turn: fast-forward. A miss on your
+## turn: "Tap a glowing pawn", an error buzz, and the glowing pawns pulse once.
+func tap(screen_pos: Vector2) -> bool:
+	if S.is_empty() or app.paused or _sheet_open() or S.phase == "over":
+		return false
+	if online and (not ns.my_turn() or _net_sent == ns.n):
+		return false                         # not your move (or already sent): nothing to fast-forward online
+	if _cpu_turn(S.turn) and not autoplay:
+		if _ff > FF:
+			_ff = FF
+			board.speed = _speed()
+		return true
+	if S.phase != "choose" or _busy or autoplay:
+		return false
+	var mc := LudoRules.mover_of(S, S.turn)
+	var key := board.pick(world.camera, screen_pos)
+	if key >= 0 and key / 4 == mc and board.movable.has(key):
+		var u := LudoRules.unit_for_token(S, key % 4)
+		if not u.is_empty():
+			move(int(u.token))
+			return true
+	var own := board.pick_any(world.camera, screen_pos, mc)
+	if own >= 0:
+		hud.say("That pawn can’t move with a %d." % int(S.dice), 1.4)
+	else:
+		hud.say("Tap a glowing pawn", 1.2)
+	Haptics.error()
+	Sound.sfx("tap")
+	board.pulse_movable()
+	return true
+
+## Move token i of the player whose pawns the roll moves; animates every event the rules return.
+func move(i: int) -> void:
+	if S.is_empty() or _busy or i < 0:
+		return
+	if online:
+		if ns.my_turn() and S.phase == "choose":
+			board.set_movable([])
+			_net_request("move", {i = i})    # the server's act moves the pawn (_net_act)
+		return
+	var id := _id
+	var roller: int = S.turn
+	var ev := LudoRules.move(S, i)
+	if ev.is_empty():
+		return
+	if tut:
+		tut.on_moved(roller)
+	_busy = true
+	board.set_movable([])
+	await _after_move(id, roller, ev, {})
+
+func _after_move(id: int, roller: int, ev: Array, info: Dictionary) -> void:
+	_busy = true
+	var soft := not _loud(roller)
+	var you := _you(roller)
+	var human := _loud(roller)
+	var k := 0
+	while k < ev.size():
+		var e: Dictionary = ev[k]
+		k += 1
+		match e.type:
+			"move":
+				info.to = e.to
+				info.pair = e.pair
+				info.c = e.c
+				board.speed = _speed()
+				await board.walk(e.c, e.tokens, e.from, e.to, e.pair, func(_q): Sound.sfx("step", {soft = soft}), _holding)
+			"capture":
+				info.victims = e.victims
+				await _capture(e.c, e.victims, soft, roller)
+			"split":
+				info.split = "in the home lane" if e.where == "lane" else "on the start square"
+				Sound.sfx("split", {soft = soft})
+			"pair_offer":
+				board.relayout(S)
+				hud.update(S, roller)
+				_idle_line()
+				if online:                   # the answer is a request; the server's `pair` act plays it
+					_busy = false
+					if ns.my_turn():
+						_net_pair_prompt()
+					return
+				var yes := await _ask_pair()
+				if not live(id):
+					return
+				ev.append_array(LudoRules.answer_pair(S, yes))
+			"pair_formed":
+				print("[ludo] pair formed: %s" % LudoRules.pname(S, e.c))
+				info.paired = true
+				Sound.sfx("pair", {soft = soft})
+				board.relayout(S)
+				board.link_glow(LudoBoard.to_world(LudoBoard.grid_of(e.c, S.tok[e.c][e.a], e.a)))
+				if human:
+					Haptics.light()
+				if e.human and tut == null and (not online or roller == ns.me):
+					Save.profile.stats.pairsFormed += 1
+					Save.save()
+				if tut:
+					tut.on_event(e)
+			"home":
+				info.home = true
+				Sound.sfx("home", {soft = soft})
+				var at := LudoBoard.to_world(LudoBoard.grid_of(e.c, LudoRules.GOAL, 0))
+				board.home_burst(at, Palette.PLAYER[e.c])
+				hud.pop("Home!", _screen(at + Vector3(0, 1.2, 0)), Palette.HONEY, 30, true)
+				hud.update(S, roller)
+				hud.bump_tile(e.c)
+				if human:
+					Haptics.success()
+			"finished":
+				info.finished = e.c
+			"game_over":
+				board.relayout(S)
+				hud.update(S, S.winner)
+				_busy = false
+				_game_over()
+				return
+			"turn":
+				board.relayout(S)
+				var extra: bool = e.again
+				_turn_message(roller, info, extra)
+				await wait(AFTER_EXTRA if extra else AFTER_TURN)
+				if live(id):
+					_begin_turn()
+				return
+		if not live(id):
+			return
+	_busy = false
+
+## The capture moment: hit-stop, a puff of the victim's colour, a small shake, the victim arcs home, "+1 roll".
+func _capture(c: int, victims: Array, soft: bool, roller: int) -> void:
+	var id := _id
+	var at: Vector3 = board.toks[victims[0][0]][victims[0][1]].node.position
+	await get_tree().create_timer(HIT_STOP).timeout        # hit-stop: real time, not scaled
+	if not live(id):
+		return
+	Sound.sfx("capture", {soft = soft})
+	var hit_you := victims.any(func(v): return _you(v[0]))
+	if _loud(roller) or hit_you:
+		Haptics.medium()
+	_shake()
+	hud.pop("+1 roll", _screen(at + Vector3(0, 1.3, 0)), Palette.HONEY, 28, true)
+	await board.send_home(victims)
+
+func _shake() -> void:
+	if PlayerTile._pref("reduce_motion"):
+		return
+	var cam := world.camera
+	var c := Vector3(0, LudoBoard.TOP, 0)
+	var ppu := (cam.unproject_position(c) - cam.unproject_position(c + cam.global_transform.basis.x)).length()
+	var amp := SHAKE_PX / maxf(ppu, 0.001)
+	if _shake_tw:
+		_shake_tw.kill()
+	_shake_tw = create_tween()
+	_shake_tw.tween_method(func(k: float):
+		cam.h_offset = sin(k * TAU * 4.0) * amp * (1.0 - k), 0.0, 1.0, 0.2)
+	_shake_tw.tween_callback(func(): cam.h_offset = 0.0)
+
+func _screen(p: Vector3) -> Vector2:
+	return world.camera.unproject_position(p)
+
+## One message for the whole move, readable until the next roll (CL-07).
+func _turn_message(roller: int, info: Dictionary, extra: bool) -> void:
+	var c: int = info.get("c", roller)
+	var you := _you(roller)
+	var who := "You" if you else "[b]%s[/b]" % LudoRules.pname(S, roller)
+	var again := " Roll again." if you or (LudoRules.is_human(S, roller) and not online) else ""
+	var msg := ""
+	var kind := "event"
+	var victims: Array = info.get("victims", [])
+	if victims.size() == 2:
+		var vc: int = victims[0][0]
+		if you:
+			msg = "You broke a pair!%s" % again
+		elif _you(vc):
+			msg = "%s broke your pair!" % who
+		else:
+			msg = "%s broke %s pair!" % [who, _poss_tinted(vc)]
+	elif victims.size() == 1:
+		var vc: int = victims[0][0]
+		if you:
+			msg = "You captured a pawn!%s" % again
+		elif _you(vc):
+			msg = "%s captured your pawn!" % who
+		else:
+			msg = "%s captured %s pawn!" % [who, _poss_tinted(vc)]
+	elif info.has("finished"):
+		var f: int = info.finished
+		if _you(f):
+			msg = "All four home! Roll a 6 to help %s." % _name_of(LudoRules.mate_of(f))
+		else:
+			msg = "%s is done! A 6 lets them help %s." % [_name_of(f), _name_of(LudoRules.mate_of(f))]
+	elif info.get("home", false):
+		var what := "Pair" if info.get("pair", false) else "Pawn"
+		msg = ("%s home!%s" % [what, again]) if you or again != "" else "%s got a %s home!" % [who, what.to_lower()]
+	elif info.get("paired", false):
+		msg = "%s made a pair.%s" % [who, again if extra else ""]
+		kind = "info"
+	elif info.has("split"):
+		msg = "%s pair split %s.%s" % ["Your" if _you(c) else "[b]%s[/b]’s" % LudoRules.pname(S, c), info.split, again if extra else ""]
+		kind = "info"
+	elif extra:
+		msg = "Six! Roll again." if (you or (LudoRules.is_human(S, roller) and not online)) else "Six! %s rolls again." % who
+		hud.turn_pop("+1 roll", Palette.HONEY, 26)
+	if msg != "":
+		hud.say(msg, 2.2 if kind == "event" else 1.6, kind)
+
+## "Mocha’s" / "your" in the victim's own colour.
+func _poss_tinted(c: int) -> String:
+	if _you(c):
+		return "your"
+	return "[b][color=#%s]%s[/color][/b]’s" % [PlayerTile.name_color(c).to_html(false), LudoRules.pname(S, c)]
+
+## House rule "Ask before pairing": the inline prompt (your own turn only). Autoplay answers at random.
+func _ask_pair() -> bool:
+	if autoplay:
+		return rng.randf() < 0.6
+	if TapLog.enabled():
+		_log_pair_button.call_deferred()
+	var yes := await hud.ask_pair()
+	_idle_line()
+	return yes
+
+func _log_pair_button() -> void:
+	await get_tree().process_frame
+	if hud.pair_box.visible:
+		TapLog.point(hud.pair_yes)
+
+# ---------- saving ----------
+
+## Saves the live match now (main: the app goes to the background). Never the tutorial.
+func save_match() -> void:
+	_save()
+
+func _save() -> void:
+	if not save_matches or autoplay or online or S.is_empty() or S.phase == "over" or tut != null:
+		return
+	MatchStore.save("ludo", {S = S, players = players, teams = teams, opts = opts}, _summary())
+
+## "Ludo vs Computer · 35%" / "Ludo Teams (2 v 2) · 35%" / "Ludo Pass & Play".
+func _summary() -> String:
+	var mode := "Pass & Play" if not S.players.has("cpu") else ("Teams (2 v 2)" if S.teams else "vs Computer")
+	var me: int = S.players.find("human")
+	var t := "Ludo " + mode
+	if S.players.has("cpu") and me >= 0:
+		t += " · " + Fmt.pct(LudoRules.progress(S, me))
+	return t
+
+# ---------- the end ----------
+
+func _game_over() -> void:
+	if _ended:
+		return
+	_ended = true
+	if online:
+		await _net_game_over()
+		return
+	var id := _id
+	MatchStore.clear("ludo")
+	var winners := LudoRules.winners(S)
+	var human_won := winners.any(func(k): return LudoRules.is_human(S, k))
+	var vs_cpu: bool = S.players.has("cpu")
+	Sound.sfx("win" if human_won else "lose")
+	var reward := LudoRules.win_reward(S)
+	if reward <= 0:
+		reward = LudoRules.play_reward(S)    # a finished game you lost vs the computer: a small participation reward
+	var w: int = S.winner
+	var copy := result_copy(S)
+	var title: String = copy.title
+	var sub: String = copy.sub
+	print("[ludo] game over: winner %s team=%s human_won=%s reward=%d" % [LudoRules.pname(S, w), S.teams, human_won, reward])
+	var xp_before := int(Save.profile.get("xp", 0))
+	Save.record_ludo(players, human_won)
+	var xp_after := int(Save.profile.get("xp", 0))
+	if reward > 0:
+		Save.add_coins(reward)
+	hud.hide_for_result()
+	var standings := []
+	for e in LudoRules.standings(S):
+		var c: int = e.color
+		var kind := "you" if LudoRules.is_you(S, c) else ("cpu" if S.players[c] == "cpu" else "human")
+		var nm := LudoRules.pname(S, c)
+		standings.append({color = c, name = "You" if kind == "you" else nm, kind = kind,
+			cpu_id = nm.to_lower() if kind == "cpu" and PlayerTile.CPU_IDS.has(nm.to_lower()) else "",
+			place = e.place, finished = e.finished, progress = e.progress})
+	await wait(0.35)
+	if not live(id):
+		return
+	finished.emit({game = "ludo", title = title, sub = sub, standings = standings, human_won = human_won,
+		reward = reward, teams = S.teams, color = w, winners = winners, vs_cpu = vs_cpu,
+		xp_before = xp_before, xp_after = xp_after})
+
+func _home_count(c: int) -> int:
+	return LudoMatch.home_count(S, c)
+
+static func home_count(s: Dictionary, c: int) -> int:
+	var n := 0
+	for p in s.tok[c]:
+		if p >= LudoRules.GOAL:
+			n += 1
+	return n
+
+## The result's headline, always from your side (vs the computer): {title, sub}.
+##   you won:   "You win!" / "All four pawns home!"   Teams: "Your team wins!" / "You and Biscotti got all 8 pawns home!"
+##   you lost:  "You finished 3rd" / "Mocha won · 2 of 4 pawns home"
+##              Teams: "Your team finished 2nd" / "Team Green + Blue won · 5 of 8 pawns home"
+##   no you (Pass & Play): "Mocha wins!" / "All four pawns home!"   Teams: "Team Red + Yellow wins!" / "Both teammates…"
+## The XP is not repeated here: the result screen shows it once, in its card.
+static func result_copy(s: Dictionary) -> Dictionary:
+	var w: int = s.winner
+	var winners := LudoRules.winners(s)
+	var me := -1
+	for k in 4:
+		if LudoRules.active(s, k) and NetLudo.you(s, k):
+			me = k
+	var you_won := me >= 0 and winners.has(me)
+	var place := 0
+	if me >= 0:
+		for e in LudoRules.standings(s):
+			if int(e.color) == me:
+				place = int(e.place)
+	if LudoRules.team_on(s):
+		if me < 0:
+			return {title = "Team %s wins!" % LudoRules.team_label(s, w), sub = "Both teammates got all four pawns home!"}
+		var mate := LudoRules.mate_of(me)
+		if you_won:
+			return {title = "Your team wins!", sub = "You and %s got all 8 pawns home!" % LudoRules.pname(s, mate)}
+		var n := home_count(s, me) + home_count(s, mate)
+		var won_by := "Team %s won" % LudoRules.team_label(s, w)
+		return {title = "Your team finished %s" % ResultScreen.ordinal(maxi(place, 2)),
+			sub = won_by + (" · %d of 8 pawns home" % n if n > 0 else "")}
+	if me < 0:
+		return {title = "%s wins!" % LudoRules.pname(s, w), sub = "All four pawns home!"}
+	if you_won:
+		return {title = "You win!", sub = "All four pawns home!"}
+	var k := home_count(s, me)
+	return {title = "You finished %s" % ResultScreen.ordinal(maxi(place, 2)),
+		sub = "%s won" % LudoRules.pname(s, w) + (" · %d of 4 pawns home" % k if k > 0 else "")}
+
+
+# ---------- online (friend rooms) ----------
+
+## An online match from the server's `start` (or a `sync` when joining one in progress). net: the NetClient.
+func start_online(msg: Dictionary, net_: Object) -> void:
+	_end_tutorial()
+	hud.tutorial = false
+	online = true
+	net = net_
+	ns = NetLudo.new()
+	ns.begin(msg, str(net_.get("member_id")) if net_ else "")
+	players = ns.S.players.duplicate()
+	opts = {bot_level = "normal", pair_ask = bool(ns.S.get("pair_ask", false))}
+	_net_sent = -1
+	_net_info = {}
+	_net_pumping = false
+	_net_ready = false
+	_net_hud()
+	await _open(ns.S, int(msg.get("n", 0)) == 0 and str(msg.get("t", "start")) == "start")
+
+## Back to an offline match: no replica, the HUD's online parts off.
+func _offline() -> void:
+	if not online:
+		return
+	online = false
+	net = null
+	_net_pumping = false
+	_net_prompt = -1
+	if hud.has_method("set_online"):
+		hud.set_online(false)
+
+## The HUD's online parts: you, the seats (names, avatars, badges), the away prompt.
+func _net_hud() -> void:
+	if hud.has_method("set_online"):
+		hud.set_online(true, ns.me, ns.seats)
+
+## _open's last step online: show the phase the state is in, then play what the server sent meanwhile.
+func _net_open(id: int) -> void:
+	_busy = false
+	_net_ready = true
+	hud.update(S, S.turn)
+	_net_badges()
+	match str(S.phase):
+		"choose":
+			_choose(id, S.turn)
+		"pair_ask":
+			board.relayout(S)
+			_idle_line()
+			if ns.my_turn():
+				_net_pair_prompt()
+		"over":
+			_game_over()
+			return
+		_:
+			_begin_turn()
+	_net_kick()
+
+## A server message for the match: act / sync / over (queued, played in order).
+func net_push(msg: Dictionary) -> void:
+	if not online or ns == null:
+		return
+	ns.push(msg)
+	_net_kick()
+
+## Plays the queue, one message at a time, each to the end of its animation.
+func _net_kick() -> void:
+	if _net_pumping or not online or S.is_empty() or not _net_ready:
+		return
+	_net_pumping = true
+	var id := _id
+	while live(id) and online:
+		var m := ns.next()
+		if m.is_empty():
+			break
+		_ff = NET_CATCHUP if ns.pending() > 0 else 1.0     # behind the server: catch up
+		board.speed = _speed()
+		match str(m.get("t", "")):
+			"need_sync":
+				_net_send({t = "sync_req"})
+			"sync":
+				_net_pumping = false
+				_net_resync(m)
+				return                             # _open plays the rest of the queue
+			"over":
+				_net_end(m)
+			"act":
+				await _net_act(id, m)
+	if id == _id:
+		_net_pumping = false
+		_ff = 1.0
+		board.speed = _speed()
+
+## One server action through the offline animation path.
+func _net_act(id: int, m: Dictionary) -> void:
+	var a: Dictionary = m.get("a", {})
+	var c := int(a.get("c", S.turn))
+	match str(a.get("k", "")):
+		"roll":
+			_busy = true
+			hud.hold_dice = false
+			hud.dice.set_active(false)
+			await _tumble(c, int(a.get("v", 1)))
+			if not live(id):
+				return
+			var ev := ns.apply_rules(a)
+			_net_check(m)
+			await _after_roll(id, c, int(a.get("v", 1)), ev)
+		"move":
+			var roller: int = S.turn
+			_busy = true
+			board.set_movable([])
+			var ev := ns.apply_rules(a)
+			_net_check(m)
+			_net_info = {}
+			if ev.is_empty():
+				_busy = false
+				return
+			await _after_move(id, roller, ev, _net_info)
+		"pair":
+			if _net_prompt >= 0:
+				_net_prompt = -1
+				hud.cancel_pair()                  # answered (by you, or by the server's timer)
+			var roller: int = S.turn
+			_busy = true
+			var ev := ns.apply_rules(a)
+			_net_check(m)
+			await _after_move(id, roller, ev, _net_info)
+		"mode":
+			ns.apply_rules(a)
+			_net_check(m)
+			players = S.players.duplicate()
+			_net_badges()
+			hud.update(S, S.turn)
+			_idle_line()
+			if c == ns.me and S.phase == "choose" and ns.my_turn():
+				_choose(id, c)                     # back in the middle of your move
+			elif c == ns.me and S.phase == "pair_ask" and ns.my_turn():
+				_net_pair_prompt()
+
+## After an act's rules step: the hash. A mismatch asks for a snapshot.
+func _net_check(m: Dictionary) -> void:
+	if _net_sent >= 0 and _net_sent < ns.n:
+		_net_sent = -1                         # our request was answered (or overtaken)
+	if not ns.verify(m):
+		push_warning("[net] hash mismatch at n=%d: sync_req" % int(m.get("n", -1)))
+		_net_send({t = "sync_req"})
+
+## A full snapshot: replace the state, re-lay the board and go on from there.
+func _net_resync(m: Dictionary) -> void:
+	ns.begin(m, str(net.get("member_id")) if net else "")
+	players = ns.S.players.duplicate()
+	_net_sent = -1
+	_net_info = {}
+	_net_ready = false
+	_net_hud()
+	await _open(ns.S, false)
+
+## `over`: the result (the last move's events usually got there first).
+func _net_end(m: Dictionary) -> void:
+	if _ended:
+		return
+	if S.phase != "over":
+		S.phase = "over"
+		S.winner = int(m.get("winner", S.winner))
+		if m.get("finished") is Array:
+			S.finished = MatchStore.ints(m.finished)
+		board.relayout(S)
+		hud.update(S, S.winner)
+	_game_over()
+
+## A request for the current step (at most one per step).
+func _net_request(t: String, fields := {}) -> void:
+	if not online or not ns.my_turn() or _net_sent == ns.n:
+		return
+	if _net_send(ns.request(t, fields)):
+		_net_sent = ns.n
+		if t == "roll":
+			hud.hold_dice = true
+			hud.dice.set_active(false)
+
+func _net_send(msg: Dictionary) -> bool:
+	return net != null and bool(net.call("send_msg", msg))
+
+## The pair prompt for your move; the answer goes to the server (the `pair` act plays it).
+func _net_pair_prompt() -> void:
+	var at := ns.n
+	if _net_prompt == at:
+		return
+	_net_prompt = at
+	var yes := await _ask_pair()
+	if _net_prompt != at or not online or ns.n != at:
+		return                                 # answered by the server's timer meanwhile
+	_net_prompt = -1
+	_net_request("pair", {yes = yes})
+
+## turn {c, deadline, now}: the server's clock for the current step, on that player's tile.
+func net_turn(msg: Dictionary) -> void:
+	if not online or not hud.has_method("set_timer"):
+		return
+	var left := maxf(0.0, float(msg.get("deadline", 0)) - float(msg.get("now", 0)))
+	var total := maxf(left, NetLudo.phase_sec(str(S.get("phase", "roll"))) * 1000.0)
+	hud.set_timer(int(msg.get("c", -1)), left, total)
+
+## presence {id, online}: the offline badge.
+func net_presence(msg: Dictionary) -> void:
+	if not online:
+		return
+	ns.set_online(NetClient.id_str(msg.get("id", "")), bool(msg.get("online", true)))
+	_net_badges()
+
+## A request the server refused (stale, not your turn, bad action): let the player try again.
+func net_error(msg: Dictionary) -> void:
+	if not online:
+		return
+	push_warning("[net] request refused: %s" % str(msg.get("code", "")))
+	_net_sent = -1
+	hud.hold_dice = false
+	if not S.is_empty():
+		hud.update(S, S.turn)
+		if ns.my_turn() and S.phase == "choose" and not _busy:
+			_choose(_id, S.turn)
+
+## NetClient.status: the "Reconnecting…" banner.
+func net_status(st: String) -> void:
+	if online and hud.has_method("set_banner"):
+		hud.set_banner("Reconnecting…" if st in ["reconnecting", "connecting"] else "")
+
+## "I’m back": your seat is yours again (the server answers with a `mode human` act).
+func _net_back() -> void:
+	if online:
+		_net_send({t = "back"})
+
+## Offline / bot badges on the tiles, and the away prompt when a bot plays for you.
+func _net_badges() -> void:
+	if not online or not hud.has_method("set_badges"):
+		return
+	var b := ["", "", "", ""]
+	for c in 4:
+		if not LudoRules.active(S, c):
+			continue
+		var st := ns.seat(c)
+		if S.players[c] == "cpu":
+			b[c] = "bot"
+		elif c != ns.me and not st.is_empty() and not bool(st.get("online", true)):   # (you are here)
+			b[c] = "offline"
+	hud.set_badges(b)
+	hud.show_away(ns.me >= 0 and S.players[ns.me] == "cpu" and S.phase != "over")
+
+## The event line while someone else plays: "Ana’s turn", "Ana is choosing…", a bot "Ana (bot) is thinking…".
+func _net_wait_line(c: int) -> String:
+	var nm := "[b]%s[/b]" % LudoRules.pname(S, c)
+	if c == ns.me:
+		return "A bot is playing for you"
+	if S.players[c] == "cpu":
+		return "%s is away. A bot is playing…" % nm
+	match str(S.phase):
+		"choose":
+			return "%s is choosing a pawn…" % nm
+		"pair_ask":
+			return "%s is deciding on a pair…" % nm
+	return "%s’s turn" % nm
+
+## The online result: XP for playing (more for a win), no coins; the friends' names and avatars.
+func _net_game_over() -> void:
+	var id := _id
+	_net_prompt = -1
+	hud.cancel_pair()
+	if hud.has_method("show_away"):
+		hud.show_away(false)
+	var winners := LudoRules.winners(S)
+	var won := winners.has(ns.me)
+	Sound.sfx("win" if won else "lose")
+	var copy := result_copy(S)
+	var xp_before := int(Save.profile.get("xp", 0))
+	if ns.me >= 0:
+		Save.profile.xp = xp_before + (NET_XP_WIN if won else NET_XP_PLAY)
+		Save.save()
+		Save.changed.emit()
+	var xp_after := int(Save.profile.get("xp", 0))
+	hud.hide_for_result()
+	var standings := []
+	for e in LudoRules.standings(S):
+		var c: int = e.color
+		var st := ns.seat(c)
+		var mine := c == ns.me
+		standings.append({color = c, name = "You" if mine else str(st.get("name", LudoRules.pname(S, c))),
+			kind = "you" if mine else "human", cpu_id = "", avatar = str(st.get("avatar", "")),
+			frame = str(st.get("frame", "")), place = e.place, finished = e.finished, progress = e.progress})
+	await wait(0.35)
+	if not live(id):
+		return
+	finished.emit({game = "ludo", title = copy.title, sub = copy.sub, standings = standings, human_won = won,
+		reward = 0, teams = S.teams, color = S.winner, winners = winners, vs_cpu = false, online = true,
+		xp_before = xp_before, xp_after = xp_after})

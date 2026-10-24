@@ -13,6 +13,38 @@ A mobile-first 3D Ludo game for the browser, played on a round table inside a co
 Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-mymensingh.pages.dev
 (Cloudflare Pages, free plan, project `ludo-king-mymensingh`, deployed by uploading the build zip).
 
+## Android / Godot port (started 2026-10-23)
+Decision (user, 2026-10-23): publish on Google Play by rebuilding the game in **Godot 4.7** (chosen over Unity /
+Unreal, and over wrapping the web build with Capacitor / TWA), with **online multiplayer**. The web version
+(`index.html`) stays live and is the reference until the port matches it. Order: 1. rules module + tests (done) ->
+2. 3D game + screens (done) -> 3. online friend rooms (done, 2026-10-24) -> 4. quick match / accounts -> 5. Play Store
+release (12-tester closed test for 14 days).
+- **Online (decision 2026-10-24: Cloudflare, free plan, replaces the earlier Nakama plan):** `server/` is a Cloudflare
+  Worker with one Durable Object (`Room`, SQLite storage, WebSocket hibernation) per 6-letter room code, live at
+  `https://ludo-zing-rooms.flipfold.workers.dev` on the project's Cloudflare account (hrdev.main). Server-authoritative:
+  it rolls the dice and validates every action with `server/src/rules/ludo.ts`, a line-for-line TypeScript port of
+  `ludo_rules.gd` proven identical on 140 recorded GDScript games (80k actions). Clients replay the server's actions
+  with their own GDScript rules and compare a state hash after each (`server/PROTOCOL.md`). Bots take over idle /
+  disconnected seats; reconnect restores the seat. Godot side: `godot/scripts/net/*`, Friends + Lobby sheets, online
+  mode in `ludo_match.gd`. Ludo only for now (Snakes & Ladders online: "Soon"). Online games give XP, no coins.
+  Deploy with `server/tools/cf.sh deploy` (project-scoped wrangler login in `server/.wrangler/home`, git-ignored).
+- `godot/` holds the project; see `godot/README.md`. Rules are pure functions over a JSON-safe Dictionary
+  (`LudoRules`, `SnakesLaddersRules`) returning events, so the server can run them as referee. Human-only steps are
+  phases (`pick`, `pair_ask`). Keep them in step with the JS rules while both versions exist.
+- Tests: `tools/godot-test.sh` (Mac; Godot from `brew install --cask godot`). 272 checks: ports of pair-rules (25),
+  team-rules (28), pair-capture-split (151), the rule / turn part of snakes-ladders (42) and new turn-flow checks (26).
+- Play name: never use "Ludo King" (another company's trademark) in the app name or package id.
+- Status 2026-10-24: playable Android build (package `com.flipfold.ludozing`), tested on the Android emulator
+  (Medium Phone API 35): splash, home (spin / rewards / free coins, tabs), Ludo vs Computer / Pass & Play / Pair
+  Mode, Snakes & Ladders, pause / back button / settings / Top View, shop (rooms, dice) + inventory, daily reward,
+  five rooms. Renderer GL Compatibility (the emulator shows black with Vulkan). Lighting ported from the web values
+  and calibrated against web screenshots (see godot/README.md). Build: `tools/android-build.sh --run`.
+  Also ported (2026-10-24, second pass): welcome screen, Collection (20 characters, avatars, frames, nameplates,
+  badges, achievements; daily calendar gives characters), Snakes & Ladders scene worlds (jungle, frost, candy,
+  desert, cloud, enchanted) with the 3D landing + shop Scenes tab, shop 3D room preview, info (i) bubbles.
+  568 headless checks (`tools/godot-test.sh`). Not ported: Google / Facebook sign-in (hidden in the web version
+  too until Firebase is set up), online multiplayer (now in `server/`, see above), release signing + AAB.
+
 ## Technology
 - One HTML file, `index.html` (~3,190 lines): inline CSS + plain JS in one IIFE. No framework, no bundler, no Node.
 - three.js **r128** (CDN in source, local copy in the build). WebGL, PCF soft shadows, sRGB output (colours go through `lin()`),
@@ -56,6 +88,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `submission/` | YouTube Playables submission kit (`SUBMISSION.md`, two screenshots). |
 | `README.md` | Build, test and deploy commands. |
 | `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). |
+| `godot/`, `tools/godot-test.sh` | The Godot 4.7 Android version (rules + tests so far) and its headless test runner. See `godot/README.md`. |
 | `build/`, `ludo-royale-web.zip` | Obsolete early build; not used. |
 
 ## Architecture (inside `index.html`)
