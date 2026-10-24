@@ -140,10 +140,22 @@ func _ready() -> void:
 
 ## Splash: draws the first-use shaders once (the dice, and the S&L scene when it may be needed soon) so the first
 ## match doesn't freeze while they compile (PERF: ~1.2 s on the first S&L match, ~0.1 s on the first Ludo roll).
+## UPDATE_ONCE turns itself into UPDATE_DISABLED after its frame: the dice must go back to drawing while visible,
+## or they freeze on their first frame for the rest of the session (no visible rolls).
+func _restore_dice_updates(vps: Array[SubViewport]) -> void:
+	for i in 2:
+		await RenderingServer.frame_post_draw
+	for vp in vps:
+		if is_instance_valid(vp):
+			vp.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+
 func _warm_up() -> void:
+	var dice_vps: Array[SubViewport] = []
 	for d in [hud.dice, sl.dice]:
 		if d and d.viewport:
-			d.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+			d.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE   # draw once now, even while hidden
+			dice_vps.append(d.viewport)
+	_restore_dice_updates(dice_vps)
 	var last := str((Save.prefs.get("last_played", {}) as Dictionary).get("game", "")) if Save.prefs.get("last_played") is Dictionary else ""
 	if Quality.tier() != "low" or last == "sl":
 		await sl_scenes.set_scene(baker, SLScenes.scene_in_use())
