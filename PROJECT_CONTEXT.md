@@ -48,7 +48,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
-| `tests/emotes.js` | 29 emote tests (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
+| `tests/emotes.js` | 34 emote tests (incl. the 16 required reactions, 3 families, vector-only art, tap sizes) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -130,8 +130,15 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   `dailyState()` decides; `claimDaily()` writes via `commitProfile` after re-reading the stored profile. Limitation:
   local only (browser storage or the signed-in account's sync / YouTube cloud save); the device clock decides the day.
   Tests: `tests/daily-rewards.js` (32).
-- **Emotes (Ludo games, 2026-10-24):** `EMOTES` (id, name, emoji fallback, motion class, custom 64x64 SVG art; all
-  free, `owned()` is the hook for a future shop) and `Emotes` (defined before the HUD code). `#emoteBtn` is placed by
+- **Emotes (Ludo games, 2026-10-24; 2D cartoon set the same day):** 18 original 2D cartoon stickers (bold dark outline
+  `EO`, flat colours, minimal shading) built from one face kit (`EYES` / `BROWS` / `MOUTHS` / `blush` over a geometry
+  `{l,r,y,m}`) in three families: `pawnArt` (the four pawn colours, `PAWN_COL`, with arms via `elimb`), `boyArt` /
+  `hijabArt` (friends), and game symbols (dice, crown, broken heart). Reactions: Victory, Laugh, Cool, Angry, Love,
+  Sleepy, Confused, Hi!, Celebrate (pawns); Cry, Shocked, Facepalm, Clap, Thinking, Tease (friends); Roll it!, Winner,
+  Disappointed (game). Picker sections by `group` (`EMOTE_GROUPS`), width fitted to the screen, scrolls when short.
+  The bubble is a cartoon speech bubble (cream, dark outline, the sender's colour as its rim, tail toward the avatar).
+  `EMOTES` entries: id, group, name, emoji fallback (ch), motion class, art; all
+  free, `owned()` is the hook for a future shop; `Emotes` is defined before the HUD code. `#emoteBtn` is placed by
   `Emotes.place()` (from `buildCards` and on resize): level with your dice between the bottom cards, else just below
   between them, else in `.hud-top` before the gear, judged against each bottom card's columns at rest and enlarged
   (x1.05) plus the "Tap" hint (falls back to the HUD at 320px and in landscape). `#emotePanel` (4x2) closes on a pick,

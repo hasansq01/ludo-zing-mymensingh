@@ -198,6 +198,11 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Emotes redrawn as a 2D cartoon collection (2026-10-24, user's style reference; original art, not copied): 18
+      emotes in three families (pawn characters in the four colours, a hoodie boy and hijab girls, game symbols) covering
+      all 16 requested reactions plus Roll it! and Winner; consistent outline / proportions; grouped picker; cartoon
+      speech bubbles with the sender's colour rim. `tests/emotes.js` 34/34 at 320x568, 390x844, 430x932, 844x390,
+      1366x768; home visual suite PASS (0.000%). On `feature/emotes`. Not deployed.
 - [x] Emotes in Ludo games (2026-10-24): 8 free custom-drawn animated emotes (Laugh, Cool, Love, Angry, Cry, Surprised,
       Clap, Celebrate) in `EMOTES` (expandable; `owned()` is the future shop hook). Button beside your dice (measured
       against the enlarged cards and the "Tap" hint; falls back to the top HUD row at 320px and in landscape), panel

@@ -838,19 +838,31 @@ body:not([data-screen="game"]) .unit-pick{display:none}
 .emote-btn.in-hud{position:static;transform:none;flex:none;width:44px;height:44px;border-radius:15px}
 .emote-btn.in-hud:active{transform:scale(.92)}
 body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-panel{display:none}
-.emote-panel{position:fixed;z-index:6;display:grid;grid-template-columns:repeat(4,58px);gap:6px;padding:10px;border-radius:20px;
-  background:#fff8ef;border:3px solid #fff;box-shadow:0 0 0 2px #f3c497,0 12px 26px rgba(80,40,30,.3);animation:pop .2s cubic-bezier(.2,.9,.3,1.2)}
+.emote-panel{position:fixed;z-index:6;box-sizing:border-box;display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;padding:8px 10px 10px;border-radius:20px;
+  overflow-y:auto;overscroll-behavior:contain;background:#fff8ef;border:3px solid #fff;box-shadow:0 0 0 2px #f3c497,0 12px 26px rgba(80,40,30,.3);animation:pop .2s cubic-bezier(.2,.9,.3,1.2)}
 .emote-panel[hidden]{display:none}
-.em-pick{display:flex;flex-direction:column;align-items:center;gap:1px;width:58px;height:62px;padding:4px 0 2px;border-radius:14px;background:#ffeedd;border:1.5px solid #f6d3b0;transition:transform .1s}
+.em-group{grid-column:1/-1;margin:4px 2px -2px;font-size:.62rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#b0306f}
+.em-pick{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;height:60px;padding:3px 0 2px;border-radius:14px;background:#fff1e2;border:1.5px solid #f6d3b0;transition:transform .1s}
 .em-pick:hover,.em-pick:focus-visible{background:#ffe0c2}
 .em-pick:active{transform:scale(.9)}
-.em-pick svg{width:40px;height:40px;filter:drop-shadow(0 2px 1px rgba(110,60,40,.2))}
-.em-pick span{font-size:.56rem;font-weight:900;color:#8a4a2c;letter-spacing:.02em;white-space:nowrap}
-.emote-bubble{position:absolute;z-index:5;width:76px;height:76px;margin:-42px 0 0 -38px;border-radius:50%;display:grid;place-items:center;pointer-events:none;
-  background:radial-gradient(circle at 40% 35%,#fffdf8,#ffeedd);border:3px solid #fff;box-shadow:0 0 0 3px var(--c),0 8px 18px rgba(80,40,30,.35);
-  animation:emLife 1.8s ease forwards}
-.emote-bubble .em-art{display:block;width:60px;height:60px}
-.emote-bubble svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 2px 2px rgba(110,60,40,.25))}
+.em-pick svg{width:40px;height:40px;overflow:visible}
+.em-pick span{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:.52rem;font-weight:900;color:#8a4a2c;white-space:nowrap}
+/* the reaction: a cartoon speech bubble (cream, dark outline, the sender's colour as its rim) whose tail points at the
+   sender's avatar, which it sits on (so it never covers the board, dice, names or another player's bubble) */
+.emote-bubble{position:absolute;z-index:5;width:80px;height:72px;margin:-45px 0 0 -40px;border-radius:20px;display:grid;place-items:center;pointer-events:none;
+  background:#fffaf2;border:2.5px solid #3a2418;box-shadow:0 0 0 3px var(--c),0 8px 16px rgba(80,40,30,.3);animation:emLife 1.8s ease forwards}
+.emote-bubble::after{content:"";position:absolute;left:50%;bottom:-8px;width:12px;height:12px;margin-left:-6px;transform:rotate(45deg);
+  background:#fffaf2;border-right:2.5px solid #3a2418;border-bottom:2.5px solid #3a2418;box-shadow:3px 3px 0 0 var(--c)}
+.emote-bubble .em-art{display:block;width:62px;height:62px}
+.emote-bubble svg{width:100%;height:100%;overflow:visible}
+.em-float .em-art{animation:emFloat 1s .3s ease-in-out 2}
+@keyframes emFloat{50%{transform:translateY(-4px)}}
+.em-wobble .em-art{animation:emWobble .6s .3s ease-in-out 2}
+@keyframes emWobble{25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+.em-wave .em-art{animation:emWave .4s .3s ease-in-out 3;transform-origin:50% 90%}
+@keyframes emWave{50%{transform:rotate(9deg)}}
+.em-roll .em-art{animation:emRoll .7s .25s cubic-bezier(.3,1.3,.5,1)}
+@keyframes emRoll{0%{transform:rotate(-200deg) scale(.6)}100%{transform:rotate(0) scale(1)}}
 @keyframes emLife{0%{transform:scale(.2);opacity:0}12%{transform:scale(1.16);opacity:1}22%{transform:scale(.95)}30%,82%{transform:scale(1);opacity:1}100%{transform:scale(.85) translateY(-10px);opacity:0}}
 .em-shake .em-art{animation:emShake .3s .35s ease-in-out 4}
 @keyframes emShake{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
@@ -4015,35 +4027,135 @@ function pickAI(mv) {
    Sender: the only human in vs Computer; in Pass & Play the player whose turn it is (holding the device).
    CPU players react now and then to captures and the result (random, throttled, never the same emote twice running).
    Purely visual: no game state, rule or turn is touched. */
-const EMOTE_FACE = (id, inner, c1 = '#ffe07a', c2 = '#f6a92e', line = '#b5701c') =>
-  `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="emg-${id}" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></radialGradient></defs>` +
-  `<circle cx="32" cy="33" r="27" fill="url(#emg-${id})" stroke="${line}" stroke-width="2.6"/><ellipse cx="22" cy="18" rx="9" ry="5" fill="#fff" opacity=".45" transform="rotate(-24 22 18)"/>${inner}</svg>`;
-const EM_INK = '#5a2a1a';
+/* Emote art: original 2D cartoon stickers (bold dark outline, flat colours, minimal shading) in three families that share
+   one face kit, so every character keeps its look across emotions:
+   - pawn: the four Ludo pawns (head + bell body) with faces and arms;
+   - friend: a boy in a hoodie and girls in hijabs;
+   - game: dice, crown, broken heart.
+   All 64x64 SVG built from the helpers below (no image files to load or fail). */
+const EO = '#3a2418', EW = 2.4, SKIN = '#f6c7a1', MOUTH = '#7a2a2a', TONGUE = '#ff7f86';
+const PAWN_COL = { red: ['#ef5350', '#c62f34'], green: ['#3cb878', '#23864f'], yellow: ['#ffcc3a', '#d99a12'], blue: ['#4a8ae8', '#2a5fb8'] };
+const esvg = s => `<svg viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round">${s}</svg>`;
+const eline = (d, w = EW, c = EO) => `<path d="${d}" stroke="${c}" stroke-width="${w}"/>`;
+const eshape = (d, fill, w = EW) => `<path d="${d}" fill="${fill}" stroke="${EO}" stroke-width="${w}"/>`;
+const elimb = (d, col, hx, hy) => `<path d="${d}" stroke="${EO}" stroke-width="7.4"/><path d="${d}" stroke="${col}" stroke-width="4"/><circle cx="${hx}" cy="${hy}" r="3.8" fill="${col}" stroke="${EO}" stroke-width="2"/>`;
+const eheart = (x, y, s, fill = '#e5484d') => `<path d="M${x} ${y + 3.4 * s}l${-3.6 * s} ${-3.6 * s}a${2.1 * s} ${2.1 * s} 0 0 1 ${3.6 * s}-${2.4 * s}a${2.1 * s} ${2.1 * s} 0 0 1 ${3.6 * s} ${2.4 * s}z" fill="${fill}" stroke="${EO}" stroke-width="${1.4}"/>`;
+const espark = (x, y, s = 1, fill = '#ffd34d') => `<path d="M${x} ${y - 6 * s}l${1.6 * s} ${4.4 * s} ${4.4 * s} ${1.6 * s}-${4.4 * s} ${1.6 * s}-${1.6 * s} ${4.4 * s}-${1.6 * s}-${4.4 * s}-${4.4 * s}-${1.6 * s} ${4.4 * s}-${1.6 * s}z" fill="${fill}" stroke="${EO}" stroke-width="1.3"/>`;
+const ezap = (x, y) => eline(`M${x} ${y}l3 6M${x + 7} ${y + 3}l-4 5M${x + 9} ${y + 11}h-6`, 3, '#ffc12e');   // excitement lines
+// one face kit: g = { l, r, y, m } = left / right eye x, eye y, mouth y (mouth centred on x 32)
+const EYES = {
+  dot: g => `<circle cx="${g.l}" cy="${g.y}" r="2.3" fill="${EO}"/><circle cx="${g.r}" cy="${g.y}" r="2.3" fill="${EO}"/>`,
+  happy: g => eline(`M${g.l - 3} ${g.y + 1}q3-4.5 6 0M${g.r - 3} ${g.y + 1}q3-4.5 6 0`),
+  squeeze: g => eline(`M${g.l - 3} ${g.y - 3}l5 3-5 3M${g.r + 3} ${g.y - 3}l-5 3 5 3`),
+  round: g => `<circle cx="${g.l}" cy="${g.y}" r="4.3" fill="#fff" stroke="${EO}" stroke-width="1.8"/><circle cx="${g.r}" cy="${g.y}" r="4.3" fill="#fff" stroke="${EO}" stroke-width="1.8"/><circle cx="${g.l}" cy="${g.y + .5}" r="2" fill="${EO}"/><circle cx="${g.r}" cy="${g.y + .5}" r="2" fill="${EO}"/>`,
+  closed: g => eline(`M${g.l - 3} ${g.y}q3 3 6 0M${g.r - 3} ${g.y}q3 3 6 0`),
+  heart: g => eheart(g.l, g.y - 1.5, 1.05) + eheart(g.r, g.y - 1.5, 1.05),
+  shades: g => eshape(`M${g.l - 8} ${g.y - 4}h${g.r - g.l + 16}v3c0 4-3 6-7 6s-6-2-6-5h-${g.r - g.l - 12 > 0 ? g.r - g.l - 12 : 2}c0 3-2 5-6 5s-7-2-7-6z`, '#2b2f4a', 2) + eline(`M${g.l - 5} ${g.y - 1}h4M${g.r - 2} ${g.y - 1}h4`, 1.6, '#8c9bd6'),
+  wink: g => eline(`M${g.l - 3} ${g.y + 1}q3-4.5 6 0`) + `<circle cx="${g.r}" cy="${g.y}" r="2.3" fill="${EO}"/>`,
+  look: g => `<circle cx="${g.l + 1.5}" cy="${g.y - 1}" r="2.3" fill="${EO}"/><circle cx="${g.r + 1.5}" cy="${g.y - 1}" r="2.3" fill="${EO}"/>`,
+};
+const BROWS = {
+  angry: g => eline(`M${g.l - 4} ${g.y - 7}l7 3.5M${g.r + 4} ${g.y - 7}l-7 3.5`, 2.6),
+  worried: g => eline(`M${g.l - 4} ${g.y - 5}l6-2.5M${g.r + 4} ${g.y - 5}l-6-2.5`, 2.2),
+  raised: g => eline(`M${g.l - 3} ${g.y - 6}h6M${g.r - 3} ${g.y - 8}q3-3 6 0`, 2.2),
+  up: g => eline(`M${g.l - 3} ${g.y - 7}q3-2.5 6 0M${g.r - 3} ${g.y - 7}q3-2.5 6 0`, 2.2),
+};
+const MOUTHS = {
+  grin: g => eshape(`M25 ${g.m - 1}h14q-1 8.5-7 8.5t-7-8.5z`, MOUTH, 2) + `<path d="M28 ${g.m + 4.5}q4 3 8 0q-1 3-4 3t-4-3z" fill="${TONGUE}"/>`,
+  smile: g => eline(`M26 ${g.m}q6 5.5 12 0`, 2.6),
+  frown: g => eline(`M26 ${g.m + 3.5}q6-5.5 12 0`, 2.6),
+  O: g => `<ellipse cx="32" cy="${g.m + 2}" rx="3.6" ry="4.6" fill="${MOUTH}" stroke="${EO}" stroke-width="2"/>`,
+  wail: g => eshape(`M26 ${g.m + 5}q6-10 12 0q-6 2.5-12 0z`, MOUTH, 2),
+  flat: g => eline(`M28 ${g.m + 1.5}h8`, 2.6),
+  wavy: g => eline(`M26 ${g.m + 1.5}q1.5-2.5 3 0t3 0 3 0 3 0`, 2.2),
+  tongue: g => eline(`M26 ${g.m}q6 5 12 0`, 2.6) + eshape(`M30.5 ${g.m + 2.6}v3.6a2.6 2.6 0 0 0 5.2 0v-3`, TONGUE, 1.8),
+  smirk: g => eline(`M27 ${g.m + 1.5}q6 3.5 10-2.5`, 2.6),
+  sleepy: g => `<ellipse cx="32" cy="${g.m + 2}" rx="2.2" ry="1.6" fill="${MOUTH}" stroke="${EO}" stroke-width="1.6"/>`,
+};
+const blush = g => `<circle cx="${g.l - 4}" cy="${g.y + 5.5}" r="2.6" fill="#ff8fa3" opacity=".75"/><circle cx="${g.r + 4}" cy="${g.y + 5.5}" r="2.6" fill="#ff8fa3" opacity=".75"/>`;
+const eface = (g, e, m, b, cheeks) => (b ? BROWS[b](g) : '') + EYES[e](g) + MOUTHS[m](g) + (cheeks ? blush(g) : '');
+// characters: arms (behind the body / in front) and extras are drawn around a shared base
+const PG = { l: 26, r: 38, y: 24, m: 31 }, BG = { l: 27, r: 37, y: 28, m: 34 }, HG = { l: 27.5, r: 36.5, y: 29, m: 35 };
+function pawnArt(col, face, { back = '', front = '', extra = '' } = {}) {
+  const [c] = PAWN_COL[col];
+  return esvg(back + eshape('M14 62c0-12 6-20 18-22 12 2 18 10 18 22z', c) + eline('M20 59c1-7 4-12 9-14', 3, 'rgba(255,255,255,.35)') +
+    `<circle cx="32" cy="25" r="16" fill="${c}" stroke="${EO}" stroke-width="${EW}"/><ellipse cx="25" cy="16.5" rx="5" ry="3" fill="#fff" opacity=".35" transform="rotate(-30 25 16.5)"/>` +
+    face(PG) + front + extra);
+}
+function boyArt(hoodie, face, { back = '', front = '', extra = '' } = {}) {
+  return esvg(back + eshape('M13 62c0-10 7-17 19-18 12 1 19 8 19 18z', hoodie) + eshape('M26 44.5l6 6.5 6-6.5', '#fff', 1.8) +
+    `<circle cx="18.5" cy="29" r="3.2" fill="${SKIN}" stroke="${EO}" stroke-width="1.8"/><circle cx="45.5" cy="29" r="3.2" fill="${SKIN}" stroke="${EO}" stroke-width="1.8"/>` +
+    `<circle cx="32" cy="28" r="14" fill="${SKIN}" stroke="${EO}" stroke-width="${EW}"/>` +
+    eshape('M17.5 27c-1.5-11 5.5-17 14.5-17 10 0 16 6 15 16-3-3-6-5-10-5.5 1 2 .5 3.5-1.5 4.5-1.5-3-4.5-5-8.5-5-3 2.5-6.5 4-9.5 7z', '#6b3f22') +
+    eshape('M24 12l3-5 3 4 4-5 2 6', '#6b3f22', 2) + face(BG) + front + extra);
+}
+function hijabArt(scarf, face, { back = '', front = '', extra = '' } = {}) {
+  return esvg(back + eshape('M11 62c0-12 7-20 21-21 14 1 21 9 21 21z', scarf) +
+    eshape('M14.5 32c0-12 7.5-20 17.5-20s17.5 8 17.5 20c0 6-3 11-6.5 13h-22c-3.5-2-6.5-7-6.5-13z', scarf) +
+    `<ellipse cx="32" cy="31" rx="11.5" ry="12.5" fill="${SKIN}" stroke="${EO}" stroke-width="2"/>` + eline('M21 21q11-9 22 0', 2.6, 'rgba(255,255,255,.35)') +
+    face(HG) + front + extra);
+}
+const EMOTE_GROUPS = [['pawn', 'Pawns'], ['friend', 'Friends'], ['game', 'Game']];
 const EMOTES = [
-  { id: 'laugh', name: 'Laugh', ch: '😂', motion: 'em-shake', art: EMOTE_FACE('laugh',
-    `<path d="M16 27q5-7 11 0M37 27q5-7 11 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M17 36h30q-2 15-15 15T17 36z" fill="#7a2a2a" stroke="${EM_INK}" stroke-width="2" stroke-linejoin="round"/><path d="M24 46q8 6 16 0q-2 5-8 5t-8-5z" fill="#ff7f86"/><path d="M8 30q-3 6 0 9 3-3 0-9zM56 30q-3 6 0 9 3-3 0-9z" fill="#6cc6ff" stroke="#3a8fd0" stroke-width="1"/>`) },
-  { id: 'cool', name: 'Cool', ch: '😎', motion: 'em-tilt', art: EMOTE_FACE('cool',
-    `<path d="M11 24h42v3c0 7-4 11-10 11s-9-4-10-9h-2c-1 5-4 9-10 9S11 34 11 27z" fill="#2b2f4a"/><path d="M15 27h12M37 27h12" stroke="#6b7bb8" stroke-width="2.4" stroke-linecap="round"/><path d="M23 45q9 6 18-3" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`) },
-  { id: 'love', name: 'Love', ch: '😍', motion: 'em-beat', art: EMOTE_FACE('love',
-    `<path d="M23 34l-7-7a4.2 4.2 0 0 1 7-4.5 4.2 4.2 0 0 1 7 4.5zM41 34l-7-7a4.2 4.2 0 0 1 7-4.5 4.2 4.2 0 0 1 7 4.5z" fill="#e5484d" stroke="#a8282d" stroke-width="1.2" stroke-linejoin="round"/><circle cx="14" cy="40" r="4" fill="#ff8fa3" opacity=".7"/><circle cx="50" cy="40" r="4" fill="#ff8fa3" opacity=".7"/><path d="M22 42q10 10 20 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`) },
-  { id: 'angry', name: 'Angry', ch: '😡', motion: 'em-rage', art: EMOTE_FACE('angry',
-    `<path d="M15 21l12 6M49 21l-12 6" stroke="${EM_INK}" stroke-width="3.4" stroke-linecap="round"/><circle cx="23" cy="31" r="3.2" fill="${EM_INK}"/><circle cx="41" cy="31" r="3.2" fill="${EM_INK}"/><path d="M21 47q11-9 22 0" stroke="${EM_INK}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`, '#ffb07a', '#e5484d', '#9c2a24') },
-  { id: 'cry', name: 'Cry', ch: '😭', motion: 'em-sob', art: EMOTE_FACE('cry',
-    `<path d="M15 27q6 5 12 0M37 27q6 5 12 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M18 30v21a4 4 0 0 0 8 0V30zM38 30v21a4 4 0 0 0 8 0V30z" fill="#6cc6ff" opacity=".9"/><path d="M26 46q6-6 12 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`, '#ffe9a0', '#f5b84a') },
-  { id: 'wow', name: 'Surprised', ch: '😮', motion: 'em-jump', art: EMOTE_FACE('wow',
-    `<path d="M15 17q6-5 12-1M37 16q6-4 12 1" stroke="${EM_INK}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="22" cy="28" r="6.5" fill="#fff" stroke="${EM_INK}" stroke-width="2"/><circle cx="42" cy="28" r="6.5" fill="#fff" stroke="${EM_INK}" stroke-width="2"/><circle cx="22" cy="29" r="3" fill="${EM_INK}"/><circle cx="42" cy="29" r="3" fill="${EM_INK}"/><ellipse cx="32" cy="46" rx="6" ry="7.5" fill="#7a2a2a" stroke="${EM_INK}" stroke-width="2"/>`) },
-  { id: 'clap', name: 'Clap', ch: '👏', motion: 'em-clap', art:
-    `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="#b5701c" stroke-width="2.2" stroke-linejoin="round"><path d="M14 40l12-24a5 5 0 0 1 9 4l-3 9 10-14a5 5 0 0 1 8 5L39 41c-5 9-15 12-22 7-4-2-5-5-3-8z" fill="#ffd08a"/><path d="M24 44l12-24a5 5 0 0 1 9 4l-3 9 7-9a5 5 0 0 1 8 5L46 45c-5 9-15 12-22 7-3-2-2-5 0-8z" fill="#ffe2b0"/></g><path d="M8 18l5 4M6 28h6M14 10l3 6M52 54l5 2M44 58l2 4" stroke="#f6a92e" stroke-width="3" stroke-linecap="round"/></svg>` },
-  { id: 'party', name: 'Celebrate', ch: '🎉', motion: 'em-party', art:
-    `<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 58l12-34 22 22z" fill="#ff8a6a" stroke="#b5452e" stroke-width="2.4" stroke-linejoin="round"/><path d="M13 44l6 6M16 35l12 12" stroke="#ffe07a" stroke-width="3.4" stroke-linecap="round"/><path d="M27 21q4-10 12-8M43 37q10-4 9 6M34 16l3-7M48 26l8-4" stroke="#2fb39c" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="46" cy="12" r="3" fill="#e5484d"/><circle cx="56" cy="34" r="3" fill="#3b7be0"/><circle cx="38" cy="28" r="2.5" fill="#f6a92e"/><rect x="50" y="46" width="5" height="5" rx="1" fill="#b49cff" transform="rotate(20 52 48)"/><rect x="24" y="8" width="5" height="5" rx="1" fill="#ffd34d" transform="rotate(-15 26 10)"/></svg>` },
-];
-const Emotes = (() => {
+  // ---- pawns ----
+  { id: 'happy', group: 'pawn', name: 'Victory', ch: '🙌', motion: 'em-jump', art: pawnArt('red', g => eface(g, 'happy', 'grin', null, true),
+    { back: elimb('M47 47q9-6 9-19', PAWN_COL.red[0], 56, 27) + elimb('M17 49q-6 4-6 10', PAWN_COL.red[0], 11, 59), extra: ezap(48, 3) }) },
+  { id: 'laugh', group: 'pawn', name: 'Laugh', ch: '😂', motion: 'em-shake', art: pawnArt('blue', g => eface(g, 'squeeze', 'grin') +
+    `<path d="M${g.l - 6} ${g.y + 2}q-4 6 0 9 4-3 0-9zM${g.r + 6} ${g.y + 2}q-4 6 0 9 4-3 0-9z" fill="#6cc6ff" stroke="#2f7fc0" stroke-width="1.2"/>`,
+    { back: elimb('M17 49q-8-3-9-12', PAWN_COL.blue[0], 8, 37) + elimb('M47 49q8-3 9-12', PAWN_COL.blue[0], 56, 37) }) },
+  { id: 'cool', group: 'pawn', name: 'Cool', ch: '😎', motion: 'em-tilt', art: pawnArt('yellow', g => eface(g, 'shades', 'smirk'),
+    { front: elimb('M46 49q6 1 11-3', PAWN_COL.yellow[0], 57, 46) + eline('M58 45l4-3', 3.6) + eline('M58 45l4-3', 2, PAWN_COL.yellow[0]), extra: espark(53, 13) }) },
+  { id: 'angry', group: 'pawn', name: 'Angry', ch: '😡', motion: 'em-rage', art: pawnArt('green', g => eface(g, 'dot', 'frown', 'angry'),
+    { back: elimb('M17 49q-6 3-7 9', PAWN_COL.green[0], 10, 58) + elimb('M47 49q6 3 7 9', PAWN_COL.green[0], 54, 58),
+      extra: eline('M48 6q4 3 0 7M57 6q-4 3 0 7M47 7q5 2 11 0M47 12q5-2 11 0', 2.4, '#e5484d') }) },
+  { id: 'love', group: 'pawn', name: 'Love', ch: '😍', motion: 'em-beat', art: pawnArt('red', g => eface(g, 'heart', 'smile', null, true),
+    { front: elimb('M19 49q2-6 7-8', PAWN_COL.red[0], 26, 41) + elimb('M45 49q-2-6-7-8', PAWN_COL.red[0], 38, 41), extra: eheart(10, 12, 1.3) + eheart(55, 9, 1) }) },
+  { id: 'sleepy', group: 'pawn', name: 'Sleepy', ch: '😴', motion: 'em-float', art: pawnArt('green', g => eface(g, 'closed', 'sleepy'),
+    { extra: eline('M45 5h7l-7 8h7', 2.6, '#3b7be0') + eline('M54 14h5l-5 6h5', 2.2, '#3b7be0') }) },
+  { id: 'confused', group: 'pawn', name: 'Confused', ch: '😕', motion: 'em-wobble', art: pawnArt('blue', g => eface(g, 'round', 'wavy', 'raised'),
+    { front: elimb('M46 48q10-5 6-19', PAWN_COL.blue[0], 51, 28), extra: eline('M51 6a5 5 0 1 1 6 5c-1.4.7-2 1.6-2 3.2', 3, '#3b7be0') + `<circle cx="55" cy="19" r="1.8" fill="#3b7be0"/>` }) },
+  { id: 'hi', group: 'pawn', name: 'Hi!', ch: '👋', motion: 'em-wave', art: pawnArt('yellow', g => eface(g, 'wink', 'grin', null, true),
+    { back: elimb('M47 47q8-6 8-18', PAWN_COL.yellow[0], 55, 28), extra: eline('M50 21l-2-3M55 19v-4M60 21l2-3', 2, EO) + `<text x="1" y="15" font-family="'Lilita One',system-ui,sans-serif" font-size="15" fill="#ffcc3a" stroke="${EO}" stroke-width="2.2" paint-order="stroke" transform="rotate(-10 8 10)">Hi!</text>` }) },
+  { id: 'party', group: 'pawn', name: 'Celebrate', ch: '🎉', motion: 'em-party', art: pawnArt('green', g => eface(g, 'happy', 'grin', null, true),
+    { front: elimb('M46 49q6-1 9-7', PAWN_COL.green[0], 55, 42) + eshape('M54 44l8-14 3 9z', '#ff8a6a', 1.8),
+      extra: `<rect x="8" y="8" width="4" height="4" rx="1" fill="#e5484d" transform="rotate(20 10 10)"/><rect x="50" y="20" width="4" height="4" rx="1" fill="#3b7be0"/><rect x="14" y="2" width="4" height="4" rx="1" fill="#ffd34d"/><rect x="44" y="4" width="4" height="4" rx="1" fill="#b49cff" transform="rotate(-20 46 6)"/>` + eline('M57 26q3-4 6-2', 2, '#2fb39c') }) },
+  // ---- friends ----
+  { id: 'cry', group: 'friend', name: 'Cry', ch: '😭', motion: 'em-sob', art: hijabArt('#4a8ae8', g => eface(g, 'closed', 'wail') +
+    `<path d="M${g.l - 2} ${g.y + 2}v14a3 3 0 0 0 5 0V${g.y + 2}zM${g.r - 3} ${g.y + 2}v14a3 3 0 0 0 5 0V${g.y + 2}z" fill="#6cc6ff" opacity=".9"/>`) },
+  { id: 'wow', group: 'friend', name: 'Shocked', ch: '😮', motion: 'em-jump', art: boyArt('#2fa86b', g => eface(g, 'round', 'O', 'up'), { extra: ezap(48, 2) }) },
+  { id: 'facepalm', group: 'friend', name: 'Facepalm', ch: '🤦', motion: 'em-float', art: boyArt('#3b6fd8', g => eface(g, 'closed', 'frown'),
+    { front: elimb('M24 52q-3-10 4-17', '#3b6fd8', 28, 35) + `<ellipse cx="33" cy="25" rx="9" ry="6.5" fill="${SKIN}" stroke="${EO}" stroke-width="2" transform="rotate(-12 33 25)"/>` + eline('M27 22.5h7M27.5 26h7', 1.4) }) },
+  { id: 'clap', group: 'friend', name: 'Clap', ch: '👏', motion: 'em-clap', art: hijabArt('#e0607e', g => eface(g, 'happy', 'grin', null, true),
+    { front: `<ellipse cx="27" cy="52" rx="5" ry="6.5" fill="${SKIN}" stroke="${EO}" stroke-width="2" transform="rotate(-20 27 52)"/><ellipse cx="36" cy="50" rx="5" ry="6.5" fill="${SKIN}" stroke="${EO}" stroke-width="2" transform="rotate(20 36 50)"/>`, extra: ezap(48, 2) }) },
+  { id: 'think', group: 'friend', name: 'Thinking', ch: '🤔', motion: 'em-wobble', art: boyArt('#e5484d', g => eface(g, 'look', 'flat', 'raised'),
+    { front: elimb('M40 60q-2-10 0-17', '#e5484d', 40, 43) + `<circle cx="39.5" cy="41.5" r="4.4" fill="${SKIN}" stroke="${EO}" stroke-width="2"/>`,
+      extra: `<circle cx="50" cy="12" r="2" fill="${EO}"/><circle cx="55" cy="8" r="2.6" fill="${EO}"/><circle cx="61" cy="4" r="3" fill="${EO}"/>` }) },
+  { id: 'tease', group: 'friend', name: 'Tease', ch: '😜', motion: 'em-shake', art: hijabArt('#2fb39c', g => eface(g, 'wink', 'tongue', null, true),
+    { extra: espark(52, 12) + espark(10, 18, .7) }) },
+  // ---- game ----
+  { id: 'dice', group: 'game', name: 'Roll it!', ch: '🎲', motion: 'em-roll', art: esvg(
+    `<g transform="rotate(-12 32 34)">${eshape('M14 18a6 6 0 0 1 6-6h24a6 6 0 0 1 6 6v24a6 6 0 0 1-6 6H20a6 6 0 0 1-6-6z', '#fffaf1', 2.6)}` +
+    eline('M17 15q15-4 30 0', 2, '#ffffff') + [[22, 20], [42, 20], [22, 30], [42, 30], [22, 40], [42, 40]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="${EO}"/>`).join('') + `</g>` +
+    eline('M52 50l7 2M50 56l6 5M8 12l4 4', 3, '#ffc12e')) },
+  { id: 'crown', group: 'game', name: 'Winner', ch: '👑', motion: 'em-beat', art: esvg(
+    eshape('M10 46l-2-24 12 10 12-18 12 18 12-10-2 24z', '#ffcc3a') + eshape('M10 46h44v7H10z', '#f6a92e') +
+    `<circle cx="32" cy="38" r="4" fill="#e5484d" stroke="${EO}" stroke-width="1.6"/><circle cx="19" cy="40" r="2.6" fill="#3b7be0" stroke="${EO}" stroke-width="1.4"/><circle cx="45" cy="40" r="2.6" fill="#2fa86b" stroke="${EO}" stroke-width="1.4"/>` +
+    `<circle cx="8" cy="21" r="2.6" fill="#ffcc3a" stroke="${EO}" stroke-width="1.4"/><circle cx="32" cy="13" r="2.6" fill="#ffcc3a" stroke="${EO}" stroke-width="1.4"/><circle cx="56" cy="21" r="2.6" fill="#ffcc3a" stroke="${EO}" stroke-width="1.4"/>` +
+    espark(54, 8, .8) + espark(9, 56, .6)) },
+  { id: 'sad', group: 'game', name: 'Disappointed', ch: '💔', motion: 'em-sob', art: esvg(
+    eshape('M30 54L12 36a10 10 0 0 1 18-14l-3 9 6 5-5 6 4 4z', '#e5484d') + eshape('M36 56l-2-6 5-5-4-6 5-6-2-10a10 10 0 0 1 16 15z', '#e5484d') +
+    eline('M17 30q2-6 7-6', 2.4, 'rgba(255,255,255,.55)') + eheart(50, 50, .8) + eheart(12, 52, .6)) },
+];const Emotes = (() => {
   const btn = $('emoteBtn'), panel = $('emotePanel'), layer = $('pcards'), btnHome = btn.parentNode;   // inside #stage: positions are stage px
   const owned = () => EMOTES;   // every emote is free for now (see above)
   const showing = {}, queue = {}, lastCpu = {};
   let lastAny = 0, open = false;
   const em = id => EMOTES.find(e => e.id === id);
-  panel.innerHTML = owned().map(e => `<button type="button" class="em-pick" data-emote="${e.id}" aria-label="${e.name}" title="${e.name}">${e.art}<span>${e.name}</span></button>`).join('');
+  // the picker: one section per family (Pawns, Friends, Game)
+  panel.innerHTML = EMOTE_GROUPS.map(([g, label]) => {
+    const list = owned().filter(e => e.group === g); if (!list.length) return '';
+    return `<p class="em-group">${label}</p>` + list.map(e => `<button type="button" class="em-pick" data-emote="${e.id}" aria-label="${e.name}" title="${e.name}">${e.art}<span>${e.name}</span></button>`).join('');
+  }).join('');
   const sender = () => {   // vs Computer: the only human; Pass & Play: whoever holds the device (the player to move)
     if (!S) return -1;
     const hs = [0, 1, 2, 3].filter(c => isHuman(c));
@@ -4087,8 +4199,10 @@ const Emotes = (() => {
     }
     if (open) placePanel();
   }
-  function placePanel() {   // above the button (bottom) or below it (top bar), kept on screen
+  function placePanel() {   // above the button (bottom) or below it (top bar), kept on screen; scrolls if the screen is short
+    panel.style.width = Math.min(312, SW() - 16) + 'px';
     const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, b = btn.getBoundingClientRect();
+    panel.style.maxHeight = Math.max(160, ((btn.classList.contains('in-hud') ? st.bottom - b.bottom : b.top - st.top) / sc) - 24) + 'px';
     const w = panel.offsetWidth * sc, h = panel.offsetHeight * sc, m = 8 * sc;
     const x = Math.max(st.left + m, Math.min(st.right - m - w, (b.left + b.right) / 2 - w / 2));
     const below = btn.classList.contains('in-hud');
@@ -4139,13 +4253,13 @@ const Emotes = (() => {
     if (kind === 'capture') {
       const owners = [...new Set(victims.map(v => v[0]))];
       const hurt = owners.find(o => S.players[o] === 'cpu' && isHuman(c));
-      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow'], .4)) return;
-      if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool'], .35);
+      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow', 'facepalm', 'sad'], .4)) return;
+      if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool', 'tease'], .35);
     } else if (kind === 'win') {
       const winners = teamOn() ? [c, mateOf(c)] : [c];
       const cpuWinner = winners.find(w => S.players[w] === 'cpu');
-      if (cpuWinner !== undefined) cpuSay(cpuWinner, ['party', 'cool'], .7);
-      else { const loser = [0, 1, 2, 3].find(o => S.players[o] === 'cpu' && !winners.includes(o)); if (loser !== undefined) cpuSay(loser, ['clap', 'cry'], .5); }
+      if (cpuWinner !== undefined) cpuSay(cpuWinner, ['party', 'crown', 'happy'], .7);
+      else { const loser = [0, 1, 2, 3].find(o => S.players[o] === 'cpu' && !winners.includes(o)); if (loser !== undefined) cpuSay(loser, ['clap', 'sad', 'cry'], .5); }
     }
   }
   function reset() {   // a new game (or leaving one): no bubbles, queues or reaction cooldowns carried over

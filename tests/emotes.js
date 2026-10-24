@@ -19,7 +19,11 @@
   L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(400);
   const S0 = JSON.stringify(L.S);
   check('game: the emote button is shown, 44px', !btn.hidden && btn.offsetWidth >= 44 && btn.offsetHeight >= 44);
-  check('the collection has 8 free emotes', L.EMOTES.length === 8 && panel.querySelectorAll('.em-pick').length === 8 && E.list().length === 8);
+  const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'sleepy', 'confused', 'facepalm', 'clap', 'party', 'think', 'sad', 'hi', 'tease'];
+  check('at least 16 free emotes, every required reaction present', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)) && panel.querySelectorAll('.em-pick').length === L.EMOTES.length && E.list().length === L.EMOTES.length, need.filter(id => !L.EMOTES.some(e => e.id === id)));
+  check('three families (pawns, friends, game) as picker sections', ['pawn', 'friend', 'game'].every(g => L.EMOTES.some(e => e.group === g)) && panel.querySelectorAll('.em-group').length === 3);
+  check('every emote is 2D vector art (inline SVG, no image files)', L.EMOTES.every(e => /^<svg viewBox="0 0 64 64"/.test(e.art) && !/<image|\.png|\.jpg/.test(e.art)));
+  check('ids are unique', new Set(L.EMOTES.map(e => e.id)).size === L.EMOTES.length);
   const parts = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #pcards .tap, #msg, #menuBtn, #gearBtn')].filter(e => e !== btn);
   check('the button covers no card, dice, name or HUD control', parts.every(p => !overlap(R(btn), R(p), 0.5)), parts.filter(p => overlap(R(btn), R(p), .5)).map(p => p.className || p.id));
   const st = R($('stage'));
@@ -30,6 +34,8 @@
   btn.click(); await sleep(50);
   check('tapping the button opens the panel', E.open && !panel.hidden && btn.getAttribute('aria-expanded') === 'true');
   check('the panel is fully on screen', R(panel).left >= st.left - .5 && R(panel).right <= st.right + .5 && R(panel).top >= st.top - .5 && R(panel).bottom <= st.bottom + .5);
+  check('every emote can be reached (the panel scrolls when the screen is short)', panel.scrollHeight <= panel.clientHeight + 1 || getComputedStyle(panel).overflowY === 'auto');
+  check('picker buttons are comfortable to tap', [...panel.querySelectorAll('.em-pick')].every(b => b.offsetWidth >= 44 && b.offsetHeight >= 44));
   document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   check('a tap outside closes it', !E.open && panel.hidden);
   btn.click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -76,7 +82,7 @@
   // CPU reactions: forced chance, then throttled
   E.reset(); const rnd = Math.random; Math.random = () => 0;
   E.react('capture', 0, [[1, 0]]); await sleep(1000);
-  check('a CPU whose pawn is captured may react (sad / angry / surprised)', bubbleOf(1) && ['cry', 'angry', 'wow'].includes(bubbleOf(1).dataset.emote));
+  check('a CPU whose pawn is captured may react (cry / angry / shocked / facepalm / disappointed)', bubbleOf(1) && ['cry', 'angry', 'wow', 'facepalm', 'sad'].includes(bubbleOf(1).dataset.emote));
   E.react('capture', 0, [[2, 0]]); await sleep(1000);
   check('reactions are throttled (no burst right after)', !bubbleOf(2));
   Math.random = rnd;
