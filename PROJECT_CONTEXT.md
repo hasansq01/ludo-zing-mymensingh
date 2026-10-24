@@ -48,6 +48,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
+| `tests/emotes.js` | 34 emote tests (incl. the 16 required reactions, 3 families, vector-only art, tap sizes) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -55,7 +56,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `firebase/firestore.rules`, `firebase/SETUP.md` | Firestore security rules for player progress; the manual Firebase / Google / Facebook setup steps. |
 | `submission/` | YouTube Playables submission kit (`SUBMISSION.md`, two screenshots). |
 | `README.md` | Build, test and deploy commands. |
-| `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). |
+| `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). Team workflow (since 2026-10-24): all updates are committed on the shared working branch `feature/emotes`, never directly on `main`; they reach `main` through pull requests on GitHub (PR #1). |
 | `build/`, `ludo-royale-web.zip` | Obsolete early build; not used. |
 
 ## Architecture (inside `index.html`)
@@ -129,6 +130,24 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   `dailyState()` decides; `claimDaily()` writes via `commitProfile` after re-reading the stored profile. Limitation:
   local only (browser storage or the signed-in account's sync / YouTube cloud save); the device clock decides the day.
   Tests: `tests/daily-rewards.js` (32).
+- **Emotes (Ludo games, 2026-10-24; 2D cartoon set the same day):** 18 original 2D cartoon stickers (bold dark outline
+  `EO`, flat colours, minimal shading) built from one face kit (`EYES` / `BROWS` / `MOUTHS` / `blush` over a geometry
+  `{l,r,y,m}`) in three families: `pawnArt` (the four pawn colours, `PAWN_COL`, with arms via `elimb`), `boyArt` /
+  `hijabArt` (friends), and game symbols (dice, crown, broken heart). Reactions: Victory, Laugh, Cool, Angry, Love,
+  Sleepy, Confused, Hi!, Celebrate (pawns); Cry, Shocked, Facepalm, Clap, Thinking, Tease (friends); Roll it!, Winner,
+  Disappointed (game). Picker sections by `group` (`EMOTE_GROUPS`), width fitted to the screen, scrolls when short.
+  The bubble is a cartoon speech bubble (cream, dark outline, the sender's colour as its rim, tail toward the avatar).
+  `EMOTES` entries: id, group, name, emoji fallback (ch), motion class, art; all
+  free, `owned()` is the hook for a future shop; `Emotes` is defined before the HUD code. `#emoteBtn` is placed by
+  `Emotes.place()` (from `buildCards` and on resize): level with your dice between the bottom cards, else just below
+  between them, else in `.hud-top` before the gear, judged against each bottom card's columns at rest and enlarged
+  (x1.05) plus the "Tap" hint (falls back to the HUD at 320px and in landscape). `#emotePanel` (4x2) closes on a pick,
+  an outside tap, Escape or `openSheet`. Bubbles (`.emote-bubble` in `#pcards`, pointer-events none) are centred on the
+  sender's avatar with their colour ring, live 1.8s (`emLife` + a per-emote motion; reduced motion = fade), one per
+  player with a queue of 2; `sfx('emote')` follows the sound settings. Sender = the only human, or the player to move
+  in Pass & Play. CPU reactions: `Emotes.react('capture'|'win')` from `move` / `gameOver` (random chance, 9s per CPU,
+  4s overall, never the same twice running; cleared by `reset()` on each new game / exit). No game state is touched.
+  Tests: `tests/emotes.js` (29).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;

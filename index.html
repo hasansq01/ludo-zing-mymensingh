@@ -829,6 +829,64 @@ body.jungle-ready .sl.is-landing{background:transparent}
 .unit-pick button.on{background:linear-gradient(var(--gold-hi),var(--gold));color:var(--on-accent);box-shadow:0 3px 0 var(--gold-deep)}
 .unit-pick.ask button{animation:nudge 1.1s ease-in-out infinite}
 body:not([data-screen="game"]) .unit-pick{display:none}
+/* Emotes: button (centred on its spot, or a regular HUD button on narrow screens), panel, bubbles over the avatars */
+.emote-btn{position:fixed;z-index:3;width:44px;height:44px;transform:translate(-50%,-50%);border-radius:50%;display:grid;place-items:center;padding:0;
+  background:linear-gradient(180deg,#fff8ee,#ffe3c4);border:2px solid #fff;box-shadow:0 3px 0 #dc9a62,0 5px 12px rgba(110,60,40,.25);transition:transform .12s}
+.emote-btn:active{transform:translate(-50%,-50%) scale(.92)}
+.emote-btn svg{width:30px;height:30px}
+.emote-btn[aria-expanded="true"]{box-shadow:0 0 0 3px #ffb48a,0 3px 0 #dc9a62}
+.emote-btn.in-hud{position:static;transform:none;flex:none;width:44px;height:44px;border-radius:15px}
+.emote-btn.in-hud:active{transform:scale(.92)}
+body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-panel{display:none}
+.emote-panel{position:fixed;z-index:6;box-sizing:border-box;display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;padding:8px 10px 10px;border-radius:20px;
+  overflow-y:auto;overscroll-behavior:contain;background:#fff8ef;border:3px solid #fff;box-shadow:0 0 0 2px #f3c497,0 12px 26px rgba(80,40,30,.3);animation:pop .2s cubic-bezier(.2,.9,.3,1.2)}
+.emote-panel[hidden]{display:none}
+.em-group{grid-column:1/-1;margin:4px 2px -2px;font-size:.62rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#b0306f}
+.em-pick{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;height:60px;padding:3px 0 2px;border-radius:14px;background:#fff1e2;border:1.5px solid #f6d3b0;transition:transform .1s}
+.em-pick:hover,.em-pick:focus-visible{background:#ffe0c2}
+.em-pick:active{transform:scale(.9)}
+.em-pick svg{width:40px;height:40px;overflow:visible}
+.em-pick span{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:.52rem;font-weight:900;color:#8a4a2c;white-space:nowrap}
+/* the reaction: a cartoon speech bubble (cream, dark outline, the sender's colour as its rim) whose tail points at the
+   sender's avatar, which it sits on (so it never covers the board, dice, names or another player's bubble) */
+.emote-bubble{position:absolute;z-index:5;width:80px;height:72px;margin:-45px 0 0 -40px;border-radius:20px;display:grid;place-items:center;pointer-events:none;
+  background:#fffaf2;border:2.5px solid #3a2418;box-shadow:0 0 0 3px var(--c),0 8px 16px rgba(80,40,30,.3);animation:emLife 1.8s ease forwards}
+.emote-bubble::after{content:"";position:absolute;left:50%;bottom:-8px;width:12px;height:12px;margin-left:-6px;transform:rotate(45deg);
+  background:#fffaf2;border-right:2.5px solid #3a2418;border-bottom:2.5px solid #3a2418;box-shadow:3px 3px 0 0 var(--c)}
+.emote-bubble .em-art{display:block;width:62px;height:62px}
+.emote-bubble svg{width:100%;height:100%;overflow:visible}
+.em-float .em-art{animation:emFloat 1s .3s ease-in-out 2}
+@keyframes emFloat{50%{transform:translateY(-4px)}}
+.em-wobble .em-art{animation:emWobble .6s .3s ease-in-out 2}
+@keyframes emWobble{25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+.em-wave .em-art{animation:emWave .4s .3s ease-in-out 3;transform-origin:50% 90%}
+@keyframes emWave{50%{transform:rotate(9deg)}}
+.em-roll .em-art{animation:emRoll .7s .25s cubic-bezier(.3,1.3,.5,1)}
+@keyframes emRoll{0%{transform:rotate(-200deg) scale(.6)}100%{transform:rotate(0) scale(1)}}
+@keyframes emLife{0%{transform:scale(.2);opacity:0}12%{transform:scale(1.16);opacity:1}22%{transform:scale(.95)}30%,82%{transform:scale(1);opacity:1}100%{transform:scale(.85) translateY(-10px);opacity:0}}
+.em-shake .em-art{animation:emShake .3s .35s ease-in-out 4}
+@keyframes emShake{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+.em-tilt .em-art{animation:emTilt 1.2s .3s ease-in-out}
+@keyframes emTilt{0%{transform:translateY(-8px) rotate(-14deg)}40%{transform:translateY(0) rotate(6deg)}70%,100%{transform:rotate(0)}}
+.em-beat .em-art{animation:emBeat .45s .3s ease-in-out 3}
+@keyframes emBeat{30%{transform:scale(1.18)}60%{transform:scale(.96)}}
+.em-rage .em-art{animation:emRage .12s .3s linear 9}
+@keyframes emRage{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.em-rage{box-shadow:0 0 0 3px var(--c),0 0 18px rgba(229,72,77,.55),0 8px 18px rgba(80,40,30,.35)}
+.em-sob .em-art{animation:emSob .5s .3s ease-in-out 3}
+@keyframes emSob{50%{transform:translateY(3px) scaleY(.94)}}
+.em-jump .em-art{animation:emJump .5s .25s cubic-bezier(.3,1.6,.5,1)}
+@keyframes emJump{0%{transform:scale(.7)}60%{transform:scale(1.22) translateY(-4px)}100%{transform:scale(1)}}
+.em-clap .em-art{animation:emClap .22s .3s ease-in-out 6}
+@keyframes emClap{50%{transform:scaleX(.82)}}
+.em-party .em-art{animation:emShake .35s .3s ease-in-out 3}
+.em-party i{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:2px;opacity:0;animation:emBurst .8s .25s ease-out forwards}
+.em-party i:nth-child(2){background:#e5484d;--dx:-34px;--dy:-30px}.em-party i:nth-child(3){background:#2fb39c;--dx:34px;--dy:-28px}
+.em-party i:nth-child(4){background:#ffd34d;--dx:-38px;--dy:6px}.em-party i:nth-child(5){background:#3b7be0;--dx:38px;--dy:8px}
+.em-party i:nth-child(6){background:#b49cff;--dx:-14px;--dy:-42px}.em-party i:nth-child(7){background:#ff8a6a;--dx:16px;--dy:-44px}
+@keyframes emBurst{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(200deg)}}
+@media (prefers-reduced-motion:reduce){.emote-bubble{animation:emFade 1.8s linear forwards}.emote-bubble .em-art,.em-party i{animation:none}.em-party i{display:none}}
+@keyframes emFade{0%{opacity:0}10%,85%{opacity:1}100%{opacity:0}}
 .fine{font-size:.84rem}
 .tap{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:.66rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep);white-space:nowrap;text-shadow:var(--halo)}
 .slot{position:relative}
@@ -1147,6 +1205,9 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
   <button type="button" id="pickPair">Pair <small id="pickPairN">+2</small></button>
   <span class="info-i" data-info="pair"></span>
 </div>
+<!-- Emotes (Ludo games): the button beside your dice (or in the top row on narrow screens), its panel, filled by Emotes -->
+<button class="emote-btn" id="emoteBtn" type="button" aria-label="Emotes" aria-haspopup="true" aria-expanded="false" hidden><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 6.5h22a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H14l-6 5v-5H5a3 3 0 0 1-3-3v-12a3 3 0 0 1 3-3z" fill="#fff8ec" stroke="#b5701c" stroke-width="1.8" stroke-linejoin="round"/><circle cx="16" cy="15.5" r="6.4" fill="#ffd56a" stroke="#b5701c" stroke-width="1.4"/><circle cx="13.7" cy="14.2" r="1" fill="#5a2a1a"/><circle cx="18.3" cy="14.2" r="1" fill="#5a2a1a"/><path d="M13.2 17q2.8 2.6 5.6 0" stroke="#5a2a1a" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg></button>
+<div class="emote-panel" id="emotePanel" role="dialog" aria-label="Choose an emote" hidden></div>
 
 <!-- Play vs Computer -->
 <div class="sheet" id="cpuSheet" hidden>
@@ -3186,6 +3247,7 @@ const Sound = (() => {
     capture: t => { tone(560, t, .34, { type: 'sawtooth', v: .16, f2: 110, lp: 1700 }); noise(t, .3, { v: .14, f: 1500, f2: 300, q: .8 }); tone(150, t + .2, .2, { v: .32, f2: 70 }); },
     pair:    t => arp([72, 76, 79], t, .07, .16, { type: 'triangle', v: .2 }),
     split:   t => arp([79, 74], t, .08, .16, { type: 'triangle', v: .2 }),
+    emote:   t => { tone(NOTE(81), t, .09, { type: 'triangle', v: .16, f2: NOTE(88) }); tone(NOTE(88), t + .06, .12, { type: 'triangle', v: .1 }); },   // a soft bubble pop
     coin:    (t, amount = 0) => {   // the rendered coin sample (see coinSamples); a plain two-note chime until it's ready
       const buf = coinBufs && coinBufs[amount >= 500 ? 'big' : 'small'];
       if (!buf) { tone(NOTE(83), t, .09, { type: 'square', v: .17, lp: 4000 }); tone(NOTE(88), t + .075, .32, { type: 'square', v: .17, lp: 4000 }); return; }
@@ -3839,6 +3901,7 @@ async function move(i) {
       return hop(vt, vt.g.position.clone(), toWorld(gridOf(o, -1, j)), 2.4, 650).then(() => { vt.anim = false; });
     }));
     if (!live(id)) return;
+    Emotes.react('capture', c, victims);   // now and then a computer player reacts (visual only)
   }
 
   // a pair landing on any colour's start square, or entering its home column (progress 51-55, the coloured lane
@@ -3893,6 +3956,7 @@ function nextTurn() { S.sixes = 0; S.turn = nextActive(S.turn); beginTurn(); }
 function gameOver(c) {
   S.phase = 'over'; S.winner = c; movableSet = new Set();
   updateHUD();
+  Emotes.react('win', c);
   const humanWon = (teamOn() ? [c, mateOf(c)] : [c]).some(isHuman);
   sfx(humanWon ? 'win' : 'lose');
   $('win').style.setProperty('--c', COLORS[c].css);
@@ -3953,6 +4017,265 @@ function pickAI(mv) {
   return best;
 }
 
+/* ---------- Emotes (Ludo games only) ----------
+   EMOTES is the collection: id, name, the system emoji as a text fallback, its motion (CSS class) and custom art
+   (64x64 SVG, game-style faces in our palette). All are free for now; a future shop can add entries with a price and
+   check ownership in `owned()` without touching the rest. The emote button (#emoteBtn) sits beside your dice at the
+   bottom centre when the two bottom cards leave room, otherwise in the top HUD row. Its panel (#emotePanel) closes on a
+   pick, a tap elsewhere, Escape or any sheet. A bubble pops over the sender's avatar (so it never covers the board,
+   dice, names or another player's emote) for ~1.8s; a player's next emotes queue (at most 2 waiting).
+   Sender: the only human in vs Computer; in Pass & Play the player whose turn it is (holding the device).
+   CPU players react now and then to captures and the result (random, throttled, never the same emote twice running).
+   Purely visual: no game state, rule or turn is touched. */
+/* Emote art: original 2D cartoon stickers (bold dark outline, flat colours, minimal shading) in three families that share
+   one face kit, so every character keeps its look across emotions:
+   - pawn: the four Ludo pawns (head + bell body) with faces and arms;
+   - friend: a boy in a hoodie and girls in hijabs;
+   - game: dice, crown, broken heart.
+   All 64x64 SVG built from the helpers below (no image files to load or fail). */
+const EO = '#3a2418', EW = 2.4, SKIN = '#f6c7a1', MOUTH = '#7a2a2a', TONGUE = '#ff7f86';
+const PAWN_COL = { red: ['#ef5350', '#c62f34'], green: ['#3cb878', '#23864f'], yellow: ['#ffcc3a', '#d99a12'], blue: ['#4a8ae8', '#2a5fb8'] };
+const esvg = s => `<svg viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round">${s}</svg>`;
+const eline = (d, w = EW, c = EO) => `<path d="${d}" stroke="${c}" stroke-width="${w}"/>`;
+const eshape = (d, fill, w = EW) => `<path d="${d}" fill="${fill}" stroke="${EO}" stroke-width="${w}"/>`;
+const elimb = (d, col, hx, hy) => `<path d="${d}" stroke="${EO}" stroke-width="7.4"/><path d="${d}" stroke="${col}" stroke-width="4"/><circle cx="${hx}" cy="${hy}" r="3.8" fill="${col}" stroke="${EO}" stroke-width="2"/>`;
+const eheart = (x, y, s, fill = '#e5484d') => `<path d="M${x} ${y + 3.4 * s}l${-3.6 * s} ${-3.6 * s}a${2.1 * s} ${2.1 * s} 0 0 1 ${3.6 * s}-${2.4 * s}a${2.1 * s} ${2.1 * s} 0 0 1 ${3.6 * s} ${2.4 * s}z" fill="${fill}" stroke="${EO}" stroke-width="${1.4}"/>`;
+const espark = (x, y, s = 1, fill = '#ffd34d') => `<path d="M${x} ${y - 6 * s}l${1.6 * s} ${4.4 * s} ${4.4 * s} ${1.6 * s}-${4.4 * s} ${1.6 * s}-${1.6 * s} ${4.4 * s}-${1.6 * s}-${4.4 * s}-${4.4 * s}-${1.6 * s} ${4.4 * s}-${1.6 * s}z" fill="${fill}" stroke="${EO}" stroke-width="1.3"/>`;
+const ezap = (x, y) => eline(`M${x} ${y}l3 6M${x + 7} ${y + 3}l-4 5M${x + 9} ${y + 11}h-6`, 3, '#ffc12e');   // excitement lines
+// one face kit: g = { l, r, y, m } = left / right eye x, eye y, mouth y (mouth centred on x 32)
+const EYES = {
+  dot: g => `<circle cx="${g.l}" cy="${g.y}" r="2.3" fill="${EO}"/><circle cx="${g.r}" cy="${g.y}" r="2.3" fill="${EO}"/>`,
+  happy: g => eline(`M${g.l - 3} ${g.y + 1}q3-4.5 6 0M${g.r - 3} ${g.y + 1}q3-4.5 6 0`),
+  squeeze: g => eline(`M${g.l - 3} ${g.y - 3}l5 3-5 3M${g.r + 3} ${g.y - 3}l-5 3 5 3`),
+  round: g => `<circle cx="${g.l}" cy="${g.y}" r="4.3" fill="#fff" stroke="${EO}" stroke-width="1.8"/><circle cx="${g.r}" cy="${g.y}" r="4.3" fill="#fff" stroke="${EO}" stroke-width="1.8"/><circle cx="${g.l}" cy="${g.y + .5}" r="2" fill="${EO}"/><circle cx="${g.r}" cy="${g.y + .5}" r="2" fill="${EO}"/>`,
+  closed: g => eline(`M${g.l - 3} ${g.y}q3 3 6 0M${g.r - 3} ${g.y}q3 3 6 0`),
+  heart: g => eheart(g.l, g.y - 1.5, 1.05) + eheart(g.r, g.y - 1.5, 1.05),
+  shades: g => eshape(`M${g.l - 8} ${g.y - 4}h${g.r - g.l + 16}v3c0 4-3 6-7 6s-6-2-6-5h-${g.r - g.l - 12 > 0 ? g.r - g.l - 12 : 2}c0 3-2 5-6 5s-7-2-7-6z`, '#2b2f4a', 2) + eline(`M${g.l - 5} ${g.y - 1}h4M${g.r - 2} ${g.y - 1}h4`, 1.6, '#8c9bd6'),
+  wink: g => eline(`M${g.l - 3} ${g.y + 1}q3-4.5 6 0`) + `<circle cx="${g.r}" cy="${g.y}" r="2.3" fill="${EO}"/>`,
+  look: g => `<circle cx="${g.l + 1.5}" cy="${g.y - 1}" r="2.3" fill="${EO}"/><circle cx="${g.r + 1.5}" cy="${g.y - 1}" r="2.3" fill="${EO}"/>`,
+};
+const BROWS = {
+  angry: g => eline(`M${g.l - 4} ${g.y - 7}l7 3.5M${g.r + 4} ${g.y - 7}l-7 3.5`, 2.6),
+  worried: g => eline(`M${g.l - 4} ${g.y - 5}l6-2.5M${g.r + 4} ${g.y - 5}l-6-2.5`, 2.2),
+  raised: g => eline(`M${g.l - 3} ${g.y - 6}h6M${g.r - 3} ${g.y - 8}q3-3 6 0`, 2.2),
+  up: g => eline(`M${g.l - 3} ${g.y - 7}q3-2.5 6 0M${g.r - 3} ${g.y - 7}q3-2.5 6 0`, 2.2),
+};
+const MOUTHS = {
+  grin: g => eshape(`M25 ${g.m - 1}h14q-1 8.5-7 8.5t-7-8.5z`, MOUTH, 2) + `<path d="M28 ${g.m + 4.5}q4 3 8 0q-1 3-4 3t-4-3z" fill="${TONGUE}"/>`,
+  smile: g => eline(`M26 ${g.m}q6 5.5 12 0`, 2.6),
+  frown: g => eline(`M26 ${g.m + 3.5}q6-5.5 12 0`, 2.6),
+  O: g => `<ellipse cx="32" cy="${g.m + 2}" rx="3.6" ry="4.6" fill="${MOUTH}" stroke="${EO}" stroke-width="2"/>`,
+  wail: g => eshape(`M26 ${g.m + 5}q6-10 12 0q-6 2.5-12 0z`, MOUTH, 2),
+  flat: g => eline(`M28 ${g.m + 1.5}h8`, 2.6),
+  wavy: g => eline(`M26 ${g.m + 1.5}q1.5-2.5 3 0t3 0 3 0 3 0`, 2.2),
+  tongue: g => eline(`M26 ${g.m}q6 5 12 0`, 2.6) + eshape(`M30.5 ${g.m + 2.6}v3.6a2.6 2.6 0 0 0 5.2 0v-3`, TONGUE, 1.8),
+  smirk: g => eline(`M27 ${g.m + 1.5}q6 3.5 10-2.5`, 2.6),
+  sleepy: g => `<ellipse cx="32" cy="${g.m + 2}" rx="2.2" ry="1.6" fill="${MOUTH}" stroke="${EO}" stroke-width="1.6"/>`,
+};
+const blush = g => `<circle cx="${g.l - 4}" cy="${g.y + 5.5}" r="2.6" fill="#ff8fa3" opacity=".75"/><circle cx="${g.r + 4}" cy="${g.y + 5.5}" r="2.6" fill="#ff8fa3" opacity=".75"/>`;
+const eface = (g, e, m, b, cheeks) => (b ? BROWS[b](g) : '') + EYES[e](g) + MOUTHS[m](g) + (cheeks ? blush(g) : '');
+// characters: arms (behind the body / in front) and extras are drawn around a shared base
+const PG = { l: 26, r: 38, y: 24, m: 31 }, BG = { l: 27, r: 37, y: 28, m: 34 }, HG = { l: 27.5, r: 36.5, y: 29, m: 35 };
+function pawnArt(col, face, { back = '', front = '', extra = '' } = {}) {
+  const [c] = PAWN_COL[col];
+  return esvg(back + eshape('M14 62c0-12 6-20 18-22 12 2 18 10 18 22z', c) + eline('M20 59c1-7 4-12 9-14', 3, 'rgba(255,255,255,.35)') +
+    `<circle cx="32" cy="25" r="16" fill="${c}" stroke="${EO}" stroke-width="${EW}"/><ellipse cx="25" cy="16.5" rx="5" ry="3" fill="#fff" opacity=".35" transform="rotate(-30 25 16.5)"/>` +
+    face(PG) + front + extra);
+}
+function boyArt(hoodie, face, { back = '', front = '', extra = '' } = {}) {
+  return esvg(back + eshape('M13 62c0-10 7-17 19-18 12 1 19 8 19 18z', hoodie) + eshape('M26 44.5l6 6.5 6-6.5', '#fff', 1.8) +
+    `<circle cx="18.5" cy="29" r="3.2" fill="${SKIN}" stroke="${EO}" stroke-width="1.8"/><circle cx="45.5" cy="29" r="3.2" fill="${SKIN}" stroke="${EO}" stroke-width="1.8"/>` +
+    `<circle cx="32" cy="28" r="14" fill="${SKIN}" stroke="${EO}" stroke-width="${EW}"/>` +
+    eshape('M17.5 27c-1.5-11 5.5-17 14.5-17 10 0 16 6 15 16-3-3-6-5-10-5.5 1 2 .5 3.5-1.5 4.5-1.5-3-4.5-5-8.5-5-3 2.5-6.5 4-9.5 7z', '#6b3f22') +
+    eshape('M24 12l3-5 3 4 4-5 2 6', '#6b3f22', 2) + face(BG) + front + extra);
+}
+function hijabArt(scarf, face, { back = '', front = '', extra = '' } = {}) {
+  return esvg(back + eshape('M11 62c0-12 7-20 21-21 14 1 21 9 21 21z', scarf) +
+    eshape('M14.5 32c0-12 7.5-20 17.5-20s17.5 8 17.5 20c0 6-3 11-6.5 13h-22c-3.5-2-6.5-7-6.5-13z', scarf) +
+    `<ellipse cx="32" cy="31" rx="11.5" ry="12.5" fill="${SKIN}" stroke="${EO}" stroke-width="2"/>` + eline('M21 21q11-9 22 0', 2.6, 'rgba(255,255,255,.35)') +
+    face(HG) + front + extra);
+}
+const EMOTE_GROUPS = [['pawn', 'Pawns'], ['friend', 'Friends'], ['game', 'Game']];
+const EMOTES = [
+  // ---- pawns ----
+  { id: 'happy', group: 'pawn', name: 'Victory', ch: '🙌', motion: 'em-jump', art: pawnArt('red', g => eface(g, 'happy', 'grin', null, true),
+    { back: elimb('M47 47q9-6 9-19', PAWN_COL.red[0], 56, 27) + elimb('M17 49q-6 4-6 10', PAWN_COL.red[0], 11, 59), extra: ezap(48, 3) }) },
+  { id: 'laugh', group: 'pawn', name: 'Laugh', ch: '😂', motion: 'em-shake', art: pawnArt('blue', g => eface(g, 'squeeze', 'grin') +
+    `<path d="M${g.l - 6} ${g.y + 2}q-4 6 0 9 4-3 0-9zM${g.r + 6} ${g.y + 2}q-4 6 0 9 4-3 0-9z" fill="#6cc6ff" stroke="#2f7fc0" stroke-width="1.2"/>`,
+    { back: elimb('M17 49q-8-3-9-12', PAWN_COL.blue[0], 8, 37) + elimb('M47 49q8-3 9-12', PAWN_COL.blue[0], 56, 37) }) },
+  { id: 'cool', group: 'pawn', name: 'Cool', ch: '😎', motion: 'em-tilt', art: pawnArt('yellow', g => eface(g, 'shades', 'smirk'),
+    { front: elimb('M46 49q6 1 11-3', PAWN_COL.yellow[0], 57, 46) + eline('M58 45l4-3', 3.6) + eline('M58 45l4-3', 2, PAWN_COL.yellow[0]), extra: espark(53, 13) }) },
+  { id: 'angry', group: 'pawn', name: 'Angry', ch: '😡', motion: 'em-rage', art: pawnArt('green', g => eface(g, 'dot', 'frown', 'angry'),
+    { back: elimb('M17 49q-6 3-7 9', PAWN_COL.green[0], 10, 58) + elimb('M47 49q6 3 7 9', PAWN_COL.green[0], 54, 58),
+      extra: eline('M48 6q4 3 0 7M57 6q-4 3 0 7M47 7q5 2 11 0M47 12q5-2 11 0', 2.4, '#e5484d') }) },
+  { id: 'love', group: 'pawn', name: 'Love', ch: '😍', motion: 'em-beat', art: pawnArt('red', g => eface(g, 'heart', 'smile', null, true),
+    { front: elimb('M19 49q2-6 7-8', PAWN_COL.red[0], 26, 41) + elimb('M45 49q-2-6-7-8', PAWN_COL.red[0], 38, 41), extra: eheart(10, 12, 1.3) + eheart(55, 9, 1) }) },
+  { id: 'sleepy', group: 'pawn', name: 'Sleepy', ch: '😴', motion: 'em-float', art: pawnArt('green', g => eface(g, 'closed', 'sleepy'),
+    { extra: eline('M45 5h7l-7 8h7', 2.6, '#3b7be0') + eline('M54 14h5l-5 6h5', 2.2, '#3b7be0') }) },
+  { id: 'confused', group: 'pawn', name: 'Confused', ch: '😕', motion: 'em-wobble', art: pawnArt('blue', g => eface(g, 'round', 'wavy', 'raised'),
+    { front: elimb('M46 48q10-5 6-19', PAWN_COL.blue[0], 51, 28), extra: eline('M51 6a5 5 0 1 1 6 5c-1.4.7-2 1.6-2 3.2', 3, '#3b7be0') + `<circle cx="55" cy="19" r="1.8" fill="#3b7be0"/>` }) },
+  { id: 'hi', group: 'pawn', name: 'Hi!', ch: '👋', motion: 'em-wave', art: pawnArt('yellow', g => eface(g, 'wink', 'grin', null, true),
+    { back: elimb('M47 47q8-6 8-18', PAWN_COL.yellow[0], 55, 28), extra: eline('M50 21l-2-3M55 19v-4M60 21l2-3', 2, EO) + `<text x="1" y="15" font-family="'Lilita One',system-ui,sans-serif" font-size="15" fill="#ffcc3a" stroke="${EO}" stroke-width="2.2" paint-order="stroke" transform="rotate(-10 8 10)">Hi!</text>` }) },
+  { id: 'party', group: 'pawn', name: 'Celebrate', ch: '🎉', motion: 'em-party', art: pawnArt('green', g => eface(g, 'happy', 'grin', null, true),
+    { front: elimb('M46 49q6-1 9-7', PAWN_COL.green[0], 55, 42) + eshape('M54 44l8-14 3 9z', '#ff8a6a', 1.8),
+      extra: `<rect x="8" y="8" width="4" height="4" rx="1" fill="#e5484d" transform="rotate(20 10 10)"/><rect x="50" y="20" width="4" height="4" rx="1" fill="#3b7be0"/><rect x="14" y="2" width="4" height="4" rx="1" fill="#ffd34d"/><rect x="44" y="4" width="4" height="4" rx="1" fill="#b49cff" transform="rotate(-20 46 6)"/>` + eline('M57 26q3-4 6-2', 2, '#2fb39c') }) },
+  // ---- friends ----
+  { id: 'cry', group: 'friend', name: 'Cry', ch: '😭', motion: 'em-sob', art: hijabArt('#4a8ae8', g => eface(g, 'closed', 'wail') +
+    `<path d="M${g.l - 2} ${g.y + 2}v14a3 3 0 0 0 5 0V${g.y + 2}zM${g.r - 3} ${g.y + 2}v14a3 3 0 0 0 5 0V${g.y + 2}z" fill="#6cc6ff" opacity=".9"/>`) },
+  { id: 'wow', group: 'friend', name: 'Shocked', ch: '😮', motion: 'em-jump', art: boyArt('#2fa86b', g => eface(g, 'round', 'O', 'up'), { extra: ezap(48, 2) }) },
+  { id: 'facepalm', group: 'friend', name: 'Facepalm', ch: '🤦', motion: 'em-float', art: boyArt('#3b6fd8', g => eface(g, 'closed', 'frown'),
+    { front: elimb('M24 52q-3-10 4-17', '#3b6fd8', 28, 35) + `<ellipse cx="33" cy="25" rx="9" ry="6.5" fill="${SKIN}" stroke="${EO}" stroke-width="2" transform="rotate(-12 33 25)"/>` + eline('M27 22.5h7M27.5 26h7', 1.4) }) },
+  { id: 'clap', group: 'friend', name: 'Clap', ch: '👏', motion: 'em-clap', art: hijabArt('#e0607e', g => eface(g, 'happy', 'grin', null, true),
+    { front: `<ellipse cx="27" cy="52" rx="5" ry="6.5" fill="${SKIN}" stroke="${EO}" stroke-width="2" transform="rotate(-20 27 52)"/><ellipse cx="36" cy="50" rx="5" ry="6.5" fill="${SKIN}" stroke="${EO}" stroke-width="2" transform="rotate(20 36 50)"/>`, extra: ezap(48, 2) }) },
+  { id: 'think', group: 'friend', name: 'Thinking', ch: '🤔', motion: 'em-wobble', art: boyArt('#e5484d', g => eface(g, 'look', 'flat', 'raised'),
+    { front: elimb('M40 60q-2-10 0-17', '#e5484d', 40, 43) + `<circle cx="39.5" cy="41.5" r="4.4" fill="${SKIN}" stroke="${EO}" stroke-width="2"/>`,
+      extra: `<circle cx="50" cy="12" r="2" fill="${EO}"/><circle cx="55" cy="8" r="2.6" fill="${EO}"/><circle cx="61" cy="4" r="3" fill="${EO}"/>` }) },
+  { id: 'tease', group: 'friend', name: 'Tease', ch: '😜', motion: 'em-shake', art: hijabArt('#2fb39c', g => eface(g, 'wink', 'tongue', null, true),
+    { extra: espark(52, 12) + espark(10, 18, .7) }) },
+  // ---- game ----
+  { id: 'dice', group: 'game', name: 'Roll it!', ch: '🎲', motion: 'em-roll', art: esvg(
+    `<g transform="rotate(-12 32 34)">${eshape('M14 18a6 6 0 0 1 6-6h24a6 6 0 0 1 6 6v24a6 6 0 0 1-6 6H20a6 6 0 0 1-6-6z', '#fffaf1', 2.6)}` +
+    eline('M17 15q15-4 30 0', 2, '#ffffff') + [[22, 20], [42, 20], [22, 30], [42, 30], [22, 40], [42, 40]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="${EO}"/>`).join('') + `</g>` +
+    eline('M52 50l7 2M50 56l6 5M8 12l4 4', 3, '#ffc12e')) },
+  { id: 'crown', group: 'game', name: 'Winner', ch: '👑', motion: 'em-beat', art: esvg(
+    eshape('M10 46l-2-24 12 10 12-18 12 18 12-10-2 24z', '#ffcc3a') + eshape('M10 46h44v7H10z', '#f6a92e') +
+    `<circle cx="32" cy="38" r="4" fill="#e5484d" stroke="${EO}" stroke-width="1.6"/><circle cx="19" cy="40" r="2.6" fill="#3b7be0" stroke="${EO}" stroke-width="1.4"/><circle cx="45" cy="40" r="2.6" fill="#2fa86b" stroke="${EO}" stroke-width="1.4"/>` +
+    `<circle cx="8" cy="21" r="2.6" fill="#ffcc3a" stroke="${EO}" stroke-width="1.4"/><circle cx="32" cy="13" r="2.6" fill="#ffcc3a" stroke="${EO}" stroke-width="1.4"/><circle cx="56" cy="21" r="2.6" fill="#ffcc3a" stroke="${EO}" stroke-width="1.4"/>` +
+    espark(54, 8, .8) + espark(9, 56, .6)) },
+  { id: 'sad', group: 'game', name: 'Disappointed', ch: '💔', motion: 'em-sob', art: esvg(
+    eshape('M30 54L12 36a10 10 0 0 1 18-14l-3 9 6 5-5 6 4 4z', '#e5484d') + eshape('M36 56l-2-6 5-5-4-6 5-6-2-10a10 10 0 0 1 16 15z', '#e5484d') +
+    eline('M17 30q2-6 7-6', 2.4, 'rgba(255,255,255,.55)') + eheart(50, 50, .8) + eheart(12, 52, .6)) },
+];const Emotes = (() => {
+  const btn = $('emoteBtn'), panel = $('emotePanel'), layer = $('pcards'), btnHome = btn.parentNode;   // inside #stage: positions are stage px
+  const owned = () => EMOTES;   // every emote is free for now (see above)
+  const showing = {}, queue = {}, lastCpu = {};
+  let lastAny = 0, open = false;
+  const em = id => EMOTES.find(e => e.id === id);
+  // the picker: one section per family (Pawns, Friends, Game)
+  panel.innerHTML = EMOTE_GROUPS.map(([g, label]) => {
+    const list = owned().filter(e => e.group === g); if (!list.length) return '';
+    return `<p class="em-group">${label}</p>` + list.map(e => `<button type="button" class="em-pick" data-emote="${e.id}" aria-label="${e.name}" title="${e.name}">${e.art}<span>${e.name}</span></button>`).join('');
+  }).join('');
+  const sender = () => {   // vs Computer: the only human; Pass & Play: whoever holds the device (the player to move)
+    if (!S) return -1;
+    const hs = [0, 1, 2, 3].filter(c => isHuman(c));
+    return hs.length === 1 ? hs[0] : isHuman(S.turn) ? S.turn : hs[0] ?? -1;
+  };
+  // The bottom cards grow 5% on their turn (transform about their outer edge) and the active one shows "Tap" under its
+  // dice, so the free space is measured for the worst case: each card's columns both at rest and enlarged.
+  const SZ = 44, M = 4;
+  function obstacles(card) {
+    const left = !card.dataset.pos.endsWith('r'), W = card.offsetWidth, H = card.offsetHeight, x0 = card.offsetLeft, y0 = card.offsetTop;
+    const ox = left ? x0 : x0 + W, oy = y0 + H / 2, k = 1.05;
+    const box = (x, y, w, h) => [{ l: x, t: y, r: x + w, b: y + h }, { l: ox + (x - ox) * k, t: oy + (y - oy) * k, r: ox + (x + w - ox) * k, b: oy + (y + h - oy) * k }];
+    const who = card.querySelector('.who'), sl = card.querySelector('.slot');
+    const sx = x0 + sl.offsetLeft, sy = y0 + sl.offsetTop;
+    return [...box(x0 + who.offsetLeft, y0 + who.offsetTop, who.offsetWidth, who.offsetHeight), ...box(sx, sy, sl.offsetWidth, sl.offsetHeight),
+      ...box(sx + sl.offsetWidth / 2 - 20, sy + sl.offsetHeight, 40, 22)];   // the "Tap" hint under the dice
+  }
+  const clear = (c, obs) => obs.every(o => c.r + M <= o.l || c.l - M >= o.r || c.b + M <= o.t || c.t - M >= o.b);
+  function place() {   // beside your dice: level with it, or just below between the cards; else in the top HUD row
+    if (!S || screen !== 'game') { btn.hidden = true; return; }
+    btn.hidden = sender() < 0;
+    const bl = layer.querySelector('.pcard[data-pos="bl"]'), br = layer.querySelector('.pcard[data-pos="br"]'), ref = bl || br;
+    let spot = null;
+    if (ref) {
+      const obs = [bl, br].filter(Boolean).flatMap(obstacles), W = SW(), sl = ref.querySelector('.slot');
+      const slotMid = ref.offsetTop + sl.offsetTop + sl.offsetHeight / 2, low = ref.offsetTop + ref.offsetHeight - SZ / 2;   // bottom flush with the cards
+      const L = bl ? Math.max(...obstacles(bl).map(o => o.r)) : 0, R = br ? Math.min(...obstacles(br).map(o => o.l)) : W;
+      for (const [x, y] of [[(L + R) / 2, slotMid], [W / 2, low]]) {
+        const c = { l: x - SZ / 2, t: y - SZ / 2, r: x + SZ / 2, b: y + SZ / 2 };
+        if (c.l >= M && c.r <= W - M && clear(c, obs)) { spot = [x, y]; break; }
+      }
+    }
+    if (spot) {
+      if (btn.parentNode !== btnHome) btnHome.appendChild(btn);
+      btn.classList.remove('in-hud');
+      btn.style.left = spot[0] + 'px'; btn.style.top = spot[1] + 'px';
+    } else {
+      btn.classList.add('in-hud'); btn.style.left = btn.style.top = '';
+      const hud = document.querySelector('.hud-top');
+      if (btn.parentNode !== hud) hud.insertBefore(btn, $('gearBtn'));
+    }
+    if (open) placePanel();
+  }
+  function placePanel() {   // above the button (bottom) or below it (top bar), kept on screen; scrolls if the screen is short
+    panel.style.width = Math.min(312, SW() - 16) + 'px';
+    const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, b = btn.getBoundingClientRect();
+    panel.style.maxHeight = Math.max(160, ((btn.classList.contains('in-hud') ? st.bottom - b.bottom : b.top - st.top) / sc) - 24) + 'px';
+    const w = panel.offsetWidth * sc, h = panel.offsetHeight * sc, m = 8 * sc;
+    const x = Math.max(st.left + m, Math.min(st.right - m - w, (b.left + b.right) / 2 - w / 2));
+    const below = btn.classList.contains('in-hud');
+    const y = below ? b.bottom + m : b.top - m - h;
+    panel.style.left = (x - st.left) / sc + 'px'; panel.style.top = (Math.max(st.top + m, y) - st.top) / sc + 'px';
+    panel.classList.toggle('down', below);
+  }
+  function setOpen(on) {
+    if (open === on) return;
+    open = on; panel.hidden = !on; btn.setAttribute('aria-expanded', String(on));
+    if (on) { placePanel(); sfx('tap'); const f = panel.querySelector('.em-pick'); if (f) f.focus({ preventScroll: true }); }
+  }
+  // the bubble: over the sender's avatar, popping in, moving in the emote's own way, fading out
+  function show(c, id) {
+    const e = em(id); if (!e || !S || !cards[c]) return false;
+    if (showing[c]) { queue[c] = queue[c] || []; if (queue[c].length < 2) queue[c].push(id); return true; }
+    const ava = cards[c].querySelector('.ava'); if (!ava) return false;
+    const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, r = ava.getBoundingClientRect();
+    const b = document.createElement('div');
+    b.className = `emote-bubble ${e.motion}`; b.dataset.seat = c; b.dataset.emote = id;
+    b.style.setProperty('--c', COLORS[c].css);
+    b.style.left = ((r.left + r.right) / 2 - st.left) / sc + 'px'; b.style.top = ((r.top + r.bottom) / 2 - st.top) / sc + 'px';
+    b.setAttribute('role', 'img'); b.setAttribute('aria-label', `${pname(c)}: ${e.name}`);
+    b.innerHTML = `<span class="em-art">${e.art}</span>` + (e.motion === 'em-party' ? '<i></i><i></i><i></i><i></i><i></i><i></i>' : '');
+    layer.appendChild(b); showing[c] = b; sfx('emote');
+    const gid = S.id;
+    setTimeout(() => {
+      b.remove(); if (showing[c] === b) delete showing[c];
+      if (!S || S.id !== gid) return;
+      const next = (queue[c] || []).shift(); if (next) show(c, next);
+    }, 1800);
+    return true;
+  }
+  function send(id) { const c = sender(); setOpen(false); if (c >= 0) show(c, id); }
+  // CPU players: an occasional, varied reaction (throttled per player and overall)
+  const pick = (c, ids) => { const opts = ids.filter(x => x !== lastCpu[c]); return opts[Math.floor(Math.random() * opts.length)]; };
+  function cpuSay(c, ids, chance) {
+    if (!S || S.players[c] !== 'cpu' || Math.random() >= chance) return false;
+    const now = performance.now();
+    if (now - lastAny < 4000 || now - (lastCpu['t' + c] || -1e9) < 9000) return false;
+    const id = pick(c, ids); lastAny = now; lastCpu['t' + c] = now; lastCpu[c] = id;
+    const gid = S.id;
+    setTimeout(() => { if (S && S.id === gid) show(c, id); }, 350 + Math.random() * 500);
+    return true;
+  }
+  function react(kind, c, victims = []) {
+    if (!S) return;
+    if (kind === 'capture') {
+      const owners = [...new Set(victims.map(v => v[0]))];
+      const hurt = owners.find(o => S.players[o] === 'cpu' && isHuman(c));
+      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow', 'facepalm', 'sad'], .4)) return;
+      if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool', 'tease'], .35);
+    } else if (kind === 'win') {
+      const winners = teamOn() ? [c, mateOf(c)] : [c];
+      const cpuWinner = winners.find(w => S.players[w] === 'cpu');
+      if (cpuWinner !== undefined) cpuSay(cpuWinner, ['party', 'crown', 'happy'], .7);
+      else { const loser = [0, 1, 2, 3].find(o => S.players[o] === 'cpu' && !winners.includes(o)); if (loser !== undefined) cpuSay(loser, ['clap', 'sad', 'cry'], .5); }
+    }
+  }
+  function reset() {   // a new game (or leaving one): no bubbles, queues or reaction cooldowns carried over
+    setOpen(false);
+    Object.keys(showing).forEach(k => { showing[k].remove(); delete showing[k]; });
+    Object.keys(queue).forEach(k => delete queue[k]);
+    Object.keys(lastCpu).forEach(k => delete lastCpu[k]); lastAny = 0;
+  }
+  btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!open); });
+  panel.addEventListener('click', e => { const b = e.target.closest('[data-emote]'); if (b) send(b.dataset.emote); });
+  addEventListener('pointerdown', e => { if (open && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false); }, true);
+  addEventListener('keydown', e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setOpen(false); btn.focus({ preventScroll: true }); } }, true);
+  addEventListener('resize', () => setTimeout(place, 60));
+  return { place, show, send, react, reset, setOpen, sender, get open() { return open; }, get showing() { return { ...showing }; }, get queue() { return JSON.parse(JSON.stringify(queue)); }, list: () => owned().map(e => e.id) };
+})();
+
 /* ---------- HUD ---------- */
 function setMsg(html) { $('msg').innerHTML = html; }
 /* Player cards sit in the screen corners, clockwise from the viewer's own corner (bottom-left),
@@ -3983,6 +4306,7 @@ function buildCards() {
     cards[c] = el;
   });
   Info.auto(wrap);
+  Emotes.reset(); Emotes.place();   // the emote button beside your dice (cards are in place now)
 }
 
 const tapEl = document.createElement('span');
@@ -6323,7 +6647,7 @@ function openSheet(id) {
   const cur = openSheetEl();
   backTo[id] = cur && cur.id !== id ? cur.id : null;
   if (cur) cur.hidden = true;
-  Info.close();
+  Info.close(); Emotes.setOpen(false);
   $(id).hidden = false;
   Info.auto($(id));   // a feature ⓘ that is relevant as soon as this sheet opens
   document.documentElement.classList.add('sheet-open');
@@ -6353,6 +6677,7 @@ sheets.forEach(el => el.querySelectorAll('[data-close]').forEach(b => b.addEvent
 function startGame(players, teams = false) { closeAllSheets(); sfx('select'); newGame(players, teams); }
 function goHome() {
   gameId++; S = null; paused = false; movableSet = new Set();
+  Emotes.reset(); Emotes.place();   // no bubbles left behind; the button hides
   closeAllSheets();
   toks.flat().forEach(t => { t.anim = false; });
   relayout(); updateHUD();
@@ -6670,7 +6995,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { Emotes, EMOTES, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
