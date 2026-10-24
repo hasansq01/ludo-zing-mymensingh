@@ -198,6 +198,14 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Clash-style emote animation (2026-10-24, from the user's two Clash Royale recordings, studied frame by frame):
+      every sticker has moving parts inside a still bubble: the character moves in its mood (squash, shake, rage,
+      sway, tilt, heave, jolt, groove, no), arms swing about their shoulders (wave / pump / point / thumb), faces
+      laugh, blink, wag a tongue, tears flow, and accents pop, twinkle, drip, rise, wobble or burst; game objects roll,
+      hop, crack, clap, wave or peek. Sending flies the sticker out of the tapped picker cell (overshoot, settle), it
+      holds ~2.4s and shrinks away; the picker greys out for 2s after a send. Victory + Yay! prototyped first and
+      approved. `tests/emotes.js` 56/56 at 320x568, 390x844, 430x932, 844x390, 1366x768 (headless Chrome); home visual
+      suite PASS (0.000%). On `feature/emotes`, uncommitted. Not deployed.
 - [x] Emote sticker collection (2026-10-24, user's reference sheet; phase 1 style approved on Victory + Celebration):
       all 24 emotes redrawn as stickers with their own speech bubble (172x109), from one kit (pawn / hijab girl / hoodie
       boy bases, hands, faces, accents); reviewed against the reference by a subagent and fixed. Clap replaced by Yay!

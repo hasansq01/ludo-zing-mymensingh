@@ -25,6 +25,7 @@
   check('a new player owns and has equipped only the Starter set', JSON.stringify(L.P.emoteSets) === '["starter"]' && L.P.emoteSet === 'starter', [L.P.emoteSets, L.P.emoteSet]);
   check('the picker holds only the equipped set (6 emotes)', panel.querySelectorAll('.em-pick').length === 6 && E.list().join() === L.EMOTE_SETS[0].emotes.join());
   check('every emote is a 2D vector sticker (inline SVG on the 172x109 grid, no image files)', L.EMOTES.every(e => /^<svg viewBox="0 0 172 109"/.test(e.art) && !/<image|\.png|\.jpg/.test(e.art)));
+  check('every emote is an animated sticker (moving parts inside a still bubble)', L.EMOTES.every(e => /class="sa-/.test(e.art)), L.EMOTES.filter(e => !/class="sa-/.test(e.art)).map(e => e.id));
   check('every copy on the page has its own clip-path ids', (() => { const ids = [...document.querySelectorAll('#emotePanel [id], #pcards [id^="st"]')].map(n => n.id); return ids.length > 0 && new Set(ids).size === ids.length; })());
   check('ids are unique', new Set(L.EMOTES.map(e => e.id)).size === L.EMOTES.length);
   const parts = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #pcards .tap, #msg, #menuBtn, #gearBtn')].filter(e => e !== btn);
@@ -57,7 +58,12 @@
   check('opening a menu closes it', !E.open);
 
   // pick -> bubble over the sender's avatar
-  btn.click(); panel.querySelector('[data-emote="laugh"]').click(); await sleep(220);
+  btn.click(); panel.querySelector('[data-emote="laugh"]').click();
+  check('a picked emote flies out of its picker cell', bubbleOf(0) && bubbleOf(0).classList.contains('fly') && bubbleOf(0).style.getPropertyValue('--fx') !== '');
+  check('after sending, the picker cools down (greyed, taps ignored)', panel.classList.contains('cooling'));
+  btn.click(); panel.querySelector('[data-emote="cool"]').click();
+  check('a tap during the cooldown sends nothing', !(E.queue[0] || []).length);
+  E.setOpen(false); await sleep(220);
   const b0 = bubbleOf(0);
   check('picking an emote closes the panel and shows a bubble', !E.open && b0 && b0.dataset.emote === 'laugh');
   // cards are built in seat order for the seats in play
@@ -72,8 +78,8 @@
   // queue: one at a time per player, at most two waiting
   E.send('cool'); E.send('love'); E.send('cheer'); E.send('party');
   check('a player\'s further emotes wait (at most 2)', document.querySelectorAll('.emote-bubble[data-seat="0"]').length === 1 && (E.queue[0] || []).length === 2, E.queue);
-  await sleep(1900);
-  check('the next queued emote follows after ~1.8s', bubbleOf(0) && bubbleOf(0).dataset.emote === 'cool');
+  await sleep(2500);
+  check('the next queued emote follows after ~2.4s', bubbleOf(0) && bubbleOf(0).dataset.emote === 'cool');
 
   // every seat at once: no two bubbles overlap, none covers the board centre text / dice
   E.reset();

@@ -142,6 +142,14 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   Champ (pawns); Cry, Shocked, Facepalm, Yay! (`cheer`, the approved yellow-hijab sticker; replaced Clap), Thinking,
   Tease (friends); Roll it!, Winner, Disappointed, High five, Give up, Peek-a-boo (game). In-game bubble: the sticker
   (100x63.5) on the sender's avatar with a thin glow in their colour. Picker cells 72x50 (`CW` / `CH` in `placePanel`).
+  **Animation (Clash-style):** parts are `<g class="sa-…">` groups (`stPart`): `sa-char` + a mood class wraps the
+  character (built in by `stPawn` / `stHijab` / `stBoy`, `mood` option), `stArm` wraps arms in `sa-arm` (pivot = the
+  path's start, swing by hand kind), `stFace` wraps eyes / mouths (`ST_EYEMOVE`, `ST_TALK`), accents wrap themselves
+  (`sa-beat`, `sa-twinkle`, `sa-drip`, `sa-rise`, `sa-wobble`, `sa-throb`, `sa-pop`, `sa-burst`); game objects use
+  `sa-roll`, `sa-hop`, `sa-crack`, `sa-clap`, `sa-bob`, `sa-wave`, `sa-peek`. All keyframes live in the "sticker
+  animation" CSS block (reduced motion stops them). Stickers with parts get `em-alive` instead of a whole-sticker
+  motion. Sending: `send(id, cell)` flies the bubble from the picker cell (`.fly`, `--fx` / `--fy`, `emFly`), CPU and
+  queued emotes pop (`emPop`); life `LIFE` 2.4s with `emOut`; the picker cools down 2s (`cool()`, `.cooling`).
   **Sets (2026-10-24):** 24 emotes in 4 sets of 6 (`EMOTE_SETS`): Starter (free, default; Victory, Laugh, Cool, Angry,
   Love, Celebrate), Pawn Pals 2,500 (Champ, Sleepy, Sob, Gasp, Confused, Hi!), Friends 4,000 (Cry, Shocked, Facepalm,
   Yay!, Thinking, Tease), Game 3,500 (Roll it!, Winner, High five, Give up, Disappointed, Peek-a-boo). Profile:
