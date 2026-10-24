@@ -198,6 +198,19 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Emote sticker collection (2026-10-24, user's reference sheet; phase 1 style approved on Victory + Celebration):
+      all 24 emotes redrawn as stickers with their own speech bubble (172x109), from one kit (pawn / hijab girl / hoodie
+      boy bases, hands, faces, accents); reviewed against the reference by a subagent and fixed. Clap replaced by Yay!
+      (the approved yellow-hijab sticker). Picker cells 72x50, in-game bubble = the sticker with a glow in the sender's
+      colour, Shop/Inventory previews at sticker ratio; `emArt()` keeps clip ids unique. `tests/emotes.js` 52/52 at
+      320x568, 390x844, 430x932, 844x390, 1366x768 (headless Chrome; the hidden pane fails 2-3 checks that need a
+      visible page); home visual suite PASS (0.000%). On `feature/emotes`, uncommitted. Not deployed.
+- [x] Emote sets + left-side picker (2026-10-24, user's screenshots): 6 new cartoon emotes (Sob, Gasp, Champ, High five,
+      Give up, Peek-a-boo) -> 24 in 4 sets of 6; Starter free and equipped by default, Pawn Pals / Friends / Game sold in a
+      new Shop > Emotes tab (and Inventory > Emotes) with preview cards, a View sheet, Buy (existing coin logic) and Use;
+      only the equipped set appears in the game, in a slim panel at the left of the board (1-3 columns by space) with a
+      slide-in + staggered pop and a fade-out. `tests/emotes.js` 51/51 at 320x568, 390x844, 430x932, 844x390, 1366x768.
+      On `feature/emotes`. Not deployed.
 - [x] Emotes redrawn as a 2D cartoon collection (2026-10-24, user's style reference; original art, not copied): 18
       emotes in three families (pawn characters in the four colours, a hoodie boy and hijab girls, game symbols) covering
       all 16 requested reactions plus Roll it! and Winner; consistent outline / proportions; grouped picker; cartoon

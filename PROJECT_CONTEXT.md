@@ -48,7 +48,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
-| `tests/emotes.js` | 34 emote tests (incl. the 16 required reactions, 3 families, vector-only art, tap sizes) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
+| `tests/emotes.js` | 52 emote tests (incl. the 16 required reactions, 4 sets of 6, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -130,13 +130,29 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   `dailyState()` decides; `claimDaily()` writes via `commitProfile` after re-reading the stored profile. Limitation:
   local only (browser storage or the signed-in account's sync / YouTube cloud save); the device clock decides the day.
   Tests: `tests/daily-rewards.js` (32).
-- **Emotes (Ludo games, 2026-10-24; 2D cartoon set the same day):** 18 original 2D cartoon stickers (bold dark outline
-  `EO`, flat colours, minimal shading) built from one face kit (`EYES` / `BROWS` / `MOUTHS` / `blush` over a geometry
-  `{l,r,y,m}`) in three families: `pawnArt` (the four pawn colours, `PAWN_COL`, with arms via `elimb`), `boyArt` /
-  `hijabArt` (friends), and game symbols (dice, crown, broken heart). Reactions: Victory, Laugh, Cool, Angry, Love,
-  Sleepy, Confused, Hi!, Celebrate (pawns); Cry, Shocked, Facepalm, Clap, Thinking, Tease (friends); Roll it!, Winner,
-  Disappointed (game). Picker sections by `group` (`EMOTE_GROUPS`), width fitted to the screen, scrolls when short.
-  The bubble is a cartoon speech bubble (cream, dark outline, the sender's colour as its rim, tail toward the avatar).
+- **Emotes (Ludo games, 2026-10-24; sticker style approved the same day):** 24 2D stickers matched to the user's
+  reference sheet. Each sticker carries its own cream speech bubble (dark outline, tail left) on a 172x109 viewBox
+  (`stSticker`); the character pops out over its top edge and is cut at its bottom. Kit: `stSil` (merged silhouette:
+  outline pass + fill), `stShade` (clipped cel shading), `stTube` / `stArm`, hands (`stFist`, `stPalm`, `stThumb`,
+  `stPoint`), a face kit (`STE` eyes / `STB` brows / `STM` mouths, `stFace` over `{l,r,y,m,cx}`), accents (`stShards`,
+  `stHeart`, `stStar`, `stDrop`, `stZ`, `stQ`, `stAnger`, `stBang`, `stConfetti`), and three bases: `stPawn` (four
+  colours, `ST_PAL`), `stHijab` (any scarf colour) and `stBoy` (jacket colour). `EMOTE_STICKERS[id]` holds the art;
+  `EMOTES` maps id/name/motion onto it. `emArt(e)` makes the clip-path ids unique per copy on the page (use it wherever
+  a sticker is inserted). Reactions: Victory, Laugh, Cool, Angry, Love, Sleepy, Confused, Hi!, Celebrate, Sob, Gasp,
+  Champ (pawns); Cry, Shocked, Facepalm, Yay! (`cheer`, the approved yellow-hijab sticker; replaced Clap), Thinking,
+  Tease (friends); Roll it!, Winner, Disappointed, High five, Give up, Peek-a-boo (game). In-game bubble: the sticker
+  (100x63.5) on the sender's avatar with a thin glow in their colour. Picker cells 72x50 (`CW` / `CH` in `placePanel`).
+  **Sets (2026-10-24):** 24 emotes in 4 sets of 6 (`EMOTE_SETS`): Starter (free, default; Victory, Laugh, Cool, Angry,
+  Love, Celebrate), Pawn Pals 2,500 (Champ, Sleepy, Sob, Gasp, Confused, Hi!), Friends 4,000 (Cry, Shocked, Facepalm,
+  Yay!, Thinking, Tease), Game 3,500 (Roll it!, Winner, High five, Give up, Disappointed, Peek-a-boo). Profile:
+  `P.emoteSets` (always incl. starter), `P.emoteSet` (equipped; `ensureProfile` repairs). Only the equipped set is in the
+  game picker (`Emotes.refresh()` on each `reset()` / set change). Shop > Emotes and Inventory > Emotes (`renderEmoteSets`):
+  card = 2x3 preview of the set, Equipped / Owned / Locked tag, View + Buy / Use; `buyEmoteSet` (commitProfile; owns +
+  equips; refuses without coins / when owned) / `useEmoteSet`; View = `#emSetSheet` (`openEmoteSet`): the six emotes big,
+  each playing its motion, with Buy / Use. Picker: a slim panel along the left edge of the board, vertically centred in
+  the band between the top and bottom player cards (1 column; 2 or 3 when the band is short, e.g. 320x568 and the
+  landscape frame), popping out from the left (slide + scale + fade, buttons staggered by `--i`), closing with a quick
+  fade (`.closing`, then hidden after 170ms).
   `EMOTES` entries: id, group, name, emoji fallback (ch), motion class, art; all
   free, `owned()` is the hook for a future shop; `Emotes` is defined before the HUD code. `#emoteBtn` is placed by
   `Emotes.place()` (from `buildCards` and on resize): level with your dice between the bottom cards, else just below

@@ -19,10 +19,13 @@
   L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(400);
   const S0 = JSON.stringify(L.S);
   check('game: the emote button is shown, 44px', !btn.hidden && btn.offsetWidth >= 44 && btn.offsetHeight >= 44);
-  const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'sleepy', 'confused', 'facepalm', 'clap', 'party', 'think', 'sad', 'hi', 'tease'];
-  check('at least 16 free emotes, every required reaction present', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)) && panel.querySelectorAll('.em-pick').length === L.EMOTES.length && E.list().length === L.EMOTES.length, need.filter(id => !L.EMOTES.some(e => e.id === id)));
-  check('three families (pawns, friends, game) as picker sections', ['pawn', 'friend', 'game'].every(g => L.EMOTES.some(e => e.group === g)) && panel.querySelectorAll('.em-group').length === 3);
-  check('every emote is 2D vector art (inline SVG, no image files)', L.EMOTES.every(e => /^<svg viewBox="0 0 64 64"/.test(e.art) && !/<image|\.png|\.jpg/.test(e.art)));
+  const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'sleepy', 'confused', 'facepalm', 'cheer', 'party', 'think', 'sad', 'hi', 'tease'];
+  check('every required reaction exists (16+)', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)), need.filter(id => !L.EMOTES.some(e => e.id === id)));
+  check('4 sets of 6 (rows of the reference): Starter free, others priced, every emote in exactly one set', L.EMOTE_SETS.length === 4 && L.EMOTE_SETS.every(s => s.emotes.length === 6) && L.EMOTE_SETS[0].id === 'starter' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
+  check('a new player owns and has equipped only the Starter set', JSON.stringify(L.P.emoteSets) === '["starter"]' && L.P.emoteSet === 'starter', [L.P.emoteSets, L.P.emoteSet]);
+  check('the picker holds only the equipped set (6 emotes)', panel.querySelectorAll('.em-pick').length === 6 && E.list().join() === L.EMOTE_SETS[0].emotes.join());
+  check('every emote is a 2D vector sticker (inline SVG on the 172x109 grid, no image files)', L.EMOTES.every(e => /^<svg viewBox="0 0 172 109"/.test(e.art) && !/<image|\.png|\.jpg/.test(e.art)));
+  check('every copy on the page has its own clip-path ids', (() => { const ids = [...document.querySelectorAll('#emotePanel [id], #pcards [id^="st"]')].map(n => n.id); return ids.length > 0 && new Set(ids).size === ids.length; })());
   check('ids are unique', new Set(L.EMOTES.map(e => e.id)).size === L.EMOTES.length);
   const parts = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #pcards .tap, #msg, #menuBtn, #gearBtn')].filter(e => e !== btn);
   check('the button covers no card, dice, name or HUD control', parts.every(p => !overlap(R(btn), R(p), 0.5)), parts.filter(p => overlap(R(btn), R(p), .5)).map(p => p.className || p.id));
@@ -34,17 +37,27 @@
   btn.click(); await sleep(50);
   check('tapping the button opens the panel', E.open && !panel.hidden && btn.getAttribute('aria-expanded') === 'true');
   check('the panel is fully on screen', R(panel).left >= st.left - .5 && R(panel).right <= st.right + .5 && R(panel).top >= st.top - .5 && R(panel).bottom <= st.bottom + .5);
-  check('every emote can be reached (the panel scrolls when the screen is short)', panel.scrollHeight <= panel.clientHeight + 1 || getComputedStyle(panel).overflowY === 'auto');
+  const sc = st.width / $('stage').offsetWidth;
+  check('the panel sits along the left edge', R(panel).left - st.left <= 12 * sc && (R(panel).left + R(panel).right) / 2 < st.left + st.width / 2, [R(panel).left - st.left]);
+  const cardsNow = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #msg, #menuBtn, #gearBtn, #emoteBtn')];
+  check('the panel covers no player card, dice, HUD control or the emote button', cardsNow.every(p => !overlap(R(panel), R(p), .5)), cardsNow.filter(p => overlap(R(panel), R(p), .5)).map(p => p.className || p.id));
+  check('it pops out with the slide-in animation, buttons staggered', panel.classList.contains('show') && getComputedStyle(panel.querySelector('.em-pick:nth-child(3)')).getPropertyValue('--i').trim() === '2');
   check('picker buttons are comfortable to tap', [...panel.querySelectorAll('.em-pick')].every(b => b.offsetWidth >= 44 && b.offsetHeight >= 44));
   document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  check('a tap outside closes it', !E.open && panel.hidden);
+  check('a tap outside closes it (smooth fade, then hidden)', !E.open && panel.classList.contains('closing'));
+  await sleep(220);
+  check('…and it is gone after the fade', panel.hidden);
+  // (the pause menu also opens whenever the page is hidden, so check that Escape never reaches the game's own handler)
+  let leaked = false; const spy = e => { if (e.key === 'Escape') leaked = true; };
+  addEventListener('keydown', spy);   // bubble phase on window: where the game's Escape -> pause handler listens
   btn.click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  check('Escape closes it (and does not open the pause menu)', !E.open && $('pauseSheet').hidden);
+  removeEventListener('keydown', spy);
+  check('Escape closes it and is not passed on (it does not also open the pause menu)', !E.open && !leaked);
   btn.click(); L.openSheet('settingsSheet'); L.closeSheet('settingsSheet');
   check('opening a menu closes it', !E.open);
 
   // pick -> bubble over the sender's avatar
-  btn.click(); panel.querySelector('[data-emote="laugh"]').click(); await sleep(30);
+  btn.click(); panel.querySelector('[data-emote="laugh"]').click(); await sleep(220);
   const b0 = bubbleOf(0);
   check('picking an emote closes the panel and shows a bubble', !E.open && b0 && b0.dataset.emote === 'laugh');
   // cards are built in seat order for the seats in play
@@ -57,7 +70,7 @@
   check('the bubble ignores taps (never blocks the game)', getComputedStyle(b0).pointerEvents === 'none');
 
   // queue: one at a time per player, at most two waiting
-  E.send('cool'); E.send('love'); E.send('clap'); E.send('party');
+  E.send('cool'); E.send('love'); E.send('cheer'); E.send('party');
   check('a player\'s further emotes wait (at most 2)', document.querySelectorAll('.emote-bubble[data-seat="0"]').length === 1 && (E.queue[0] || []).length === 2, E.queue);
   await sleep(1900);
   check('the next queued emote follows after ~1.8s', bubbleOf(0) && bubbleOf(0).dataset.emote === 'cool');
@@ -76,7 +89,7 @@
   E.place();
   check('Top View: the button still covers no card or HUD control', [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #msg, #menuBtn, #gearBtn')].every(p => !overlap(R(btn), R(p), .5)));
   E.show(0, 'wow'); await sleep(30);
-  check('Top View: the bubble still sits on the avatar', bubbleOf(0) && overlap(R(bubbleOf(0)), R(document.querySelector('#pcards .pcard .ava'))));
+  check('Top View: the bubble still sits on the avatar', bubbleOf(0) && overlap(R(bubbleOf(0)), R(document.querySelector('#pcards .pcard .ava'))), [bubbleOf(0) && R(bubbleOf(0)), R(document.querySelector('#pcards .pcard .ava'))]);
   document.querySelector('input[name=cam][value="3d"]').click(); await sleep(200);
 
   // CPU reactions: forced chance, then throttled
@@ -93,8 +106,40 @@
   // ---- Pass & Play: the player to move is the sender ----
   E.reset(); L.newGame(['human', 'human', 'human', 'human'], false); await sleep(300);
   check('Pass & Play: sender is the player to move', E.sender() === L.S.turn);
-  E.send('clap'); await sleep(30);
-  check('Pass & Play: the bubble shows on that player\'s card', bubbleOf(L.S.turn) && bubbleOf(L.S.turn).dataset.emote === 'clap');
+  E.send('cheer'); await sleep(30);
+  check('Pass & Play: the bubble shows on that player\'s card', bubbleOf(L.S.turn) && bubbleOf(L.S.turn).dataset.emote === 'cheer');
+
+  // ---- emote sets: shop, buy, equip, inventory, preview ----
+  const P = L.P, keep = JSON.stringify({ coins: P.coins, emoteSets: P.emoteSets, emoteSet: P.emoteSet });
+  const pals = L.EMOTE_SETS.find(s => s.id === 'pawns');
+  L.goHome(); L.renderShop(); L.openSheet('shopSheet'); L.showShopTab('emotes'); await sleep(50);
+  const cards = [...$('shopEmotes').querySelectorAll('.item')];
+  check('Shop > Emotes: one card per set, each previewing its 6 emotes', cards.length === 4 && cards.every(c => c.querySelectorAll('.emset-prev svg').length === 6));
+  check('the cards tell Equipped / Locked apart', /Equipped/.test(cards[0].textContent) && cards.slice(1).every(c => /Locked/.test(c.textContent) && c.querySelector('[data-emset-buy]')));
+  P.coins = pals.price - 1; $('shopEmotes').querySelector('[data-emset-buy="pawns"]').click();
+  check('not enough coins: nothing spent, still locked', P.coins === pals.price - 1 && !P.emoteSets.includes('pawns'));
+  P.coins = pals.price + 10; $('shopEmotes').querySelector('[data-emset-buy="pawns"]').click();
+  check('Buy charges the price once, owns and equips the set', P.coins === 10 && P.emoteSets.includes('pawns') && P.emoteSet === 'pawns', [P.coins, P.emoteSets, P.emoteSet]);
+  check('an owned set is never sold twice', L.buyEmoteSet('pawns') === false && P.coins === 10);
+  check('the purchase is saved', (L.Store.data.profile.emoteSets || []).includes('pawns') && L.Store.data.profile.emoteSet === 'pawns');
+  L.closeSheet('shopSheet');
+  L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(300);
+  btn.click(); await sleep(30);
+  check('in the game, the picker now holds only the Pawn Pals emotes', [...panel.querySelectorAll('.em-pick')].map(b => b.dataset.emote).join() === pals.emotes.join());
+  panel.querySelector('[data-emote="champ"]').click(); await sleep(220);
+  check('a Pawn Pals emote plays on your avatar', bubbleOf(0) && bubbleOf(0).dataset.emote === 'champ');
+  L.goHome(); L.renderInv(); L.openSheet('invSheet'); await sleep(30);
+  const inv = [...$('invEmotes').querySelectorAll('.item')];
+  check('Inventory > Emotes lists only owned sets', inv.length === 2);
+  $('invEmotes').querySelector('[data-emset-use="starter"]').click();
+  check('Use in Inventory equips the Starter set again', P.emoteSet === 'starter');
+  L.closeSheet('invSheet');
+  L.openEmoteSet('friends'); await sleep(30);
+  check('View: the set preview shows its 6 emotes and Buy with the real price', !$('emSetSheet').hidden && $('emSetGrid').children.length === 6 && /Buy — 4K/.test($('emSetAct').textContent));
+  P.coins = 0; $('emSetAct').click();
+  check('View: Buy without coins explains and spends nothing', /more coins/.test($('emSetNote').textContent) && !P.emoteSets.includes('friends'));
+  L.closeSheet('emSetSheet');
+  Object.assign(P, JSON.parse(keep));
 
   // ---- leaving the game ----
   L.goHome(); await sleep(50);
