@@ -829,13 +829,15 @@ body.jungle-ready .sl.is-landing{background:transparent}
 .unit-pick button.on{background:linear-gradient(var(--gold-hi),var(--gold));color:var(--on-accent);box-shadow:0 3px 0 var(--gold-deep)}
 .unit-pick.ask button{animation:nudge 1.1s ease-in-out infinite}
 body:not([data-screen="game"]) .unit-pick{display:none}
-/* Emotes: button (centred on its spot, or a regular HUD button on narrow screens), panel, bubbles over the avatars */
-.emote-btn{position:fixed;z-index:3;width:44px;height:44px;transform:translate(-50%,-50%);border-radius:50%;display:grid;place-items:center;padding:0;
-  background:linear-gradient(180deg,#fff8ee,#ffe3c4);border:2px solid #fff;box-shadow:0 3px 0 #dc9a62,0 5px 12px rgba(110,60,40,.25);transition:transform .12s}
+/* Emotes: button (a bare cream chat bubble just above your avatar, or in the HUD row when there is no room), panel,
+   reactions beside each player's dice */
+.emote-btn{position:fixed;z-index:3;width:44px;height:44px;transform:translate(-50%,-50%);border-radius:12px;display:grid;place-items:center;padding:0;
+  background:none;border:0;box-shadow:none;transition:transform .12s;-webkit-tap-highlight-color:transparent}
 .emote-btn:active{transform:translate(-50%,-50%) scale(.92)}
-.emote-btn svg{width:30px;height:30px}
-.emote-btn[aria-expanded="true"]{box-shadow:0 0 0 3px #ffb48a,0 3px 0 #dc9a62}
-.emote-btn.in-hud{position:static;transform:none;flex:none;width:44px;height:44px;border-radius:15px}
+.emote-btn svg{width:34px;height:34px;overflow:visible;filter:drop-shadow(0 1.5px 0 rgba(220,154,98,.9)) drop-shadow(0 3px 5px rgba(110,60,40,.3));transition:transform .15s}
+.emote-btn[aria-expanded="true"] svg{transform:scale(1.1);filter:drop-shadow(0 0 4px rgba(255,180,138,.95)) drop-shadow(0 3px 5px rgba(110,60,40,.3))}
+.emote-btn:focus-visible{outline:2px solid #ffb48a;outline-offset:2px}
+.emote-btn.in-hud{position:static;transform:none;flex:none;width:44px;height:44px}
 .emote-btn.in-hud:active{transform:scale(.92)}
 body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-panel{display:none}
 /* the picker: the equipped set only, a slim panel along the left edge of the board (1-3 columns, see placePanel) that
@@ -867,14 +869,12 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .emset-cell b{font-size:.72rem;font-weight:900;color:#8a4a2c}
 .emset-cell.em-shake .em-art,.emset-cell.em-tilt .em-art,.emset-cell.em-beat .em-art,.emset-cell.em-rage .em-art,.emset-cell.em-sob .em-art,.emset-cell.em-jump .em-art,
 .emset-cell.em-clap .em-art,.emset-cell.em-party .em-art,.emset-cell.em-float .em-art,.emset-cell.em-wobble .em-art,.emset-cell.em-wave .em-art,.emset-cell.em-roll .em-art{animation-delay:calc(var(--i,0) * 120ms + .3s)}
-/* the reaction: the sticker (its own cream speech bubble) with a thin glow in the sender's colour, sitting on the
-   sender's avatar (so it never covers the board, dice, names or another player's bubble) */
-.emote-bubble{position:absolute;z-index:5;width:100px;height:63.5px;margin:-38px 0 0 -50px;display:grid;place-items:center;pointer-events:none;
-  filter:drop-shadow(0 0 1.5px var(--c)) drop-shadow(0 0 1.5px var(--c)) drop-shadow(0 7px 9px rgba(80,40,30,.35));animation:emPop .34s cubic-bezier(.3,1.5,.5,1) both,emOut .18s 2.2s ease-in forwards}
-.emote-bubble.fly{animation:emFly .34s cubic-bezier(.25,.9,.35,1) both,emOut .18s 2.2s ease-in forwards}
-@keyframes emPop{0%{transform:scale(.25);opacity:0}60%{transform:scale(1.2);opacity:1}100%{transform:scale(1)}}
-@keyframes emFly{0%{transform:translate(var(--fx),var(--fy)) scale(.3)}65%{transform:translate(0,0) scale(1.22)}82%{transform:scale(.94)}100%{transform:scale(1)}}
-@keyframes emOut{to{transform:scale(.55);opacity:0}}
+/* the reaction: the sticker (its own cream speech bubble) with a thin glow in the sender's colour, just above the
+   sender's avatar and dice (below them for the top players), clear of the board edge, names and other bubbles */
+.emote-bubble{position:absolute;z-index:5;width:116px;height:74px;margin:-37px 0 0 -58px;display:grid;place-items:center;pointer-events:none;
+  filter:drop-shadow(0 0 1.5px var(--c)) drop-shadow(0 0 1.5px var(--c)) drop-shadow(0 7px 9px rgba(80,40,30,.35));animation:emPop .42s cubic-bezier(.2,.9,.3,1) both,emOut .3s 2.1s ease-in forwards}
+@keyframes emPop{0%{transform:translateY(8px) scale(.6);opacity:0}55%{transform:translateY(-2px) scale(1.07);opacity:1}78%{transform:scale(.98)}100%{transform:none}}
+@keyframes emOut{to{transform:translateY(-6px) scale(.96);opacity:0}}
 /* the picker after sending: greyed and ignoring taps for 2s (the colour comes back smoothly) */
 .emote-panel .em-pick{transition:transform .1s,filter .3s,opacity .3s}
 .emote-panel.cooling .em-pick{filter:grayscale(1);opacity:.75;cursor:default}
@@ -983,7 +983,7 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .em-party i:nth-child(4){background:#ffd34d;--dx:-38px;--dy:6px}.em-party i:nth-child(5){background:#3b7be0;--dx:38px;--dy:8px}
 .em-party i:nth-child(6){background:#b49cff;--dx:-14px;--dy:-42px}.em-party i:nth-child(7){background:#ff8a6a;--dx:16px;--dy:-44px}
 @keyframes emBurst{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(200deg)}}
-@media (prefers-reduced-motion:reduce){.emote-bubble,.emote-bubble.fly{animation:emFade 2.4s linear forwards}.emote-bubble .em-art,.em-party i{animation:none}.em-party i{display:none}
+@media (prefers-reduced-motion:reduce){.emote-bubble{animation:emFade 2.4s linear forwards}.emote-bubble .em-art,.em-party i{animation:none}.em-party i{display:none}
   [class^="sa-"],[class*=" sa-"]{animation:none!important}}
 @keyframes emFade{0%{opacity:0}10%,85%{opacity:1}100%{opacity:0}}
 .fine{font-size:.84rem}
@@ -1305,7 +1305,7 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
   <span class="info-i" data-info="pair"></span>
 </div>
 <!-- Emotes (Ludo games): the button beside your dice (or in the top row on narrow screens), its panel, filled by Emotes -->
-<button class="emote-btn" id="emoteBtn" type="button" aria-label="Emotes" aria-haspopup="true" aria-expanded="false" hidden><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 6.5h22a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H14l-6 5v-5H5a3 3 0 0 1-3-3v-12a3 3 0 0 1 3-3z" fill="#fff8ec" stroke="#b5701c" stroke-width="1.8" stroke-linejoin="round"/><circle cx="16" cy="15.5" r="6.4" fill="#ffd56a" stroke="#b5701c" stroke-width="1.4"/><circle cx="13.7" cy="14.2" r="1" fill="#5a2a1a"/><circle cx="18.3" cy="14.2" r="1" fill="#5a2a1a"/><path d="M13.2 17q2.8 2.6 5.6 0" stroke="#5a2a1a" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg></button>
+<button class="emote-btn" id="emoteBtn" type="button" aria-label="Emotes" aria-haspopup="true" aria-expanded="false" hidden><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="emBtnG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf2"/><stop offset="1" stop-color="#ffe6c8"/></linearGradient></defs><path d="M9 5.5h14a6 6 0 0 1 6 6v5.5a6 6 0 0 1-6 6h-8.6l-5 4.1c-.6.5-1.5.1-1.4-.7l.3-3.6A6 6 0 0 1 3 17V11.5a6 6 0 0 1 6-6z" fill="url(#emBtnG)" stroke="#9a5a2e" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8.6h7" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".9"/><circle cx="10.8" cy="14.3" r="1.75" fill="#9a5a2e"/><circle cx="16" cy="14.3" r="1.75" fill="#9a5a2e"/><circle cx="21.2" cy="14.3" r="1.75" fill="#9a5a2e"/></svg></button>
 <div class="emote-panel" id="emotePanel" role="dialog" aria-label="Choose an emote" hidden></div>
 
 <!-- Play vs Computer -->
@@ -4136,10 +4136,10 @@ function pickAI(mv) {
 /* ---------- Emotes (Ludo games only) ----------
    EMOTES is the collection: id, name, the system emoji as a text fallback, its motion (CSS class) and custom art
    (64x64 SVG, game-style faces in our palette). All are free for now; a future shop can add entries with a price and
-   check ownership in `owned()` without touching the rest. The emote button (#emoteBtn) sits beside your dice at the
-   bottom centre when the two bottom cards leave room, otherwise in the top HUD row. Its panel (#emotePanel) closes on a
-   pick, a tap elsewhere, Escape or any sheet. A bubble pops over the sender's avatar (so it never covers the board,
-   dice, names or another player's emote) for ~2.4s; a player's next emotes queue (at most 2 waiting).
+   check ownership in `owned()` without touching the rest. The emote button (#emoteBtn) sits just above your avatar,
+   otherwise in the top HUD row. Its panel (#emotePanel) closes on a pick, a tap elsewhere, Escape or any sheet. A
+   reaction pops in beside the sender's dice (inner side, just above the card row; below it for the top players), clear
+   of the board, dice, names and other reactions, for ~2.4s; a player's next emotes queue (at most 2 waiting).
    Sender: the only human in vs Computer; in Pass & Play the player whose turn it is (holding the device).
    CPU players react now and then to captures and the result (random, throttled, never the same emote twice running).
    Purely visual: no game state, rule or turn is touched. */
@@ -4561,32 +4561,22 @@ const Emotes = (() => {
     const hs = [0, 1, 2, 3].filter(c => isHuman(c));
     return hs.length === 1 ? hs[0] : isHuman(S.turn) ? S.turn : hs[0] ?? -1;
   };
-  // The bottom cards grow 5% on their turn (transform about their outer edge) and the active one shows "Tap" under its
-  // dice, so the free space is measured for the worst case: each card's columns both at rest and enlarged.
+  // the button's hit area; the bottom cards grow 5% on their turn, so the button keeps clear of the enlarged card
   const SZ = 44, M = 4;
-  function obstacles(card) {
-    const left = !card.dataset.pos.endsWith('r'), W = card.offsetWidth, H = card.offsetHeight, x0 = card.offsetLeft, y0 = card.offsetTop;
-    const ox = left ? x0 : x0 + W, oy = y0 + H / 2, k = 1.05;
-    const box = (x, y, w, h) => [{ l: x, t: y, r: x + w, b: y + h }, { l: ox + (x - ox) * k, t: oy + (y - oy) * k, r: ox + (x + w - ox) * k, b: oy + (y + h - oy) * k }];
-    const who = card.querySelector('.who'), sl = card.querySelector('.slot');
-    const sx = x0 + sl.offsetLeft, sy = y0 + sl.offsetTop;
-    return [...box(x0 + who.offsetLeft, y0 + who.offsetTop, who.offsetWidth, who.offsetHeight), ...box(sx, sy, sl.offsetWidth, sl.offsetHeight),
-      ...box(sx + sl.offsetWidth / 2 - 20, sy + sl.offsetHeight, 40, 22)];   // the "Tap" hint under the dice
-  }
-  const clear = (c, obs) => obs.every(o => c.r + M <= o.l || c.l - M >= o.r || c.b + M <= o.t || c.t - M >= o.b);
-  function place() {   // beside your dice: level with it, or just below between the cards; else in the top HUD row
+  // an element's box in stage px (the stage is scaled to fit the screen)
+  const rel = el => {
+    const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, r = el.getBoundingClientRect();
+    return { l: (r.left - st.left) / sc, t: (r.top - st.top) / sc, r: (r.right - st.left) / sc, b: (r.bottom - st.top) / sc };
+  };
+  function place() {   // just above your avatar (clear of the card even when it grows on your turn); else in the HUD row
     if (!S || screen !== 'game') { btn.hidden = true; return; }
     btn.hidden = sender() < 0;
-    const bl = layer.querySelector('.pcard[data-pos="bl"]'), br = layer.querySelector('.pcard[data-pos="br"]'), ref = bl || br;
+    const ref = layer.querySelector('.pcard[data-pos="bl"]') || layer.querySelector('.pcard[data-pos="br"]'), hud = document.querySelector('.hud-top');
     let spot = null;
     if (ref) {
-      const obs = [bl, br].filter(Boolean).flatMap(obstacles), W = SW(), sl = ref.querySelector('.slot');
-      const slotMid = ref.offsetTop + sl.offsetTop + sl.offsetHeight / 2, low = ref.offsetTop + ref.offsetHeight - SZ / 2;   // bottom flush with the cards
-      const L = bl ? Math.max(...obstacles(bl).map(o => o.r)) : 0, R = br ? Math.min(...obstacles(br).map(o => o.l)) : W;
-      for (const [x, y] of [[(L + R) / 2, slotMid], [W / 2, low]]) {
-        const c = { l: x - SZ / 2, t: y - SZ / 2, r: x + SZ / 2, b: y + SZ / 2 };
-        if (c.l >= M && c.r <= W - M && clear(c, obs)) { spot = [x, y]; break; }
-      }
+      const a = rel(ref.querySelector('.ava')), k = rel(ref), hudB = hud ? rel(hud).b : 0;
+      const x = (a.l + a.r) / 2, y = a.t - (k.b - k.t) * .05 - 2 - SZ / 2;
+      if (y - SZ / 2 >= hudB + 8 && x - SZ / 2 >= M) spot = [x, y];
     }
     if (spot) {
       if (btn.parentNode !== btnHome) btnHome.appendChild(btn);
@@ -4607,7 +4597,7 @@ const Emotes = (() => {
     const tops = cards.filter(c => c.dataset.pos[0] === 't'), bots = cards.filter(c => c.dataset.pos[0] === 'b');
     const hudB = hud ? hud.offsetTop + hud.offsetHeight : 60;
     const t0 = Math.max(hudB, ...tops.map(c => c.offsetTop + c.offsetHeight * 1.05)) + 8;
-    const t1 = Math.min(H - 8, ...bots.map(c => c.offsetTop - c.offsetHeight * .05)) - 8;
+    const t1 = Math.min(H - 8, ...bots.map(c => c.offsetTop - c.offsetHeight * .05), btn.classList.contains('in-hud') || btn.hidden ? H : rel(btn).t) - 8;
     const size = cols => { const rows = Math.ceil(n / cols); return { cols, w: cols * CW + (cols - 1) * GAP + PAD * 2, h: rows * CH + (rows - 1) * GAP + PAD * 2 }; };
     const fit = [1, 2, 3, 6].map(size).find(s => s.h <= t1 - t0) || size(6);
     panel.style.setProperty('--cols', fit.cols);
@@ -4626,21 +4616,37 @@ const Emotes = (() => {
       closeTimer = setTimeout(() => { panel.hidden = true; panel.classList.remove('closing'); }, 170);
     }
   }
-  // the bubble (Clash-style): it flies out of the picker cell that was tapped (or pops in on the avatar for a CPU or a
-  // queued emote), overshoots and settles on the sender's avatar, holds while the character inside moves, then shrinks
-  // away. Animated stickers (sa-* parts) keep the bubble still; the others still move as a whole (their motion class).
-  const LIFE = 2400;
-  function show(c, id, from) {
+  // the reaction: beside the player's dice on the inner side (towards the middle of the screen), just above the card
+  // row for the bottom players and just below it for the top ones, kept inside the screen. It pops in with a small
+  // bounce, holds while the character inside moves, then fades away. Animated stickers (sa-* parts) keep the bubble
+  // still; others move as a whole.
+  // its size follows the screen: 116px wide on a normal phone, down to about 84px on small or landscape screens so it
+  // never swamps the board
+  const LIFE = 2400, BGAP = 4, BSIDE = 24, EDGE = 8;
+  const bubbleW = () => Math.round(Math.min(116, Math.max(84, Math.min(SW() * .3, SH() * .15))));
+  function spot(c) {
+    const card = cards[c], k = rel(card), s = rel(card.querySelector('.slot')), grow = (k.b - k.t) * .05;   // the card grows 5% on its turn
+    const inner = !card.dataset.pos.endsWith('r'), low = card.dataset.pos[0] === 'b', half = SW() / 2;
+    // each stays on its own half of the screen (the left and right players' reactions never meet in the middle) and
+    // clear of the emote button above your avatar; on a narrow screen it shrinks a little rather than overlap
+    let minL = inner ? EDGE : half + 4, maxR = inner ? half - 4 : SW() - EDGE;
+    if (low && !btn.hidden && !btn.classList.contains('in-hud')) {
+      const b = rel(btn);
+      if (inner && b.r < half) minL = Math.max(minL, b.r + 6); else if (!inner && b.l > half) maxR = Math.min(maxR, b.l - 6);
+    }
+    const BW = Math.round(Math.min(bubbleW(), maxR - minL)), BH = Math.round(BW * 74 / 116), side = BSIDE * BW / 116;
+    const x = Math.min(Math.max(inner ? s.r + side : s.l - side, minL + BW / 2), maxR - BW / 2);
+    const y = Math.min(Math.max(low ? k.t - grow - BGAP - BH / 2 : k.b + grow + BGAP + BH / 2, BH / 2 + EDGE), SH() - BH / 2 - EDGE);
+    return [x, y, BW, BH];
+  }
+  function show(c, id) {
     const e = em(id); if (!e || !S || !cards[c]) return false;
     if (showing[c]) { queue[c] = queue[c] || []; if (queue[c].length < 2) queue[c].push(id); return true; }
-    const ava = cards[c].querySelector('.ava'); if (!ava) return false;
-    const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, r = ava.getBoundingClientRect();
     const b = document.createElement('div');
-    b.className = `emote-bubble ${/class="sa-/.test(e.art) ? 'em-alive' : e.motion}${from ? ' fly' : ''}`; b.dataset.seat = c; b.dataset.emote = id;
+    b.className = `emote-bubble ${/class="sa-/.test(e.art) ? 'em-alive' : e.motion}`; b.dataset.seat = c; b.dataset.emote = id;
     b.style.setProperty('--c', COLORS[c].css);
-    const x = ((r.left + r.right) / 2 - st.left) / sc, y = ((r.top + r.bottom) / 2 - st.top) / sc;
-    b.style.left = x + 'px'; b.style.top = y + 'px';
-    if (from) { b.style.setProperty('--fx', ((from.left + from.right) / 2 - st.left) / sc - x + 'px'); b.style.setProperty('--fy', ((from.top + from.bottom) / 2 - st.top) / sc - y + 'px'); }
+    const [x, y, BW, BH] = spot(c);
+    b.style.cssText += `;left:${x}px;top:${y}px;width:${BW}px;height:${BH}px;margin:${-BH / 2}px 0 0 ${-BW / 2}px`;
     b.setAttribute('role', 'img'); b.setAttribute('aria-label', `${pname(c)}: ${e.name}`);
     b.innerHTML = `<span class="em-art">${emArt(e)}</span>` + (e.motion === 'em-party' ? '<i></i><i></i><i></i><i></i><i></i><i></i>' : '');
     layer.appendChild(b); showing[c] = b; sfx('emote');
@@ -4652,16 +4658,13 @@ const Emotes = (() => {
     }, LIFE);
     return true;
   }
-  // sending from the picker: it flies from the tapped cell; the picker then cools down (greyed, taps ignored) for 2s
+  // sending from the picker; the picker then cools down (greyed, taps ignored) for 2s
   let coolTimer = 0;
   function cool() {
     panel.classList.add('cooling'); btn.classList.add('cooling'); clearTimeout(coolTimer);
     coolTimer = setTimeout(() => { panel.classList.remove('cooling'); btn.classList.remove('cooling'); }, 2000);
   }
-  function send(id, cell) {
-    const c = sender(), from = cell && open ? cell.getBoundingClientRect() : null;
-    setOpen(false); if (c >= 0) show(c, id, from);
-  }
+  function send(id) { const c = sender(); setOpen(false); if (c >= 0) show(c, id); }
   // CPU players: an occasional, varied reaction (throttled per player and overall)
   const pick = (c, ids) => { const opts = ids.filter(x => x !== lastCpu[c]); return opts[Math.floor(Math.random() * opts.length)]; };
   function cpuSay(c, ids, chance) {
@@ -4696,7 +4699,7 @@ const Emotes = (() => {
     clearTimeout(coolTimer); panel.classList.remove('cooling'); btn.classList.remove('cooling');
   }
   btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!open); });
-  panel.addEventListener('click', e => { const b = e.target.closest('[data-emote]'); if (b && !panel.classList.contains('cooling')) { send(b.dataset.emote, b); cool(); } });
+  panel.addEventListener('click', e => { const b = e.target.closest('[data-emote]'); if (b && !panel.classList.contains('cooling')) { send(b.dataset.emote); cool(); } });
   addEventListener('pointerdown', e => { if (open && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false); }, true);
   addEventListener('keydown', e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setOpen(false); btn.focus({ preventScroll: true }); } }, true);
   addEventListener('resize', () => setTimeout(place, 60));

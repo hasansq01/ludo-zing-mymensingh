@@ -198,6 +198,16 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Emote button + reaction placement, round 2 (2026-10-24, user's marked screenshot): the button sits just above
+      your avatar (green mark) and is a cream speech bubble with a thin warm-brown outline and three dots (the game's
+      card palette; no circle). Reactions pop in beside the sender's dice on the inner side, just above the card row
+      (red mark; below the card for top players), each on its own half of the screen and clear of the button (shrinking
+      a little on narrow screens). `tests/emotes.js` 61/61 at 320x568, 390x844, 430x932, 520x917, 844x390, 1366x768.
+- [x] Emote button + reaction placement polish (2026-10-24, user's screenshot): the button is a bare outlined chat
+      bubble with three dots (no circle; drop shadow for contrast; a soft glow while open). Reactions show just above
+      the sender's avatar and dice (below the card for top players), centred on the card and kept on screen, sized to
+      the screen (116px wide on normal phones, down to 84px), pop in with a small bounce and fade out. `tests/emotes.js`
+      60/60 at 320x568, 390x844, 430x932, 844x390, 1366x768 (both cameras, Pass & Play); home visual suite PASS.
 - [x] Clash-style emote animation (2026-10-24, from the user's two Clash Royale recordings, studied frame by frame):
       every sticker has moving parts inside a still bubble: the character moves in its mood (squash, shake, rage,
       sway, tilt, heave, jolt, groove, no), arms swing about their shoulders (wave / pump / point / thumb), faces

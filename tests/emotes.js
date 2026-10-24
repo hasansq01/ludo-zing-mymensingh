@@ -19,6 +19,8 @@
   L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(400);
   const S0 = JSON.stringify(L.S);
   check('game: the emote button is shown, 44px', !btn.hidden && btn.offsetWidth >= 44 && btn.offsetHeight >= 44);
+  { const av = R(document.querySelector('#pcards .pcard[data-pos="bl"] .ava')), bb = R(btn);
+    check('the button sits just above your avatar (or in the HUD row when there is no room)', btn.classList.contains('in-hud') || (bb.bottom <= av.top && av.top - bb.bottom <= 12 && Math.abs((bb.left + bb.right) / 2 - (av.left + av.right) / 2) < 3), [bb, av]); }
   const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'sleepy', 'confused', 'facepalm', 'cheer', 'party', 'think', 'sad', 'hi', 'tease'];
   check('every required reaction exists (16+)', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)), need.filter(id => !L.EMOTES.some(e => e.id === id)));
   check('4 sets of 6 (rows of the reference): Starter free, others priced, every emote in exactly one set', L.EMOTE_SETS.length === 4 && L.EMOTE_SETS.every(s => s.emotes.length === 6) && L.EMOTE_SETS[0].id === 'starter' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
@@ -57,9 +59,10 @@
   btn.click(); L.openSheet('settingsSheet'); L.closeSheet('settingsSheet');
   check('opening a menu closes it', !E.open);
 
-  // pick -> bubble over the sender's avatar
+  // pick -> a reaction just above the sender's avatar and dice
+  check('the button is a bare outlined chat bubble with three dots (no filled background)', getComputedStyle(btn).backgroundImage === 'none' && /rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle(btn).backgroundColor) && btn.querySelectorAll('svg circle').length === 3);
   btn.click(); panel.querySelector('[data-emote="laugh"]').click();
-  check('a picked emote flies out of its picker cell', bubbleOf(0) && bubbleOf(0).classList.contains('fly') && bubbleOf(0).style.getPropertyValue('--fx') !== '');
+  check('a picked emote pops in with a small bounce, then fades out (test mode freezes animation, so read the rule)', bubbleOf(0) && [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.selectorText === '.emote-bubble' && /emPop/.test(r.style.animation) && /emOut/.test(r.style.animation)); } catch (e) { return false; } }));
   check('after sending, the picker cools down (greyed, taps ignored)', panel.classList.contains('cooling'));
   btn.click(); panel.querySelector('[data-emote="cool"]').click();
   check('a tap during the cooldown sends nothing', !(E.queue[0] || []).length);
@@ -68,10 +71,14 @@
   check('picking an emote closes the panel and shows a bubble', !E.open && b0 && b0.dataset.emote === 'laugh');
   // cards are built in seat order for the seats in play
   const cardsAva = c => document.querySelectorAll('#pcards .pcard')[[0, 1, 2, 3].filter(k => L.S.players[k] !== 'off').indexOf(c)].querySelector('.ava');
-  const br = R(b0), ar = R(cardsAva(0));
-  check('the bubble is centred on the sender\'s avatar', Math.abs((br.left + br.right) / 2 - (ar.left + ar.right) / 2) < 8 && Math.abs((br.top + br.bottom) / 2 - (ar.top + ar.bottom) / 2) < 10, [br, ar]);
-  const name0 = document.querySelector('#pcards .pcard .who b');
-  check('the bubble leaves the player name readable', R(b0).bottom <= R(name0).top + 2, [R(b0).bottom, R(name0).top]);
+  const br = R(b0), card0 = cardsAva(0).closest('.pcard'), cr = R(card0), stR = R($('stage')), k = stR.width / $('stage').offsetWidth;
+  check('the reaction sits just above the sender\'s avatar and dice, clear of them', br.bottom <= cr.top - 4 * k && cr.top - br.bottom <= 26 * k, [br, cr]);
+  const slot0 = R(card0.querySelector('.slot'));
+  const av0 = R(cardsAva(0)), mid = (stR.left + stR.right) / 2;
+  check('it sits beside the dice towards the middle, on its own half of the screen', (br.left + br.right) / 2 > (av0.left + av0.right) / 2 && br.right <= mid + 1 && ((br.left + br.right) / 2 >= slot0.right - 2 * k || br.right >= mid - 6 * k), [br, slot0, mid]);
+  check('it is big enough to read (about 70-116px wide, sized to the screen) and inside the screen', br.width / k >= 70 && br.width / k <= 117 && br.left >= stR.left + 6 * k && br.right <= stR.right - 6 * k && br.top >= stR.top, [br.width / k, br.left, br.right]);
+  { const parts0 = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #msg, #menuBtn, #gearBtn, #emoteBtn')];
+    check('it covers no player card, dice, name or HUD control', parts0.every(p => !overlap(br, R(p), .5)), parts0.filter(p => overlap(br, R(p), .5)).map(p => (p.id || p.className) + ' ' + JSON.stringify(R(p))).concat([JSON.stringify(br)])); }
   check('the bubble is labelled for screen readers', /: Laugh$/.test(b0.getAttribute('aria-label')));
   check('the bubble ignores taps (never blocks the game)', getComputedStyle(b0).pointerEvents === 'none');
 
@@ -89,13 +96,14 @@
   check('bubbles never overlap each other', bs.every((a, i) => bs.every((b, j) => i === j || !overlap(R(a), R(b)))));
   const dice = $('diceBtn');
   check('bubbles do not cover the dice', bs.every(b => !overlap(R(b), R(dice), 1)));
+  check('top players\' reactions show just below their cards', [1, 2].filter(c => L.S.players[c] !== 'off').every(c => { const card = cardsAva(c).closest('.pcard'); return card.dataset.pos[0] !== 't' || R(bubbleOf(c)).top >= R(card).bottom; }));
 
   // Top View: the cards stay in the corners, so placement still holds
   E.reset(); document.querySelector('input[name=cam][value=top]').click(); await sleep(300);
   E.place();
   check('Top View: the button still covers no card or HUD control', [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #msg, #menuBtn, #gearBtn')].every(p => !overlap(R(btn), R(p), .5)));
   E.show(0, 'wow'); await sleep(30);
-  check('Top View: the bubble still sits on the avatar', bubbleOf(0) && overlap(R(bubbleOf(0)), R(document.querySelector('#pcards .pcard .ava'))), [bubbleOf(0) && R(bubbleOf(0)), R(document.querySelector('#pcards .pcard .ava'))]);
+  check('Top View: the reaction still sits just above the player\'s card', bubbleOf(0) && R(bubbleOf(0)).bottom <= R(cardsAva(0).closest('.pcard')).top && R(bubbleOf(0)).left < R(cardsAva(0).closest('.pcard')).right, [bubbleOf(0) && R(bubbleOf(0)), R(cardsAva(0).closest('.pcard'))]);
   document.querySelector('input[name=cam][value="3d"]').click(); await sleep(200);
 
   // CPU reactions: forced chance, then throttled

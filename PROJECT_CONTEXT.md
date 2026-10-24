@@ -148,8 +148,11 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   (`sa-beat`, `sa-twinkle`, `sa-drip`, `sa-rise`, `sa-wobble`, `sa-throb`, `sa-pop`, `sa-burst`); game objects use
   `sa-roll`, `sa-hop`, `sa-crack`, `sa-clap`, `sa-bob`, `sa-wave`, `sa-peek`. All keyframes live in the "sticker
   animation" CSS block (reduced motion stops them). Stickers with parts get `em-alive` instead of a whole-sticker
-  motion. Sending: `send(id, cell)` flies the bubble from the picker cell (`.fly`, `--fx` / `--fy`, `emFly`), CPU and
-  queued emotes pop (`emPop`); life `LIFE` 2.4s with `emOut`; the picker cools down 2s (`cool()`, `.cooling`).
+  motion. Reactions pop in (`emPop`, small bounce) at `spot(c)`: beside the sender's dice on the inner side, just
+  above the card row (below it for the top players), each on its own half of the screen and clear of the emote button,
+  sized by `bubbleW()` (84-116px, smaller only if it cannot fit); life `LIFE` 2.4s, fading with `emOut`; the picker
+  cools down 2s after a send (`cool()`, `.cooling`). The emote button (`place()`) sits just above your avatar (HUD
+  row if no room): a cream chat bubble, thin warm-brown outline, three dots, no background.
   **Sets (2026-10-24):** 24 emotes in 4 sets of 6 (`EMOTE_SETS`): Starter (free, default; Victory, Laugh, Cool, Angry,
   Love, Celebrate), Pawn Pals 2,500 (Champ, Sleepy, Sob, Gasp, Confused, Hi!), Friends 4,000 (Cry, Shocked, Facepalm,
   Yay!, Thinking, Tease), Game 3,500 (Roll it!, Winner, High five, Give up, Disappointed, Peek-a-boo). Profile:
