@@ -198,6 +198,14 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Emotes in Ludo games (2026-10-24): 8 free custom-drawn animated emotes (Laugh, Cool, Love, Angry, Cry, Surprised,
+      Clap, Celebrate) in `EMOTES` (expandable; `owned()` is the future shop hook). Button beside your dice (measured
+      against the enlarged cards and the "Tap" hint; falls back to the top HUD row at 320px and in landscape), panel
+      closes on pick / outside tap / Escape / any sheet. Bubble pops over the sender's avatar with their colour ring
+      (~1.8s, per-emote motion, soft pop sound, reduced-motion fade), per-player queue (max 2). vs Computer: you send;
+      Pass & Play: the player to move. CPU players react now and then to captures and the result (throttled, varied).
+      No online play exists, so no delivery was built. `tests/emotes.js` 29/29 at 320x568, 390x844, 430x932, 844x390,
+      1366x768. Not deployed.
 - [x] Bars polish (2026-10-22, user's marked screenshot): blue replaced by the café palette (honey/peach bars, peach-cream
       tiles, coral Home, teal "+", plum tracks); top row in three groups (cream profile capsule, coin pill, cream gear
       tile); five equal tab columns (no negative margins, Home raised by transform inside its column); badges centred

@@ -829,6 +829,52 @@ body.jungle-ready .sl.is-landing{background:transparent}
 .unit-pick button.on{background:linear-gradient(var(--gold-hi),var(--gold));color:var(--on-accent);box-shadow:0 3px 0 var(--gold-deep)}
 .unit-pick.ask button{animation:nudge 1.1s ease-in-out infinite}
 body:not([data-screen="game"]) .unit-pick{display:none}
+/* Emotes: button (centred on its spot, or a regular HUD button on narrow screens), panel, bubbles over the avatars */
+.emote-btn{position:fixed;z-index:3;width:44px;height:44px;transform:translate(-50%,-50%);border-radius:50%;display:grid;place-items:center;padding:0;
+  background:linear-gradient(180deg,#fff8ee,#ffe3c4);border:2px solid #fff;box-shadow:0 3px 0 #dc9a62,0 5px 12px rgba(110,60,40,.25);transition:transform .12s}
+.emote-btn:active{transform:translate(-50%,-50%) scale(.92)}
+.emote-btn svg{width:30px;height:30px}
+.emote-btn[aria-expanded="true"]{box-shadow:0 0 0 3px #ffb48a,0 3px 0 #dc9a62}
+.emote-btn.in-hud{position:static;transform:none;flex:none;width:44px;height:44px;border-radius:15px}
+.emote-btn.in-hud:active{transform:scale(.92)}
+body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-panel{display:none}
+.emote-panel{position:fixed;z-index:6;display:grid;grid-template-columns:repeat(4,58px);gap:6px;padding:10px;border-radius:20px;
+  background:#fff8ef;border:3px solid #fff;box-shadow:0 0 0 2px #f3c497,0 12px 26px rgba(80,40,30,.3);animation:pop .2s cubic-bezier(.2,.9,.3,1.2)}
+.emote-panel[hidden]{display:none}
+.em-pick{display:flex;flex-direction:column;align-items:center;gap:1px;width:58px;height:62px;padding:4px 0 2px;border-radius:14px;background:#ffeedd;border:1.5px solid #f6d3b0;transition:transform .1s}
+.em-pick:hover,.em-pick:focus-visible{background:#ffe0c2}
+.em-pick:active{transform:scale(.9)}
+.em-pick svg{width:40px;height:40px;filter:drop-shadow(0 2px 1px rgba(110,60,40,.2))}
+.em-pick span{font-size:.56rem;font-weight:900;color:#8a4a2c;letter-spacing:.02em;white-space:nowrap}
+.emote-bubble{position:absolute;z-index:5;width:76px;height:76px;margin:-42px 0 0 -38px;border-radius:50%;display:grid;place-items:center;pointer-events:none;
+  background:radial-gradient(circle at 40% 35%,#fffdf8,#ffeedd);border:3px solid #fff;box-shadow:0 0 0 3px var(--c),0 8px 18px rgba(80,40,30,.35);
+  animation:emLife 1.8s ease forwards}
+.emote-bubble .em-art{display:block;width:60px;height:60px}
+.emote-bubble svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 2px 2px rgba(110,60,40,.25))}
+@keyframes emLife{0%{transform:scale(.2);opacity:0}12%{transform:scale(1.16);opacity:1}22%{transform:scale(.95)}30%,82%{transform:scale(1);opacity:1}100%{transform:scale(.85) translateY(-10px);opacity:0}}
+.em-shake .em-art{animation:emShake .3s .35s ease-in-out 4}
+@keyframes emShake{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+.em-tilt .em-art{animation:emTilt 1.2s .3s ease-in-out}
+@keyframes emTilt{0%{transform:translateY(-8px) rotate(-14deg)}40%{transform:translateY(0) rotate(6deg)}70%,100%{transform:rotate(0)}}
+.em-beat .em-art{animation:emBeat .45s .3s ease-in-out 3}
+@keyframes emBeat{30%{transform:scale(1.18)}60%{transform:scale(.96)}}
+.em-rage .em-art{animation:emRage .12s .3s linear 9}
+@keyframes emRage{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.em-rage{box-shadow:0 0 0 3px var(--c),0 0 18px rgba(229,72,77,.55),0 8px 18px rgba(80,40,30,.35)}
+.em-sob .em-art{animation:emSob .5s .3s ease-in-out 3}
+@keyframes emSob{50%{transform:translateY(3px) scaleY(.94)}}
+.em-jump .em-art{animation:emJump .5s .25s cubic-bezier(.3,1.6,.5,1)}
+@keyframes emJump{0%{transform:scale(.7)}60%{transform:scale(1.22) translateY(-4px)}100%{transform:scale(1)}}
+.em-clap .em-art{animation:emClap .22s .3s ease-in-out 6}
+@keyframes emClap{50%{transform:scaleX(.82)}}
+.em-party .em-art{animation:emShake .35s .3s ease-in-out 3}
+.em-party i{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:2px;opacity:0;animation:emBurst .8s .25s ease-out forwards}
+.em-party i:nth-child(2){background:#e5484d;--dx:-34px;--dy:-30px}.em-party i:nth-child(3){background:#2fb39c;--dx:34px;--dy:-28px}
+.em-party i:nth-child(4){background:#ffd34d;--dx:-38px;--dy:6px}.em-party i:nth-child(5){background:#3b7be0;--dx:38px;--dy:8px}
+.em-party i:nth-child(6){background:#b49cff;--dx:-14px;--dy:-42px}.em-party i:nth-child(7){background:#ff8a6a;--dx:16px;--dy:-44px}
+@keyframes emBurst{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(200deg)}}
+@media (prefers-reduced-motion:reduce){.emote-bubble{animation:emFade 1.8s linear forwards}.emote-bubble .em-art,.em-party i{animation:none}.em-party i{display:none}}
+@keyframes emFade{0%{opacity:0}10%,85%{opacity:1}100%{opacity:0}}
 .fine{font-size:.84rem}
 .tap{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:.66rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep);white-space:nowrap;text-shadow:var(--halo)}
 .slot{position:relative}
@@ -1147,6 +1193,9 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
   <button type="button" id="pickPair">Pair <small id="pickPairN">+2</small></button>
   <span class="info-i" data-info="pair"></span>
 </div>
+<!-- Emotes (Ludo games): the button beside your dice (or in the top row on narrow screens), its panel, filled by Emotes -->
+<button class="emote-btn" id="emoteBtn" type="button" aria-label="Emotes" aria-haspopup="true" aria-expanded="false" hidden><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 6.5h22a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H14l-6 5v-5H5a3 3 0 0 1-3-3v-12a3 3 0 0 1 3-3z" fill="#fff8ec" stroke="#b5701c" stroke-width="1.8" stroke-linejoin="round"/><circle cx="16" cy="15.5" r="6.4" fill="#ffd56a" stroke="#b5701c" stroke-width="1.4"/><circle cx="13.7" cy="14.2" r="1" fill="#5a2a1a"/><circle cx="18.3" cy="14.2" r="1" fill="#5a2a1a"/><path d="M13.2 17q2.8 2.6 5.6 0" stroke="#5a2a1a" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg></button>
+<div class="emote-panel" id="emotePanel" role="dialog" aria-label="Choose an emote" hidden></div>
 
 <!-- Play vs Computer -->
 <div class="sheet" id="cpuSheet" hidden>
@@ -3186,6 +3235,7 @@ const Sound = (() => {
     capture: t => { tone(560, t, .34, { type: 'sawtooth', v: .16, f2: 110, lp: 1700 }); noise(t, .3, { v: .14, f: 1500, f2: 300, q: .8 }); tone(150, t + .2, .2, { v: .32, f2: 70 }); },
     pair:    t => arp([72, 76, 79], t, .07, .16, { type: 'triangle', v: .2 }),
     split:   t => arp([79, 74], t, .08, .16, { type: 'triangle', v: .2 }),
+    emote:   t => { tone(NOTE(81), t, .09, { type: 'triangle', v: .16, f2: NOTE(88) }); tone(NOTE(88), t + .06, .12, { type: 'triangle', v: .1 }); },   // a soft bubble pop
     coin:    (t, amount = 0) => {   // the rendered coin sample (see coinSamples); a plain two-note chime until it's ready
       const buf = coinBufs && coinBufs[amount >= 500 ? 'big' : 'small'];
       if (!buf) { tone(NOTE(83), t, .09, { type: 'square', v: .17, lp: 4000 }); tone(NOTE(88), t + .075, .32, { type: 'square', v: .17, lp: 4000 }); return; }
@@ -3839,6 +3889,7 @@ async function move(i) {
       return hop(vt, vt.g.position.clone(), toWorld(gridOf(o, -1, j)), 2.4, 650).then(() => { vt.anim = false; });
     }));
     if (!live(id)) return;
+    Emotes.react('capture', c, victims);   // now and then a computer player reacts (visual only)
   }
 
   // a pair landing on any colour's start square, or entering its home column (progress 51-55, the coloured lane
@@ -3893,6 +3944,7 @@ function nextTurn() { S.sixes = 0; S.turn = nextActive(S.turn); beginTurn(); }
 function gameOver(c) {
   S.phase = 'over'; S.winner = c; movableSet = new Set();
   updateHUD();
+  Emotes.react('win', c);
   const humanWon = (teamOn() ? [c, mateOf(c)] : [c]).some(isHuman);
   sfx(humanWon ? 'win' : 'lose');
   $('win').style.setProperty('--c', COLORS[c].css);
@@ -3953,6 +4005,163 @@ function pickAI(mv) {
   return best;
 }
 
+/* ---------- Emotes (Ludo games only) ----------
+   EMOTES is the collection: id, name, the system emoji as a text fallback, its motion (CSS class) and custom art
+   (64x64 SVG, game-style faces in our palette). All are free for now; a future shop can add entries with a price and
+   check ownership in `owned()` without touching the rest. The emote button (#emoteBtn) sits beside your dice at the
+   bottom centre when the two bottom cards leave room, otherwise in the top HUD row. Its panel (#emotePanel) closes on a
+   pick, a tap elsewhere, Escape or any sheet. A bubble pops over the sender's avatar (so it never covers the board,
+   dice, names or another player's emote) for ~1.8s; a player's next emotes queue (at most 2 waiting).
+   Sender: the only human in vs Computer; in Pass & Play the player whose turn it is (holding the device).
+   CPU players react now and then to captures and the result (random, throttled, never the same emote twice running).
+   Purely visual: no game state, rule or turn is touched. */
+const EMOTE_FACE = (id, inner, c1 = '#ffe07a', c2 = '#f6a92e', line = '#b5701c') =>
+  `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="emg-${id}" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></radialGradient></defs>` +
+  `<circle cx="32" cy="33" r="27" fill="url(#emg-${id})" stroke="${line}" stroke-width="2.6"/><ellipse cx="22" cy="18" rx="9" ry="5" fill="#fff" opacity=".45" transform="rotate(-24 22 18)"/>${inner}</svg>`;
+const EM_INK = '#5a2a1a';
+const EMOTES = [
+  { id: 'laugh', name: 'Laugh', ch: '😂', motion: 'em-shake', art: EMOTE_FACE('laugh',
+    `<path d="M16 27q5-7 11 0M37 27q5-7 11 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M17 36h30q-2 15-15 15T17 36z" fill="#7a2a2a" stroke="${EM_INK}" stroke-width="2" stroke-linejoin="round"/><path d="M24 46q8 6 16 0q-2 5-8 5t-8-5z" fill="#ff7f86"/><path d="M8 30q-3 6 0 9 3-3 0-9zM56 30q-3 6 0 9 3-3 0-9z" fill="#6cc6ff" stroke="#3a8fd0" stroke-width="1"/>`) },
+  { id: 'cool', name: 'Cool', ch: '😎', motion: 'em-tilt', art: EMOTE_FACE('cool',
+    `<path d="M11 24h42v3c0 7-4 11-10 11s-9-4-10-9h-2c-1 5-4 9-10 9S11 34 11 27z" fill="#2b2f4a"/><path d="M15 27h12M37 27h12" stroke="#6b7bb8" stroke-width="2.4" stroke-linecap="round"/><path d="M23 45q9 6 18-3" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`) },
+  { id: 'love', name: 'Love', ch: '😍', motion: 'em-beat', art: EMOTE_FACE('love',
+    `<path d="M23 34l-7-7a4.2 4.2 0 0 1 7-4.5 4.2 4.2 0 0 1 7 4.5zM41 34l-7-7a4.2 4.2 0 0 1 7-4.5 4.2 4.2 0 0 1 7 4.5z" fill="#e5484d" stroke="#a8282d" stroke-width="1.2" stroke-linejoin="round"/><circle cx="14" cy="40" r="4" fill="#ff8fa3" opacity=".7"/><circle cx="50" cy="40" r="4" fill="#ff8fa3" opacity=".7"/><path d="M22 42q10 10 20 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`) },
+  { id: 'angry', name: 'Angry', ch: '😡', motion: 'em-rage', art: EMOTE_FACE('angry',
+    `<path d="M15 21l12 6M49 21l-12 6" stroke="${EM_INK}" stroke-width="3.4" stroke-linecap="round"/><circle cx="23" cy="31" r="3.2" fill="${EM_INK}"/><circle cx="41" cy="31" r="3.2" fill="${EM_INK}"/><path d="M21 47q11-9 22 0" stroke="${EM_INK}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`, '#ffb07a', '#e5484d', '#9c2a24') },
+  { id: 'cry', name: 'Cry', ch: '😭', motion: 'em-sob', art: EMOTE_FACE('cry',
+    `<path d="M15 27q6 5 12 0M37 27q6 5 12 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M18 30v21a4 4 0 0 0 8 0V30zM38 30v21a4 4 0 0 0 8 0V30z" fill="#6cc6ff" opacity=".9"/><path d="M26 46q6-6 12 0" stroke="${EM_INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`, '#ffe9a0', '#f5b84a') },
+  { id: 'wow', name: 'Surprised', ch: '😮', motion: 'em-jump', art: EMOTE_FACE('wow',
+    `<path d="M15 17q6-5 12-1M37 16q6-4 12 1" stroke="${EM_INK}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="22" cy="28" r="6.5" fill="#fff" stroke="${EM_INK}" stroke-width="2"/><circle cx="42" cy="28" r="6.5" fill="#fff" stroke="${EM_INK}" stroke-width="2"/><circle cx="22" cy="29" r="3" fill="${EM_INK}"/><circle cx="42" cy="29" r="3" fill="${EM_INK}"/><ellipse cx="32" cy="46" rx="6" ry="7.5" fill="#7a2a2a" stroke="${EM_INK}" stroke-width="2"/>`) },
+  { id: 'clap', name: 'Clap', ch: '👏', motion: 'em-clap', art:
+    `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="#b5701c" stroke-width="2.2" stroke-linejoin="round"><path d="M14 40l12-24a5 5 0 0 1 9 4l-3 9 10-14a5 5 0 0 1 8 5L39 41c-5 9-15 12-22 7-4-2-5-5-3-8z" fill="#ffd08a"/><path d="M24 44l12-24a5 5 0 0 1 9 4l-3 9 7-9a5 5 0 0 1 8 5L46 45c-5 9-15 12-22 7-3-2-2-5 0-8z" fill="#ffe2b0"/></g><path d="M8 18l5 4M6 28h6M14 10l3 6M52 54l5 2M44 58l2 4" stroke="#f6a92e" stroke-width="3" stroke-linecap="round"/></svg>` },
+  { id: 'party', name: 'Celebrate', ch: '🎉', motion: 'em-party', art:
+    `<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 58l12-34 22 22z" fill="#ff8a6a" stroke="#b5452e" stroke-width="2.4" stroke-linejoin="round"/><path d="M13 44l6 6M16 35l12 12" stroke="#ffe07a" stroke-width="3.4" stroke-linecap="round"/><path d="M27 21q4-10 12-8M43 37q10-4 9 6M34 16l3-7M48 26l8-4" stroke="#2fb39c" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="46" cy="12" r="3" fill="#e5484d"/><circle cx="56" cy="34" r="3" fill="#3b7be0"/><circle cx="38" cy="28" r="2.5" fill="#f6a92e"/><rect x="50" y="46" width="5" height="5" rx="1" fill="#b49cff" transform="rotate(20 52 48)"/><rect x="24" y="8" width="5" height="5" rx="1" fill="#ffd34d" transform="rotate(-15 26 10)"/></svg>` },
+];
+const Emotes = (() => {
+  const btn = $('emoteBtn'), panel = $('emotePanel'), layer = $('pcards'), btnHome = btn.parentNode;   // inside #stage: positions are stage px
+  const owned = () => EMOTES;   // every emote is free for now (see above)
+  const showing = {}, queue = {}, lastCpu = {};
+  let lastAny = 0, open = false;
+  const em = id => EMOTES.find(e => e.id === id);
+  panel.innerHTML = owned().map(e => `<button type="button" class="em-pick" data-emote="${e.id}" aria-label="${e.name}" title="${e.name}">${e.art}<span>${e.name}</span></button>`).join('');
+  const sender = () => {   // vs Computer: the only human; Pass & Play: whoever holds the device (the player to move)
+    if (!S) return -1;
+    const hs = [0, 1, 2, 3].filter(c => isHuman(c));
+    return hs.length === 1 ? hs[0] : isHuman(S.turn) ? S.turn : hs[0] ?? -1;
+  };
+  // The bottom cards grow 5% on their turn (transform about their outer edge) and the active one shows "Tap" under its
+  // dice, so the free space is measured for the worst case: each card's columns both at rest and enlarged.
+  const SZ = 44, M = 4;
+  function obstacles(card) {
+    const left = !card.dataset.pos.endsWith('r'), W = card.offsetWidth, H = card.offsetHeight, x0 = card.offsetLeft, y0 = card.offsetTop;
+    const ox = left ? x0 : x0 + W, oy = y0 + H / 2, k = 1.05;
+    const box = (x, y, w, h) => [{ l: x, t: y, r: x + w, b: y + h }, { l: ox + (x - ox) * k, t: oy + (y - oy) * k, r: ox + (x + w - ox) * k, b: oy + (y + h - oy) * k }];
+    const who = card.querySelector('.who'), sl = card.querySelector('.slot');
+    const sx = x0 + sl.offsetLeft, sy = y0 + sl.offsetTop;
+    return [...box(x0 + who.offsetLeft, y0 + who.offsetTop, who.offsetWidth, who.offsetHeight), ...box(sx, sy, sl.offsetWidth, sl.offsetHeight),
+      ...box(sx + sl.offsetWidth / 2 - 20, sy + sl.offsetHeight, 40, 22)];   // the "Tap" hint under the dice
+  }
+  const clear = (c, obs) => obs.every(o => c.r + M <= o.l || c.l - M >= o.r || c.b + M <= o.t || c.t - M >= o.b);
+  function place() {   // beside your dice: level with it, or just below between the cards; else in the top HUD row
+    if (!S || screen !== 'game') { btn.hidden = true; return; }
+    btn.hidden = sender() < 0;
+    const bl = layer.querySelector('.pcard[data-pos="bl"]'), br = layer.querySelector('.pcard[data-pos="br"]'), ref = bl || br;
+    let spot = null;
+    if (ref) {
+      const obs = [bl, br].filter(Boolean).flatMap(obstacles), W = SW(), sl = ref.querySelector('.slot');
+      const slotMid = ref.offsetTop + sl.offsetTop + sl.offsetHeight / 2, low = ref.offsetTop + ref.offsetHeight - SZ / 2;   // bottom flush with the cards
+      const L = bl ? Math.max(...obstacles(bl).map(o => o.r)) : 0, R = br ? Math.min(...obstacles(br).map(o => o.l)) : W;
+      for (const [x, y] of [[(L + R) / 2, slotMid], [W / 2, low]]) {
+        const c = { l: x - SZ / 2, t: y - SZ / 2, r: x + SZ / 2, b: y + SZ / 2 };
+        if (c.l >= M && c.r <= W - M && clear(c, obs)) { spot = [x, y]; break; }
+      }
+    }
+    if (spot) {
+      if (btn.parentNode !== btnHome) btnHome.appendChild(btn);
+      btn.classList.remove('in-hud');
+      btn.style.left = spot[0] + 'px'; btn.style.top = spot[1] + 'px';
+    } else {
+      btn.classList.add('in-hud'); btn.style.left = btn.style.top = '';
+      const hud = document.querySelector('.hud-top');
+      if (btn.parentNode !== hud) hud.insertBefore(btn, $('gearBtn'));
+    }
+    if (open) placePanel();
+  }
+  function placePanel() {   // above the button (bottom) or below it (top bar), kept on screen
+    const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, b = btn.getBoundingClientRect();
+    const w = panel.offsetWidth * sc, h = panel.offsetHeight * sc, m = 8 * sc;
+    const x = Math.max(st.left + m, Math.min(st.right - m - w, (b.left + b.right) / 2 - w / 2));
+    const below = btn.classList.contains('in-hud');
+    const y = below ? b.bottom + m : b.top - m - h;
+    panel.style.left = (x - st.left) / sc + 'px'; panel.style.top = (Math.max(st.top + m, y) - st.top) / sc + 'px';
+    panel.classList.toggle('down', below);
+  }
+  function setOpen(on) {
+    if (open === on) return;
+    open = on; panel.hidden = !on; btn.setAttribute('aria-expanded', String(on));
+    if (on) { placePanel(); sfx('tap'); const f = panel.querySelector('.em-pick'); if (f) f.focus({ preventScroll: true }); }
+  }
+  // the bubble: over the sender's avatar, popping in, moving in the emote's own way, fading out
+  function show(c, id) {
+    const e = em(id); if (!e || !S || !cards[c]) return false;
+    if (showing[c]) { queue[c] = queue[c] || []; if (queue[c].length < 2) queue[c].push(id); return true; }
+    const ava = cards[c].querySelector('.ava'); if (!ava) return false;
+    const st = $('stage').getBoundingClientRect(), sc = st.width / (SW() || 1) || 1, r = ava.getBoundingClientRect();
+    const b = document.createElement('div');
+    b.className = `emote-bubble ${e.motion}`; b.dataset.seat = c; b.dataset.emote = id;
+    b.style.setProperty('--c', COLORS[c].css);
+    b.style.left = ((r.left + r.right) / 2 - st.left) / sc + 'px'; b.style.top = ((r.top + r.bottom) / 2 - st.top) / sc + 'px';
+    b.setAttribute('role', 'img'); b.setAttribute('aria-label', `${pname(c)}: ${e.name}`);
+    b.innerHTML = `<span class="em-art">${e.art}</span>` + (e.motion === 'em-party' ? '<i></i><i></i><i></i><i></i><i></i><i></i>' : '');
+    layer.appendChild(b); showing[c] = b; sfx('emote');
+    const gid = S.id;
+    setTimeout(() => {
+      b.remove(); if (showing[c] === b) delete showing[c];
+      if (!S || S.id !== gid) return;
+      const next = (queue[c] || []).shift(); if (next) show(c, next);
+    }, 1800);
+    return true;
+  }
+  function send(id) { const c = sender(); setOpen(false); if (c >= 0) show(c, id); }
+  // CPU players: an occasional, varied reaction (throttled per player and overall)
+  const pick = (c, ids) => { const opts = ids.filter(x => x !== lastCpu[c]); return opts[Math.floor(Math.random() * opts.length)]; };
+  function cpuSay(c, ids, chance) {
+    if (!S || S.players[c] !== 'cpu' || Math.random() >= chance) return false;
+    const now = performance.now();
+    if (now - lastAny < 4000 || now - (lastCpu['t' + c] || -1e9) < 9000) return false;
+    const id = pick(c, ids); lastAny = now; lastCpu['t' + c] = now; lastCpu[c] = id;
+    const gid = S.id;
+    setTimeout(() => { if (S && S.id === gid) show(c, id); }, 350 + Math.random() * 500);
+    return true;
+  }
+  function react(kind, c, victims = []) {
+    if (!S) return;
+    if (kind === 'capture') {
+      const owners = [...new Set(victims.map(v => v[0]))];
+      const hurt = owners.find(o => S.players[o] === 'cpu' && isHuman(c));
+      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow'], .4)) return;
+      if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool'], .35);
+    } else if (kind === 'win') {
+      const winners = teamOn() ? [c, mateOf(c)] : [c];
+      const cpuWinner = winners.find(w => S.players[w] === 'cpu');
+      if (cpuWinner !== undefined) cpuSay(cpuWinner, ['party', 'cool'], .7);
+      else { const loser = [0, 1, 2, 3].find(o => S.players[o] === 'cpu' && !winners.includes(o)); if (loser !== undefined) cpuSay(loser, ['clap', 'cry'], .5); }
+    }
+  }
+  function reset() {   // a new game (or leaving one): no bubbles, queues or reaction cooldowns carried over
+    setOpen(false);
+    Object.keys(showing).forEach(k => { showing[k].remove(); delete showing[k]; });
+    Object.keys(queue).forEach(k => delete queue[k]);
+    Object.keys(lastCpu).forEach(k => delete lastCpu[k]); lastAny = 0;
+  }
+  btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!open); });
+  panel.addEventListener('click', e => { const b = e.target.closest('[data-emote]'); if (b) send(b.dataset.emote); });
+  addEventListener('pointerdown', e => { if (open && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false); }, true);
+  addEventListener('keydown', e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setOpen(false); btn.focus({ preventScroll: true }); } }, true);
+  addEventListener('resize', () => setTimeout(place, 60));
+  return { place, show, send, react, reset, setOpen, sender, get open() { return open; }, get showing() { return { ...showing }; }, get queue() { return JSON.parse(JSON.stringify(queue)); }, list: () => owned().map(e => e.id) };
+})();
+
 /* ---------- HUD ---------- */
 function setMsg(html) { $('msg').innerHTML = html; }
 /* Player cards sit in the screen corners, clockwise from the viewer's own corner (bottom-left),
@@ -3983,6 +4192,7 @@ function buildCards() {
     cards[c] = el;
   });
   Info.auto(wrap);
+  Emotes.reset(); Emotes.place();   // the emote button beside your dice (cards are in place now)
 }
 
 const tapEl = document.createElement('span');
@@ -6323,7 +6533,7 @@ function openSheet(id) {
   const cur = openSheetEl();
   backTo[id] = cur && cur.id !== id ? cur.id : null;
   if (cur) cur.hidden = true;
-  Info.close();
+  Info.close(); Emotes.setOpen(false);
   $(id).hidden = false;
   Info.auto($(id));   // a feature ⓘ that is relevant as soon as this sheet opens
   document.documentElement.classList.add('sheet-open');
@@ -6353,6 +6563,7 @@ sheets.forEach(el => el.querySelectorAll('[data-close]').forEach(b => b.addEvent
 function startGame(players, teams = false) { closeAllSheets(); sfx('select'); newGame(players, teams); }
 function goHome() {
   gameId++; S = null; paused = false; movableSet = new Set();
+  Emotes.reset(); Emotes.place();   // no bubbles left behind; the button hides
   closeAllSheets();
   toks.flat().forEach(t => { t.anim = false; });
   relayout(); updateHUD();
@@ -6670,7 +6881,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { Emotes, EMOTES, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
