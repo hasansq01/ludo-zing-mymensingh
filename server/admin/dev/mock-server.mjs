@@ -4,6 +4,7 @@
 //   node server/admin/dev/mock-server.mjs            → http://localhost:8790/admin  (password: dev)
 //   PORT=9000 node server/admin/dev/mock-server.mjs
 //   MOCK_DISABLED=1 …   every /admin/api call answers 503 admin_disabled (no ADMIN_PASSWORD)
+//   MOCK_USAGE_OFF=1 …  the Usage page's "not configured" state (no CF_API_TOKEN); MOCK_USAGE_ERR=1 → 502 from Cloudflare
 //   MOCK_LATENCY=400 …  extra latency per API call (ms), to see skeletons
 //
 // Data is fake and in memory (seeded, so it's the same on every start). Three rooms play live matches whose
@@ -22,6 +23,8 @@ const PASSWORD = "dev";
 const DISABLED = process.env.MOCK_DISABLED === "1";
 const LATENCY = Number(process.env.MOCK_LATENCY || 120);
 const PUSH_OFF = process.env.MOCK_PUSH_OFF === "1"; // push not configured (no FCM_SERVICE_ACCOUNT)
+const USAGE_OFF = process.env.MOCK_USAGE_OFF === "1";
+const USAGE_ERR = process.env.MOCK_USAGE_ERR === "1";
 const DAY = 86400e3;
 
 // ---------- seeded RNG ----------
@@ -548,6 +551,71 @@ function snapshot(L) {
   };
 }
 
+// GET /usage (src/usage.ts): today's Cloudflare free-plan use. Limits as in FREE_LIMITS; numbers are fake.
+const USAGE_METRICS = [
+  { id: "workers_requests", label: "Workers requests", group: "workers", unit: "count", period: "day", limit: 100000, share: 0.31, note: "HTTP requests and cron runs that start the Worker, all Workers of the account." },
+  { id: "do_requests", label: "Durable Object requests", group: "do", unit: "count", period: "day", limit: 100000, share: 0.78, note: "Fetches, RPC calls and alarms; incoming WebSocket messages count 20 to 1." },
+  { id: "do_duration", label: "Durable Object duration", group: "do", unit: "gbs", period: "day", limit: 13000, share: 0.93, note: "GB-seconds of wall-clock time (128 MB per object) while an object is awake and not hibernating." },
+  { id: "do_rows_read", label: "Durable Object rows read", group: "do", unit: "count", period: "day", limit: 5000000, share: 0.12, note: "SQLite rows read by Durable Objects." },
+  { id: "do_rows_written", label: "Durable Object rows written", group: "do", unit: "count", period: "day", limit: 100000, share: 0.41, note: "SQLite rows written by Durable Objects (deletes and alarms included)." },
+  { id: "do_storage", label: "Durable Object storage", group: "do", unit: "bytes", period: "total", limit: 5000000000, share: 0.0004, note: "SQLite data stored by Durable Objects, account total. Does not reset." },
+  { id: "d1_rows_read", label: "D1 rows read", group: "d1", unit: "count", period: "day", limit: 5000000, share: 0.27, note: "Rows scanned by D1 queries, all databases of the account." },
+  { id: "d1_rows_written", label: "D1 rows written", group: "d1", unit: "count", period: "day", limit: 100000, share: 0.09, note: "Rows changed by D1 writes (an index adds one per write)." },
+  { id: "d1_storage", label: "D1 database size", group: "d1", unit: "bytes", period: "total", limit: 500000000, share: 0.021, note: "Largest D1 database against the 500 MB per-database limit. Does not reset." },
+];
+const USAGE_INFO = [
+  { label: "Worker CPU time", value: "10 ms per request" }, { label: "Subrequests per invocation", value: "50" },
+  { label: "D1 queries per invocation", value: "50" }, { label: "D1 total storage (account)", value: "5 GB" },
+];
+function usage() {
+  const now = Date.now();
+  const today0 = Math.floor(now / DAY) * DAY;
+  const reset_at = new Date(today0 + DAY).toISOString();
+  const base = { now, reset_at, account_id: "cd708edb210d36f6f898127f0373d124", worker: "ludo-zing-rooms", info: USAGE_INFO };
+  if (USAGE_OFF) {
+    return { configured: false, ...base, metrics: USAGE_METRICS.map(({ share, ...m }) => m),
+      setup: { secret: "CF_API_TOKEN", permission: "Account > Account Analytics > Read", steps: [
+        "Cloudflare dashboard > My Profile > API Tokens > Create Token > Create Custom Token.",
+        "Permissions: Account, Account Analytics, Read. Account Resources: Include > the account of this Worker.",
+        "Create the token and copy it once.",
+        "In server/: tools/cf.sh secret put CF_API_TOKEN (paste the token), then reload this page."] } };
+  }
+  const level = (p) => (p >= 90 ? "danger" : p >= 70 ? "warning" : "ok");
+  const metrics = USAGE_METRICS.map(({ share, ...m }) => {
+    const used = m.unit === "gbs" ? Math.round(m.limit * share * 100) / 100 : Math.round(m.limit * share);
+    const percent = Math.round(used / m.limit * 1000) / 10;
+    const o = { ...m, used, left: Math.max(0, m.limit - used), percent, level: level(percent) };
+    if (m.id === "workers_requests" || m.id === "do_requests") o.mine = Math.round(used * 0.97);
+    if (m.id === "d1_storage") { o.total_bytes = used; o.databases = 1; }
+    return o;
+  });
+  const hrs = new Date(now).getUTCHours();
+  const curve = (h) => 0.35 + 0.65 * Math.sin(Math.PI * ((h + 3) % 24) / 24) ** 2;
+  const hours = [];
+  const hourly = { workers_requests: [], do_requests: [], do_duration: [], do_rows_read: [], do_rows_written: [], d1_rows_read: [], d1_rows_written: [] };
+  const used = Object.fromEntries(metrics.map((m) => [m.id, m.used]));
+  let wsum = 0;
+  for (let h = 0; h <= hrs; h++) wsum += curve(h);
+  for (let h = 0; h <= hrs; h++) {
+    hours.push(new Date(today0 + h * 3600e3).toISOString());
+    for (const k of Object.keys(hourly)) hourly[k].push(k === "do_duration" ? Math.round(used[k] * curve(h) / wsum * (0.9 + rnd() * 0.2) * 100) / 100 : Math.round(used[k] * curve(h) / wsum * (0.9 + rnd() * 0.2)));
+  }
+  const daily = [];
+  for (let d = 6; d >= 0; d--) {
+    const e = { day: new Date(today0 - d * DAY).toISOString().slice(0, 10) };
+    for (const k of Object.keys(hourly)) e[k] = k === "do_duration" ? Math.round(used[k] * (d === 0 ? 1 : 0.5 + rnd() * 0.7) * 100) / 100 : Math.round(used[k] * (d === 0 ? 1 : 0.5 + rnd() * 0.7));
+    daily.push(e);
+  }
+  const mToday = matches.filter((m) => m.started_at >= today0).length;
+  return {
+    configured: true, ...base, cached_at: now - 70e3, stale: false, metrics, hourly: { hours, ...hourly }, daily,
+    estimate: { games_left: 41, basis: mToday >= 5 ? "today" : "7d", matches: mToday >= 5 ? mToday : 63, limiting: "do_duration",
+      per_game: { workers_requests: 84.2, do_requests: 612.5, do_duration: 18.4, do_rows_read: 9100, do_rows_written: 210.5, d1_rows_read: 1420, d1_rows_written: 33 } },
+    do_requests_by_type: { fetch: 5200, alarm: 3100, webSocketMessage: 98000 },
+    sampling: "Cloudflare's adaptive analytics are sampled: the numbers track the real usage closely but can differ slightly from the dashboard's billing figures.",
+  };
+}
+
 function overview() {
   const now = Date.now();
   const days = [];
@@ -635,6 +703,7 @@ async function api(req, res, url) {
   switch (sub[0]) {
     case "me": return send(res, 200, { ok: true });
     case "overview": return send(res, 200, overview());
+    case "usage": return USAGE_ERR ? fail(res, 502, "cloudflare_failed", "Cloudflare Analytics API: Authentication error") : send(res, 200, usage());
     case "rooms": {
       for (const L of live.values()) { L.room.members = L.members.length; L.room.online = L.members.filter((x) => x.online).length; }
       if (!sub[1]) {

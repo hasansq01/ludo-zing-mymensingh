@@ -41,5 +41,6 @@
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }
   // Secret (not here): ADMIN_PASSWORD (tools/cf.sh secret put ADMIN_PASSWORD; locally .dev.vars).
+  // Optional secret: CF_API_TOKEN (API token, Account > Account Analytics > Read; the console's Usage page, ADMIN_API.md).
   // Optional secret: FCM_SERVICE_ACCOUNT (the Firebase service-account JSON; unset = push off).
 }

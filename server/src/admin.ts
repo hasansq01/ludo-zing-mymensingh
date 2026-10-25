@@ -5,6 +5,7 @@ import * as D from "./db";
 import { BOARDS, PERIODS, type Board, type PeriodArg, countScores, periodKey, topScores } from "./leaderboard";
 import * as P from "./push";
 import { isCode, type AdminSnapshot, type Env, type Room } from "./room";
+import { usageReport, type UsageEnv } from "./usage";
 
 const COOKIE = "lz_admin";
 const SESSION_S = 12 * 60 * 60; // 43200
@@ -246,6 +247,13 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
       case "events":
         if (b !== undefined) break;
         return m === "GET" ? await events(c) : fail(405, "method");
+      case "usage":
+        if (b !== undefined) break;
+        if (m !== "GET") return fail(405, "method");
+        {
+          const u = await usageReport(env as Env & UsageEnv, c.now);
+          return json(u.body, u.status);
+        }
       case "config":
         if (b !== undefined) break;
         if (m === "GET") return json(await D.readConfig(env.DB));

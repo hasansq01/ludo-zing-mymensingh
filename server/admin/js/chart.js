@@ -17,9 +17,10 @@ const DAY_LONG = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "
 const dayDate = (d) => new Date(d + "T00:00:00Z");
 
 /**
- * series: [{key, name, tone: 1|2, values: number[]}], days: ["YYYY-MM-DD"]
+ * series: [{key, name, tone: 1|2, values: number[]}], days: ["YYYY-MM-DD"] (or any x keys, with fmtShort / fmtLong
+ * for the axis and the tooltip, e.g. ISO hours; pointLabel heads the table's first column)
  */
-export function lineChart({ title, days, series, yLabel = "Per day", xLabel = "Day (UTC)", height = 248 }) {
+export function lineChart({ title, days, series, yLabel = "Per day", xLabel = "Day (UTC)", height = 248, pointLabel = "Day", fmtShort = (d) => DAY_FMT.format(dayDate(d)), fmtLong = (d) => DAY_LONG.format(dayDate(d)) }) {
   const legend = h("ul", { class: "legend", "aria-label": "Legend" }, series.map((sr) =>
     h("li", null, h("span", { class: "lkey lkey-line tone-" + sr.tone, "aria-hidden": "true" }), sr.name)));
   const viewBtn = h("button", { class: "btn btn-sm btn-ghost", type: "button", "aria-pressed": "false" }, icon("table", { size: 14 }), "Table");
@@ -42,8 +43,8 @@ export function lineChart({ title, days, series, yLabel = "Per day", xLabel = "D
 
   // table view (every value reachable without hovering)
   tableBox.appendChild(h("div", { class: "tbl-scroll" }, h("table", { class: "tbl tbl-dense" },
-    h("thead", null, h("tr", null, h("th", { scope: "col" }, "Day"), series.map((sr) => h("th", { scope: "col", class: "num" }, sr.name)))),
-    h("tbody", null, days.map((d, i) => h("tr", null, h("td", null, DAY_LONG.format(dayDate(d))),
+    h("thead", null, h("tr", null, h("th", { scope: "col" }, pointLabel), series.map((sr) => h("th", { scope: "col", class: "num" }, sr.name)))),
+    h("tbody", null, days.map((d, i) => h("tr", null, h("td", null, fmtLong(d)),
       series.map((sr) => h("td", { class: "num" }, fmtInt(sr.values[i])))))))));
 
   let width = 0;
@@ -80,7 +81,7 @@ export function lineChart({ title, days, series, yLabel = "Per day", xLabel = "D
     days.forEach((d, i) => {
       if ((n - 1 - i) % every !== 0) return;
       svg.appendChild(s("line", { x1: x(i), x2: x(i), y1: m.t + ih, y2: m.t + ih + 4, class: "c-base" }));
-      svg.appendChild(s("text", { x: x(i), y: m.t + ih + 18, class: "c-tick", "text-anchor": "middle" }, DAY_FMT.format(dayDate(d))));
+      svg.appendChild(s("text", { x: x(i), y: m.t + ih + 18, class: "c-tick", "text-anchor": "middle" }, fmtShort(d)));
     });
     // axis titles
     svg.appendChild(s("text", { x: m.l + iw / 2, y: H - 4, class: "c-axis", "text-anchor": "middle" }, xLabel));
@@ -116,7 +117,7 @@ export function lineChart({ title, days, series, yLabel = "Per day", xLabel = "D
       const [ln, ...dots] = cross.children;
       ln.setAttribute("x1", x(i)); ln.setAttribute("x2", x(i));
       series.forEach((sr, k) => { dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(sr.values[i])); });
-      clear(tip).append(h("div", { class: "tip-head" }, DAY_LONG.format(dayDate(days[i]))),
+      clear(tip).append(h("div", { class: "tip-head" }, fmtLong(days[i])),
         ...series.map((sr) => h("div", { class: "tip-row" }, h("span", { class: "lkey lkey-line tone-" + sr.tone }),
           h("strong", null, fmtInt(sr.values[i])), h("span", { class: "tip-name" }, sr.name))));
       tip.hidden = false;

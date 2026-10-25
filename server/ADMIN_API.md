@@ -270,3 +270,31 @@ created_by: "admin", created_at, sent_at, targeted, sent, failed, opened}` (time
   token, or of another sender) is deleted and counted failed; FCM busy / unreachable is retried after 1 and 2 min,
   then counted failed. Status `sent` when the queue is done (`failed` if nothing was delivered and something
   failed). `opened` = accounts that opened it (`POST /v1/push/opened {cid}` from the game, once per account).
+
+## Usage (Cloudflare free-plan allowances)
+
+`GET /admin/api/usage` (session required) reads the Cloudflare GraphQL Analytics API
+(`https://api.cloudflare.com/client/v4/graphql`, `src/usage.ts`) and returns today's (UTC day; every daily
+allowance resets at 00:00 UTC) use against the Workers Free limits. The limits are per **account**, so totals cover
+every Worker / Durable Object / D1 database of the account; `mine` is this Worker's share. The limits table
+(`FREE_LIMITS`) cites the Cloudflare doc pages and the date they were checked. Secret `CF_API_TOKEN` = an API token
+with **Account > Account Analytics > Read** on the account (`tools/cf.sh secret put CF_API_TOKEN`); optional var
+`CF_ACCOUNT_ID` overrides the built-in account id. Cached 5 minutes per isolate; all HTTP goes through
+`setCloudflareFetcher` (tests).
+
+- No token: `200 {configured: false, now, reset_at, account_id, worker, metrics: [{id, label, group, unit, period,
+  limit, note}], info, setup: {secret, permission, steps: [string]}}`.
+- Configured: `200 {configured: true, now, cached_at, stale, reset_at (ISO, next 00:00 UTC), account_id, worker,
+  metrics: [{id, label, group: workers|do|d1, unit: count|gbs|bytes, period: day|total, used, limit, left, percent
+  (0–100, 1 decimal), level: ok|warning (≥70)|danger (≥90), note, mine? (workers_requests, do_requests)}],
+  hourly: {hours: [ISO hour, today 00:00 UTC … now], <daily metric id>: [number per hour]},
+  daily: [{day, <daily metric id>…}] (last 7 UTC days, oldest first),
+  estimate: {games_left: int | null, basis: "today" | "7d" | null, matches, limiting: metric id, per_game: {id: cost}},
+  do_requests_by_type, info: [{label, value}] (per-request limits, not daily), sampling}`.
+  Metric ids: `workers_requests`, `do_requests`, `do_duration` (GB-s), `do_rows_read`, `do_rows_written`,
+  `do_storage` (total, no reset), `d1_rows_read`, `d1_rows_written`, `d1_storage` (largest database vs 500 MB; also
+  `total_bytes`, `databases`). Durable Object requests count incoming WebSocket messages 20 to 1.
+  `estimate` = games left before the tightest metric runs out, at the per-match cost seen so far (today's numbers if
+  ≥ 5 matches started today, else the last 7 days) from D1 `matches`; a rough guess, other traffic is in the cost.
+- Cloudflare refused / unreachable: `200` with the last good body and `stale: true, error_msg` if it is from today,
+  else `502 {error: "cloudflare_failed", msg}`.
