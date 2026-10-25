@@ -346,6 +346,11 @@ func _wallet_sheets() -> void:
 	ps._name_edit.text = "Mimi"
 	await ps._save_name()
 	check("profile: a new name is PATCHed to the server", f.last("/v1/me").method == HTTPClient.METHOD_PATCH and f.last("/v1/me").body == {name = "Mimi"} and Save.profile.name == "Mimi", f.last("/v1/me"))
+	var patches := f.count("/v1/me")
+	ps._name_edit.text = " you "
+	await ps._save_name()
+	check("profile: \"You\" is refused before anything is sent (the game shows each player to themselves as You)",
+		Save.profile.name == "Mimi" and f.count("/v1/me") == patches and ps._save_btn.disabled and ps._err.visible and ps._err.text.contains("You"), ps._err.text)
 	f.online = false
 	a._session = ""
 	ps._name_edit.text = "Mimi Two"
@@ -376,7 +381,7 @@ func _misc() -> void:
 	check("result: a second note replaces the first", n == 1)
 	r.free()
 	var home := FileAccess.get_file_as_string("res://scripts/ui/home_screen.gd")
-	check("home: the Ranks side button opens the leaderboard", home.contains("[\"leaderboard\", \"Ranks\"") and FileAccess.get_file_as_string("res://scripts/main.gd").contains("LeaderboardSheet.new().open(sheet_layer)"))
+	check("home: Ranks in the nav opens the leaderboard", home.contains("[\"leaderboard\", \"Ranks\"") and FileAccess.get_file_as_string("res://scripts/main.gd").contains("LeaderboardSheet.new().open(sheet_layer)"))
 
 func _texts_of(n: Node) -> Array:
 	var out := []

@@ -7,10 +7,11 @@ extends Node
 ## welcome). A game ends on the full-screen ResultScreen (Play again / Home). A live match is kept by MatchStore, so
 ## Home offers "Continue match" after the app was closed or killed.
 ## Home's Ludo / Snakes & Ladders switch also picks the lobby's backdrop: the café, or the equipped S&L scene with its
-## board (the Shop's Scenes tab, also "Change scene" on Home, changes it). There is no separate S&L landing screen.
+## board (the Scenes tab of the Shop / Inventory changes it; with Snakes & Ladders picked both open on that tab).
+## There is no separate S&L landing screen.
 ## Android's Back: closes the top sheet (Sheet.back), Home on a result, pauses a game, and asks before leaving the
 ## app on Home.
-## Online (friend rooms, Ludo only): Home's "Play with friends" opens Online's Friends sheet; the room's `start` /
+## Online (friend rooms, Ludo only): Home's Friends opens Online's Friends sheet; the room's `start` /
 ## `sync` comes back here as start_online(); the pause menu offers Leave match instead of Restart; the result's Play
 ## again is the host's rematch and Home leaves the room. A room kept from an earlier run is taken back at launch.
 
@@ -270,7 +271,6 @@ func _build_screens() -> void:
 	home.open_tab.connect(_on_tab)
 	home.play_game.connect(_open_setup)          # the game cards: (game "ludo" | "sl", mode "cpu" | "local") -> setup
 	home.continue_match.connect(continue_match)
-	home.play_again.connect(_on_home_play_again)   # play_again(cfg): the last setup, one tap
 	home.game_switched.connect(_on_game_switched)  # Ludo / Snakes & Ladders: the backdrop follows
 	hud = LudoHUD.new()
 	hud.name = "LudoHUD"
@@ -351,7 +351,7 @@ func _fit_home() -> void:
 	if screen == "home" and home.game == "sl":
 		_frame_sl_home()
 
-## The S&L board framed in Home's free band (between the logo and the feature tiles), at the match's 3D angle.
+## The S&L board framed in Home's free band (between the logo and the dock), at the match's 3D angle.
 func _frame_sl_home() -> void:
 	var band := home.free_band()
 	var w := ui_root.size.x
@@ -555,7 +555,7 @@ func start_sl(cfg: Dictionary) -> void:
 ## Home's switch changed: the café for Ludo, the equipped S&L scene for Snakes & Ladders.
 func _on_game_switched(_game: String) -> void:
 	if screen == "home":
-		_fit_home()                              # the free band changed ("Change scene" shows for S&L)
+		_fit_home()
 		_home_backdrop()
 
 ## Home's backdrop for the game picked on the switch. Snakes & Ladders: the equipped scene (built on first use; the
@@ -607,46 +607,8 @@ func _open_setup(game: String, mode: String) -> void:
 			start_sl(cfg))
 	s.open(sheet_layer)
 
-## Home's "Play again" card: {game, mode, setup} (setup = the remembered choices), a full start config, or {}
-## (the last game remembered).
-func _on_home_play_again(cfg: Variant = {}) -> void:
-	var c: Dictionary = cfg if cfg is Dictionary else {}
-	var game := str(c.get("game", ""))
-	if game == "ludo" and c.get("players") is Array:
-		start_ludo(c)
-	elif game == "sl" and c.has("n"):
-		start_sl(c)
-	elif game in ["ludo", "sl"] and c.get("setup") is Dictionary and not (c.setup as Dictionary).is_empty():
-		var cfg2 := setup_config(game, str(c.get("mode", "cpu")), c.setup)
-		if game == "ludo":
-			start_ludo(cfg2)
-		else:
-			start_sl(cfg2)
-	else:
-		play_again_last(game, str(c.get("mode", "")))
-
-## Home's one-tap "Play again": the last game and mode played (Save.prefs.last_played) with the choices SetupSheet
-## remembered for it (Save.prefs.last_setup[game][mode]). Nothing remembered: the setup opens instead.
-func play_again_last(game := "", mode := "") -> void:
-	var lp: Dictionary = Save.prefs.get("last_played", {}) if Save.prefs.get("last_played") is Dictionary else {}
-	if game == "":
-		game = str(lp.get("game", "ludo"))
-	if mode == "":
-		mode = str(lp.get("mode", "cpu"))
-	var all: Variant = Save.prefs.get("last_setup", {})
-	var per_game: Variant = (all as Dictionary).get(game, {}) if all is Dictionary else {}
-	var d: Variant = (per_game as Dictionary).get(mode) if per_game is Dictionary else null
-	if not d is Dictionary:
-		_open_setup(game, mode)
-		return
-	var cfg := setup_config(game, mode, d)
-	if game == "ludo":
-		start_ludo(cfg)
-	else:
-		start_sl(cfg)
-
 ## A start config from remembered setup choices {count, color, teams, bot_level, names} (as SetupSheet builds it;
-## Pass & Play names are kept in seat order and passed on as cfg.names, [4] by colour).
+## Pass & Play names are kept in seat order and passed on as cfg.names, [4] by colour; Save.prefs.last_setup).
 static func setup_config(game: String, mode: String, d: Dictionary) -> Dictionary:
 	var cpu := mode == "cpu"
 	var count := clampi(int(d.get("count", 3 if cpu else 2)), 1 if cpu else 2, 3 if cpu else 4)
@@ -718,7 +680,7 @@ static func _sl_cfg_of(d: Dictionary) -> Dictionary:
 			col = int(p.get("c", 0))
 	return {game = "sl", mode = str(g.get("mode", "cpu")), n = maxi(2, ps.size()), color = col}
 
-## Home's tabs, side buttons and cards.
+## Home's tabs and buttons (and the deep links of notifications: daily, spin, free, leaderboard, shop).
 func _on_tab(tab: String) -> void:
 	match tab:
 		"home":
@@ -729,22 +691,27 @@ func _on_tab(tab: String) -> void:
 				go_home()
 		"sl", "snake":
 			open_sl_landing()
-		"scenes":                                       # Home's "Change scene" (Snakes & Ladders picked)
+		"scenes":                                       # the Shop's Scenes tab (Snakes & Ladders worlds)
 			var s := ShopSheet.new("scenes")
 			_wire_shop(s)
 			s.open(sheet_layer)
 		"shop", "coins":
-			var s := ShopSheet.new("coins" if tab == "coins" else "rooms")
+			var s := ShopSheet.new("coins" if tab == "coins" else _home_shop_tab())
 			_wire_shop(s)
 			s.open(sheet_layer)
 		"inventory", "collection", "owned":                 # the nav's Inventory: what you own, ready to use
-			var s := ShopSheet.new("rooms", 400.0, true, true)
+			var s := ShopSheet.new(_home_shop_tab(), 400.0, true, true)
 			_wire_shop(s)
 			s.shop_requested.connect(func(t: String):
 				s.close()
 				var shop := ShopSheet.new(t)
 				_wire_shop(shop)
 				shop.open(sheet_layer))
+			s.open(sheet_layer)
+		"rewards":                                      # Home's gift: Free spin / Daily reward / Free coins
+			var s := RewardsSheet.new()
+			s.picked.connect(_on_tab)                   # each row does what its own button does (spin / daily / free)
+			s.closed.connect(home.refresh)
 			s.open(sheet_layer)
 		"spin":
 			var s := SpinSheet.new()
@@ -770,6 +737,11 @@ func _on_tab(tab: String) -> void:
 			open_settings()
 		"howto":
 			HowToSheet.new().open(sheet_layer)
+
+## The Shop / Inventory tab Home opens on: Scenes while Snakes & Ladders is picked (where its world is changed),
+## else Rooms.
+func _home_shop_tab() -> String:
+	return "scenes" if home and home.game == "sl" else "rooms"
 
 ## Profile -> Shop and other sheets that open the Shop themselves call this on the sheet they open:
 ## rooms, dice and scenes put in use there reach the game at once, and Home refreshes when it closes.
@@ -803,14 +775,15 @@ func apply_dice_skin() -> void:
 		if is_instance_valid(d):
 			d.set_skin(sk.bg, sk.edge, sk.pip, sk.one)
 
-## Free coins: claim them (coins fly from the side button into the counter) or say when they are ready.
+## Free coins: claim them (coins fly from the Rewards sheet's row, else Home's gift, into the counter) or say when
+## they are ready.
 func _claim_free() -> void:
 	var left := Rewards.free_left_sec(Save.profile)
 	var from := _home_side("free")
 	if left > 0:
 		_home_toast("Free coins in %s" % Fmt.until(left))
-		if from is SideButton:
-			(from as SideButton).shake()
+		if from and from.has_method("shake"):
+			from.call("shake")
 		Haptics.error()
 		return
 	var before := int(Save.profile.coins)
@@ -825,8 +798,8 @@ func _claim_free() -> void:
 		if not r.get("ok", false):
 			_home_toast(Account.error_text(str(r.get("error", "")), "claim"), "bad")
 			Haptics.error()
-			if from is SideButton:
-				(from as SideButton).shake()
+			if from and from.has_method("shake"):
+				from.call("shake")
 			home.refresh()
 			return
 		n = int(r.get("coins", 0))
@@ -845,9 +818,14 @@ func _claim_free() -> void:
 		CoinFly.run(ui_root, at, target, n, Callable(), int(Save.profile.coins))
 	_home_toast("%s coins" % Fmt.gain(n), "coin")
 
-## A toast on Home: just above the feature tiles, never over the play buttons (elsewhere: the usual place).
+## A toast on Home: just above the dock (or the Continue pill), never over the play buttons; under the card of a
+## sheet open on top (the Rewards sheet); elsewhere the usual place.
 func _home_toast(text: String, kind := "info") -> void:
-	var over: Control = _home_side("free") if screen == "home" and home and home.visible else null
+	var top := _top_sheet()
+	if top and screen == "home":
+		Toast.show(ui_root, text, top.card, 1.8, kind)
+		return
+	var over: Control = home.toast_anchor() if screen == "home" and home and home.visible else null
 	if over:
 		Toast.show_above(ui_root, text, over, 1.8, kind)
 	else:
@@ -857,8 +835,14 @@ func _home_toast(text: String, kind := "info") -> void:
 func _home_coins() -> CoinAmount:
 	return home.coin_amount if home and is_instance_valid(home.coin_amount) else null
 
-## A home side button by id ("spin" | "daily" | "free"), or null.
+## Where the coins of a reward ("spin" | "daily" | "free") fly from: its row in the Rewards sheet when that is the
+## top sheet, else Home's gift (null for anything else).
 func _home_side(id: String) -> Control:
+	var top := _top_sheet()
+	if top is RewardsSheet:
+		var row := (top as RewardsSheet).row(id)
+		if row:
+			return row
 	return home.side_button(id)
 
 ## A short message near the bottom of the screen (kept for older callers).

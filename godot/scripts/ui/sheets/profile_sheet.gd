@@ -634,11 +634,13 @@ static func clean_name(s: String) -> String:
 ## True when the typed name is valid. Save shows only when the name changed, disabled while it's invalid.
 func _validate(show_err: bool) -> bool:
 	var n := clean_name(_name_edit.text)
-	var ok := n.length() >= 1 and n.length() <= MAX_NAME
+	var reserved := n.to_lower() == "you"           # (the game calls every player's own row "You")
+	var ok := n.length() >= 1 and n.length() <= MAX_NAME and not reserved
 	var changed := n != str(Save.profile.get("name", ""))
 	_save_btn.visible = changed
 	_save_btn.disabled = not ok or not changed
-	_err.text = "Enter a name of 1 to %d characters." % MAX_NAME if show_err and not ok else ""
+	_err.text = "" if not show_err or ok else "Pick another name: “You” is how the game shows you to yourself." if reserved \
+		else "Enter a name of 1 to %d characters." % MAX_NAME
 	_err.visible = _err.text != ""
 	return ok
 

@@ -92,15 +92,8 @@ func _shot_current(s: String) -> void:
 	home.visible = true
 	main.close_all_sheets()
 	home.refresh()
-	if s == "continue":                       # the Continue match slot, in memory only (no user://match.json)
-		home._quick_kind = "continue"
-		home._quick_title.text = "Continue match"
-		home._quick_sub.text = "Ludo vs Computer · 35%"
-		home._quick_icon.texture = UIKit.svg(HomeScreen.HI % "resume")
-		home._quick_go.text = "Resume"
-		UIKit.set_kind(home._quick_go, "teal")
-		home._quick.visible = true
-		home._layout()
+	if s == "continue":                       # the Continue match pill, in memory only (no user://match.json)
+		home._show_continue("Ludo vs Computer · 35%")
 	main._fit_home()
 	await _sleep(0.2)
 	_frame_cam()
@@ -108,9 +101,7 @@ func _shot_current(s: String) -> void:
 	main.close_all_sheets()
 	await _save_shot("%s/00_current_%s_%s.png" % [out, s, tag])
 	if s == "continue":
-		home._quick_kind = ""
-		home._quick.visible = false
-		home._layout()
+		home._show_continue("")
 
 
 func _shot_variant(v: String, s: String) -> void:

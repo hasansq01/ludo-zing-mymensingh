@@ -474,6 +474,8 @@ static func error_text(code: String, action := "claim") -> String:
 			return "You already own that."
 		"locked":
 			return "That’s still locked."
+		"reserved":
+			return "Pick another name: “You” is how the game shows you to yourself."
 		"claimed", "spun", "cooldown":
 			return "Already claimed. Come back later."
 		"busy", "server", "accounts_disabled", "rate":

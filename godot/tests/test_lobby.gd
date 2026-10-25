@@ -52,14 +52,14 @@ func run() -> void:
 	check("meter numbers: compact when tight", Meter.fitted_text("140 / 150 XP", f, 12, tight) == "140/150", Meter.fitted_text("140 / 150 XP", f, 12, tight))
 	check("meter numbers: none when nothing fits", Meter.fitted_text("140 / 150", f, 12, 10.0) == "")
 
-	# ---- copy: sentence case titles; the side button reads like its sheet ----
+	# ---- copy: sentence case titles; the Rewards rows read like their sheets ----
 	var src := FileAccess.get_file_as_string("res://scripts/ui/setup_sheet.gd")
 	check("setup title: Play vs computer", src.contains("\"Play vs computer\"") and not src.contains("\"Play vs Computer\""))
 	var spin := FileAccess.get_file_as_string("res://scripts/ui/sheets/spin_sheet.gd")
 	var daily := FileAccess.get_file_as_string("res://scripts/ui/sheets/daily_sheet.gd")
 	check("sheet titles: Daily spin / Daily reward", spin.contains("\"Daily spin\"") and daily.contains("\"Daily reward\"") and not daily.contains("\"LOCKED\""))
-	var home := FileAccess.get_file_as_string("res://scripts/ui/home_screen.gd")
-	check("home side button: Daily (not Rewards)", home.contains("[\"daily\", \"Daily\", HI % \"gift\"]"))
+	var rewards := FileAccess.get_file_as_string("res://scripts/ui/sheets/rewards_sheet.gd")
+	check("rewards sheet rows read like their sheets: Free spin / Daily reward", rewards.contains("[\"daily\", \"Daily reward\"") and rewards.contains("[\"spin\", \"Free spin\""))
 	var main_src := FileAccess.get_file_as_string("res://scripts/main.gd")
 	check("free coins: Fmt.until, never the ticking clock", main_src.contains("\"Free coins in %s\" % Fmt.until(left)"))
 	check("home switch drives the backdrop", main_src.contains("home.game_switched.connect(_on_game_switched)") and not main_src.contains("SLLanding.new()"))

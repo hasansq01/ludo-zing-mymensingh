@@ -1,29 +1,32 @@
 class_name HomeScreen
 extends Control
-## The lobby over the slowly orbiting café ("Scene + dock", the layout the user picked). The top half is the café
-## scene: the top bar (player chip with level, coins with a "+", the gear) and the game logo over the 3D table. The
-## bottom is a cream dock: the three lobby features on its top edge (Spin / Daily / Free coins, live states), the
-## quick-action slot (Continue match, else Play again, else hidden), the Ludo / Snakes & Ladders switch, the online
-## row (QUICK MATCH, the primary action, and PLAY WITH FRIENDS), the offline row (VS COMPUTER, PASS & PLAY) and the
-## nav (Home / Shop / Inventory). Every mode works for both games. Icons: the home family in assets/ui/home/hi_*.svg.
+## The lobby over the slowly orbiting café ("One big Play", the layout the owner picked). The café scene is the hero:
+## the top bar (player chip with level and XP, coins with a "+", the Rewards gift with a red count of the rewards
+## ready now, the gear), a smaller game logo over the 3D table and, when a match was kept, a slim "Continue match"
+## pill just above the dock. The cream dock at the bottom: the Ludo / Snakes & Ladders switch, one big QUICK MATCH,
+## a row of three compact modes (Friends / Computer / Pass & Play) and the nav (Home / Shop / Ranks / Inventory).
+## Every mode works for both games. Free spin / Daily reward / Free coins live in the Rewards sheet (the gift).
+## Icons: the home family in assets/ui/home/hi_*.svg.
 ##
 ## Contract with main.gd:
-##   play_game(game, mode)   game "ludo" | "sl", mode "cpu" | "local" (VS COMPUTER / PASS & PLAY); "online" only when
+##   play_game(game, mode)   game "ludo" | "sl", mode "cpu" | "local" (Computer / Pass & Play); "online" only when
 ##                           nothing listens to play_friends (older main.gd builds)
 ##   quick_match(game)       QUICK MATCH (Online.open_quick)
-##   play_friends(game)      PLAY WITH FRIENDS (Online.open_friends)
+##   play_friends(game)      Friends (Online.open_friends)
 ##   play(mode)              legacy: only emitted for Ludo when nothing is connected to play_game
-##   continue_match()        the Continue match slot (MatchStore has a saved match)
-##   play_again(cfg)         the Play again slot: cfg {game, mode, setup} from Save.prefs.last_played and
-##                           Save.prefs.last_setup[game][mode]
+##   continue_match()        the Continue match pill (MatchStore has a saved match)
 ##   game_switched(game)     the Ludo / Snakes & Ladders switch changed (Save.prefs.home_game is already updated)
-##   open_tab(tab)           shop | inventory | profile | settings | coins | spin | daily | free | leaderboard | scenes (the Shop's Scenes tab,
-##                           from "Change scene" while Snakes & Ladders is picked; home: already here, not emitted)
+##   open_tab(tab)           rewards (the gift) | shop | leaderboard (Ranks) | inventory | profile | settings | coins
+##                           (home: already here, not emitted)
 ##   select_game(game)       pick "ludo" | "sl" on the switch from code (emits game_switched when it changes)
 ##   safe_top / safe_bottom  set by main; the layout keeps >= BOTTOM_MIN px above the bottom edge regardless
 ##   free_band() -> Vector2  (top, bottom) of the free area for the 3D table, in UI px
 ##   table_width_factor      the table may be this many screen widths wide when framed (bigger board)
-##   coin_amount             the CoinAmount in the top bar (CoinFly target); side_button(id) -> the feature button
+##   coin_amount             the CoinAmount in the top bar (CoinFly target); side_button(id) -> where the coins of
+##                           reward `id` fly from when no Rewards sheet is open (the gift)
+##   toast_anchor()          the control a Home toast sits above (never over the play buttons)
+##   reward_states(p) / ready_count(p)   static: Free spin / Daily reward / Free coins now (the gift's count and the
+##                           Rewards sheet read the same rules)
 ##   coin_fly_active         set true while a CoinFly runs to coin_amount (refresh() then leaves the number alone;
 ##                           in-flight CoinFly overlays aimed at coin_amount, anywhere in the tree, are detected too)
 ##   hold_coins(sec)         call BEFORE a reward is granted when a CoinFly will follow (Save.changed fires on the
@@ -35,25 +38,24 @@ signal play_game(game: String, mode: String)
 signal quick_match(game: String)
 signal play_friends(game: String)
 signal continue_match
-signal play_again(cfg: Dictionary)          ## {game, mode, setup} (setup = Save.prefs.last_setup[game][mode])
 signal game_switched(game: String)
-signal open_tab(tab: String)             ## shop | inventory | profile | settings | coins | spin | daily | free | scenes
+signal open_tab(tab: String)             ## rewards | shop | leaderboard | inventory | profile | settings | coins
 
 const HI := "res://assets/ui/home/hi_%s.svg"
-const MATCH_STORE := "res://scripts/core/match_store.gd"
-const REWARDS := "res://scripts/core/rewards.gd"
+const TROPHY := "res://assets/ui/ic_trophy.svg"
+const REWARD_IDS := ["spin", "daily", "free"]
 const BAR_H := 52.0                      # top bar height
-const NAV_H := 64.0
+const NAV_H := 60.0
 const G := 16.0                          # screen gutter (UIKit.SCREEN_GUTTER)
 const BOTTOM_MIN := 20.0                 # gesture-nav phones report 0 in immersive mode: keep this clear anyway
-const TILE := 60.0                       # feature tile
-const LIP_OVER := 30.0                   # how far the feature tiles rise above the dock's top edge
-const QUICK_H := 56.0
-const SWITCH_H := 60.0
-const MODE_H := 58.0                     # the online row: QUICK MATCH (primary) + PLAY WITH FRIENDS
-const FRIENDS_H := 52.0                  # the offline row under it: VS COMPUTER + PASS & PLAY
+const PILL_H := 52.0                     # the Continue match pill
+const SWITCH_H := 56.0                   # (its halves: 48 px tall)
+const PLAY_H := 76.0                     # the one big QUICK MATCH
+const MODE_H := 64.0                     # the row of three: Friends / Computer / Pass & Play
+const SHORT_H := 760.0                   # below this UI height the two get a little lower
+const TABLE_MIN := 160.0                 # the free band the logo leaves for the table (when it can)
 const AVATAR := 42.0                     # the top bar's avatar
-const SWITCH_ICON := 32.0
+const SWITCH_ICON := 30.0
 const SWITCH_FS := 15                    # the switch labels (UIKit.FS.label + 1); never below UIKit.FS.label
 
 var safe_top := 0.0:
@@ -73,34 +75,34 @@ var game := "ludo"
 
 var logo: BrandLogo
 var coin_amount: CoinAmount
-var sides := {}                          # id -> SideButton (spin | daily | free)
+var rewards_button: Button               # the gift (opens the Rewards sheet)
+var quick_button: Button                 # QUICK MATCH (the matchmaker)
+var friends_button: Button               # Friends (online rooms)
 
 var _top: HBoxContainer
+var _chip: Button                        # the player chip (only the avatar when the bar is tight)
+var _chip_text: Control                  # its name + XP column
 var _name: Label
 var _avatar: Control
 var _level: LevelBadge
 var _xp: Meter
+var _gift_badge: Label                   # the red count on the gift
+var _badge_tw: Tween
+var _ready_n := -1                       # the count shown
 var _veil: TextureRect
 var _dock: Panel
-var _quick: Button
+var _quick: Button                       # the Continue match pill
 var _quick_icon: TextureRect
 var _quick_title: Label
 var _quick_sub: Label
 var _quick_go: Button
-var _quick_kind := ""                    # "continue" | "again" | ""
-var _again := {}                         # {game, mode} for Play again
+var _quick_kind := ""                    # "continue" | ""
 var _switch: PanelContainer
 var _switch_buttons := {}                # game -> Button
 var _switch_parts := {}                  # game -> {row, icon, label, text}
-var _scene_chip: Button                  # "Change scene" (Snakes & Ladders selected): the Shop's Scenes tab
-var _modes: HBoxContainer
-var friends_button: Button               # PLAY WITH FRIENDS (online rooms)
-var quick_button: Button                 # QUICK MATCH (the matchmaker)
-var _online: HBoxContainer               # the online row
+var _modes: HBoxContainer                # Friends / Computer / Pass & Play
 var _tabs: HBoxContainer                 # the nav row (dev/tap_dbg.gd reads its first child)
 var _rule: ColorRect
-var _dots := {}                          # feature id -> red dot
-var _cd_text := {}                       # feature id -> countdown shown
 var _timer: Timer
 var _band := Vector2(200, 500)
 
@@ -119,7 +121,7 @@ func _ready() -> void:
 	_build_dock()
 	_timer = Timer.new()
 	_timer.wait_time = 1.0
-	_timer.timeout.connect(_refresh_sides)
+	_timer.timeout.connect(_refresh_rewards)
 	add_child(_timer)
 	visibility_changed.connect(_on_visibility)
 	Save.changed.connect(refresh)
@@ -176,16 +178,15 @@ func _build_top_bar() -> void:
 	_top = UIKit.hbox(UIKit.SPACE.sm)
 	add_child(_top)
 	# player chip: avatar, name, the level star over the XP bar (opens the profile)
-	var chip := _flat_button(_chip_style(), _chip_style(18, true))
-	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	chip.custom_minimum_size = Vector2(0, BAR_H)
-	chip.pressed.connect(func(): open_tab.emit("profile"))
-	_top.add_child(chip)
-	var r := UIKit.hbox(UIKit.SPACE.sm)
+	_chip = _flat_button(_chip_style(), _chip_style(18, true))
+	_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_chip.custom_minimum_size = Vector2(BAR_H, BAR_H)
+	_chip.pressed.connect(func(): open_tab.emit("profile"))
+	_top.add_child(_chip)
+	var r := UIKit.hbox(UIKit.SPACE.md)                  # room for the star's overhang
 	_fill(r)
 	r.offset_left = 5; r.offset_top = 5; r.offset_right = -10; r.offset_bottom = -5
-	r.add_theme_constant_override("separation", UIKit.SPACE.md)     # room for the star's overhang
-	chip.add_child(r)
+	_chip.add_child(r)
 	# the avatar with the level star on its bottom-right corner (a 28 px badge, 12 px digits: readable, and never
 	# on top of the XP bar)
 	var av := Control.new()
@@ -205,17 +206,16 @@ func _build_top_bar() -> void:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
+	_chip_text = col
 	_name = UIKit.label("You", UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.clip_text = true
 	col.add_child(_name)
-	# web .pxp: gold on a dark inset ink track, with the numbers ("140 / 150"; "140/150" when tight, none when it
-	# can't fit)
-	_xp = Meter.new("night", 16, true)
+	_xp = Meter.new("night", 12)                          # gold on a dark inset track, no numbers (the profile has them)
 	col.add_child(_xp)
 	# coins: the balance and a teal "+" (opens the Earn coins hub)
 	var coins := _flat_button(_chip_style(UIKit.R.pill), _chip_style(UIKit.R.pill, true))
-	coins.custom_minimum_size = Vector2(108, BAR_H)
+	coins.custom_minimum_size = Vector2(104, BAR_H)
 	coins.pressed.connect(func(): open_tab.emit("coins"))
 	_top.add_child(coins)
 	var cr := UIKit.hbox(6)
@@ -237,6 +237,16 @@ func _build_top_bar() -> void:
 	pl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	plus.add_child(pl)
 	cr.add_child(plus)
+	# the gift: Free spin / Daily reward / Free coins (the Rewards sheet), with the count of those ready now
+	rewards_button = UIKit.icon_button(HI % "gift", "glass", int(BAR_H), 38)
+	rewards_button.name = "Rewards"
+	rewards_button.pressed.connect(func(): open_tab.emit("rewards"))
+	_top.add_child(rewards_button)
+	_gift_badge = UIKit.notify_badge("0", false)          # (its gentle pulse: _show_count, off with Reduce motion)
+	_gift_badge.name = "Count"
+	_gift_badge.position = Vector2(BAR_H - 16.0, -6.0)
+	_gift_badge.visible = false
+	rewards_button.add_child(_gift_badge)
 	var gear := UIKit.icon_button(HI % "gear", "glass", int(BAR_H), 32)
 	gear.pressed.connect(func(): open_tab.emit("settings"))
 	_top.add_child(gear)
@@ -252,45 +262,23 @@ func _build_dock() -> void:
 	_dock.add_theme_stylebox_override("panel", s)
 	_dock.mouse_filter = Control.MOUSE_FILTER_STOP        # taps on the dock never reach the 3D room
 	add_child(_dock)
-	for f in [["spin", "Spin", HI % "spin"], ["daily", "Daily", HI % "gift"], ["free", "Free", HI % "coins"],
-			["leaderboard", "Ranks", "res://assets/ui/ic_trophy.svg"]]:
-		var sb := SideButton.new(f[0], f[1], f[2], [Palette.CARD, Palette.LIP_CREAM], TILE)
-		sb.caption.add_theme_font_override("font", UIKit.font_body(900))   # font_caps renders too light for now
-		sb.caption.add_theme_color_override("font_color", Palette.INK)
-		sb.caption.add_theme_constant_override("outline_size", 0)
-		sb.pressed.connect(func(id): open_tab.emit(id))
-		add_child(sb)
-		sides[f[0]] = sb
-		var dot := Panel.new()
-		dot.add_theme_stylebox_override("panel", UIKit.box(Palette.RED, UIKit.R.pill, UIKit.BW.line, Color.WHITE))
-		dot.size = Vector2(14, 14)
-		dot.position = Vector2((SideButton.WIDTH - TILE) / 2.0 + TILE - 11.0, -4.0)
-		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		dot.visible = false
-		sb.add_child(dot)
-		_dots[f[0]] = dot
 	_build_quick()
 	_build_switch()
-	_scene_chip = UIKit.button_with("Change scene", UIKit.icon("cat_scenes", 22), "white", "sm")
-	_scene_chip.name = "ChangeScene"
-	_scene_chip.pressed.connect(func(): open_tab.emit("scenes"))
-	_scene_chip.visible = game == "sl"
-	add_child(_scene_chip)
-	_online = UIKit.hbox(UIKit.SPACE.md - 2)
-	_online.name = "Online"
-	quick_button = _row_button("QUICK MATCH", "honey", HI % "quick", 36, 20)
-	quick_button.name = "QuickMatch"
-	quick_button.size_flags_stretch_ratio = 1.35
+	quick_button = _big_play()
 	quick_button.pressed.connect(func(): quick_match.emit(game))
-	_online.add_child(quick_button)
-	friends_button = _row_button("PLAY WITH\nFRIENDS", "white", "perk_friends", 30, 15)
+	add_child(quick_button)
+	_modes = UIKit.hbox(UIKit.SPACE.sm + 2)
+	_modes.name = "Modes"
+	friends_button = _tile_button("Friends", UIKit.ICON_DIR + "perk_friends.svg")
 	friends_button.name = "Friends"
 	friends_button.pressed.connect(_friends)
-	_online.add_child(friends_button)
-	add_child(_online)
-	_modes = UIKit.hbox(UIKit.SPACE.md - 2)
-	_modes.add_child(_mode_button("VS COMPUTER", "teal", "cpu", "cpu"))
-	_modes.add_child(_mode_button("PASS & PLAY", "white", "pass_play", "local"))
+	_modes.add_child(friends_button)
+	for m in [["Computer", "cpu", "cpu"], ["Pass & Play", "pass_play", "local"]]:
+		var b := _tile_button(m[0], HI % m[1])
+		b.name = str(m[0]).replace(" & ", "")
+		var mode: String = m[2]
+		b.pressed.connect(func(): _play(mode))
+		_modes.add_child(b)
 	add_child(_modes)
 	_rule = ColorRect.new()
 	_rule.color = Palette.LINE
@@ -299,45 +287,41 @@ func _build_dock() -> void:
 	_build_nav()
 
 
-## The quick-action slot: Continue match / Play again (hidden when there is neither).
+## The Continue match pill over the café (hidden when no match is kept): the resume icon, the title, the match and
+## a teal Resume (the whole pill is the button).
 func _build_quick() -> void:
-	var st := UIKit.box(Palette.SURFACE_2, UIKit.R.lg, UIKit.BW.line, Palette.ROW_EDGE)
-	st.border_width_bottom = UIKit.LIP.sm
-	UIKit.pad(st, 8, 6)
-	var pr := st.duplicate() as StyleBoxFlat
-	pr.bg_color = Palette.CHIP
-	pr.border_width_bottom = 1
-	_quick = _flat_button(st, pr)
-	_quick.custom_minimum_size = Vector2(0, QUICK_H)
+	_quick = _flat_button(_chip_style(UIKit.R.pill), _chip_style(UIKit.R.pill, true))
+	_quick.name = "Continue"
 	_quick.pressed.connect(_on_quick)
 	add_child(_quick)
 	var r := UIKit.hbox(10)
 	_fill(r)
-	r.offset_left = 8; r.offset_right = -8
+	r.offset_left = 6; r.offset_right = -6
 	_quick.add_child(r)
-	_quick_icon = UIKit.icon(HI % "resume", 40)
+	_quick_icon = UIKit.icon(HI % "resume", 36)
 	_quick_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(_quick_icon)
-	var col := UIKit.vbox(0)
+	var col := UIKit.vbox(-2)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
-	_quick_title = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	_quick_title = UIKit.label("Continue match", UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
 	col.add_child(_quick_title)
 	_quick_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
 	_quick_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_quick_sub.clip_text = true
 	col.add_child(_quick_sub)
 	_quick_go = UIKit.button("Resume", "teal", "xs")
-	_quick_go.mouse_filter = Control.MOUSE_FILTER_IGNORE      # the whole slot is the button
+	_quick_go.mouse_filter = Control.MOUSE_FILTER_IGNORE      # the whole pill is the button
 	_quick_go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_quick_go.custom_minimum_size.x = 84
 	r.add_child(_quick_go)
 	_quick.visible = false
 
 
-## The game switch: two segments (family icon + name); the selected one is a raised white face.
+## The game switch: two segments (family icon + name); the selected one is a raised white face, the other's name
+## is the softer SUB.
 func _build_switch() -> void:
 	_switch = PanelContainer.new()
 	var ts := UIKit.box(Palette.CHIP, UIKit.R.lg)
@@ -359,7 +343,7 @@ func _build_switch() -> void:
 		b.button_group = group
 		b.focus_mode = Control.FOCUS_NONE
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size = Vector2(0, UIKit.TAP + 4)
+		b.custom_minimum_size = Vector2(0, UIKit.TAP)
 		for k in ["normal", "hover", "disabled"]:
 			b.add_theme_stylebox_override(k, off)
 		for k in ["pressed", "hover_pressed"]:
@@ -385,60 +369,86 @@ func _build_switch() -> void:
 		b.toggled.connect(func(v: bool): if v: _set_game(key))
 		row.add_child(b)
 		_switch_buttons[key] = b
+	_tint_switch()
 
 
-func _mode_button(text: String, kind: String, icon_name: String, mode: String) -> Button:
-	var b := _row_button(text, kind, HI % icon_name, 32, 17)
-	b.pressed.connect(func(): _play(mode))
+## The picked game's name in INK, the other one in SUB.
+func _tint_switch() -> void:
+	for k in _switch_parts:
+		(_switch_parts[k].label as Label).add_theme_color_override("font_color", Palette.INK if k == game else Palette.SUB)
+
+
+## The one big QUICK MATCH: honey, the bolt globe, the caps title and a one-line hint (the content follows the press).
+func _big_play() -> Button:
+	var b := UIKit.button("", "honey", "lg")
+	b.name = "QuickMatch"
+	var lip := float(UIKit.BTN.lg.lip)
+	var r := UIKit.hbox(UIKit.SPACE.md)
+	_fill(r)
+	r.alignment = BoxContainer.ALIGNMENT_CENTER
+	r.offset_bottom = -lip
+	b.add_child(r)
+	var ic := UIKit.icon(HI % "quick", PLAY_H - 30.0)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r.add_child(ic)
+	var col := UIKit.vbox(0)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.add_child(col)
+	var t := UIKit.label("QUICK MATCH", 28, Palette.ON_HONEY, UIKit.font_display())
+	t.name = "Text"
+	col.add_child(t)
+	col.add_child(UIKit.label("Play online now", UIKit.FS.small + 1, Color(Palette.ON_HONEY, 0.72), UIKit.font_body(800)))
+	b.button_down.connect(func(): r.offset_top = lip - 2.0; r.offset_bottom = -2.0)
+	b.button_up.connect(func(): r.offset_top = 0.0; r.offset_bottom = -lip)
+	b.resized.connect(func() -> void:                     # a smaller bolt on a lower button (short screens)
+		ic.custom_minimum_size = Vector2.ONE * clampf(b.size.y - 30.0, 36.0, PLAY_H - 30.0))
 	return b
 
 
-## A dock button: icon + caps label (Lilita, `fs`, shrinking to fit the button down to 12; "\n" = two lines).
-func _row_button(text: String, kind: String, icon_path: String, icon_px: float, fs: int) -> Button:
-	var ic := UIKit.icon(icon_path, icon_px)
-	var b := UIKit.button_with(text, ic, kind, "md")
+## A compact mode: a white kit button with its icon over a short label (the content follows the press).
+func _tile_button(text: String, icon_path: String) -> Button:
+	var b := UIKit.button("", "white", "md")
+	b.custom_minimum_size = Vector2(0, MODE_H)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var row := b.find_child("Content", true, false) as HBoxContainer
-	if row:
-		row.add_theme_constant_override("separation", UIKit.SPACE.xs + 2)
-	var l := b.find_child("Text", true, false) as Label
-	if l:
-		l.add_theme_font_size_override("font_size", fs)
-		l.add_theme_constant_override("line_spacing", -4)
-		var fit := func() -> void:
-			var room := b.size.x - 2.0 * UIKit.SPACE.sm - icon_px - float(UIKit.SPACE.xs + 2)
-			var f := l.get_theme_font("font")
-			var k := fs
-			var widest := func(sz: int) -> float:
-				var m := 0.0
-				for ln in l.text.split("\n"):
-					m = maxf(m, f.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x)
-				return m
-			while k > UIKit.FS.small and float(widest.call(k)) > room:
-				k -= 1
-			l.add_theme_font_size_override("font_size", k)
-			ic.custom_minimum_size = Vector2(icon_px, icon_px) * (1.0 if float(widest.call(k)) <= room else 0.8)
-		b.resized.connect(fit)
+	var lip := float(UIKit.BTN.md.lip)
+	var col := UIKit.vbox(2)
+	_fill(col)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.offset_bottom = -lip
+	b.add_child(col)
+	var ic := UIKit.icon(icon_path, 30)
+	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(ic)
+	var l := UIKit.label(text, UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	l.name = "Text"
+	l.clip_text = true
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	col.add_child(l)
+	b.button_down.connect(func(): col.offset_top = lip - 2.0; col.offset_bottom = -2.0)
+	b.button_up.connect(func(): col.offset_top = 0.0; col.offset_bottom = -lip)
 	return b
 
 
 func _build_nav() -> void:
-	_tabs = UIKit.hbox(6)
+	_tabs = UIKit.hbox(4)
 	add_child(_tabs)
-	for t in [["home", "Home"], ["shop", "Shop"], ["inventory", "Inventory"]]:   # the profile: the player chip up top
+	for t in [["home", "Home", HI % "home"], ["shop", "Shop", HI % "shop"], ["leaderboard", "Ranks", TROPHY],
+			["inventory", "Inventory", HI % "inventory"]]:   # the profile: the player chip up top
 		var on: bool = t[0] == "home"
 		var st := UIKit.box(Palette.HONEY_TINT if on else Color(1, 1, 1, 0), UIKit.R.lg, UIKit.BW.line if on else 0, Palette.HONEY_TINT_EDGE)
 		UIKit.pad(st, 0)
 		var pr := UIKit.box(Palette.CHIP, UIKit.R.lg)
 		UIKit.pad(pr, 0)
 		var b := _flat_button(st, pr)
+		b.name = str(t[1])
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, NAV_H - 8)
 		var col := UIKit.vbox(0)
 		_fill(col)
 		col.alignment = BoxContainer.ALIGNMENT_CENTER
 		b.add_child(col)
-		var ic := UIKit.icon(HI % t[0], 30)
+		var ic := UIKit.icon(t[2], 28)
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		col.add_child(ic)
 		col.add_child(UIKit.label(t[1], UIKit.FS.small, Palette.INK if on else Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
@@ -458,7 +468,7 @@ func _play(mode: String) -> void:
 		play.emit(mode)                    # older main.gd builds listen to play(mode) only
 
 
-## PLAY WITH FRIENDS: Online listens to play_friends; older main.gd builds get play_game(game, "online").
+## Friends: Online listens to play_friends; older main.gd builds get play_game(game, "online").
 func _friends() -> void:
 	if get_signal_connection_list("play_friends").is_empty():
 		_play("online")
@@ -472,8 +482,7 @@ func _set_game(g: String) -> void:
 	if Save.prefs.get("home_game", "ludo") != g:
 		Save.prefs.home_game = g
 		Save.save()
-	_scene_chip.visible = g == "sl"
-	_layout()
+	_tint_switch()
 	game_switched.emit(g)
 
 
@@ -496,51 +505,87 @@ func _pref_game() -> String:
 func _on_quick() -> void:
 	if _quick_kind == "continue":
 		continue_match.emit()
-	elif _quick_kind == "again":
-		play_again.emit(_again.duplicate(true))
 
 
-## A feature button by id (spin | daily | free), for CoinFly origins and coach marks.
+## Where the coins of reward `id` (spin | daily | free) fly from when no Rewards sheet is open: the gift. null for
+## anything else.
 func side_button(id: String) -> Control:
-	return sides.get(id)
+	return rewards_button if id in REWARD_IDS else null
+
+
+## The control a Home toast sits above: the Continue pill when it shows, else the dock (never over the play buttons).
+func toast_anchor() -> Control:
+	return _quick if _quick.visible else _dock
 
 
 # =====================================================================================================================
 # State
 # =====================================================================================================================
 
+## Free spin / Daily reward / Free coins right now: {spin: {ready, wait}, daily: {...}, free: {...}}; wait is the
+## countdown while it isn't ready ("13h 20m" to midnight; "3:53:09" for the free coins), "" when it is. The gift's
+## count and the Rewards sheet both read this (the rules themselves are Rewards').
+static func reward_states(p: Dictionary) -> Dictionary:
+	var spin_ok := Rewards.can_spin(p)
+	var daily_ok := bool(Rewards.daily_state(p).get("claimable", false))
+	var left := Rewards.free_left_sec(p)
+	var midnight := Fmt.until(Rewards.sec_to_midnight())
+	return {
+		spin = {ready = spin_ok, wait = "" if spin_ok else midnight},
+		daily = {ready = daily_ok, wait = "" if daily_ok else midnight},
+		free = {ready = left <= 0, wait = "" if left <= 0 else Fmt.clock(left)},
+	}
+
+
+## How many of Free spin / Daily reward / Free coins are ready now (the gift's red count).
+static func ready_count(p: Dictionary) -> int:
+	var n := 0
+	for st: Dictionary in reward_states(p).values():
+		if st.ready:
+			n += 1
+	return n
+
+
 func _on_visibility() -> void:
 	if not is_inside_tree():
 		return
 	var on := is_visible_in_tree()
 	if on:
-		_refresh_sides()
+		_refresh_rewards()
 		_timer.start()
 	else:
 		_timer.stop()
+		_pulse(false)
 
 
-## The live state of Spin / Daily reward / Free coins (once per second while visible).
-func _refresh_sides() -> void:
-	if sides.is_empty() or not ResourceLoader.exists(REWARDS):
+## The gift's count (once per second while visible: a reward that becomes ready shows up by itself).
+func _refresh_rewards() -> void:
+	_show_count(ready_count(Save.profile))
+
+
+func _show_count(n: int) -> void:
+	if n != _ready_n:
+		_ready_n = n
+		_gift_badge.text = str(n)
+		_gift_badge.visible = n > 0
+	_pulse(n > 0 and is_visible_in_tree() and not Sheet.reduce_motion())
+
+
+## The count's gentle pulse while something is ready (none with Reduce motion).
+func _pulse(on: bool) -> void:
+	var running := _badge_tw != null and _badge_tw.is_valid()
+	if on == running:
 		return
-	var R: Script = load(REWARDS)
-	var p: Dictionary = Save.profile
-	var spin_ok: bool = R.can_spin(p)
-	var daily_ok := bool((R.daily_state(p) as Dictionary).get("claimable", false))
-	var left: int = R.free_left_sec(p)
-	var midnight := Fmt.until(int(R.sec_to_midnight()))
-	_side_state("spin", spin_ok, "" if spin_ok else midnight)
-	_side_state("daily", daily_ok, "" if daily_ok else midnight)
-	_side_state("free", left <= 0, "" if left <= 0 else Fmt.clock(left))
-
-
-func _side_state(id: String, is_ready: bool, countdown: String) -> void:
-	if _cd_text.get(id, "-") != countdown:          # set_countdown re-lays the button: only on change
-		_cd_text[id] = countdown
-		(sides[id] as SideButton).set_countdown(countdown)
-	(_dots[id] as Control).visible = is_ready
-	(sides[id] as SideButton).set_ready(is_ready)     # cooling down: the tile greys out (still tappable: it says when)
+	if running:
+		_badge_tw.kill()
+		_badge_tw = null
+		_gift_badge.scale = Vector2.ONE
+		return
+	_gift_badge.pivot_offset = _gift_badge.size / 2.0
+	_badge_tw = _gift_badge.create_tween().set_loops()
+	_badge_tw.tween_property(_gift_badge, "scale", Vector2(1.14, 1.14), 0.6).set_trans(Tween.TRANS_SINE)
+	_badge_tw.tween_property(_gift_badge, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+	_badge_tw.tween_interval(1.0)
 
 
 func refresh() -> void:
@@ -558,7 +603,8 @@ func refresh() -> void:
 	var sel: Button = _switch_buttons.get(game)
 	if sel and not sel.button_pressed:
 		sel.set_pressed_no_signal(true)
-	_refresh_sides()
+	_tint_switch()
+	_refresh_rewards()
 	_refresh_quick()
 
 
@@ -600,73 +646,33 @@ static func _fly_to(n: Node, target: Control) -> CoinFly:
 	return null
 
 
+## The Continue match pill: shown while MatchStore keeps a match ("Ludo vs Computer · 35% · 12 min ago").
 func _refresh_quick() -> void:
-	var kind := ""
-	if ResourceLoader.exists(MATCH_STORE):
-		var MS: Script = load(MATCH_STORE)
-		if MS.has_saved():
-			var pk: Dictionary = MS.peek()
-			kind = "continue"
-			var g := str(pk.get("game", "ludo"))
-			var sub := str(pk.get("summary", ""))
-			if sub == "":
-				sub = "Snakes & Ladders" if g == "sl" else "Ludo"
-			var ago := _ago(int(pk.get("saved_at", 0)))
-			_quick_title.text = "Continue match"
-			_quick_sub.text = sub + (" · " + ago if ago != "" and sub.length() + ago.length() <= 30 else "")
-			_quick_icon.texture = UIKit.svg(HI % "resume")
-			_quick_go.text = "Resume"
-			UIKit.set_kind(_quick_go, "teal")
-	if kind == "":
-		_again = _last_played()
-		if not _again.is_empty():
-			kind = "again"
-			_quick_title.text = "Play again"
-			_quick_sub.text = _setup_line(_again)
-			_quick_icon.texture = UIKit.svg(HI % "again")
-			_quick_go.text = "Play"
-			UIKit.set_kind(_quick_go, "honey")
-	if kind != _quick_kind:
-		_quick_kind = kind
-		_quick.visible = kind != ""
-		_layout()
-		var main := get_parent()
-		while main and not main.has_method("_fit_home"):
-			main = main.get_parent()
-		if main:
-			main.call("_fit_home")              # the free band changed: re-frame the table
+	if not MatchStore.has_saved():
+		_show_continue("")
+		return
+	var pk := MatchStore.peek()
+	var sub := str(pk.get("summary", ""))
+	if sub == "":
+		sub = "Snakes & Ladders" if str(pk.get("game", "ludo")) == "sl" else "Ludo"
+	var ago := _ago(int(pk.get("saved_at", 0)))
+	_show_continue(sub + (" · " + ago if ago != "" and sub.length() + ago.length() <= 30 else ""))
 
 
-## The last game and mode played with a remembered setup: {game, mode, setup} or {}.
-static func _last_played() -> Dictionary:
-	var lp: Variant = Save.prefs.get("last_played")
-	if not lp is Dictionary:
-		return {}
-	var g := str((lp as Dictionary).get("game", ""))
-	var m := str((lp as Dictionary).get("mode", ""))
-	var all: Variant = Save.prefs.get("last_setup")
-	if not all is Dictionary or not (all as Dictionary).get(g) is Dictionary:
-		return {}
-	var d: Variant = ((all as Dictionary)[g] as Dictionary).get(m)
-	if not d is Dictionary or not g in ["ludo", "sl"] or not m in ["cpu", "local"]:
-		return {}
-	return {game = g, mode = m, setup = d}
-
-
-## "Ludo · vs 3 computers · Normal" / "Snakes & Ladders · 3 players" / "Ludo · Teams (2 v 2) · Hard".
-static func _setup_line(a: Dictionary) -> String:
-	var d: Dictionary = a.setup
-	var parts := PackedStringArray(["Snakes & Ladders" if a.game == "sl" else "Ludo"])
-	var n := int(d.get("count", 3 if a.mode == "cpu" else 2))
-	if bool(d.get("teams", false)) and a.game == "ludo":
-		parts.append("Teams (2 v 2)")
-	elif a.mode == "cpu":
-		parts.append("vs %d computer%s" % [n, "" if n == 1 else "s"])
-	else:
-		parts.append("%d players" % n)
-	if a.mode == "cpu" and d.get("bot_level") is String:
-		parts.append(str(d.bot_level).capitalize())
-	return " · ".join(parts)
+## Show the Continue match pill with `sub` under its title ("" hides it); the table is re-framed when it comes or goes.
+func _show_continue(sub: String) -> void:
+	_quick_sub.text = sub
+	var kind := "continue" if sub != "" else ""
+	if kind == _quick_kind:
+		return
+	_quick_kind = kind
+	_quick.visible = kind != ""
+	_layout()
+	var main := get_parent()
+	while main and not main.has_method("_fit_home"):
+		main = main.get_parent()
+	if main:
+		main.call("_fit_home")              # the free band changed: re-frame the table
 
 
 static func _ago(unix: int) -> String:
@@ -704,61 +710,59 @@ func _layout() -> void:
 	_veil.size = Vector2(w, top + 180)
 	var cw := minf(w - 2 * G, 480.0)            # content width (tablets: centred column)
 	var x := roundf((w - cw) / 2.0)
-	_top.position = Vector2(x, top + UIKit.SPACE.sm)
-	_top.size = Vector2(cw, BAR_H)
+	_layout_top(x, top + UIKit.SPACE.sm, cw)
 	var y_bar := top + UIKit.SPACE.sm + BAR_H
-	# the dock, bottom up: nav, rule, mode buttons, switch, quick slot, feature tiles on the edge
+	# the dock, bottom up: nav, rule, the three modes, QUICK MATCH, the switch
+	var short := h < SHORT_H
 	var nav_y := bottom - NAV_H + 4
 	_tabs.position = Vector2(x - 6, nav_y)
 	_tabs.size = Vector2(cw + 12, NAV_H - 4)
 	_rule.position = Vector2(x, nav_y - UIKit.SPACE.sm)
 	_rule.size = Vector2(cw, 2)
-	_modes.position = Vector2(x, nav_y - UIKit.SPACE.lg - FRIENDS_H)
-	_modes.size = Vector2(cw, FRIENDS_H)
-	_online.position = Vector2(x, _modes.position.y - UIKit.SPACE.sm - MODE_H)
-	_online.size = Vector2(cw, MODE_H)
-	_switch.position = Vector2(x, _online.position.y - UIKit.SPACE.md - SWITCH_H)
+	var mh := MODE_H - 4.0 if short else MODE_H
+	_modes.position = Vector2(x, nav_y - UIKit.SPACE.lg - mh)
+	_modes.size = Vector2(cw, mh)
+	var ph := PLAY_H - 8.0 if short else PLAY_H
+	quick_button.position = Vector2(x, _modes.position.y - UIKit.SPACE.md - ph)
+	quick_button.size = Vector2(cw, ph)
+	_switch.position = Vector2(x, quick_button.position.y - UIKit.SPACE.md - SWITCH_H)
 	_switch.size = Vector2(cw, SWITCH_H)
-	var top_of := _switch.position.y
-	if _quick.visible:
-		_quick.position = Vector2(x, top_of - 10 - QUICK_H)
-		_quick.size = Vector2(cw, QUICK_H)
-		top_of = _quick.position.y
 	_fit_switch(cw)
-	var below := TILE - LIP_OVER + 3 + 18 + 20            # tile part inside the dock + caption + countdown pill
-	var dock_y := top_of - UIKit.SPACE.md - below
+	var dock_y := _switch.position.y - UIKit.SPACE.lg - 2
 	_dock.position = Vector2(0, dock_y)
 	_dock.size = Vector2(w, h - dock_y + 4)
-	var ids := ["spin", "daily", "free", "leaderboard"]
-	var tw := SideButton.WIDTH
-	var gap := clampf((w - 2.0 * G - ids.size() * tw) / (ids.size() - 1.0), 4.0, 28.0)
-	var total := ids.size() * tw + (ids.size() - 1) * gap
-	var x0 := roundf((w - total) / 2.0)
-	for i in ids.size():
-		(sides[ids[i]] as Control).position = Vector2(x0 + i * (tw + gap), dock_y - LIP_OVER)
-	# the logo in the scene, as large as the space allows
-	var lw := minf(270.0, w - 2 * G)
+	var band_bottom := dock_y - UIKit.SPACE.sm
+	if _quick.visible:                            # Continue match: a slim pill just above the dock
+		_quick.position = Vector2(x, dock_y - UIKit.SPACE.md - PILL_H)
+		_quick.size = Vector2(cw, PILL_H)
+		band_bottom = _quick.position.y - UIKit.SPACE.xs
+	# the logo: smaller than the table under it (the café is the hero), smaller still when the table would get less
+	# than TABLE_MIN px (a tall safe area, the Continue pill)
+	var ly := roundf(y_bar + UIKit.SPACE.md)
+	var lw := minf(208.0, cw)
 	var lh := lw * 266.0 / 320.0
-	var max_h := 0.24 * h
+	var max_h := clampf(minf(0.185 * h, band_bottom - ly - TABLE_MIN), 100.0, 180.0)
 	if lh > max_h:
 		lh = max_h
 		lw = lh * 320.0 / 266.0
-	logo.size = Vector2(lw, lh)
-	logo.position = Vector2(roundf((w - lw) / 2.0), y_bar + 14)
-	_band = Vector2(logo.position.y + logo.size.y, dock_y - LIP_OVER - 10)
-	# Snakes & Ladders: "Change scene" just above the feature tiles; the board is framed above it
-	if _scene_chip.visible:
-		var bs := _scene_chip.get_combined_minimum_size()
-		var row := _scene_chip.get_node_or_null("Content") as Control
-		if row:                                  # the content row isn't part of the button's minimum size
-			bs.x = maxf(bs.x, row.get_combined_minimum_size().x + 2.0 * float(UIKit.BTN.sm.pad) + 8.0)
-		_scene_chip.size = bs
-		_scene_chip.position = Vector2(roundf((w - bs.x) / 2.0), dock_y - LIP_OVER - 8.0 - bs.y)
-		_band.y = _scene_chip.position.y - 4.0
+	logo.size = Vector2(roundf(lw), roundf(lh))
+	logo.position = Vector2(roundf((w - lw) / 2.0), ly)
+	_band = Vector2(logo.position.y + logo.size.y, band_bottom)
+
+
+## The top bar; when it is tight (narrower than a phone's 390 px UI) the player chip keeps only the avatar.
+func _layout_top(x: float, y: float, cw: float) -> void:
+	var others := 0.0
+	for c in _top.get_children():
+		if c != _chip:
+			others += (c as Control).get_combined_minimum_size().x + UIKit.SPACE.sm
+	_chip_text.visible = cw - others >= 120.0      # room for the name and the XP bar
+	_top.position = Vector2(x, y)
+	_top.size = Vector2(cw, BAR_H)
 
 
 ## The switch labels at the size that fits their half (item: the long "Snakes & Ladders" never overflows): 15 px with
-## a 32 px icon, then 14 px, then a 26 px icon, then the name on two lines. Both halves use the same size.
+## a 30 px icon, then 14 px, then a 26 px icon, then the name on two lines. Both halves use the same size.
 func _fit_switch(cw: float) -> void:
 	if _switch_parts.is_empty():
 		return
@@ -775,7 +779,7 @@ func _fit_switch(cw: float) -> void:
 		return m
 	var pick := [SWITCH_FS, SWITCH_ICON, UIKit.SPACE.sm, false]
 	var tries := [[SWITCH_FS, SWITCH_ICON, UIKit.SPACE.sm, false], [UIKit.FS.label, SWITCH_ICON, UIKit.SPACE.sm, false],
-		[UIKit.FS.label, 26.0, UIKit.SPACE.xs + 2, false], [UIKit.FS.label, 30.0, UIKit.SPACE.sm, true]]
+		[UIKit.FS.label, 26.0, UIKit.SPACE.xs + 2, false], [UIKit.FS.label, 28.0, UIKit.SPACE.sm, true]]
 	for t in tries:
 		pick = t
 		if float(t[1]) + float(t[2]) + float(widest.call(t[0], t[3])) <= room:
@@ -795,6 +799,6 @@ static func _two_lines(t: String) -> String:
 	return t if at < 0 else t.substr(0, at) + "\n" + t.substr(at + 1)
 
 
-## The band between the logo and the dock's feature tiles, in UI pixels (for the home camera framing).
+## The band between the logo and the dock (or the Continue pill), in UI pixels (for the home camera framing).
 func free_band() -> Vector2:
 	return _band

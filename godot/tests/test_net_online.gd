@@ -691,8 +691,7 @@ func _home() -> void:
 		var h := HomeScreen.new()
 		frame.add_child(h)
 		h._layout()
-		for r: Container in [h._online, h._modes]:
-			r.notification(Container.NOTIFICATION_SORT_CHILDREN)
+		h._modes.notification(Container.NOTIFICATION_SORT_CHILDREN)
 		var asked := []
 		h.quick_match.connect(func(g: String): asked.append(g))
 		h.play_friends.connect(func(g: String): asked.append("friends:" + g))
@@ -700,14 +699,14 @@ func _home() -> void:
 		h.select_game("sl")
 		h.quick_button.pressed.emit()
 		h.friends_button.pressed.emit()
-		check("home %dx%d: QUICK MATCH and PLAY WITH FRIENDS ask for the picked game (S&L too)" % [sz.x, sz.y],
+		check("home %dx%d: QUICK MATCH and Friends ask for the picked game (S&L too)" % [sz.x, sz.y],
 			asked == ["ludo", "sl", "friends:sl"], asked)
-		var rows := [h._online, h._modes]
+		var rows: Array[Control] = [h.quick_button, h._modes]
 		var ok := true
 		for r: Control in rows:
 			ok = ok and r.position.x >= 15.0 and r.position.x + r.size.x <= sz.x - 15.0 and r.size.y >= UIKit.TAP
-		var gap := h._modes.position.y - (h._online.position.y + h._online.size.y)
-		check("home %dx%d: both rows inside the gutters, >= 48 px, apart" % [sz.x, sz.y], ok and gap >= 6.0, [h._online.position, h._online.size, h._modes.position, gap])
+		var gap := h._modes.position.y - (h.quick_button.position.y + h.quick_button.size.y)
+		check("home %dx%d: QUICK MATCH and the modes inside the gutters, >= 48 px, apart" % [sz.x, sz.y], ok and gap >= 6.0, [h.quick_button.position, h.quick_button.size, h._modes.position, gap])
 		check("home %dx%d: QUICK MATCH is the wider one" % [sz.x, sz.y], h.quick_button.size.x > h.friends_button.size.x, [h.quick_button.size, h.friends_button.size])
 		if sz.y >= 844.0:                    # (the UI is never shorter than the 844 px base on a phone)
 			check("home %dx%d: the free band for the table stays" % [sz.x, sz.y], h.free_band().y - h.free_band().x > 40.0, h.free_band())
