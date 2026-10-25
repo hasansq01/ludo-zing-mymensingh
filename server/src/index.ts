@@ -1,13 +1,20 @@
-// Ludo Zing online rooms: the Worker routes /v1/... to one Room Durable Object per room code (PROTOCOL.md), serves
+// Ludo Zing online rooms: the Worker routes /v1/... to one Room Durable Object per room code (PROTOCOL.md), the
+// accounts / wallet / leaderboard endpoints (ONLINE_V2.md §1, §2, §4), quick match (/v1/quick/*, quick.ts), serves
 // the admin console at /admin (static files from ./admin) and its API at /admin/api (ADMIN_API.md), and runs the
 // daily cron (D1 pruning).
+import * as A from "./accounts";
 import { CSP, handleAdmin } from "./admin";
 import { cron } from "./cron";
 import * as D from "./db";
-import { isCode, randomCode, Room, type Env } from "./room";
+import { handleLeaderboard } from "./leaderboard";
+import { handleQuick } from "./quick";
+import { isCode, randomCode, Room, type Env as RoomEnv } from "./room";
+import * as W from "./wallet";
 
 export { Room };
-export type { Env };
+export { Matchmaker } from "./matchmaker"; // the quick-match queue DO (wrangler.jsonc MATCHMAKER, migration v2)
+/** The Worker's bindings: the Room's plus the accounts secrets (SESSION_KEY, GOOGLE_WEB_CLIENT_ID / _SECRET). */
+export type Env = A.AccEnv;
 
 const JSON_HEADERS = { "Cache-Control": "no-store" };
 
@@ -15,7 +22,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = JSO
   return Response.json(body, { status, headers });
 }
 
-function stub(env: Env, code: string): DurableObjectStub<Room> {
+function stub(env: RoomEnv, code: string): DurableObjectStub<Room> {
   return env.ROOMS.get(env.ROOMS.idFromName(code));
 }
 
@@ -47,13 +54,66 @@ async function publicConfig(env: Env): Promise<Response> {
   }
 }
 
-async function v1(req: Request, env: Env, parts: string[]): Promise<Response> {
+const POST_AUTHED: Record<string, (req: Request, env: Env, a: A.Authed, now: number) => Promise<Response>> = {
+  "shop/buy": W.shopBuy,
+  "shop/equip": W.shopEquip,
+  "rewards/daily": (_req, env, a, now) => W.rewardDaily(env, a, now),
+  "rewards/spin": (_req, env, a, now) => W.rewardSpin(env, a, now),
+  "rewards/free": (_req, env, a, now) => W.rewardFree(env, a, now),
+  "achievements/claim": W.achievementClaim,
+  claims: W.postClaim,
+};
+
+/** /v1/auth/*, /v1/me, /v1/shop/*, /v1/rewards*, /v1/achievements/*, /v1/claims, /v1/leaderboard (ONLINE_V2.md). */
+async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]): Promise<Response | null> {
+  const path = parts.slice(1).join("/");
+  const m = req.method;
+  const now = A.clock(req, env);
+  try {
+    switch (path) {
+      case "auth/guest":
+        return m === "POST" ? await A.authGuest(req, env, now) : json({ error: "method" }, 405);
+      case "auth/google":
+        return m === "POST" ? await A.authGoogle(req, env, now) : json({ error: "method" }, 405);
+      case "auth/google/resolve":
+        return m === "POST" ? await A.authGoogleResolve(req, env, now) : json({ error: "method" }, 405);
+      case "leaderboard": {
+        if (m !== "GET") return json({ error: "method" }, 405);
+        const me = await A.optionalAccount(req, env, now);
+        return await handleLeaderboard(env.DB, ctx, new URL(req.url), me, now, env.TEST_MODE === "1");
+      }
+      case "me":
+      case "rewards": {
+        if (m !== "GET" && !(path === "me" && m === "PATCH")) return json({ error: "method" }, 405);
+        const a = await A.authenticate(req, env, now);
+        if (a instanceof Response) return a;
+        if (path === "rewards") return await W.rewardsState(a, A.rowToProfile(a.row), now);
+        return m === "GET" ? await A.getMe(a) : await A.patchMe(req, env, a, now);
+      }
+    }
+    const h = POST_AUTHED[path];
+    if (!h) return null;
+    if (m !== "POST") return json({ error: "method" }, 405);
+    const a = await A.authenticate(req, env, now);
+    if (a instanceof Response) return a;
+    return await h(req, env, a, now);
+  } catch (e) {
+    if (e instanceof A.BadRequest) return json({ error: "bad_request", msg: e.message }, 400);
+    if (e instanceof A.Busy) return json({ error: "busy" }, 503);
+    throw e;
+  }
+}
+
+async function v1(req: Request, env: Env, ctx: ExecutionContext, parts: string[]): Promise<Response> {
   if (parts.length === 2 && parts[1] === "health") {
     return req.method === "GET" ? json({ ok: true }) : json({ error: "method" }, 405);
   }
   if (parts.length === 2 && parts[1] === "config") {
     return req.method === "GET" ? publicConfig(env) : json({ error: "method" }, 405);
   }
+  if (parts[1] === "quick") return handleQuick(req, env, ctx);
+  const r = await v2(req, env, ctx, parts);
+  if (r) return r;
   if (parts[1] !== "rooms") return json({ error: "not_found" }, 404);
 
   if (parts.length === 2) {
@@ -99,7 +159,7 @@ async function adminFiles(req: Request, env: Env, url: URL): Promise<Response> {
 async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(req.url);
   const parts = url.pathname.split("/").filter(Boolean); // ["v1", "rooms", CODE, "ws"]
-  if (parts[0] === "v1") return v1(req, env, parts);
+  if (parts[0] === "v1") return v1(req, env, ctx, parts);
   if (parts[0] === "admin") {
     if (parts[1] === "api") return handleAdmin(req, env, ctx, parts.slice(2));
     return adminFiles(req, env, url);

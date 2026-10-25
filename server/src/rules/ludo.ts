@@ -16,6 +16,11 @@
 //   phase, pick ("" | "single" | "pair"), winner, teams, free[4], pending, pair_ask, finished [colours] }
 // Progress per token: -1 base, 0-50 track, 51-55 home column, 56 (GOAL) finished.
 // Colours: 0 red, 1 green, 2 yellow, 3 blue.
+//
+// Play on after the first finish (see the GDScript header): a finished side gets its place ("finished" event) and is
+// skipped; the game is over when fewer than two sides are unfinished or no unfinished side has a "human" seat; the
+// unfinished sides are then ranked by progress and s.finished is the full order. endGame() (the {k: "end"} action)
+// ends a game early the same way.
 
 import { mathRandom, type Rng } from "./rng";
 
@@ -82,9 +87,10 @@ export type LudoEvent =
   | { type: "pair_offer"; c: number; a: number; b: number }
   | { type: "pair_formed"; c: number; a: number; b: number; human: boolean }
   | { type: "home"; c: number }
-  | { type: "finished"; c: number }
+  | { type: "all_home"; c: number }
+  | { type: "finished"; c: number; place: number; team?: number[] }
   | { type: "turn"; c: number; again: boolean }
-  | { type: "game_over"; winner: number; team: number[] };
+  | { type: "game_over"; winner: number; team: number[]; order: number[] };
 
 export interface Unit {
   mover: number;
@@ -194,12 +200,19 @@ export function verb(s: LudoState, c: number, base: string, third: string): stri
   return isYou(s, c) ? base : third;
 }
 
+/** The next colour that plays after c: active and its side not finished yet (play on: finished sides sit out). */
 export function nextActive(s: LudoState, c: number): number {
   for (let k = 1; k < 5; k++) {
     const n = (c + k) % 4;
-    if (active(s, n)) return n;
+    if (active(s, n) && !sideDone(s, n)) return n;
   }
   return c;
+}
+
+/** Colour c's side has finished: individual, c is in s.finished; Teams, c and its partner both all home. */
+export function sideDone(s: LudoState, c: number): boolean {
+  if (teamOn(s)) return allHome(s, c) && allHome(s, mateOf(c));
+  return finishedOf(s).includes(c);
 }
 
 // ---------- Team (Pair Mode) games: Red + Yellow, Green + Blue ----------
@@ -542,20 +555,18 @@ function finishMove(s: LudoState, pend: Pending, ev: LudoEvent[]): void {
   if (to === GOAL) {
     extra = true;
     ev.push({ type: "home", c });
-    if (allHome(s, c)) markFinished(s, c);
-  }
-  if (teamOn(s)) {
-    if (allHome(s, c) && allHome(s, mateOf(c))) {
-      gameOver(s, c, ev);
-      return;
+    if (allHome(s, c)) {
+      markFinished(s, c); // (Teams: each colour's own order; standings() lists partners by it)
+      if (!teamOn(s) || allHome(s, mateOf(c))) {
+        sideFinished(s, c, ev); // a colour (Teams: both partners, the team together) has its place
+        if (s.phase === "over") return;
+      } else {
+        ev.push({ type: "all_home", c }); // Teams: four home, the partner still playing (Free Hand next)
+      }
     }
-  } else if (allHome(s, c)) {
-    gameOver(s, c, ev);
-    return;
   }
-  if (teamOn(s) && to >= GOAL && allHome(s, c)) ev.push({ type: "finished", c });
-  if (extra) beginTurn(s, ev);
-  else nextTurn(s, ev);
+  if (extra && !sideDone(s, s.turn)) beginTurn(s, ev);
+  else nextTurn(s, ev); // (a side that just finished hands the turn on, extra or not)
 }
 
 function beginTurn(s: LudoState, ev: LudoEvent[]): void {
@@ -572,13 +583,58 @@ function nextTurn(s: LudoState, ev: LudoEvent[]): void {
   ev.push({ type: "turn", c: s.turn, again: false });
 }
 
-function gameOver(s: LudoState, c: number, ev: LudoEvent[]): void {
+/** Colour c's side just finished (c: the colour whose pawn came home last): its place, then is the game over? */
+function sideFinished(s: LudoState, c: number, ev: LudoEvent[]): void {
+  let place = 0;
+  for (const side of sides(s)) if (sideDone(s, side[0])) place += 1;
+  const e: Extract<LudoEvent, { type: "finished" }> = { type: "finished", c, place };
+  if (teamOn(s)) e.team = [Math.min(c, mateOf(c)), Math.max(c, mateOf(c))];
+  ev.push(e);
+  let left = 0;
+  let human = false;
+  for (const side of sides(s)) {
+    if (sideDone(s, side[0])) continue;
+    left += 1;
+    for (const k of side) human = human || isHuman(s, k);
+  }
+  if (left < 2 || !human) gameOver(s, place === 1 ? c : -1, ev);
+}
+
+/** The sides of the game, each a list of colours: [[c], ...] for the active colours; Teams [[0, 2], [1, 3]]. */
+function sides(s: LudoState): number[][] {
+  if (teamOn(s)) {
+    return [
+      [0, 2],
+      [1, 3],
+    ];
+  }
+  const out: number[][] = [];
+  for (let c = 0; c < 4; c++) if (active(s, c)) out.push([c]);
+  return out;
+}
+
+/** The end: unfinished sides ranked by progress (standings()), s.finished the full order, s.winner the first finisher. */
+function gameOver(s: LudoState, w: number, ev: LudoEvent[]): void {
+  if (w < 0 && !teamOn(s) && finishedOf(s).length > 0) w = (s.finished as number[])[0];
+  s.winner = w;
+  const order = standings(s).map((e) => e.color);
+  if (w < 0) {
+    w = order[0];
+    s.winner = w;
+  }
+  s.finished = order;
   s.phase = "over";
-  s.winner = c;
-  markFinished(s, c);
-  const fin = finishedOf(s);
-  if (teamOn(s) && !fin.includes(mateOf(c))) fin.splice(fin.indexOf(c), 0, mateOf(c));
-  ev.push({ type: "game_over", winner: c, team: winners(s) });
+  s.pick = "";
+  s.pending = {};
+  ev.push({ type: "game_over", winner: w, team: winners(s), order: [...order] });
+}
+
+/** Ends the game now (the server's {k: "end"}): unfinished sides ranked by progress. [] when already over. */
+export function endGame(s: LudoState): LudoEvent[] {
+  if (s.phase === "over") return [];
+  const ev: LudoEvent[] = [];
+  gameOver(s, -1, ev);
+  return ev;
 }
 
 /** s.finished, created / normalised to ints when missing or loaded as floats (GDScript _finished). */
@@ -804,12 +860,13 @@ export type Action =
   | { k: "roll"; c: number; v: number }
   | { k: "move"; c: number; i: number }
   | { k: "pair"; c: number; yes: boolean }
-  | { k: "mode"; c: number; mode: "cpu" | "human" };
+  | { k: "mode"; c: number; mode: "cpu" | "human" }
+  | { k: "end" };
 
 /**
  * Applies one protocol action the way a client does. Returns the rules' events ([] for "mode", and [] when the rules
- * refuse the action: a refused roll / move / pair leaves the state unchanged). The colour `c` is not checked here
- * (the server checks it is s.turn before calling).
+ * refuse the action: a refused roll / move / pair / end leaves the state unchanged). The colour `c` is not checked
+ * here (the server checks it is s.turn before calling). "end" (no colour): endGame, the server ending a match early.
  */
 export function applyAction(s: LudoState, a: Action): LudoEvent[] {
   switch (a.k) {
@@ -822,5 +879,7 @@ export function applyAction(s: LudoState, a: Action): LudoEvent[] {
     case "mode":
       s.players[a.c] = a.mode;
       return [];
+    case "end":
+      return endGame(s);
   }
 }

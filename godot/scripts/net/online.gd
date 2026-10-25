@@ -1,29 +1,47 @@
 class_name Online
 extends Node
-## Friend rooms for Ludo, end to end: owns the NetClient, the Friends and Lobby sheets, and routes the room's
-## messages to the app (main.gd) and the online LudoMatch. main.gd creates one (`online`) and calls:
-##   open_friends()          Home's "Play with friends"
+## Online play end to end (server/PROTOCOL.md): friend rooms and quick match, for Ludo and Snakes & Ladders. Owns
+## the NetClient (room socket) and the NetQuick (matchmaker socket), the Friends, Lobby and Quick match sheets, and
+## routes the room's messages to the online match (LudoMatch or SLMatch, whichever `start.game` / `sync.game` says).
+## main.gd creates one (`online`) and calls:
+##   open_friends(game)      Home's "Play with friends" (game: the new room's game; the host may change it)
+##   open_quick(game)        Home's "Quick match": the table picker, then "Finding players…", then the match
 ##   try_resume()            after launch: a room kept in Save.prefs.net_room is taken back (lobby or match)
 ##   leave()                 Leave match / Home from the result / Leave in the lobby
-##   rematch()               the host's "Play again" on the result screen
-## and implements on main: start_online(msg) (enter the Ludo screen with the server's start / sync), and
-## online_host_changed(is_host) (the result screen's Play again).
-## state: "idle" | "joining" | "resuming" | "lobby" | "match" | "over".
-## Errors become friendly toasts (NetClient.error_text). Request errors during a match (stale, not_your_turn,
-## bad_action) go to LudoMatch quietly: they are races, not mistakes.
+##   rematch()               the result's Play again: the host's rematch (friend rooms), queue again (quick match)
+##   is_host()               the result may offer Play again (the host of a friend room; anyone in a quick room)
+## and uses on main: start_online(msg, net) (Ludo: enter the Ludo screen with the server's start / sync),
+## _enter_sl() + sl.start_online(msg, net) (Snakes & Ladders; start_online_sl(msg, net) when main has it),
+## online_host_changed(can_rematch) and online_closed(). When main has a `home` with the quick_match /
+## play_friends signals, Online listens to them itself.
+## state: "idle" | "joining" | "resuming" | "lobby" | "searching" | "match" | "over".
+## Quick match: the matchmaker's `matched` joins the room with its token (NetClient.join(code, token, true)); no lobby
+## comes; at `start` the sheet reveals the players, then the match opens (room messages meanwhile are held and
+## played in order). Every seat that isn't a bot is a person here: nothing tells ghost seats apart.
+## Errors become friendly toasts (NetClient.error_text) or the quick sheet's message. Request errors during a match
+## (stale, not_your_turn, bad_action) go to the match quietly: they are races, not mistakes.
 
 signal state_changed(state: String)
 
 const QUIET := ["stale", "not_your_turn", "bad_action", "rate"]
+const REFRESH_AFTER := [1.5, 6.0]          ## s after `over`: GET /v1/me (the server grants the rewards at over)
 
 var app: Node
 var net: NetClient
+var quick_q: NetQuick
 var state := "idle"
 var friends: FriendsSheet
 var lobby_sheet: LobbySheet
+var quick_sheet: QuickSheet
+var game := "ludo"                         ## the game of the room we are in (or joining)
+var quick_cfg := {}                        ## {game, players} of the last quick search (Play again queues it again)
+var reveal_fast := false                   ## tests: the players are revealed at once
 
-
-var _created := false                    # this client just made the room (applies the host's house rule once)
+var _created := false                      # this client just made the room (applies the host's choices once)
+var _friends_game := "ludo"                # the game a room we create starts with
+var _held: Array = []                      # [method, msg] for the match, held while it opens / the players reveal
+var _holding := false
+var _stopped_in_bg := false                # a search was stopped because the app went to the background
 
 func _init(app_: Node = null, client: NetClient = null) -> void:
 	app = app_
@@ -35,17 +53,35 @@ func _ready() -> void:
 		net.name = "Net"
 	if net.get_parent() == null:
 		add_child(net)
+	quick_q = NetQuick.new(net)
+	quick_q.name = "Quick"
+	add_child(quick_q)
 	net.welcome.connect(_on_welcome)
 	net.lobby.connect(_on_lobby)
 	net.start.connect(_on_start)
 	net.sync.connect(_on_sync)
-	net.act.connect(func(m: Dictionary): _to_match(m))
+	net.act.connect(func(m: Dictionary): _deliver("net_push", m))
 	net.over.connect(_on_over)
-	net.turn.connect(func(m: Dictionary): _ludo_call("net_turn", m))
-	net.presence.connect(func(m: Dictionary): _ludo_call("net_presence", m))
+	net.turn.connect(func(m: Dictionary): _deliver("net_turn", m))
+	net.presence.connect(func(m: Dictionary): _deliver("net_presence", m))
 	net.error.connect(_on_error)
-	_show_motd.call_deferred()
 	net.status_changed.connect(_on_status)
+	quick_q.queued.connect(_on_queued)
+	quick_q.matched.connect(_on_matched)
+	quick_q.failed.connect(_on_quick_failed)
+	_wire_home.call_deferred()
+	_show_motd.call_deferred()
+
+## Home's buttons (when main hasn't wired them itself).
+func _wire_home() -> void:
+	var h: Variant = app.get("home") if app else null
+	if not h is Object or not is_instance_valid(h):
+		return
+	var home: Object = h
+	if home.has_signal("quick_match") and not home.is_connected("quick_match", open_quick):
+		home.connect("quick_match", open_quick)
+	if home.has_signal("play_friends") and not home.is_connected("play_friends", open_friends):
+		home.connect("play_friends", open_friends)
 
 func _set_state(s: String) -> void:
 	if s != state:
@@ -55,20 +91,25 @@ func _set_state(s: String) -> void:
 func in_match() -> bool:
 	return state in ["match", "over"]
 
+func in_quick() -> bool:
+	return net.quick and net.in_room()
+
+## The result may offer Play again: the host of a friend room, anyone in a quick room (it queues again).
 func is_host() -> bool:
-	return net.is_host()
+	return net.is_host() or net.quick
 
 
-# ---------- the sheets ----------
+# ---------- friend rooms ----------
 
-## Home's "Play with friends". Already in a room: its lobby again.
-func open_friends() -> void:
+## Home's "Play with friends". Already in a room: its lobby again. game: the game a new room starts with.
+func open_friends(game_ := "") -> void:
 	if state == "lobby" and is_instance_valid(lobby_sheet):
 		return
 	if net.in_room() and state == "lobby":
 		_open_lobby()
 		return
-	friends = FriendsSheet.new()
+	_friends_game = game_ if game_ in ["ludo", "sl"] else _home_game()
+	friends = FriendsSheet.new(_friends_game)
 	friends.create_room.connect(_create)
 	friends.join_room.connect(_join)
 	friends.open(_layer())
@@ -113,7 +154,7 @@ func _join_failed(code: String, msg := "") -> void:
 	if is_instance_valid(friends):
 		friends.set_busy("")
 	_set_state("idle")
-	toast(msg if msg != "" and code == "banned" else NetClient.error_text(code), "bad")
+	toast(msg if msg != "" and code in ["banned", "maintenance"] else NetClient.error_text(code), "bad")
 
 func _open_lobby() -> void:
 	if is_instance_valid(friends):
@@ -121,8 +162,10 @@ func _open_lobby() -> void:
 	friends = null
 	if is_instance_valid(lobby_sheet) and not lobby_sheet.is_queued_for_deletion():
 		return
-	lobby_sheet = LobbySheet.new(net.code, net.member_id)
+	var g := str((net.last_lobby.get("settings", {}) as Dictionary).get("game", game)) if net.last_lobby.get("settings") is Dictionary else game
+	lobby_sheet = LobbySheet.new(net.code, net.member_id, g)
 	lobby_sheet.settings_changed.connect(func(t: bool, p: bool): net.send_msg({t = "settings", teams = t, pair_ask = p}))
+	lobby_sheet.game_changed.connect(func(g2: String): net.send_msg({t = "settings", game = g2}))
 	lobby_sheet.start_pressed.connect(func(): net.send_msg({t = "start"}))
 	lobby_sheet.leave_pressed.connect(_ask_leave_lobby)
 	lobby_sheet.open(_layer())
@@ -139,14 +182,117 @@ func _ask_leave_lobby() -> void:
 	if await Sheet.confirm(self, "Leave this room?", "Your friends can keep the room going.", "Leave", "Stay", true):
 		leave()
 
-## Leave the room for good (lobby, match or result).
+
+# ---------- quick match ----------
+
+## Home's "Quick match" for game ("ludo" | "sl"): the table picker (the last choice preselected).
+func open_quick(game_ := "") -> void:
+	var g := game_ if game_ in ["ludo", "sl"] else _home_game()
+	if state == "searching" and is_instance_valid(quick_sheet):
+		return
+	if net.in_room() and state in ["lobby", "match"]:
+		toast("Leave this room first.", "info")
+		return
+	_open_quick_sheet(g)
+
+func _open_quick_sheet(g: String) -> QuickSheet:
+	if is_instance_valid(quick_sheet):
+		quick_sheet.close()
+	var players := int(net.prefs.get("quick_players", 2))
+	quick_sheet = QuickSheet.new(g, players)
+	if reveal_fast:
+		quick_sheet.step_sec = 0.0
+		quick_sheet.hold_sec = 0.0
+	quick_sheet.find.connect(func(n: int): search(g, n))
+	quick_sheet.cancel_pressed.connect(cancel_quick)
+	var s := quick_sheet
+	quick_sheet.closed.connect(func():
+		if quick_sheet == s:
+			quick_sheet = null
+			if state == "searching" or (state == "joining" and net.quick):
+				cancel_quick())
+	quick_sheet.open(_layer())
+	return quick_sheet
+
+## Queue for a quick match (the sheet shows the search). players: 2 | 4 (remembered for next time).
+func search(g: String, players: int) -> void:
+	if not NetQuick.valid(g, players):
+		return
+	if net.in_room():
+		net.leave()                            # (Play again: the finished quick room)
+	quick_cfg = {game = g, players = players}
+	game = g
+	if int(net.prefs.get("quick_players", 0)) != players:
+		net.prefs.quick_players = players
+		net._persist()
+	_stopped_in_bg = false
+	_set_state("searching")
+	if is_instance_valid(quick_sheet):
+		quick_sheet.set_searching(players)
+	quick_q.search(g, players)
+
+## Stop searching (Cancel, the sheet closed, Back, the app went to the background). A table already found: the
+## room is left before the match starts.
+func cancel_quick() -> void:
+	if quick_q.searching():
+		quick_q.cancel()
+	if net.quick and net.in_room() and state in ["joining", "searching"]:
+		net.leave()
+	_held.clear()
+	_holding = false
+	if state in ["searching", "joining"]:
+		_set_state("idle")
+	_host_changed()                            # a result under the sheet: Play again comes back
+
+func _on_queued(position: int, eta_s: int) -> void:
+	if is_instance_valid(quick_sheet):
+		quick_sheet.set_queued(position, eta_s)
+
+func _on_matched(code: String, token: String) -> void:
+	if state != "searching":
+		return
+	_set_state("joining")
+	if is_instance_valid(quick_sheet):
+		quick_sheet.set_matched()
+	net.join(code, token, true)
+
+func _on_quick_failed(code: String, msg: String) -> void:
+	if state not in ["searching", "joining"]:
+		return
+	_set_state("idle")
+	var text := msg if msg != "" and code in ["banned", "maintenance"] else NetClient.error_text(code)
+	if is_instance_valid(quick_sheet):
+		quick_sheet.set_error(text)
+	else:
+		toast(text, "bad")
+	_host_changed()
+
+
+# ---------- the room ----------
+
+## Leave the room for good (lobby, match or result). A search stops too.
 func leave() -> void:
+	if quick_q.searching():
+		quick_q.cancel()
 	net.leave()
 	_close_lobby()
+	_held.clear()
+	_holding = false
 	_set_state("idle")
 
-## The host's Play again after `over`.
+## The result's Play again: the host's rematch in a friend room; queue again with the same table in a quick room.
 func rematch() -> void:
+	if net.quick:
+		var cfg := quick_cfg
+		if cfg.is_empty():
+			cfg = {game = game, players = int(net.prefs.get("quick_players", 2))}
+		net.leave()
+		_set_state("idle")
+		if app and app.has_method("go_home"):
+			app.call("go_home")                # the search runs over Home (Cancel leaves you there)
+		_open_quick_sheet(str(cfg.game))
+		search(str(cfg.game), int(cfg.players))
+		return
 	if net.is_host():
 		net.send_msg({t = "start"})
 
@@ -157,21 +303,21 @@ func try_resume() -> bool:
 	_set_state("resuming")
 	return true
 
-
-# ---------- messages ----------
-
 func _on_welcome(_m: Dictionary) -> void:
-	pass                                       # the lobby / sync that follows says where we are
+	pass                                       # the lobby / start / sync that follows says where we are
 
 func _on_lobby(m: Dictionary) -> void:
+	if m.get("settings") is Dictionary:
+		game = str((m.settings as Dictionary).get("game", game))
 	match state:
 		"joining":
 			_set_state("lobby")
-			if _created and net.is_host():       # a new room starts from the host's own house rule (Settings)
+			if _created and net.is_host():       # a new room starts from the host's choices: the game, the house rule
 				_created = false
 				var want := bool(net.prefs.get("pair_ask", true))
-				if bool((m.get("settings", {}) as Dictionary).get("pair_ask", false)) != want:
-					net.send_msg({t = "settings", teams = false, pair_ask = want})
+				var st: Dictionary = m.get("settings", {}) if m.get("settings") is Dictionary else {}
+				if bool(st.get("pair_ask", false)) != want or str(st.get("game", "ludo")) != _friends_game:
+					net.send_msg({t = "settings", teams = false, pair_ask = want, game = _friends_game})
 			_open_lobby()
 		"resuming":
 			await get_tree().create_timer(0.4).timeout   # a match in progress sends its sync right behind
@@ -189,50 +335,86 @@ func _on_start(m: Dictionary) -> void:
 	_close_lobby()
 	if is_instance_valid(friends):
 		friends.close()
+	game = str(m.get("game", "ludo"))
+	var revealing := is_instance_valid(quick_sheet) and net.quick and str(m.get("t", "start")) == "start"
 	_set_state("match")
-	if app and app.has_method("start_online"):
+	_holding = true                            # room messages wait until the match is up
+	if revealing:
+		var s := quick_sheet
+		await s.reveal(m.get("seats", []) if m.get("seats") is Array else [], NetReplica.color_of(m.get("seats", []), net.member_id))
+		if state != "match":
+			return                             # cancelled meanwhile
+		if is_instance_valid(s):
+			s.close()
+	await _enter_match(m)
+
+## Opens the match screen for the game the server says, then plays what arrived meanwhile.
+func _enter_match(m: Dictionary) -> void:
+	_holding = true
+	if str(m.get("game", "ludo")) == "sl":
+		if app and app.has_method("start_online_sl"):
+			app.call("start_online_sl", m, net)
+		elif app and app.has_method("_enter_sl") and app.get("sl") is Object:
+			await app.call("_enter_sl")
+			if str(app.get("screen")) == "sl" and state in ["match", "over"]:
+				(app.get("sl") as Object).call("start_online", m, net)
+	elif app and app.has_method("start_online"):
 		app.call("start_online", m, net)
+	_holding = false
+	var held := _held
+	_held = []
+	for h: Array in held:
+		_match_call(str(h[0]), h[1])
 
 func _on_sync(m: Dictionary) -> void:
-	if state == "match" and _ludo_online():
-		_to_match(m)
+	if state in ["match", "over"] and (_match() != null or _holding):
+		_deliver("net_push", m)
 		return
 	_on_start(m)                               # a resumed match (reconnect after a restart)
 
 func _on_over(m: Dictionary) -> void:
-	_to_match(m)
+	_deliver("net_push", m)
 	_set_state("over")
 	_host_changed()
+	_refresh_profile()
 
-func _to_match(m: Dictionary) -> void:
-	_ludo_call("net_push", m)
+## A message for the match: now, or held until the match is up.
+func _deliver(method: String, m: Variant) -> void:
+	if _holding:
+		_held.append([method, m])
+		return
+	_match_call(method, m)
 
 func _on_error(m: Dictionary) -> void:
 	var code := str(m.get("code", ""))
 	match state:
 		"joining":
+			if net.quick:
+				_on_quick_failed("no_connection" if code == "not_found" else code, str(m.get("msg", "")))
+				return
 			_join_failed(code, str(m.get("msg", "")))
 			return
 		"resuming":
 			_set_state("idle")                 # the kept room is gone or full: forget it quietly
 			return
 	if code in QUIET:
-		_ludo_call("net_error", m)
+		_match_call("net_error", m)
 		return
 	if code in NetClient.REMOVED and state in ["lobby", "match", "over"]:
 		var why := str(m.get("msg", "")) if code == "banned" else ""
 		toast(why if why != "" else NetClient.error_text(code), "bad")   # removed by an admin
 		_close_lobby()
 		_set_state("idle")
-		if app and app.has_method("online_closed"):
-			app.call("online_closed")
+		_closed()
 		return
 	if code == "not_found" and state in ["lobby", "match", "over"]:
-		toast("The room has closed.", "bad")
+		var was := state
+		if was != "over":                      # (a finished room may be deleted under the result: nothing to say)
+			toast("The room has closed.", "bad")
 		_close_lobby()
 		_set_state("idle")
-		if app and app.has_method("online_closed"):
-			app.call("online_closed")
+		if was != "over":
+			_closed()
 		return
 	toast(NetClient.error_text(code), "bad")
 	if state == "over":
@@ -241,25 +423,62 @@ func _on_error(m: Dictionary) -> void:
 func _on_status(s: String) -> void:
 	if is_instance_valid(lobby_sheet):
 		lobby_sheet.set_status(s)
-	_ludo_call("net_status", s)
-	if s == "idle" and state in ["lobby", "match"] and not net.in_room():
-		pass                                   # (leave() or a fatal error already moved the state on)
+	_match_call("net_status", s)
 
 func _host_changed() -> void:
 	if app and app.has_method("online_host_changed"):
-		app.call("online_host_changed", net.is_host())
+		app.call("online_host_changed", is_host())
+
+## The room is gone under us: back home (main.online_closed for Ludo; an S&L match goes home here when main
+## doesn't know about it).
+func _closed() -> void:
+	if app and app.has_method("online_closed"):
+		app.call("online_closed")
+	var sl: Variant = app.get("sl") if app else null
+	if sl is Object and is_instance_valid(sl) and bool((sl as Object).get("online")) and app.has_method("go_home"):
+		app.call("go_home")
+
+## The server granted this match's rewards at `over`: read the profile back (twice: the grant may land late).
+func _refresh_profile() -> void:
+	var acc := Account.instance()
+	if acc == null or not acc.has_session() or not is_inside_tree():
+		return
+	for sec in REFRESH_AFTER:
+		await get_tree().create_timer(sec).timeout
+		if not is_instance_valid(acc) or not acc.has_session():
+			return
+		await acc.refresh_me()
+
+## A quick search stops when the app goes to the background (the sheet goes back to the picker); a table that was
+## already found is kept (the room reconnects).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED and state == "searching":
+		_stopped_in_bg = true
+		cancel_quick()
+		if is_instance_valid(quick_sheet):
+			quick_sheet.set_error("The search stopped while the app was in the background.")
 
 
 # ---------- helpers ----------
 
-func _ludo_online() -> bool:
-	var l: Variant = app.get("ludo") if app else null
-	return l is Object and is_instance_valid(l) and bool((l as Object).get("online"))
+## The online match (LudoMatch or SLMatch whose `online` is on), or null.
+func _match() -> Object:
+	for key in ["ludo", "sl"]:
+		var l: Variant = app.get(key) if app else null
+		if l is Object and is_instance_valid(l) and bool((l as Object).get("online")):
+			return l
+	return null
 
-func _ludo_call(method: String, arg: Variant) -> void:
-	var l: Variant = app.get("ludo") if app else null
-	if l is Object and is_instance_valid(l) and (l as Object).has_method(method) and _ludo_online():
-		(l as Object).call(method, arg)
+func _match_call(method: String, arg: Variant) -> void:
+	var l := _match()
+	if l and l.has_method(method):
+		l.call(method, arg)
+
+func _home_game() -> String:
+	var h: Variant = app.get("home") if app else null
+	if h is Object and is_instance_valid(h) and str((h as Object).get("game")) in ["ludo", "sl"]:
+		return str((h as Object).get("game"))
+	return "ludo"
 
 func _layer() -> Control:
 	if app and app.get("sheet_layer") is Control:

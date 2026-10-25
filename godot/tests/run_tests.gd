@@ -11,6 +11,8 @@ const SUITES := [
 	"res://tests/test_sl_rewards.gd",
 	"res://tests/test_ludo_flow.gd",
 	"res://tests/test_ludo_standings.gd",
+	"res://tests/test_play_on.gd",
+	"res://tests/test_play_on_client.gd",
 	"res://tests/test_bot_levels.gd",
 	"res://tests/test_tutorial.gd",
 	"res://tests/test_save_prefs.gd",
@@ -25,9 +27,15 @@ const SUITES := [
 	"res://tests/test_components_b.gd",
 	"res://tests/test_lobby.gd",
 	"res://tests/test_thumbs.gd",
+	"res://tests/test_quality.gd",
 	"res://tests/test_state_hash.gd",
+	"res://tests/test_sl_state_hash.gd",
 	"res://tests/test_net.gd",
 	"res://tests/test_net_ui.gd",
+	"res://tests/test_net_online.gd",
+	"res://tests/test_play_games.gd",
+	"res://tests/test_account.gd",
+	"res://tests/test_account_ui.gd",
 ]
 
 func _initialize() -> void:

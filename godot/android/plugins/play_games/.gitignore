@@ -1,0 +1,6 @@
+# Gradle build output and caches (the built AARs are copied to godot/addons/play_games/bin/ by
+# tools/build-play-games-plugin.sh and tracked there)
+/build/
+/.gradle/
+/.kotlin/
+/local.properties

@@ -1,0 +1,808 @@
+{
+  "version": 1,
+  "source": "godot/dev/export_catalog.gd",
+  "items": [
+    {
+      "kind": "dice",
+      "id": "classic",
+      "name": "Classic",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "dice",
+      "id": "crema",
+      "name": "Crema",
+      "price": 1000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "dice",
+      "id": "espresso",
+      "name": "Espresso",
+      "price": 2500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "dice",
+      "id": "gold",
+      "name": "Royal Gold",
+      "price": 6000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "room",
+      "id": "night",
+      "name": "Moonlit Café",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "room",
+      "id": "cafe",
+      "name": "Corner Café",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "room",
+      "id": "dream",
+      "name": "Pastel Dream Room",
+      "price": 3000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "room",
+      "id": "studio",
+      "name": "Sunny Cozy Studio",
+      "price": 4000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "room",
+      "id": "cloud",
+      "name": "Cloudside Playroom",
+      "price": 5000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
+      "id": "jungle",
+      "name": "Jungle Clearing",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
+      "id": "frost",
+      "name": "Frosty Wonderland",
+      "price": 20000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
+      "id": "candy",
+      "name": "Candy Kingdom",
+      "price": 22000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
+      "id": "desert",
+      "name": "Desert Temple",
+      "price": 25000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
+      "id": "cloud",
+      "name": "Cloud Kingdom",
+      "price": 25000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
+      "id": "enchanted",
+      "name": "Enchanted Jungle",
+      "price": 25000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-arif",
+      "name": "Arif",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-rafi",
+      "name": "Rafi",
+      "price": 10000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-tanvir",
+      "name": "Tanvir",
+      "price": 10500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-nayeem",
+      "name": "Nayeem",
+      "price": 11000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-sabbir",
+      "name": "Sabbir",
+      "price": 11750,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-imran",
+      "name": "Imran",
+      "price": 10250,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-rakib",
+      "name": "Rakib",
+      "price": 12000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-fahim",
+      "name": "Fahim",
+      "price": 11250,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-shuvo",
+      "name": "Shuvo",
+      "price": 10750,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-jamil",
+      "name": "Jamil",
+      "price": 11500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-nadia",
+      "name": "Nadia",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-riya",
+      "name": "Riya",
+      "price": 10000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-tania",
+      "name": "Tania",
+      "price": 10500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-mim",
+      "name": "Mim",
+      "price": 11000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-sumaiya",
+      "name": "Sumaiya",
+      "price": 11750,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-priya",
+      "name": "Priya",
+      "price": 10250,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-lamia",
+      "name": "Lamia",
+      "price": 12000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-fariha",
+      "name": "Fariha",
+      "price": 11250,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-nusrat",
+      "name": "Nusrat",
+      "price": 10750,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "ch-ayesha",
+      "name": "Ayesha",
+      "price": 11500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "avatar",
+      "id": "pawn-red",
+      "name": "Red Pawn",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "avatar",
+      "id": "pawn-green",
+      "name": "Green Pawn",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "avatar",
+      "id": "pawn-yellow",
+      "name": "Yellow Pawn",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "avatar",
+      "id": "pawn-blue",
+      "name": "Blue Pawn",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "avatar",
+      "id": "latte",
+      "name": "Latte",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "avatar",
+      "id": "dice",
+      "name": "Lucky Dice",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "first"
+      }
+    },
+    {
+      "kind": "avatar",
+      "id": "robot",
+      "name": "Robot",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "streak"
+      }
+    },
+    {
+      "kind": "avatar",
+      "id": "crown",
+      "name": "Crown",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "level": 5
+      }
+    },
+    {
+      "kind": "frame",
+      "id": "classic",
+      "name": "Wood",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "frame",
+      "id": "gold",
+      "name": "Gold",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "level": 5
+      }
+    },
+    {
+      "kind": "frame",
+      "id": "mint",
+      "name": "Mint",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "pairs"
+      }
+    },
+    {
+      "kind": "frame",
+      "id": "royal",
+      "name": "Royal",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "coins"
+      }
+    },
+    {
+      "kind": "plate",
+      "id": "plain",
+      "name": "Plain",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "plate",
+      "id": "espresso",
+      "name": "Espresso",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "veteran"
+      }
+    },
+    {
+      "kind": "plate",
+      "id": "ruby",
+      "name": "Ruby",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "streak"
+      }
+    },
+    {
+      "kind": "badge",
+      "id": "",
+      "name": "No badge",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "badge",
+      "id": "first",
+      "name": "First Victory",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "first"
+      }
+    },
+    {
+      "kind": "badge",
+      "id": "streak",
+      "name": "Winning Streak",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "streak"
+      }
+    },
+    {
+      "kind": "badge",
+      "id": "veteran",
+      "name": "Experienced Player",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "veteran"
+      }
+    },
+    {
+      "kind": "badge",
+      "id": "pairs",
+      "name": "Master of Pairs",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "pairs"
+      }
+    },
+    {
+      "kind": "badge",
+      "id": "party",
+      "name": "Multiplayer Champion",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "party"
+      }
+    },
+    {
+      "kind": "badge",
+      "id": "coins",
+      "name": "Coin Collector",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": {
+        "ach": "coins"
+      }
+    }
+  ],
+  "achievements": [
+    {
+      "id": "first",
+      "name": "First Victory",
+      "stat": "wins",
+      "goal": 1,
+      "reward": 200
+    },
+    {
+      "id": "streak",
+      "name": "Winning Streak",
+      "stat": "bestStreak",
+      "goal": 3,
+      "reward": 300
+    },
+    {
+      "id": "veteran",
+      "name": "Experienced Player",
+      "stat": "played",
+      "goal": 25,
+      "reward": 500
+    },
+    {
+      "id": "pairs",
+      "name": "Master of Pairs",
+      "stat": "pairsFormed",
+      "goal": 10,
+      "reward": 300
+    },
+    {
+      "id": "party",
+      "name": "Multiplayer Champion",
+      "stat": "ppGames",
+      "goal": 5,
+      "reward": 300
+    },
+    {
+      "id": "coins",
+      "name": "Coin Collector",
+      "stat": "coinsEarned",
+      "goal": 10000,
+      "reward": 500
+    }
+  ],
+  "defaults": {
+    "name": "You",
+    "coins": 5000,
+    "xp": 0,
+    "stats": [
+      "played",
+      "wins",
+      "losses",
+      "streak",
+      "bestStreak",
+      "coinsEarned",
+      "pairsFormed",
+      "ppGames",
+      "slPlayed",
+      "slWins"
+    ],
+    "rooms": [
+      "night",
+      "cafe"
+    ],
+    "room": "night",
+    "dice_owned": [
+      "classic"
+    ],
+    "dice": "classic",
+    "scenes": [
+      "jungle"
+    ],
+    "scene": "jungle",
+    "avatar": "pawn-red",
+    "frame": "classic",
+    "plate": "plain",
+    "badge": "",
+    "bot_levels": [
+      "easy",
+      "normal",
+      "hard"
+    ]
+  },
+  "level": {
+    "base": 100,
+    "step": 50
+  },
+  "rewards": {
+    "daily_cycles": [
+      [
+        {
+          "coins": 100
+        },
+        {
+          "coins": 150
+        },
+        {
+          "coins": 200
+        },
+        {
+          "dice": "crema",
+          "or": 400
+        },
+        {
+          "coins": 300
+        },
+        {
+          "coins": 400
+        },
+        {
+          "coins": 800,
+          "char": "ch-rafi",
+          "or": 1200
+        }
+      ],
+      [
+        {
+          "coins": 150
+        },
+        {
+          "coins": 200
+        },
+        {
+          "coins": 250
+        },
+        {
+          "dice": "espresso",
+          "or": 600
+        },
+        {
+          "coins": 350
+        },
+        {
+          "coins": 450
+        },
+        {
+          "coins": 1000,
+          "char": "ch-mim",
+          "or": 1500
+        }
+      ],
+      [
+        {
+          "coins": 200
+        },
+        {
+          "coins": 250
+        },
+        {
+          "coins": 300
+        },
+        {
+          "coins": 400
+        },
+        {
+          "dice": "gold",
+          "or": 900
+        },
+        {
+          "coins": 500
+        },
+        {
+          "coins": 1500,
+          "char": "ch-tanvir",
+          "or": 2000
+        }
+      ]
+    ],
+    "history_max": 60,
+    "prizes": [
+      100,
+      250,
+      150,
+      500,
+      100,
+      1000,
+      200,
+      300
+    ],
+    "free_every_sec": 14400,
+    "free_amount": 300
+  },
+  "match": {
+    "ludo": {
+      "win": 200,
+      "play": 20,
+      "xp_win": 100,
+      "xp_loss": 40,
+      "xp_pp": 30
+    },
+    "sl": {
+      "win": 100,
+      "play": 10,
+      "xp_win": 0,
+      "xp_loss": 0,
+      "xp_pp": 0
+    },
+    "online_today": {
+      "coins_win": 0,
+      "coins_finish": 0,
+      "xp_win": 100,
+      "xp_finish": 40
+    }
+  }
+}

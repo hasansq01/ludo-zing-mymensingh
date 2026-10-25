@@ -24,6 +24,13 @@ extends Node
 ## hash is checked; a mismatch (or a gap) sends sync_req and the `sync` replaces the state and re-lays the board.
 ## No local AI or dice, no pause (the server keeps time), no MatchStore save; the HUD shows the server's turn timer,
 ## offline / bot badges, "Reconnecting…" and, when a bot took your seat, the "I’m back" prompt.
+##
+## Play on (LudoRules header): when a side finishes and the game goes on, its place pops over the centre ("Red
+## finished 1st!" / "You finished 1st!"), its tile shows the place badge and dims, its pawns stay home and the turn
+## order skips it (the rules do; computers and timers only ever see the next unfinished side). Your own finish online:
+## the FinishCard (Keep watching / Home = leave the room; the server still grants your place at the end). The result
+## screen at the end shows the full standings; rewards follow your place (1st = the win reward). The server's
+## {k: "end"} act (online: only ghosts / leavers left to finish) ends the game the same way.
 
 signal finished(result: Dictionary)
 ## result (ResultScreen-ready): {game "ludo", title, sub, standings [{color, name, kind "you"|"cpu"|"human", cpu_id,
@@ -63,7 +70,7 @@ var _shake_tw: Tween
 var tut: Tutorial                        # the guided first match while it runs (null otherwise)
 # online (start_online)
 const NET_CATCHUP := 0.45                 # pace while server acts are queued behind the one playing
-const NET_XP_WIN := 100                   # online games give XP, no coins (the economy stays offline for now)
+const NET_XP_WIN := 100                   # online XP (NetReplica.ONLINE_REWARDS: the server grants coins + XP)
 const NET_XP_PLAY := 40
 var online := false
 var net: Object                           # NetClient (anything with send_msg(Dictionary) -> bool)
@@ -74,6 +81,9 @@ var _net_sent := -1                       # n of our last request (one request p
 var _net_prompt := -1                     # n the pair prompt was opened at (-1: none)
 var _ended := false
 var _net_ready := false                   # the board is up: queued acts may play
+var _net_turn := {}                       # the server's last `turn` {c, end (ticks ms), total}: shown once the acts before it played
+var _my_place := 0                        # play on: the place your side finished in while the game went on (0: not yet)
+var _my_away := false                     # online: a bot was playing your seat when your side finished
 
 ## Old callers (device tests): true when tap points are printed. Use TapLog.enabled().
 static func tap_log() -> bool:
@@ -90,6 +100,8 @@ func _ready() -> void:
 	hud.dice_pressed.connect(_on_dice)
 	if hud.has_signal("away_pressed"):
 		hud.away_pressed.connect(_net_back)
+	if hud.has_signal("finish_home_pressed"):
+		hud.finish_home_pressed.connect(_finish_home)
 
 ## A dice tap counts only on a human's turn, while nothing is animating and no sheet is open.
 func _on_dice() -> void:
@@ -231,6 +243,8 @@ func _open(s: Dictionary, fresh: bool) -> void:
 	teams = S.teams
 	_ff = 1.0
 	_ended = false
+	_my_place = LudoHUD.done_place(S, ns.me) if online and ns != null and ns.me >= 0 else 0
+	_my_away = false
 	_busy = true                             # nothing is tappable until the first turn begins
 	board.cancel_all()
 	board.speed = _speed()
@@ -630,13 +644,17 @@ func _after_move(id: int, roller: int, ev: Array, info: Dictionary) -> void:
 				Sound.sfx("home", {soft = soft})
 				var at := LudoBoard.to_world(LudoBoard.grid_of(e.c, LudoRules.GOAL, 0))
 				board.home_burst(at, Palette.PLAYER[e.c])
-				hud.pop("Home!", _screen(at + Vector3(0, 1.2, 0)), Palette.HONEY, 30, true)
+				if not ev.slice(k).any(func(x): return x.type == "finished"):   # (a side's last pawn: its place pops instead)
+					hud.pop("Home!", _screen(at + Vector3(0, 1.2, 0)), Palette.HONEY, 30, true)
 				hud.update(S, roller)
 				hud.bump_tile(e.c)
 				if human:
 					Haptics.success()
+			"all_home":
+				info.finished = e.c              # Teams: four home, the partner still playing (Free Hand)
 			"finished":
-				info.finished = e.c
+				info.done = e                    # play on: this side has its place
+				await _side_finished(e, roller, ev.slice(k).any(func(x): return x.type == "game_over"))
 			"game_over":
 				board.relayout(S)
 				hud.update(S, S.winner)
@@ -654,6 +672,46 @@ func _after_move(id: int, roller: int, ev: Array, info: Dictionary) -> void:
 		if not live(id):
 			return
 	_busy = false
+
+## Play on: a side just finished ({c, place, team?}). Its tile gets the place badge (hud.update); while the game
+## goes on its place pops over the centre, and your own side's finish gets a small celebration and, online, the
+## FinishCard (Pass & Play has no "you": every finish just pops). ending: this move ends the game (the result says it).
+func _side_finished(e: Dictionary, roller: int, ending: bool) -> void:
+	var c := int(e.c)
+	var place := int(e.place)
+	var team: bool = e.has("team")
+	var mine := (e.get("team", [c]) as Array).any(func(x): return _you(int(x)))
+	if mine:
+		_my_place = place
+		_my_away = online and ns.me >= 0 and S.players[ns.me] == "cpu"
+	hud.update(S, roller)
+	var text := "%s finished %s!" % [_finish_who(e, false), ResultScreen.ordinal(place)]
+	print("[ludo] %s%s" % [text, " (game over)" if ending else ""])
+	if ending:
+		return
+	var at := LudoBoard.to_world(LudoBoard.grid_of(c, LudoRules.GOAL, 0))
+	hud.pop(text, _screen(at + Vector3(0, 1.6, 0)), Palette.GOLD_HI if place == 1 else Palette.HONEY, 30, true)
+	Sound.sfx("win", {soft = not mine})
+	if mine:
+		Haptics.success()
+		Celebrate.run(hud, "burst", 0.45)
+		if online:
+			hud.show_finish(place, team)
+	await wait(0.6)
+
+## Who finished, for the pop / the event line: "You" / "Your team", else the name ("Mocha", "Red") or the team
+## ("Team Red + Yellow"); bold = the event line's bold name.
+func _finish_who(e: Dictionary, bold: bool) -> String:
+	var c := int(e.c)
+	if (e.get("team", [c]) as Array).any(func(x): return _you(int(x))):
+		return "Your team" if e.has("team") else "You"
+	var nm := ("Team " + LudoRules.team_label(S, c)) if e.has("team") else LudoRules.pname(S, c)
+	return "[b]%s[/b]" % nm if bold else nm
+
+## The finish card's Home: online, leave the room (your place is granted at the end); offline it isn't offered.
+func _finish_home() -> void:
+	if online and app.has_method("leave_online_match"):
+		app.call("leave_online_match")
 
 ## The capture moment: hit-stop, a puff of the victim's colour, a small shake, the victim arcs home, "+1 roll".
 func _capture(c: int, victims: Array, soft: bool, roller: int) -> void:
@@ -712,6 +770,9 @@ func _turn_message(roller: int, info: Dictionary, extra: bool) -> void:
 			msg = "%s captured your pawn!" % who
 		else:
 			msg = "%s captured %s pawn!" % [who, _poss_tinted(vc)]
+	elif info.has("done"):
+		var d: Dictionary = info.done            # play on: a side finished, the others go on
+		msg = "%s finished %s! The others play on." % [_finish_who(d, true), ResultScreen.ordinal(int(d.place))]
 	elif info.has("finished"):
 		var f: int = info.finished
 		if _you(f):
@@ -862,11 +923,11 @@ static func result_copy(s: Dictionary) -> Dictionary:
 	if you_won:
 		return {title = "You win!", sub = "All four pawns home!"}
 	var k := home_count(s, me)
-	return {title = "You finished %s" % ResultScreen.ordinal(maxi(place, 2)),
-		sub = "%s won" % LudoRules.pname(s, w) + (" · %d of 4 pawns home" % k if k > 0 else "")}
+	var home := " · you got all four home" if k == 4 else (" · %d of 4 pawns home" % k if k > 0 else "")
+	return {title = "You finished %s" % ResultScreen.ordinal(maxi(place, 2)), sub = "%s won" % LudoRules.pname(s, w) + home}
 
 
-# ---------- online (friend rooms) ----------
+# ---------- online (friend rooms and quick match: every seat that isn't a bot is a person) ----------
 
 ## An online match from the server's `start` (or a `sync` when joining one in progress). net: the NetClient.
 func start_online(msg: Dictionary, net_: Object) -> void:
@@ -874,6 +935,7 @@ func start_online(msg: Dictionary, net_: Object) -> void:
 	hud.tutorial = false
 	online = true
 	net = net_
+	_net_turn = {}
 	ns = NetLudo.new()
 	ns.begin(msg, str(net_.get("member_id")) if net_ else "")
 	players = ns.S.players.duplicate()
@@ -956,6 +1018,7 @@ func _net_kick() -> void:
 		_net_pumping = false
 		_ff = 1.0
 		board.speed = _speed()
+		_net_show_turn()
 
 ## One server action through the offline animation path.
 func _net_act(id: int, m: Dictionary) -> void:
@@ -992,6 +1055,13 @@ func _net_act(id: int, m: Dictionary) -> void:
 			var ev := ns.apply_rules(a)
 			_net_check(m)
 			await _after_move(id, roller, ev, _net_info)
+		"end":                                 # the server ends the match (only bots / ghosts left to finish)
+			var ev := ns.apply_rules(a)
+			_net_check(m)
+			if not ev.is_empty():
+				board.relayout(S)
+				hud.update(S, S.winner)
+				_game_over()
 		"mode":
 			ns.apply_rules(a)
 			_net_check(m)
@@ -1060,13 +1130,24 @@ func _net_pair_prompt() -> void:
 	_net_prompt = -1
 	_net_request("pair", {yes = yes})
 
-## turn {c, deadline, now}: the server's clock for the current step, on that player's tile.
+## turn {c, deadline, now}: the server's clock for the current step, on that player's tile; kept until the acts
+## before it have played (so it never shows on the next player while the last move still animates).
 func net_turn(msg: Dictionary) -> void:
 	if not online or not hud.has_method("set_timer"):
 		return
 	var left := maxf(0.0, float(msg.get("deadline", 0)) - float(msg.get("now", 0)))
 	var total := maxf(left, NetLudo.phase_sec(str(S.get("phase", "roll"))) * 1000.0)
-	hud.set_timer(int(msg.get("c", -1)), left, total)
+	_net_turn = {c = int(msg.get("c", -1)), end = Time.get_ticks_msec() + int(left), total = total}
+	if not _net_pumping:
+		_net_show_turn()
+
+func _net_show_turn() -> void:
+	if not online or not hud.has_method("set_timer"):
+		return
+	if _net_turn.is_empty() or S.is_empty() or S.phase == "over":
+		hud.set_timer(-1, 0.0, 1.0)
+		return
+	hud.set_timer(int(_net_turn.c), float(int(_net_turn.end) - Time.get_ticks_msec()), float(_net_turn.total))
 
 ## presence {id, online}: the offline badge.
 func net_presence(msg: Dictionary) -> void:
@@ -1127,7 +1208,9 @@ func _net_wait_line(c: int) -> String:
 			return "%s is deciding on a pair…" % nm
 	return "%s’s turn" % nm
 
-## The online result: XP for playing (more for a win), no coins; the friends' names and avatars.
+## The online result: what the match earns (NetReplica.online_reward: the server grants it into your account at
+## `over` and Online refreshes the profile; without an account the XP is kept locally and there are no coins); the
+## other players' own names, avatars and levels.
 func _net_game_over() -> void:
 	var id := _id
 	_net_prompt = -1
@@ -1138,12 +1221,21 @@ func _net_game_over() -> void:
 	var won := winners.has(ns.me)
 	Sound.sfx("win" if won else "lose")
 	var copy := result_copy(S)
+	# the server's outcome: fixed when your side was ranked (play on: finished earlier, then maybe left / watched)
+	var away: bool = _my_away if _my_place > 0 else (ns.me >= 0 and S.players[ns.me] == "cpu")
+	var outcome := "" if ns.me < 0 else ("left" if away else ("win" if won else "finish"))
+	var rw := NetReplica.online_reward("ludo", outcome)
 	var xp_before := int(Save.profile.get("xp", 0))
-	if ns.me >= 0:
-		Save.profile.xp = xp_before + (NET_XP_WIN if won else NET_XP_PLAY)
+	var xp_after := xp_before
+	var reward := 0
+	if NetReplica.server_rewards():
+		reward = int(rw.coins)
+		xp_after = xp_before + int(rw.xp)
+	elif int(rw.xp) > 0:
+		Save.profile.xp = xp_before + int(rw.xp)
 		Save.save()
 		Save.changed.emit()
-	var xp_after := int(Save.profile.get("xp", 0))
+		xp_after = int(Save.profile.get("xp", 0))
 	hud.hide_for_result()
 	var standings := []
 	for e in LudoRules.standings(S):
@@ -1152,10 +1244,11 @@ func _net_game_over() -> void:
 		var mine := c == ns.me
 		standings.append({color = c, name = "You" if mine else str(st.get("name", LudoRules.pname(S, c))),
 			kind = "you" if mine else "human", cpu_id = "", avatar = str(st.get("avatar", "")),
-			frame = str(st.get("frame", "")), place = e.place, finished = e.finished, progress = e.progress})
+			frame = str(st.get("frame", "")), level = int(st.get("level", 1)), place = e.place, finished = e.finished,
+			progress = e.progress})
 	await wait(0.35)
 	if not live(id):
 		return
 	finished.emit({game = "ludo", title = copy.title, sub = copy.sub, standings = standings, human_won = won,
-		reward = 0, teams = S.teams, color = S.winner, winners = winners, vs_cpu = false, online = true,
+		reward = reward, teams = S.teams, color = S.winner, winners = winners, vs_cpu = false, online = true,
 		xp_before = xp_before, xp_after = xp_after})

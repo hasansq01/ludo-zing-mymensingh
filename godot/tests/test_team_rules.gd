@@ -83,10 +83,10 @@ func run() -> void:
 	t = base(); t[0] = HOME.duplicate(); t[2] = [56, 56, 56, 55]; s = team(t, {turn = 2})
 	play(s, 1)
 	check("team victory when Yellow finishes on its own turn", s.phase == "over" and [0, 2].has(s.winner), [s.phase, s.winner])
-	# Individual Mode: finishing four pawns still wins at once (unchanged)
+	# Individual Mode (four people): the first one home gets 1st place and the others play on
 	t = base(); t[0] = [56, 56, 56, 55]; s = team(t, {teams = false})
 	play(s, 1)
-	check("Individual: four pawns home wins immediately", s.phase == "over" and s.winner == 0, [s.phase, s.winner])
+	check("Individual: four pawns home is 1st place, the others play on", s.phase == "roll" and s.finished == [0] and s.turn == 1 and s.winner == -1, [s.phase, s.finished, s.turn])
 
 	# ---- Computer players follow the same rules ----
 	var cpus := {players = ["human", "cpu", "human", "cpu"], names = ["Red", "Mocha", "Yellow", "Espresso"], turn = 1}

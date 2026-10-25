@@ -45,6 +45,12 @@ var _ach_updaters: Array[Callable] = []
 var _claim_btns := {}                 # achievement id -> its Claim button
 var _flying := 0                      # coin flights still landing (the counter counts up on its own meanwhile)
 var _desat: Shader
+var _acct_box: PanelContainer
+var _acct_title: Label
+var _acct_note: Label
+var _acct_synced: Control
+var _acct_button: Button
+var _acct_signing := false
 
 
 func _init(width := 360.0) -> void:
@@ -78,6 +84,9 @@ func _init(width := 360.0) -> void:
 	_profile_pane = UIKit.vbox(UIKit.SPACE.md)
 	_profile_pane.add_child(UIKit.panel("row", _build_identity()))
 	_profile_pane.add_child(UIKit.panel("row", _build_name()))
+	_acct_box = UIKit.panel("row", _build_account())
+	_acct_box.name = "AccountBox"
+	_profile_pane.add_child(_acct_box)
 	_profile_pane.add_child(_build_stats())
 	list.add_child(_profile_pane)
 	_ach_pane = UIKit.vbox(UIKit.SPACE.md)
@@ -90,6 +99,10 @@ func _init(width := 360.0) -> void:
 
 func _ready() -> void:
 	Save.changed.connect(_refresh)
+	var acc := Account.instance()
+	if acc != null:
+		acc.account_changed.connect(_refresh_account)
+		acc.signed_in_changed.connect(_refresh_account)
 
 ## "profile" | "ach"
 func show_pane(key: String) -> void:
@@ -207,6 +220,11 @@ func _build_identity() -> VBoxContainer:
 	look.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	look.pressed.connect(_customise)
 	v.add_child(look)
+	var ranks := UIKit.button_with("Leaderboard", UIKit.icon("ic_trophy", 22), "white", "sm")
+	ranks.name = "Leaderboard"
+	ranks.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ranks.pressed.connect(_open_leaderboard)
+	v.add_child(ranks)
 
 	return v
 
@@ -238,6 +256,109 @@ func _build_name() -> VBoxContainer:
 	v.add_child(_err)
 	_validate(false)
 	return v
+
+## The Leaderboard over the Profile.
+func _open_leaderboard() -> void:
+	var layer := get_parent() as Control
+	if layer == null or _closing:
+		return
+	LeaderboardSheet.new().open(layer)
+
+## The Account section: "Guest" with the Google Play Games button, or the signed-in Google name with "Synced".
+## Only shown where an Account exists (the game; not previews).
+func _build_account() -> VBoxContainer:
+	var v := UIKit.vbox(UIKit.SPACE.sm)
+	v.add_child(_heading("Account"))
+	var head := UIKit.hbox(UIKit.SPACE.sm)
+	_acct_title = UIKit.label("Guest", UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	_acct_title.name = "AccountTitle"
+	_acct_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_acct_title.clip_text = true
+	_acct_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	head.add_child(_acct_title)
+	_acct_synced = UIKit.hbox(UIKit.SPACE.xs)
+	_acct_synced.name = "Synced"
+	_acct_synced.add_child(UIKit.glyph("ic_check", 16, Palette.TEAL_INK))
+	var sl := UIKit.caps_label("Synced", Palette.TEAL_INK)
+	sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_acct_synced.add_child(sl)
+	_acct_synced.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(_acct_synced)
+	v.add_child(head)
+	_acct_note = UIKit.paragraph("", UIKit.FS.small, Palette.SUB)
+	_acct_note.name = "AccountNote"
+	v.add_child(_acct_note)
+	_acct_button = UIKit.btn("Sign in with Google Play Games", "honey", "sm")
+	_acct_button.name = "GoogleSignIn"
+	UIKit.fit_text(_acct_button, 13)
+	_acct_button.pressed.connect(_sign_in_google)
+	v.add_child(_acct_button)
+	return v
+
+## What the Account section shows now (Account.instance() absent: hidden).
+func account_state() -> String:
+	var acc := Account.instance()
+	if acc == null or not acc.enabled:
+		return "none"
+	if acc.banned:
+		return "banned"
+	if not acc.is_guest():
+		return "linked"
+	if not acc.has_session():
+		return "offline"
+	return "guest" if acc.google_available() else "guest_local"
+
+func _refresh_account() -> void:
+	if _acct_box == null or not is_instance_valid(_acct_box):
+		return
+	var st := account_state()
+	_acct_box.visible = st != "none"
+	if st == "none":
+		return
+	var acc := Account.instance()
+	_acct_synced.visible = st == "linked"
+	_acct_button.visible = st in ["guest", "offline"] and acc.google_available()
+	_acct_button.disabled = _acct_signing or st == "offline"
+	_acct_button.text = "Signing in…" if _acct_signing else "Sign in with Google Play Games"
+	match st:
+		"linked":
+			var g := acc.google_name()
+			_acct_title.text = g if g != "" else "Google Play Games"
+			_acct_note.text = "Signed in with Google Play Games. Your progress is saved to your account."
+		"guest":
+			_acct_title.text = "Guest"
+			_acct_note.text = "Sign in to keep your progress if you change phones."
+		"guest_local":
+			_acct_title.text = "Guest"
+			_acct_note.text = "Your progress is saved on our server. Sign-in with Google Play Games is available on Android."
+		"offline":
+			_acct_title.text = "Guest · offline"
+			_acct_note.text = "You’re offline. Your progress will sync when you’re back online."
+		"banned":
+			_acct_title.text = "Account unavailable"
+			_acct_note.text = "This account can’t play online right now."
+			_acct_button.visible = false
+
+func _sign_in_google() -> void:
+	var acc := Account.instance()
+	if acc == null or _acct_signing:
+		return
+	_acct_signing = true
+	_refresh_account()
+	var r: Dictionary = await acc.link_google()
+	_acct_signing = false
+	if not is_instance_valid(self) or _closing:
+		return
+	_refresh_account()
+	if r.get("ok", false):
+		Haptics.success()
+		Toast.show(self, "Signed in as %s" % (acc.google_name() if acc.google_name() != "" else "your Google account"), card, 2.0, "good")
+		profile_changed.emit()
+		return
+	var why := Account.google_error_text(str(r.get("error", "")))
+	if why != "":
+		Haptics.error()
+		Toast.show(self, why, card, 2.4, "bad")
 
 ## A section label (UIKit.caption, the one section-label style).
 func _heading(text: String) -> Label:
@@ -415,7 +536,25 @@ func _claim(id: String) -> void:
 	var fly := from != Vector2.INF and target != null and is_inside_tree()
 	if fly:
 		_flying += 1                                     # before the grant: its Save.changed must not jump the counter
-	var n := Collection.claim_ach(id)
+	var n := 0
+	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
+		if btn:
+			btn.disabled = true
+		var r: Dictionary = await Account.instance().claim_ach(id)
+		if not is_instance_valid(self) or _closing:
+			return
+		n = int(r.get("coins", 0)) if r.get("ok", false) else 0
+		if n <= 0:
+			if fly:
+				_flying -= 1
+			if btn:
+				btn.disabled = false
+			Haptics.error()
+			Toast.show(self, Account.error_text(str(r.get("error", "")), "claim"), card, 2.2, "bad")
+			_refresh()
+			return
+	else:
+		n = Collection.claim_ach(id)
 	if n <= 0:
 		if fly:
 			_flying -= 1
@@ -485,6 +624,7 @@ func _refresh() -> void:
 	_tabs.set_count("ach", Collection.claimable_count(p))
 	if _name_edit and not _name_edit.has_focus():
 		_validate(false)
+	_refresh_account()
 
 ## Trimmed, inner runs of spaces collapsed to one.
 static func clean_name(s: String) -> String:
@@ -506,8 +646,20 @@ func _save_name() -> void:
 	if not _validate(true) or _save_btn.disabled:
 		return
 	var n := clean_name(_name_edit.text)
-	Save.profile.name = n
-	Save.save()
+	if Account.wallet_active():
+		_save_btn.disabled = true
+		var r: Dictionary = await Account.instance().push_identity({name = NetClient.wire_name(n)})
+		if not is_instance_valid(self) or _closing:
+			return
+		if not r.get("ok", false):
+			Haptics.error()
+			Toast.show(self, Account.error_text(str(r.get("error", "")), "name"), card, 2.2, "bad")
+			_validate(false)
+			return
+		n = str(Save.profile.get("name", n))
+	else:
+		Save.profile.name = n
+		Save.save()
 	_name_edit.text = n
 	_name_edit.release_focus()
 	Haptics.success()

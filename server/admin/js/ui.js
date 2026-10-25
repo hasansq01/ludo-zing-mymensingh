@@ -131,6 +131,37 @@ export function badge(text, tone = "neutral", ic = null) {
 const STATUS_TONE = { lobby: "info", playing: "ok", over: "neutral", closed: "muted", abandoned: "warn" };
 export const statusBadge = (st) => badge(st || "unknown", STATUS_TONE[st] || "neutral");
 
+/** What "paused" means (ADMIN_API.md): shown in tooltips and on the room page. */
+export const PAUSED_HELP =
+  "A match is in progress but nobody is connected. Bots wait until someone returns; " +
+  "the room is deleted after 10 min with nobody connected.";
+
+/** A room's status badge: "Paused" (moon) instead of "playing" while nobody is online. */
+export function roomStatusBadge(status, paused) {
+  if (status !== "playing" || !paused) return statusBadge(status);
+  const b = badge("Paused", "paused", "moon");
+  b.title = "Paused: " + PAUSED_HELP;
+  return b;
+}
+
+let tipSeq = 0;
+/**
+ * A small "i" button with a tooltip: shown on hover, on keyboard focus and on click / tap; Esc hides it.
+ * The text is also the button's description (aria-describedby), so screen readers get it on focus.
+ */
+export function helpTip(text, label = "More info") {
+  const id = "tip-" + ++tipSeq;
+  const btn = h("button", { type: "button", class: "help-tip", "aria-label": label, "aria-describedby": id, "aria-expanded": "false" }, icon("info", { size: 13 }));
+  const tip = h("span", { class: "help-tip-text", role: "tooltip", id }, text);
+  const wrap = h("span", { class: "help-tip-wrap" }, btn, tip);
+  const open = (on) => { wrap.classList.toggle("is-open", on); btn.setAttribute("aria-expanded", String(on)); };
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); open(!wrap.classList.contains("is-open")); wrap.classList.remove("is-dismissed"); });
+  btn.addEventListener("keydown", (e) => { if (e.key === "Escape") { open(false); wrap.classList.add("is-dismissed"); } });
+  btn.addEventListener("blur", () => { open(false); wrap.classList.remove("is-dismissed"); });
+  wrap.addEventListener("mouseleave", () => wrap.classList.remove("is-dismissed"));
+  return wrap;
+}
+
 const RESULT_TONE = { playing: "ok", over: "neutral", abandoned: "warn", closed: "muted" };
 export const resultBadge = (r) => badge(r === "over" ? "finished" : r || "–", RESULT_TONE[r] || "neutral");
 
@@ -219,4 +250,22 @@ export function switchEl({ checked, label, onChange, id }) {
     onChange?.(v);
   });
   return b;
+}
+
+// ---------- v2 helpers ----------
+
+/** Marks a seat the server plays itself (a "ghost"); only the console ever sees this. */
+export function ghostTag() {
+  const t = h("span", { class: "tag tag-ghost", title: "Ghost: a seat the server plays itself, shown to players as a human" }, icon("bot", { size: 11 }), "ghost");
+  return t;
+}
+
+export const accountLink = (id, text) =>
+  id ? h("a", { href: "#/accounts/" + encodeURIComponent(id), class: "mono link", title: id }, text ?? shortId(id, 12)) : h("span", { class: "muted" }, "–");
+
+/** +1,200 / -300 with a sign and colour (the sign carries the meaning, not only the colour). */
+export function delta(n, { zero = "0" } = {}) {
+  n = Number(n) || 0;
+  if (!n) return h("span", { class: "delta delta-zero" }, zero);
+  return h("span", { class: "delta " + (n > 0 ? "delta-pos" : "delta-neg") }, (n > 0 ? "+" : "\u2212") + new Intl.NumberFormat("en-US").format(Math.abs(n)));
 }

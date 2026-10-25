@@ -67,7 +67,7 @@ func _quality() -> void:
 	var gpus := {
 		"Mali-400 MP": "low", "Mali-T830": "low", "Mali-G52 MC2": "low", "Mali-G57 MC2": "medium",
 		"Mali-G78 MP14": "high", "Mali-G310": "low", "Mali-G615 MC6": "high", "Mali-G510": "medium",
-		"Adreno (TM) 506": "low", "Adreno (TM) 610": "medium", "Adreno (TM) 650": "high", "Adreno (TM) 740": "high",
+		"Adreno (TM) 506": "low", "Adreno (TM) 610": "low", "Adreno (TM) 650": "high", "Adreno (TM) 740": "high",
 		"PowerVR Rogue GE8320": "low", "Apple M3 Pro": "high", "Samsung Xclipse 920": "high", "Some Unknown GPU": "",
 	}
 	var wrong := {}

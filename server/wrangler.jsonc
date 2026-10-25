@@ -1,14 +1,21 @@
 {
-  // Ludo Zing online rooms. One Durable Object (class Room, SQLite storage) per room code, plus the admin console
+  // Ludo Zing online rooms. One Durable Object (class Room, SQLite storage) per room code, one Matchmaker per
+  // quick-match queue ("ludo:2", "ludo:4", "sl:2", "sl:4"; src/matchmaker.ts), plus the admin console
   // (ADMIN_API.md): D1 "ludo-zing-admin" for stats / bans / config, the console UI from ./admin at /admin.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ludo-zing-rooms",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-15",
   "durable_objects": {
-    "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "MATCHMAKER", "class_name": "Matchmaker" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

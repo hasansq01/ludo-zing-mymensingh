@@ -152,6 +152,11 @@ func _tick() -> void:
 
 # ---------- claiming ----------
 
+## True when the reward comes from the server (the game: an Account and the live profile; previews and tests keep
+## the local rules).
+func _server() -> bool:
+	return Account.wallet_active() and is_same(profile, Save.profile)
+
 func _claim() -> void:
 	if _busy or _closing:
 		return
@@ -166,13 +171,26 @@ func _claim() -> void:
 	_btn.disabled = true
 	if int(g.get("coins", 0)) > 0:
 		DailySheet.hold_home_coins(self)   # the grant fires Save.changed: the counter waits for the fly
-	var r := Rewards.claim_daily(profile, _day())
-	if not r.ok:
-		_busy = false
-		Sound.sfx("error")
-		_render()
-		return
-	r.char = str(g.get("char", ""))
+	var r: Dictionary
+	if _server():
+		r = await Account.instance().daily()
+		if not is_instance_valid(self) or _closing:
+			return
+		if not r.get("ok", false):
+			_busy = false
+			Sound.sfx("error")
+			Haptics.error()
+			Toast.show(self, Account.error_text(str(r.get("error", "")), "claim"), card, 2.4, "bad")
+			_render()
+			return
+	else:
+		r = Rewards.claim_daily(profile, _day())
+		if not r.ok:
+			_busy = false
+			Sound.sfx("error")
+			_render()
+			return
+		r.char = str(g.get("char", ""))
 	_render()
 	var tile := _tiles[int(r.day) - 1]
 	tile.pop()

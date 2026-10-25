@@ -11,9 +11,15 @@ export default defineConfig(async () => {
         wrangler: { configPath: "./wrangler.jsonc" },
         // TEST_MODE enables the Room's test hooks (fixed dice, short games, a time scale). It exists only here:
         // wrangler.jsonc has no such var, so deployed rooms ignore and refuse hooks.
-        // ADMIN_PASSWORD stands in for the secret (deployed: tools/cf.sh secret put ADMIN_PASSWORD).
+        // ADMIN_PASSWORD and SESSION_KEY stand in for the secrets (deployed: tools/cf.sh secret put ADMIN_PASSWORD /
+        // SESSION_KEY). The Google secrets are left unset (the Google tests pass them in a custom env).
         miniflare: {
-          bindings: { TEST_MODE: "1", ADMIN_PASSWORD: "test-admin-password", TEST_MIGRATIONS: migrations },
+          bindings: {
+            TEST_MODE: "1",
+            ADMIN_PASSWORD: "test-admin-password",
+            SESSION_KEY: "test-session-key",
+            TEST_MIGRATIONS: migrations,
+          },
         },
       }),
     ],

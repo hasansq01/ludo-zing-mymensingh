@@ -40,6 +40,7 @@ var cpu_id := ""
 var active := false
 var mover := false
 var place := 0
+var done_place := 0                      ## play on: this side finished in this place (badge, tile dimmed); 0 = playing
 
 var _ava: Control
 var _name_pill: PanelContainer
@@ -198,6 +199,25 @@ func set_place(n: int) -> void:
 		_place_badge = PlaceBadge.make(n, 26)
 		add_child(_place_badge)
 	_layout()
+
+## Play on: this side has finished in place n while the game goes on: its place badge on the avatar and the tile
+## dimmed (the card and everything on it but the badge); 0 = still playing (full colour, no badge).
+func set_done(n: int) -> void:
+	if n == done_place:
+		return
+	done_place = n
+	set_place(n)
+	_apply_done()
+
+## The dimming of a finished side (also for children added later, e.g. the online badge).
+func _apply_done() -> void:
+	var k := DONE_ALPHA if done_place > 0 else 1.0
+	self_modulate.a = k
+	for ch in get_children():
+		if ch is CanvasItem and ch != _place_badge:
+			(ch as CanvasItem).modulate.a = k
+
+const DONE_ALPHA := 0.5
 
 ## The dice slot in global (canvas) coordinates, including the tile's scale: put the dice there.
 func dice_slot_rect() -> Rect2:

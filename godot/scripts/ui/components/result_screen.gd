@@ -54,6 +54,8 @@ var _title: Label
 var _sub: Label
 var _rows: Array[Control] = []
 var _rewards: Control
+var _body: VBoxContainer
+var _claim_note: Label
 var _level_up: Control
 var _buttons: VBoxContainer
 var _closing := false
@@ -284,6 +286,7 @@ func _build() -> void:
 	var body := UIKit.vbox(UIKit.SPACE.sm)
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(body)
+	_body = body
 	_sub = UIKit.label(sub_text(), UIKit.FS.body_l, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(_sub)
@@ -321,6 +324,24 @@ func _build() -> void:
 	if is_online():
 		set_host(bool(data.get("host", false)))
 	resized.connect(_layout)
+
+## A quiet line under the rewards when the server cut the payout of an offline match ("Daily limit reached"; see
+## Account.claim_note). Safe to call late or twice; "" removes it.
+func set_claim_note(text: String) -> void:
+	if _body == null:
+		return
+	if text == "":
+		if _claim_note:
+			_claim_note.queue_free()
+			_claim_note = null
+		return
+	if _claim_note == null:
+		_claim_note = UIKit.label(text, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+		_claim_note.name = "ClaimNote"
+		_claim_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_claim_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_body.add_child(_claim_note)
+	_claim_note.text = text
 
 func _gap(h: float) -> Control:
 	var c := Control.new()

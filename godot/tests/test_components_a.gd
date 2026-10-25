@@ -114,6 +114,23 @@ func run() -> void:
 	loose.free()
 	check("toast: good kind has an icon", (b.get_child(0) as HBoxContainer).get_child_count() == 2)
 	check("toast: no insets off mobile", OS.has_feature("mobile") or Toast.safe_insets(root.get_viewport()) == Vector2.ZERO)
+	# the deferred attach runs a frame later: the card it sits under (or the layer) may be freed by then
+	var lroot := layer.get_child(0) as Control if layer else null
+	var gone_card := Control.new()
+	gone_card.free()
+	var p1 := PanelContainer.new()
+	p1.set_meta("toast", true)
+	if lroot:
+		lroot.set_meta("latest", p1)
+	Toast._attach(lroot, p1, gone_card, 0.5)
+	check("toast: attach with a freed card (no bad-argument error)", not is_instance_valid(p1) or p1.get_parent() == lroot)
+	var gone_root := Control.new()
+	gone_root.free()
+	var p2 := PanelContainer.new()
+	Toast._attach(gone_root, p2, null, 0.5)
+	check("toast: attach with a freed layer drops the pill", not is_instance_valid(p2))
+	if lroot:
+		lroot.set_meta("latest", b)               # the deferred attach of "second" still shows it
 
 	# ---- UIKit.font_caps: a flat variation at the asked weight (a nested one rendered at the default weight) ----
 	var caps := UIKit.font_caps(900, 1) as FontVariation

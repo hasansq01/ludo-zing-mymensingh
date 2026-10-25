@@ -152,6 +152,8 @@ static func attach(b: Button, key: String, auto := false, size := 20.0, gap := 5
 		b.add_theme_stylebox_override(st, sb)
 	b.add_child(ic)
 	var place := func() -> void:
+		if not is_instance_valid(b) or not is_instance_valid(ic):
+			return                           # (deferred: the button may be gone already)
 		var f := b.get_theme_font("font")
 		var fs := b.get_theme_font_size("font_size")
 		var tw := f.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x

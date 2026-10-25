@@ -59,7 +59,7 @@ func run() -> void:
 	var daily := FileAccess.get_file_as_string("res://scripts/ui/sheets/daily_sheet.gd")
 	check("sheet titles: Daily spin / Daily reward", spin.contains("\"Daily spin\"") and daily.contains("\"Daily reward\"") and not daily.contains("\"LOCKED\""))
 	var home := FileAccess.get_file_as_string("res://scripts/ui/home_screen.gd")
-	check("home side button: Daily (not Rewards)", home.contains("[\"daily\", \"Daily\", \"gift\"]"))
+	check("home side button: Daily (not Rewards)", home.contains("[\"daily\", \"Daily\", HI % \"gift\"]"))
 	var main_src := FileAccess.get_file_as_string("res://scripts/main.gd")
 	check("free coins: Fmt.until, never the ticking clock", main_src.contains("\"Free coins in %s\" % Fmt.until(left)"))
 	check("home switch drives the backdrop", main_src.contains("home.game_switched.connect(_on_game_switched)") and not main_src.contains("SLLanding.new()"))

@@ -7,14 +7,16 @@ extends SceneTree
 ## Games mix 2 / 3 / 4 seats (mostly the online layouts, sometimes any layout), all-human tables (so pair_ask
 ## questions come up) and tables with computers (levels easy / normal / hard), teams on / off, pair_ask on / off,
 ## random legal choices (either pawn of a pair; pair answers yes / no), some 6-heavy dice, "mode" switches of a seat
-## between human and cpu at any moment, and a few refused actions (wrong phase, a pawn that can't move).
+## between human and cpu at any moment, and a few refused actions (wrong phase, a pawn that can't move). Play on: games
+## run past the first finish (several "finished" events, then game_over), some are ended early by the server's
+## {k: "end"} once a side has finished (and a few get a refused "end" after the game is over).
 ##
 ## File: {version, games, ev}. ev is a table of event lists (each distinct list stored once). Per game:
 ##   {seed, args: {players, teams, opts}, levels, s0 (state after new_game), h0, steps, end?}
 ## and every step is the compact array
 ##   [k, c, val, ev_index, hash, diff, extra?]
 ## k / c / val: the protocol action ({k: "roll", c, v: val} | {k: "move", c, i: val} | {k: "pair", c, yes: val} |
-## {k: "mode", c, mode: val}); ev_index: the events the rules returned; hash: StateHash.of() after the action;
+## {k: "mode", c, mode: val} | {k: "end"} (stored as ["end", -1, 0])); ev_index: the events the rules returned; hash: StateHash.of() after the action;
 ## diff: the top-level state keys whose value changed (full values, except tok: only the changed rows, as
 ## [[colour, row], ...]), so applying the diffs in order to s0 rebuilds the full state after every step exactly; extra: {auto, units} after some of the rolls that reached phase "choose". end (game over):
 ## {standings, winners, win_reward, play_reward}.
@@ -22,7 +24,7 @@ extends SceneTree
 const Ludo := preload("res://scripts/core/ludo_rules.gd")
 const SH := preload("res://scripts/net/state_hash.gd")
 
-const MAX_STEPS := 4000
+const MAX_STEPS := 9000
 
 var ev_table := []        # event lists, each distinct JSON stored once
 var ev_index := {}
@@ -118,7 +120,14 @@ func play_game(seed_: int) -> Dictionary:
 		var ev := []
 		var c: int = s.turn
 		var x := rng.randf()
-		if x < 0.02:
+		if not s.finished.is_empty() and rng.randf() < 0.0015:
+			# the server ends the match early (only ghosts left to finish): the rest ranked by progress
+			a = ["end", -1, 0]
+			ev = Ludo.end_game(s)
+			if ev.is_empty():
+				push_error("end refused mid-game")
+				bad += 1
+		elif x < 0.02:
 			# a seat changes hands: a bot takes over / the player is back (any active seat, any phase)
 			var act := []
 			for k in 4:
@@ -184,6 +193,12 @@ func play_game(seed_: int) -> Dictionary:
 			step.append({auto = Ludo.auto_move_token(s), units = Ludo.units(s)})
 		rec.steps.append(step)
 		prev = s.duplicate(true)
+	if s.phase == "over" and rng.randf() < 0.3:
+		var ev := Ludo.end_game(s)                     # a refused "end" (already over): no events, no change
+		if not ev.is_empty():
+			push_error("end after over produced events")
+			bad += 1
+		rec.steps.append(["end", -1, 0, intern_events(ev), SH.of(s), diff(prev, s)])
 	if s.phase == "over":
 		rec["end"] = {standings = Ludo.standings(s), winners = Ludo.winners(s), win_reward = Ludo.win_reward(s),
 			play_reward = Ludo.play_reward(s)}

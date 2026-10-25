@@ -166,7 +166,9 @@ it("new games, rewards, JSON", () => {
   expect([s.phase, s.winner, Ludo.winReward(s), Ludo.playReward(s)]).toEqual(["over", 1, 0, Ludo.PLAY_REWARD]);
   t = base(); t[0] = [56, 56, 56, 55]; s = state(t);
   play(s, 1);
-  expect([s.phase, Ludo.winReward(s), Ludo.playReward(s)]).toEqual(["over", 0, 0]);
+  expect([s.phase, Ludo.winReward(s), Ludo.playReward(s)]).toEqual(["roll", 0, 0]); // Pass & Play: the others play on
+  Ludo.endGame(s);
+  expect([s.phase, s.winner, Ludo.winReward(s), Ludo.playReward(s)]).toEqual(["over", 0, 0, 0]);
   expect(Ludo.playReward(Ludo.newGame(["human", "cpu", "off", "off"]))).toBe(0);
   s = Ludo.newGame(["human", "cpu", "cpu", "cpu"], true);
   const rt = JSON.parse(JSON.stringify(s));

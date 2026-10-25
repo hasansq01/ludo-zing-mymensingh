@@ -561,18 +561,27 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 		Haptics.error()
 		Toast.show(self, "Need %s more coins" % Fmt.coins(short), card, 1.8, "bad")
 		return
+	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
+		_busy = true
+		var online: bool = await Account.instance().ensure_session()      # offline: say so before asking to confirm
+		_busy = false
+		if not is_instance_valid(self) or _closing:
+			return
+		if not online:
+			Sound.sfx("error")
+			Haptics.error()
+			Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
+			return
 	_busy = true
 	var yes: bool = await Sheet.confirm(self, "Buy %s?" % title, "%s coins. You’ll have %s left." % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], "Buy")
 	_busy = false
 	if not yes or not is_instance_valid(self) or _closing:
 		return
-	var err := ""
-	match kind:
-		"room": err = Catalog.buy_room(id)
-		"dice": err = Catalog.buy_dice(id)
-		"scene": err = SLScenes.buy_scene(id)
-		"char": err = Collection.buy_char(id, true)
-		_: err = "That isn’t for sale."
+	_busy = true
+	var err: String = await _purchase(kind, id)
+	_busy = false
+	if not is_instance_valid(self) or _closing:
+		return
 	if err != "":
 		Sound.sfx("error")
 		Haptics.error()
@@ -585,21 +594,51 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 	_announce(kind, id)
 	refresh()
 
-## Use: put an owned item in use.
+## The purchase itself: "" when bought, else the reason to show. With an Account (the game) the server sells and the
+## local profile is replaced by its answer; offline there is no local granting ("Connect to the internet to buy").
+## Without one (previews, tests) the local rules apply.
+func _purchase(kind: String, id: String) -> String:
+	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
+		var r: Dictionary = await Account.instance().buy(kind, id)
+		if r.get("ok", false):
+			return ""
+		if r.get("error", "") == "coins" and int(r.get("short", 0)) > 0:
+			return Catalog.need_text(int(r.short))
+		return Account.error_text(str(r.get("error", "")), "buy")
+	match kind:
+		"room": return Catalog.buy_room(id)
+		"dice": return Catalog.buy_dice(id)
+		"scene": return SLScenes.buy_scene(id)
+		"char": return Collection.buy_char(id, true)
+	return "That isn’t for sale."
+
+## Use: put an owned item in use. Through the server when there is an Account (the look is part of the profile it
+## keeps); offline: "Connect to the internet to change your look".
 func _on_use(kind: String, id: String) -> void:
-	if _closing:
+	if _closing or _busy:
 		return
 	var ok := false
-	match kind:
-		"room": ok = Catalog.equip_room(id)
-		"dice": ok = Catalog.equip_dice(id)
-		"scene": ok = SLScenes.equip_scene(id)
-		"char": ok = Collection.equip("avatar", id)
-		_: ok = Collection.equip(kind, id)
+	var why := Collection.SAVE_FAILED_EQUIP
+	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
+		_busy = true
+		var r: Dictionary = await Account.instance().equip("avatar" if kind == "char" else kind, id)
+		_busy = false
+		if not is_instance_valid(self) or _closing:
+			return
+		ok = bool(r.get("ok", false))
+		if not ok:
+			why = Account.error_text(str(r.get("error", "")), "equip")
+	else:
+		match kind:
+			"room": ok = Catalog.equip_room(id)
+			"dice": ok = Catalog.equip_dice(id)
+			"scene": ok = SLScenes.equip_scene(id)
+			"char": ok = Collection.equip("avatar", id)
+			_: ok = Collection.equip(kind, id)
 	if not ok:
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, Collection.SAVE_FAILED_EQUIP, card, 2.2, "bad")
+		Toast.show(self, why, card, 2.2, "bad")
 		return
 	Sound.sfx("select")
 	_announce(kind, id)

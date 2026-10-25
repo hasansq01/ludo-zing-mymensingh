@@ -4,8 +4,13 @@ extends RefCounted
 ## Pure game logic like LudoRules: the state is a plain Dictionary, dice values are passed in, and apply_roll
 ## returns events for the presentation layer to animate.
 ##
-## State: { mode ("cpu" | "local"), turn, phase ("roll" | "over"), sixes, winner, paid, need_one,
+## State: { mode ("cpu" | "local"), turn, phase ("roll" | "over"), sixes, winner, paid, need_one, finished,
 ##   players [{c, name, you, cpu, pos, rolls, ladders, snakes}] }
+## Play on (like Ludo): a player who reaches 100 gets their place (s.finished: player indices in finish order; event
+## {type "finished", turn, c, place}) and is skipped from then on; the game is over (one "win" event {turn = the
+## winner, order}) when fewer than two players are left, or none of them is a person (cpu false: vs Computer, once
+## you are home you don't watch the computers). The others are then ranked by square and s.finished becomes the full
+## order; s.winner is the first to 100. end_game(s) ends a game early the same way (the server's {k: "end"}).
 ## pos 0 is off the board; squares run 1-100. Entering the board: by default any roll v from square 0 moves to
 ## square v (ladders and snakes apply). The house rule need_one (Settings "Need a 1 to start", pref sl_need_one)
 ## brings back the web version's rule: off the board only a 1 enters, on square 1.
@@ -65,7 +70,7 @@ static func new_game(mode: String, n: int, color := 0, opts := {}) -> Dictionary
 			pos = 0, rolls = [], ladders = 0, snakes = 0,
 		})
 	return {mode = mode, turn = 0, phase = "roll", sixes = 0, winner = -1, paid = false, players = players,
-		need_one = bool(opts.get("need_one", false))}
+		need_one = bool(opts.get("need_one", false)), finished = []}
 
 ## The house rule in force for game g (a state saved before the option existed has no field: any roll enters).
 static func needs_one(g: Dictionary) -> bool:
@@ -104,9 +109,18 @@ static func apply_roll(g: Dictionary, v: int) -> Array:
 	elif r.has("snake"):
 		p.snakes += 1
 	if p.pos == 100:
-		g.phase = "over"
-		g.winner = g.turn
-		ev.append({type = "win", turn = g.turn})
+		_finished(g).append(g.turn)
+		ev.append({type = "finished", turn = g.turn, c = p.c, place = g.finished.size()})
+		var left := 0
+		var person := false
+		for k in g.players.size():
+			if not g.finished.has(k):
+				left += 1
+				person = person or not bool(g.players[k].cpu)
+		if left < 2 or not person:
+			_end(g, ev)
+		else:
+			_next(g, ev)                       # (a 6 onto 100 too: a finished player sits out)
 		return ev
 	if v == 6:
 		_again(g, ev)
@@ -135,16 +149,21 @@ static func claim_play_reward(g: Dictionary) -> int:
 	g.paid = true
 	return PLAY_REWARD
 
-## Final placings: the winner first, then everyone else by square (ties keep turn order). One entry per player:
-## {idx (index into g.players), color, name, place (1-based), finished (reached 100), pos, progress (0-1)}.
+## Placings: the players who reached 100 in finish order, then everyone else by square (ties keep turn order). One
+## entry per player: {idx (index into g.players), color, name, place (1-based), finished (reached 100), pos,
+## progress (0-1)}.
 static func standings(g: Dictionary) -> Array:
 	var order := []
 	for k in g.players.size():
 		order.append(k)
-	var win: int = g.winner
+	var fin := _finished(g)
 	order.sort_custom(func(a, b):
-		if (a == win) != (b == win):
-			return a == win
+		var fa := fin.find(a)
+		var fb := fin.find(b)
+		if (fa >= 0) != (fb >= 0):
+			return fa >= 0
+		if fa >= 0:
+			return fa < fb
 		var pa: int = g.players[a].pos
 		var pb: int = g.players[b].pos
 		return pa > pb if pa != pb else a < b)
@@ -161,6 +180,39 @@ static func _again(g: Dictionary, ev: Array) -> void:   # a 6: the same player r
 
 static func _next(g: Dictionary, ev: Array) -> void:
 	g.sixes = 0
-	g.turn = (g.turn + 1) % g.players.size()
+	var n: int = g.players.size()
+	var fin := _finished(g)
+	for k in range(1, n + 1):                  # the next player still playing (finished players sit out)
+		var t: int = (g.turn + k) % n
+		if not fin.has(t):
+			g.turn = t
+			break
 	g.phase = "roll"
 	ev.append({type = "turn", turn = g.turn, again = false})
+
+## g.finished (player indices in finish order), made / normalised when missing (a state saved before play on: the
+## winner, if any) or loaded as floats.
+static func _finished(g: Dictionary) -> Array:
+	if not g.get("finished") is Array:
+		g.finished = [int(g.winner)] if int(g.get("winner", -1)) >= 0 else []
+	elif g.finished.any(func(x): return typeof(x) != TYPE_INT):
+		g.finished = g.finished.map(func(x): return int(x))
+	return g.finished
+
+## The end: the others ranked by square after the finished players (standings()), s.finished the full order, the
+## winner the first to 100 (or, ended early with nobody there, the furthest on).
+static func _end(g: Dictionary, ev: Array) -> void:
+	var order := standings(g).map(func(e): return int(e.idx))
+	g.finished = order
+	g.winner = order[0]
+	g.phase = "over"
+	ev.append({type = "win", turn = g.winner, order = order.duplicate()})
+
+## Ends the game now (the server's {k: "end"}): the players still on the board are ranked by square. [] when the
+## game is already over.
+static func end_game(g: Dictionary) -> Array:
+	if g.phase == "over":
+		return []
+	var ev := []
+	_end(g, ev)
+	return ev

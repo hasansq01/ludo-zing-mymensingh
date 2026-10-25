@@ -1,2 +1,7 @@
 # Local secrets for `npx wrangler dev` (copy to .dev.vars, which is git-ignored). Deployed: tools/cf.sh secret put ADMIN_PASSWORD
 ADMIN_PASSWORD=dev-password-change-me
+# Player sessions (ONLINE_V2.md §1). Deployed: tools/cf.sh secret put SESSION_KEY (a long random string).
+SESSION_KEY=dev-session-key-change-me
+# Google Play Games server-side access (optional; unset: POST /v1/auth/google answers 503 google_not_configured).
+# GOOGLE_WEB_CLIENT_ID=
+# GOOGLE_WEB_CLIENT_SECRET=

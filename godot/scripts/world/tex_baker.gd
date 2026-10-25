@@ -4,16 +4,28 @@ extends Node
 ## index.html (board, wood rings, planks, brick, night sky...). A SubViewport runs a Control whose _draw calls the
 ## painter; one frame later its image is read back, mipmapped (so boards seen at an angle don't shimmer) and the
 ## viewport is freed.
+## Big textures are rendered at Quality.texture_scale() of their size (low 0.5, medium 0.75: a 2048 board is 1024 on
+## low, a quarter of the memory and of the read-back / mipmap work); the painters keep drawing in the nominal size
+## (size_2d_override stretches the canvas). Nothing is made smaller than MIN_SIDE on its longer side.
+
+const MIN_SIDE := 512
 
 class Painter extends Control:
 	var fn: Callable
+	var ms := 0                         # how long the painter's _draw took (BootTrace)
 	func _draw() -> void:
+		var t := Time.get_ticks_msec()
 		fn.call(self)
+		ms = Time.get_ticks_msec() - t
 
 ## await bake(Vector2i(1024, 1024), func(c: Control): c.draw_rect(...))
 func bake(size: Vector2i, fn: Callable, transparent := false, mipmaps := true) -> ImageTexture:
 	var vp := SubViewport.new()
-	vp.size = size
+	var px := scaled_size(size)
+	vp.size = px
+	if px != size:
+		vp.size_2d_override = size
+		vp.size_2d_override_stretch = true
 	vp.transparent_bg = transparent
 	vp.disable_3d = true
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -35,8 +47,16 @@ func bake(size: Vector2i, fn: Callable, transparent := false, mipmaps := true) -
 		img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	if BootTrace.active():
-		print("[boot]   bake %dx%d frame %d read %d mips+upload %d ms" % [size.x, size.y, t1 - t0, t2 - t1, Time.get_ticks_msec() - t2])
+		print("[boot]   bake %dx%d (%dx%d) frame %d (draw %d) read %d mips+upload %d ms" % [size.x, size.y, px.x, px.y, t1 - t0, p.ms, t2 - t1, Time.get_ticks_msec() - t2])
 	return tex
+
+## The pixel size a texture of nominal `size` is baked at on this quality tier.
+static func scaled_size(size: Vector2i) -> Vector2i:
+	var longest := maxi(size.x, size.y)
+	if longest <= MIN_SIDE:
+		return size
+	var k := clampf(maxf(Quality.texture_scale(), float(MIN_SIDE) / longest), 0.1, 1.0)
+	return Vector2i(maxi(1, roundi(size.x * k)), maxi(1, roundi(size.y * k)))
 
 
 # ---------- drawing helpers for painters ----------

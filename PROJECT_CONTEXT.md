@@ -27,6 +27,9 @@ release (12-tester closed test for 14 days).
   with their own GDScript rules and compare a state hash after each (`server/PROTOCOL.md`). Bots take over idle /
   disconnected seats; reconnect restores the seat. Godot side: `godot/scripts/net/*`, Friends + Lobby sheets, online
   mode in `ludo_match.gd`. Ludo only for now (Snakes & Ladders online: "Soon"). Online games give XP, no coins.
+  **Play on (2026-10-25, owner):** a game no longer ends at the first finish; the others play on for 2nd, 3rd…
+  (rules: `ludo_rules.gd` / `snakes_ladders_rules.gd` headers; protocol: `server/PROTOCOL.md` "Play on after the
+  first finish"; grants and offline claims by placing).
   Deploy with `server/tools/cf.sh deploy` (project-scoped wrangler login in `server/.wrangler/home`, git-ignored).
 - `godot/` holds the project; see `godot/README.md`. Rules are pure functions over a JSON-safe Dictionary
   (`LudoRules`, `SnakesLaddersRules`) returning events, so the server can run them as referee. Human-only steps are

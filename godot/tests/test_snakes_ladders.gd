@@ -156,7 +156,9 @@ func run() -> void:
 	g.turn = 2; g.players[2].pos = 97
 	SL.apply_roll(g, 3)
 	st = SL.standings(g)
-	check("standings after a win: the winner first, finished", g.phase == "over" and st[0].idx == 2 and st[0].finished and st[0].place == 1 and st[1].idx == 1, st)
+	check("standings after a computer's finish: it is first, you play on", g.phase == "roll" and g.finished == [2] and g.turn == 3 and st[0].idx == 2 and st[0].finished and st[0].place == 1 and st[1].idx == 1, [g.phase, g.finished, st])
+	SL.end_game(g)
+	check("end_game: the rest ranked by square (ties in turn order)", g.phase == "over" and g.winner == 2 and g.finished == [2, 1, 0, 3], g.finished)
 
 	# ---- 3 and 4 players ----
 	g = SL.new_game("cpu", 4)

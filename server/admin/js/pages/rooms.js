@@ -2,10 +2,11 @@
 import { h, timeEl, fmtInt, parseJson, poll } from "../dom.js";
 import { api } from "../api.js";
 import { dataTable } from "../table.js";
-import { statusBadge, codeLink, pidLink } from "../ui.js";
+import { roomStatusBadge, codeLink, pidLink } from "../ui.js";
 import { pageHead, searchBox, tabs, filterBar } from "./common.js";
 
-const STATUSES = [["lobby", "Lobby"], ["playing", "Playing"], ["over", "Over"], ["closed", "Closed"], ["all", "All"]];
+// "paused" = playing with nobody online (ADMIN_API.md); the server's "playing" filter leaves those out
+const STATUSES = [["lobby", "Lobby"], ["playing", "Playing"], ["paused", "Paused"], ["over", "Over"], ["closed", "Closed"], ["all", "All"]];
 
 export function settingsTags(settings) {
   const st = parseJson(settings, {}) || {};
@@ -39,7 +40,7 @@ export default function roomsPage(root, _params, ctx) {
     empty: ["No rooms match", "Rooms appear here as soon as someone creates one in the game."],
     columns: [
       { label: "Code", render: (r) => codeLink(r.code) },
-      { label: "Status", render: (r) => statusBadge(r.status) },
+      { label: "Status", render: (r) => roomStatusBadge(r.status, r.paused) },
       { label: "Host", cls: "col-main", render: (r) => h("div", { class: "host" }, h("span", null, r.host_name || "–"), r.host_pid ? pidLink(r.host_pid) : null) },
       { label: "Members", render: membersCell },
       { label: "Settings", render: (r) => settingsTags(r.settings) },

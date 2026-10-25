@@ -1,18 +1,21 @@
 class_name LobbySheet
 extends Sheet
 ## A friends room before the match (PROTOCOL.md `lobby`): the big room code with Copy and Share (Share copies an
-## invite line; Android has no share intent from here), the members in join order (avatar, name, online dot, the
-## seat colour they will play), the house rules and the way out.
-##   Host:   Teams (2 v 2) (only with exactly 4 players), Ask before pairing, Start game (needs 2 or more).
-##   Others: the same rules, read only, and "Waiting for host…".
+## invite line; Android has no share intent from here), the game (Ludo / Snakes & Ladders: lobby.settings.game),
+## the members in join order (avatar, level, name, online dot, the seat colour they will play), the house rules
+## (Ludo only) and the way out.
+##   Host:   the game, Teams (2 v 2) (only with exactly 4 players), Ask before pairing, Start game (needs 2 or more).
+##   Others: the same choices, read only, and "Waiting for host…".
 ## Leave (and Back) asks first. The sheet has no close button: leaving is a choice, not a dismissal.
 ##
 ##   var s := LobbySheet.new(code, my_member_id)
 ##   s.update(lobby_msg, is_host)               # every `lobby` message
 ##   s.set_status("reconnecting")               # NetClient.status
 ##   s.settings_changed.connect(func(teams, pair_ask): ...); s.start_pressed.connect(...); s.leave_pressed.connect(...)
+##   s.game_changed.connect(func(game): ...)    # the host picked "ludo" | "sl"
 
 signal settings_changed(teams: bool, pair_ask: bool)
+signal game_changed(game: String)
 signal start_pressed
 signal leave_pressed
 
@@ -26,6 +29,7 @@ var host := false
 var members: Array = []
 var teams := false
 var pair_ask := false
+var game := "ludo"
 
 var code_label: Label
 var copy_button: Button
@@ -34,6 +38,9 @@ var start_button: Button
 var leave_button: Button
 var teams_switch: SettingsSheet.Switch
 var pair_switch: SettingsSheet.Switch
+var game_picker: HBoxContainer
+var _rules_cap: Control
+var _pair_row: Control
 var count_label: Label
 var note: Label
 var status_pill: PanelContainer
@@ -43,18 +50,28 @@ var _teams_note: Label
 var _quiet := false                       # setting the switches from a lobby message: don't echo it back
 
 
-func _init(code_: String, me_id_ := "") -> void:
+func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	code = code_
 	me_id = me_id_
+	game = game_ if game_ in ["ludo", "sl"] else "ludo"
 	super("Friends room", UIKit.W.form, false, Sheet.LOOK_PM)
 	dismissable = false
 	back_action = func(): leave_pressed.emit()
-	set_kicker("Ludo online")
+	set_kicker(_kicker_text())
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	status_pill = _status_pill()
 	body.add_child(status_pill)
 	body.add_child(_code_card())
 	var box := add_scroll_body(UIKit.SPACE.sm)
+	box.add_child(UIKit.caption("Game"))
+	game_picker = UIKit.segmented([["ludo", "Ludo"], ["sl", "Snakes & Ladders"]], game, func(v):
+		if _quiet or not host or str(v) == game:
+			return
+		game = str(v)
+		game_changed.emit(game)
+		_refresh(), "sm")
+	game_picker.name = "Game"
+	box.add_child(game_picker)
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	var cap := UIKit.caption("Players")
 	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -65,7 +82,8 @@ func _init(code_: String, me_id_ := "") -> void:
 	box.add_child(head)
 	_list = UIKit.vbox(UIKit.SPACE.xs + 2)
 	box.add_child(_list)
-	box.add_child(UIKit.margin(UIKit.caption("House rules"), 0, UIKit.SPACE.xs, 0, 0))
+	_rules_cap = UIKit.margin(UIKit.caption("House rules"), 0, UIKit.SPACE.xs, 0, 0)
+	box.add_child(_rules_cap)
 	teams_switch = SettingsSheet.Switch.new(false)
 	teams_switch.name = "Teams"
 	teams_switch.toggled.connect(func(_on: bool): _changed())
@@ -75,7 +93,8 @@ func _init(code_: String, me_id_ := "") -> void:
 	pair_switch = SettingsSheet.Switch.new(false)
 	pair_switch.name = "PairAsk"
 	pair_switch.toggled.connect(func(_on: bool): _changed())
-	box.add_child(_rule_row("Ask before pairing", "You choose when two pawns meet", pair_switch))
+	_pair_row = _rule_row("Ask before pairing", "You choose when two pawns meet", pair_switch)
+	box.add_child(_pair_row)
 	note = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	note.name = "Note"
 	body.add_child(note)
@@ -175,7 +194,7 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	var mine := not empty and NetClient.id_str(m.get("id", "")) == me_id
 	var c := int(m.get("color", -1)) if not empty else -1
 	if c < 0 and not empty:
-		var cols := NetFake.Room.colors_for(maxi(2, members.size()))
+		var cols := NetFake.Room.seat_colors(game, maxi(2, members.size()))
 		c = cols[index] if index < cols.size() else -1
 	var st := UIKit.box(Color.WHITE if not empty else Color(Palette.CHIP, 0.55), UIKit.R.md, UIKit.BW.line,
 		Palette.PLAYER[c] if mine and c >= 0 else Palette.ROW_EDGE)
@@ -209,6 +228,11 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	var dot := OnlineDot.new(bool(m.get("online", true)))
 	dot.position = Vector2(AVA - 11.0, AVA - 11.0)
 	av.add_child(dot)
+	var lv := LevelBadge.new(maxi(1, int(m.get("level", 1))), "xs")
+	lv.name = "Level"
+	lv.position = Vector2(-8.0, AVA - lv.px + 6.0)
+	lv.size = Vector2(lv.px, lv.px)
+	av.add_child(lv)
 	row.add_child(av)
 	var nm := UIKit.label(str(m.get("name", "Player")) + (" (you)" if mine else ""), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -252,6 +276,8 @@ func update(msg: Dictionary, you_host: bool) -> void:
 	var s: Dictionary = msg.get("settings", {}) if msg.get("settings") is Dictionary else {}
 	teams = bool(s.get("teams", false))
 	pair_ask = bool(s.get("pair_ask", false))
+	game = str(s.get("game", "ludo")) if str(s.get("game", "ludo")) in ["ludo", "sl"] else "ludo"
+	set_kicker(_kicker_text())
 	_refresh()
 
 ## NetClient.status: "reconnecting" shows the pill and holds the buttons.
@@ -261,7 +287,10 @@ func set_status(st: String) -> void:
 	_refresh()
 
 func can_start() -> bool:
-	return host and members.size() >= 2 and (not teams or members.size() == 4) and not status_pill.visible
+	return host and members.size() >= 2 and (game != "ludo" or not teams or members.size() == 4) and not status_pill.visible
+
+func _kicker_text() -> String:
+	return "Snakes & Ladders online" if game == "sl" else "Ludo online"
 
 func _refresh() -> void:
 	for ch in _list.get_children():
@@ -273,6 +302,13 @@ func _refresh() -> void:
 		_list.add_child(_member_row({}, members.size()))   # one open-seat row, not one per seat (the card stays short)
 	count_label.text = "%d of %d" % [members.size(), MAX]
 	_quiet = true
+	for b: Button in game_picker.get_children():
+		b.set_pressed_no_signal(str(b.get_meta("value")) == game)
+		b.disabled = not host
+	game_picker.modulate.a = 1.0 if host else 0.75
+	var ludo := game == "ludo"
+	for r: Control in [_rules_cap, _teams_row, _pair_row]:
+		r.visible = ludo
 	teams_switch.set_pressed_no_signal(teams)
 	teams_switch._set_t(1.0 if teams else 0.0)
 	pair_switch.set_pressed_no_signal(pair_ask)
@@ -293,7 +329,7 @@ func _refresh() -> void:
 		start_button.disabled = true
 	if members.size() < 2:
 		note.text = "Share the code. The game can start when a friend joins."
-	elif host and teams and not four:
+	elif host and ludo and teams and not four:
 		note.text = "Teams need exactly 4 players."
 	elif host:
 		note.text = "Everyone’s here? Start when you’re ready."

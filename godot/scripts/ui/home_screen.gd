@@ -3,20 +3,21 @@ extends Control
 ## The lobby over the slowly orbiting café ("Scene + dock", the layout the user picked). The top half is the café
 ## scene: the top bar (player chip with level, coins with a "+", the gear) and the game logo over the 3D table. The
 ## bottom is a cream dock: the three lobby features on its top edge (Spin / Daily / Free coins, live states), the
-## quick-action slot (Continue match, else Play again, else hidden), the Ludo / Snakes & Ladders switch, the two mode
-## buttons, the full-width PLAY WITH FRIENDS under them (online rooms; with Snakes & Ladders picked it carries a "Soon"
-## tag and main says it is coming) and the nav (Home / Shop / Inventory). Icons: the home family in
-## assets/ui/home/hi_*.svg.
+## quick-action slot (Continue match, else Play again, else hidden), the Ludo / Snakes & Ladders switch, the online
+## row (QUICK MATCH, the primary action, and PLAY WITH FRIENDS), the offline row (VS COMPUTER, PASS & PLAY) and the
+## nav (Home / Shop / Inventory). Every mode works for both games. Icons: the home family in assets/ui/home/hi_*.svg.
 ##
 ## Contract with main.gd:
-##   play_game(game, mode)   game "ludo" | "sl", mode "cpu" | "local" | "online" (VS COMPUTER / PASS & PLAY /
-##                           PLAY WITH FRIENDS)
+##   play_game(game, mode)   game "ludo" | "sl", mode "cpu" | "local" (VS COMPUTER / PASS & PLAY); "online" only when
+##                           nothing listens to play_friends (older main.gd builds)
+##   quick_match(game)       QUICK MATCH (Online.open_quick)
+##   play_friends(game)      PLAY WITH FRIENDS (Online.open_friends)
 ##   play(mode)              legacy: only emitted for Ludo when nothing is connected to play_game
 ##   continue_match()        the Continue match slot (MatchStore has a saved match)
 ##   play_again(cfg)         the Play again slot: cfg {game, mode, setup} from Save.prefs.last_played and
 ##                           Save.prefs.last_setup[game][mode]
 ##   game_switched(game)     the Ludo / Snakes & Ladders switch changed (Save.prefs.home_game is already updated)
-##   open_tab(tab)           shop | inventory | profile | settings | coins | spin | daily | free | scenes (the Shop's Scenes tab,
+##   open_tab(tab)           shop | inventory | profile | settings | coins | spin | daily | free | leaderboard | scenes (the Shop's Scenes tab,
 ##                           from "Change scene" while Snakes & Ladders is picked; home: already here, not emitted)
 ##   select_game(game)       pick "ludo" | "sl" on the switch from code (emits game_switched when it changes)
 ##   safe_top / safe_bottom  set by main; the layout keeps >= BOTTOM_MIN px above the bottom edge regardless
@@ -31,6 +32,8 @@ extends Control
 
 signal play(mode: String)                ## legacy (Ludo only): "cpu" | "local"
 signal play_game(game: String, mode: String)
+signal quick_match(game: String)
+signal play_friends(game: String)
 signal continue_match
 signal play_again(cfg: Dictionary)          ## {game, mode, setup} (setup = Save.prefs.last_setup[game][mode])
 signal game_switched(game: String)
@@ -47,8 +50,8 @@ const TILE := 60.0                       # feature tile
 const LIP_OVER := 30.0                   # how far the feature tiles rise above the dock's top edge
 const QUICK_H := 56.0
 const SWITCH_H := 60.0
-const MODE_H := 58.0
-const FRIENDS_H := 52.0                  # PLAY WITH FRIENDS (a quieter white button under the two modes)
+const MODE_H := 58.0                     # the online row: QUICK MATCH (primary) + PLAY WITH FRIENDS
+const FRIENDS_H := 52.0                  # the offline row under it: VS COMPUTER + PASS & PLAY
 const AVATAR := 42.0                     # the top bar's avatar
 const SWITCH_ICON := 32.0
 const SWITCH_FS := 15                    # the switch labels (UIKit.FS.label + 1); never below UIKit.FS.label
@@ -91,8 +94,9 @@ var _switch_buttons := {}                # game -> Button
 var _switch_parts := {}                  # game -> {row, icon, label, text}
 var _scene_chip: Button                  # "Change scene" (Snakes & Ladders selected): the Shop's Scenes tab
 var _modes: HBoxContainer
-var friends_button: Button               # PLAY WITH FRIENDS (online)
-var _soon: Control                       # its "Soon" tag (Snakes & Ladders picked)
+var friends_button: Button               # PLAY WITH FRIENDS (online rooms)
+var quick_button: Button                 # QUICK MATCH (the matchmaker)
+var _online: HBoxContainer               # the online row
 var _tabs: HBoxContainer                 # the nav row (dev/tap_dbg.gd reads its first child)
 var _rule: ColorRect
 var _dots := {}                          # feature id -> red dot
@@ -248,8 +252,9 @@ func _build_dock() -> void:
 	_dock.add_theme_stylebox_override("panel", s)
 	_dock.mouse_filter = Control.MOUSE_FILTER_STOP        # taps on the dock never reach the 3D room
 	add_child(_dock)
-	for f in [["spin", "Spin", "spin"], ["daily", "Daily", "gift"], ["free", "Free", "coins"]]:
-		var sb := SideButton.new(f[0], f[1], HI % f[2], [Palette.CARD, Palette.LIP_CREAM], TILE)
+	for f in [["spin", "Spin", HI % "spin"], ["daily", "Daily", HI % "gift"], ["free", "Free", HI % "coins"],
+			["leaderboard", "Ranks", "res://assets/ui/ic_trophy.svg"]]:
+		var sb := SideButton.new(f[0], f[1], f[2], [Palette.CARD, Palette.LIP_CREAM], TILE)
 		sb.caption.add_theme_font_override("font", UIKit.font_body(900))   # font_caps renders too light for now
 		sb.caption.add_theme_color_override("font_color", Palette.INK)
 		sb.caption.add_theme_constant_override("outline_size", 0)
@@ -271,21 +276,22 @@ func _build_dock() -> void:
 	_scene_chip.pressed.connect(func(): open_tab.emit("scenes"))
 	_scene_chip.visible = game == "sl"
 	add_child(_scene_chip)
-	_modes = UIKit.hbox(UIKit.SPACE.md - 2)
-	_modes.add_child(_mode_button("VS COMPUTER", "honey", "cpu", "cpu"))
-	_modes.add_child(_mode_button("PASS & PLAY", "teal", "pass_play", "local"))
-	add_child(_modes)
-	friends_button = UIKit.button_with("PLAY WITH FRIENDS", UIKit.icon("perk_friends", 34), "white", "md")
+	_online = UIKit.hbox(UIKit.SPACE.md - 2)
+	_online.name = "Online"
+	quick_button = _row_button("QUICK MATCH", "honey", HI % "quick", 36, 20)
+	quick_button.name = "QuickMatch"
+	quick_button.size_flags_stretch_ratio = 1.35
+	quick_button.pressed.connect(func(): quick_match.emit(game))
+	_online.add_child(quick_button)
+	friends_button = _row_button("PLAY WITH\nFRIENDS", "white", "perk_friends", 30, 15)
 	friends_button.name = "Friends"
-	var fl := friends_button.find_child("Text", true, false) as Label
-	if fl:
-		fl.add_theme_font_size_override("font_size", 18)
-	_soon = UIKit.tag("Soon", "honey")
-	_soon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	(friends_button.find_child("Content", true, false) as Control).add_child(_soon)
-	_soon.visible = game == "sl"
-	friends_button.pressed.connect(func(): _play("online"))
-	add_child(friends_button)
+	friends_button.pressed.connect(_friends)
+	_online.add_child(friends_button)
+	add_child(_online)
+	_modes = UIKit.hbox(UIKit.SPACE.md - 2)
+	_modes.add_child(_mode_button("VS COMPUTER", "teal", "cpu", "cpu"))
+	_modes.add_child(_mode_button("PASS & PLAY", "white", "pass_play", "local"))
+	add_child(_modes)
 	_rule = ColorRect.new()
 	_rule.color = Palette.LINE
 	_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -382,12 +388,37 @@ func _build_switch() -> void:
 
 
 func _mode_button(text: String, kind: String, icon_name: String, mode: String) -> Button:
-	var b := UIKit.button_with(text, UIKit.icon(HI % icon_name, 36), kind, "md")
+	var b := _row_button(text, kind, HI % icon_name, 32, 17)
+	b.pressed.connect(func(): _play(mode))
+	return b
+
+
+## A dock button: icon + caps label (Lilita, `fs`, shrinking to fit the button down to 12; "\n" = two lines).
+func _row_button(text: String, kind: String, icon_path: String, icon_px: float, fs: int) -> Button:
+	var ic := UIKit.icon(icon_path, icon_px)
+	var b := UIKit.button_with(text, ic, kind, "md")
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var row := b.find_child("Content", true, false) as HBoxContainer
+	if row:
+		row.add_theme_constant_override("separation", UIKit.SPACE.xs + 2)
 	var l := b.find_child("Text", true, false) as Label
 	if l:
-		l.add_theme_font_size_override("font_size", 18)
-	b.pressed.connect(func(): _play(mode))
+		l.add_theme_font_size_override("font_size", fs)
+		l.add_theme_constant_override("line_spacing", -4)
+		var fit := func() -> void:
+			var room := b.size.x - 2.0 * UIKit.SPACE.sm - icon_px - float(UIKit.SPACE.xs + 2)
+			var f := l.get_theme_font("font")
+			var k := fs
+			var widest := func(sz: int) -> float:
+				var m := 0.0
+				for ln in l.text.split("\n"):
+					m = maxf(m, f.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x)
+				return m
+			while k > UIKit.FS.small and float(widest.call(k)) > room:
+				k -= 1
+			l.add_theme_font_size_override("font_size", k)
+			ic.custom_minimum_size = Vector2(icon_px, icon_px) * (1.0 if float(widest.call(k)) <= room else 0.8)
+		b.resized.connect(fit)
 	return b
 
 
@@ -427,6 +458,13 @@ func _play(mode: String) -> void:
 		play.emit(mode)                    # older main.gd builds listen to play(mode) only
 
 
+## PLAY WITH FRIENDS: Online listens to play_friends; older main.gd builds get play_game(game, "online").
+func _friends() -> void:
+	if get_signal_connection_list("play_friends").is_empty():
+		_play("online")
+	else:
+		play_friends.emit(game)
+
 func _set_game(g: String) -> void:
 	if g == game:
 		return
@@ -435,7 +473,6 @@ func _set_game(g: String) -> void:
 		Save.prefs.home_game = g
 		Save.save()
 	_scene_chip.visible = g == "sl"
-	_soon.visible = g == "sl"
 	_layout()
 	game_switched.emit(g)
 
@@ -676,11 +713,11 @@ func _layout() -> void:
 	_tabs.size = Vector2(cw + 12, NAV_H - 4)
 	_rule.position = Vector2(x, nav_y - UIKit.SPACE.sm)
 	_rule.size = Vector2(cw, 2)
-	friends_button.position = Vector2(x, nav_y - UIKit.SPACE.lg - FRIENDS_H)
-	friends_button.size = Vector2(cw, FRIENDS_H)
-	_modes.position = Vector2(x, friends_button.position.y - UIKit.SPACE.sm - MODE_H)
-	_modes.size = Vector2(cw, MODE_H)
-	_switch.position = Vector2(x, _modes.position.y - UIKit.SPACE.md - SWITCH_H)
+	_modes.position = Vector2(x, nav_y - UIKit.SPACE.lg - FRIENDS_H)
+	_modes.size = Vector2(cw, FRIENDS_H)
+	_online.position = Vector2(x, _modes.position.y - UIKit.SPACE.sm - MODE_H)
+	_online.size = Vector2(cw, MODE_H)
+	_switch.position = Vector2(x, _online.position.y - UIKit.SPACE.md - SWITCH_H)
 	_switch.size = Vector2(cw, SWITCH_H)
 	var top_of := _switch.position.y
 	if _quick.visible:
@@ -692,9 +729,9 @@ func _layout() -> void:
 	var dock_y := top_of - UIKit.SPACE.md - below
 	_dock.position = Vector2(0, dock_y)
 	_dock.size = Vector2(w, h - dock_y + 4)
-	var ids := ["spin", "daily", "free"]
-	var gap := 28.0
+	var ids := ["spin", "daily", "free", "leaderboard"]
 	var tw := SideButton.WIDTH
+	var gap := clampf((w - 2.0 * G - ids.size() * tw) / (ids.size() - 1.0), 4.0, 28.0)
 	var total := ids.size() * tw + (ids.size() - 1) * gap
 	var x0 := roundf((w - total) / 2.0)
 	for i in ids.size():

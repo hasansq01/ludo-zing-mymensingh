@@ -96,6 +96,18 @@ Last reviewed: 2026-10-19.
         unit/parity/room tests, simulated 2–4 player games incl. drop/rejoin on production, and the Android release
         APK on the emulator against production).
   - [ ] Step 4: quick match, accounts (Google sign-in) and server-side coins; Snakes & Ladders online.
+  - [x] Play on after the first finish (owner 2026-10-25): Ludo (Individual + Teams) and Snakes & Ladders go on until
+        the places are decided (ends when < 2 sides are left or no person is left unfinished; the rest ranked by
+        progress); GDScript rules + TS port with regenerated parity traces; the Room ends ghost-only / leaver-only
+        tails with `{k: "end"}`; grants and offline claims by placing; finish pops, place badges, "You finished" card.
+  - [ ] Emotes in the Godot game (next, after play-on; owner 2026-10-25): port the 24 animated stickers from
+        `origin/feature/emotes` (web index.html) into 4 packs of 6 (Starter free + equipped; Pawn Pals 2,500, Friends
+        4,000, Game 3,500 coins, bought via the server wallet), each emote paired with its own sound, a picker in Ludo and
+        S&L matches, online relay (server validates ownership + rate limit; quick-match ghosts react like people), CPU
+        reactions offline, Shop/Inventory Emotes tab with previews.
+  - [ ] Notifications (after Step 4): local reminders (daily/free/spin ready, come-back nudges), FCM push for game
+        events (your turn, friend joined, rematch), and promo sends from the admin console. Design:
+        `server/ONLINE_V2.md` section 8.
   - [ ] Step 5: Play Store release.
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
       be updated (screenshot differs 5.35%, only in the bar region x 12-377, y 9-64; all layout checks and locked

@@ -43,6 +43,8 @@ function toAction(st: Step): Action {
       return { k, c, yes: val as boolean };
     case "mode":
       return { k, c, mode: val as "cpu" | "human" };
+    case "end":
+      return { k };
   }
   throw new Error(`unknown action ${k}`);
 }
@@ -70,11 +72,20 @@ describe("GDScript parity traces", () => {
     const types = new Set<string>();
     for (const evs of T.ev) for (const e of evs) types.add((e as { type: string }).type);
     for (const t of ["rolled", "three_sixes", "need_six", "free_hand", "stuck", "choose", "move", "capture", "split",
-      "pair_offer", "pair_formed", "home", "finished", "turn", "game_over"]) {
+      "pair_offer", "pair_formed", "home", "all_home", "finished", "turn", "game_over"]) {
       expect(types.has(t), t).toBe(true);
     }
     const kinds = new Set(T.games.flatMap((g) => g.steps.map((s) => s[0])));
-    expect([...kinds].sort()).toEqual(["mode", "move", "pair", "roll"]);
+    expect([...kinds].sort()).toEqual(["end", "mode", "move", "pair", "roll"]);
+    // play on: games with several finishers, a finish the game goes on after, a team finishing, "end" mid-game
+    const evOf = (g: Game) => g.steps.map((st) => T.ev[st[3]] as { type: string; place?: number; team?: number[] }[]);
+    const finishes = (g: Game) => evOf(g).flat().filter((e) => e.type === "finished").length;
+    expect(T.games.filter((g) => finishes(g) >= 3).length).toBeGreaterThanOrEqual(5);
+    expect(T.games.some((g) => evOf(g).some((l) => l.some((e) => e.type === "finished") && l.at(-1)?.type === "turn")))
+      .toBe(true);
+    expect(T.games.some((g) => evOf(g).flat().some((e) => e.type === "finished" && e.team?.length === 2))).toBe(true);
+    expect(T.games.some((g) => g.steps.some((st) => st[0] === "end" && T.ev[st[3]].length > 0))).toBe(true);
+    expect(T.games.some((g) => g.steps.some((st) => st[0] === "end" && T.ev[st[3]].length === 0))).toBe(true);
     expect(T.games.some((g) => g.args.teams && g.end)).toBe(true);
     expect(new Set(T.games.map((g) => g.args.players.filter((p) => p !== "off").length))).toEqual(new Set([2, 3, 4]));
   });

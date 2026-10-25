@@ -158,11 +158,14 @@ static func _layer_root(vp: Viewport) -> Control:
 
 
 ## Deferred: add the newest pill (one at a time: it replaces the toast showing; an older pill that never showed is
-## dropped), then place and animate it.
-static func _attach(root: Control, pill: PanelContainer, near: Control, sec: float) -> void:
-	if not is_instance_valid(pill):
+## dropped), then place and animate it. The node arguments are untyped: `near` (a sheet's card) or the root may be
+## freed before this runs, and a freed object can't be passed to a typed parameter ("Cannot convert argument").
+static func _attach(root_: Variant, pill_: Variant, near_: Variant, sec: float) -> void:
+	if not is_instance_valid(pill_):
 		return
-	if not is_instance_valid(root) or not root.is_inside_tree() or root.get_meta("latest", null) != pill:
+	var pill := pill_ as PanelContainer
+	var root: Control = root_ as Control if is_instance_valid(root_) else null
+	if root == null or not root.is_inside_tree() or root.get_meta("latest", null) != pill:
 		pill.free()
 		return
 	for old in root.get_children():
@@ -170,7 +173,7 @@ static func _attach(root: Control, pill: PanelContainer, near: Control, sec: flo
 			root.remove_child(old)
 			old.queue_free()
 	root.add_child(pill)
-	_place(pill, near, sec)
+	_place(pill, near_ as Control if is_instance_valid(near_) else null, sec)
 
 
 static func _place(pill: PanelContainer, near: Control, sec: float) -> void:

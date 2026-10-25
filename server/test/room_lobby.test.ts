@@ -56,8 +56,8 @@ describe("hello and lobby", () => {
     expect(w).toMatchObject({ code, host: w.id, id: w.id });
     expect(typeof w.token).toBe("string");
     const l1 = await a.wait("lobby");
-    expect(l1).toMatchObject({ code, host: w.id, max: 4, settings: { teams: false, pair_ask: false } });
-    expect(l1.members).toEqual([{ id: w.id, name: "Alice", avatar: "a1", frame: "f1", online: true, color: 0 }]);
+    expect(l1).toMatchObject({ code, host: w.id, max: 4, settings: { teams: false, pair_ask: false, game: "ludo" } });
+    expect(l1.members).toEqual([{ id: w.id, name: "Alice", avatar: "a1", frame: "f1", level: 1, online: true, color: 0 }]);
 
     const b = await Client.join(code, { name: "Bob" });
     const l2 = await a.waitFor((m) => m.t === "lobby" && m.members.length === 2);
@@ -149,9 +149,9 @@ describe("hello and lobby", () => {
     expect(await h.wait("error")).toMatchObject({ code: "bad_message" });
     h.send({ t: "settings", pair_ask: true });
     const l = await g.waitFor((m) => m.t === "lobby" && m.settings.pair_ask === true);
-    expect(l.settings).toEqual({ teams: false, pair_ask: true });
+    expect(l.settings).toEqual({ teams: false, pair_ask: true, game: "ludo" });
     h.send({ t: "settings", teams: true });
-    expect((await g.waitFor((m) => m.t === "lobby" && m.settings.teams)).settings).toEqual({ teams: true, pair_ask: true });
+    expect((await g.waitFor((m) => m.t === "lobby" && m.settings.teams)).settings).toEqual({ teams: true, pair_ask: true, game: "ludo" });
   });
 
   it("start: host only, needs 2, teams need exactly 4", async () => {

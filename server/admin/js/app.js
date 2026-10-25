@@ -12,12 +12,19 @@ import matchesPage from "./pages/matches.js";
 import eventsPage from "./pages/events.js";
 import configPage from "./pages/config.js";
 import auditPage from "./pages/audit.js";
+import accountsPage from "./pages/accounts.js";
+import accountPage from "./pages/account.js";
+import leaderboardsPage from "./pages/leaderboards.js";
+import quickPage from "./pages/quick.js";
 
 const NAV = [
   { id: "status", label: "Status", icon: "status" },
+  { id: "accounts", label: "Accounts", icon: "accounts" },
   { id: "players", label: "Players", icon: "players" },
   { id: "rooms", label: "Rooms", icon: "rooms" },
   { id: "matches", label: "Matches", icon: "matches" },
+  { id: "quick", label: "Quick match", icon: "quick" },
+  { id: "leaderboards", label: "Leaderboards", icon: "crown" },
   { id: "events", label: "Events", icon: "events" },
   { id: "config", label: "Config", icon: "config" },
   { id: "audit", label: "Audit", icon: "audit" },
@@ -25,6 +32,10 @@ const NAV = [
 
 const ROUTES = [
   { re: /^\/status$/, nav: "status", page: statusPage },
+  { re: /^\/accounts$/, nav: "accounts", page: accountsPage },
+  { re: /^\/accounts\/([^/]+)$/, nav: "accounts", page: accountPage },
+  { re: /^\/leaderboards$/, nav: "leaderboards", page: leaderboardsPage },
+  { re: /^\/quick$/, nav: "quick", page: quickPage },
   { re: /^\/players$/, nav: "players", page: playersPage },
   { re: /^\/players\/([^/]+)$/, nav: "players", page: playerPage },
   { re: /^\/rooms$/, nav: "rooms", page: roomsPage },

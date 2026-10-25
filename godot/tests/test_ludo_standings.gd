@@ -56,9 +56,11 @@ func run() -> void:
 	t = base(); t[1] = [56, 56, 56, 55]; t[0][0] = 30; t[2][0] = 10; t[3][0] = 40
 	s = state(t, [], vs.merged({turn = 1, finished = []}))
 	play(s, 1)
-	check("Individual: the winner is recorded as finished", s.phase == "over" and s.finished == [1], s.finished)
+	check("Individual: the first home is recorded, you play on", s.phase == "roll" and s.finished == [1] and s.turn == 2, [s.phase, s.finished])
 	var st := Ludo.standings(s)
 	check("Individual standings: winner first, then by progress", st.map(func(e): return e.color) == [1, 3, 0, 2], st)
+	Ludo.end_game(s)
+	check("…end_game: the full order recorded, Green wins", s.phase == "over" and s.winner == 1 and s.finished == [1, 3, 0, 2], s.finished)
 	check("…places 1-4, only the winner finished", st.map(func(e): return e.place) == [1, 2, 3, 4] and st[0].finished and not st[1].finished, st)
 	check("…progress is 0-1", st.all(func(e): return e.progress >= 0.0 and e.progress <= 1.0) and is_equal_approx(st[0].progress, 1.0))
 	t = base(); t[0][0] = 20; t[1][0] = 20; s = state(t, [], {players = ["human", "off", "human", "off"]})
@@ -81,13 +83,13 @@ func run() -> void:
 	check("Teams mid-game: partners share a place, the team further on first", st.map(func(e): return e.color) == [0, 2, 3, 1] and st.map(func(e): return e.place) == [1, 1, 2, 2], st)
 	s.tok[2] = [56, 56, 56, 55]; s.turn = 2; s.phase = "roll"; s.sixes = 0
 	play(s, 1)
-	check("Teams: the team win records both partners in finish order", s.phase == "over" and s.finished == [0, 2], s.finished)
+	check("Teams: the team win records both partners in finish order, then the other team", s.phase == "over" and s.finished == [0, 2, 3, 1], s.finished)
 	st = Ludo.standings(s)
 	check("Teams final standings: winners place 1, both finished", st[0].place == 1 and st[1].place == 1 and st[0].finished and st[1].finished and st[2].place == 2, st)
 	t = base(); t[0] = HOME.duplicate(); t[2] = [56, 56, 56, 55]
 	s = state(t, [], {teams = true, finished = [], free = [true, false, false, false]})
 	play(s, 1)
-	check("Teams: a partner already home (old state) is put before the winner", s.phase == "over" and s.finished.size() == 2 and s.finished.has(0) and s.finished.has(2), s.finished)
+	check("Teams: a partner already home (old state) is listed with its team", s.phase == "over" and s.finished == [2, 0, 1, 3], s.finished)
 	t = base(); t[1][0] = 50; t[3][0] = 2; s = state(t, [], {teams = true, finished = []})
 	st = Ludo.standings(s)
 	check("Teams: Green + Blue ahead on progress lead mid-game", st[0].color == 1 and st[0].place == 1 and st[2].place == 2, st)

@@ -8,7 +8,7 @@ log="$(mktemp)"
 "$GODOT" --headless -s res://tests/run_tests.gd 2>&1 | tee "$log"
 status=$?
 # the runner's own exit code is lost in the pipe: read the result from the log
-if grep -qE "SCRIPT ERROR|Parse Error|Failed to load script" "$log"; then
+if grep -qE "SCRIPT ERROR|Parse Error|Failed to load script|Lambda capture at index [0-9]+ was freed" "$log"; then
 	echo "godot-test: script errors above (failing the run)"
 	status=1
 fi

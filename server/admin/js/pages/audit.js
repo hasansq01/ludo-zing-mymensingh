@@ -2,10 +2,10 @@
 import { h, timeEl, absTime, parseJson } from "../dom.js";
 import { api } from "../api.js";
 import { dataTable } from "../table.js";
-import { codeLink, pidLink, kv, badge } from "../ui.js";
+import { codeLink, pidLink, accountLink, kv, badge } from "../ui.js";
 import { pageHead } from "./common.js";
 
-const TONE = { ban: "danger", close: "danger", kick: "warn", unban: "ok", login: "info", logout: "muted", config: "warn", note: "neutral", login_failed: "danger" };
+const TONE = { ban: "danger", close: "danger", kick: "warn", unban: "ok", login: "info", logout: "muted", config: "warn", note: "neutral", coins: "warn", login_failed: "danger" };
 
 function actionBadge(a) {
   const key = String(a || "").split(/[._:/ ]/).pop();
@@ -19,6 +19,7 @@ function targetCell(r) {
   if (!t) return h("span", { class: "muted" }, "–");
   const [kind, rest] = t.includes(":") ? [t.slice(0, t.indexOf(":")), t.slice(t.indexOf(":") + 1)] : ["", t];
   const a = String(r.action || "");
+  if (/^acc_[a-z2-7]{16}$/.test(t) || a.startsWith("account")) return accountLink(rest);
   if (kind === "room" || (!kind && a.startsWith("room"))) return codeLink(rest);
   if (kind === "player" || (!kind && a.startsWith("player"))) return pidLink(rest);
   return h("span", { class: "mono" }, t);

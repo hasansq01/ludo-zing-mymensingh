@@ -29,6 +29,7 @@ var ludo: LudoMatch
 var sl: SLMatch
 var sl_hud: Control
 var online: Online                      # friend rooms (scripts/net/online.gd)
+var account: Account                    # the server account, wallet and claims (scripts/net/account.gd)
 var screen := "splash"                  # splash | welcome | home | ludo | sl
 var paused := false
 var speed := 1.0
@@ -43,15 +44,32 @@ var _xp_start := 0                      # Save.profile.xp when the current match
 var _home_fly := 0                      # coins won in the last game: they fly to the home counter on "Home"
 var _boost_until := 0                   # msec: Quality.game_fps() until then (sheet pops, drags, coin flights)
 var _backdrop_id := 0                   # bumps on every Home backdrop change (a slow S&L scene build can't win late)
+var _match_ms := 0                      # Time.get_ticks_msec() when the current offline match began (its claim duration)
+var _pairs_start := 0                   # stats.pairsFormed when it began (the claim reports the pairs formed)
+var _resumed := false                   # the match was continued from MatchStore (it began in an earlier session)
+var _free_busy := false                 # a Free coins claim is waiting for the server
+var _claim_id := ""                     # the claim of the match whose result is on screen
+var _sl_seen := false                   # the S&L scene has been on screen (its shaders are compiled: no warm-up needed)
 
 
 func _ready() -> void:
-	BootTrace.mark("main ready")
+	BootTrace.mark("main ready (%s tier)" % Quality.tier())
+	BootTrace.watch_frames(self)
+	var seeded := ShaderSeed.plant()          # first launch: no shader modes compiled that are never drawn
+	if seeded:
+		BootTrace.mark("shader cache seeded (%d)" % seeded)
 	get_tree().set_auto_accept_quit(false)
 	Quality.apply(get_viewport())            # low / medium / high: 3D scale, MSAA, filtering (auto per device)
+	PerfOverlay.install(self)                # debug builds only: --perf / three-finger tap / F3
 	Engine.max_fps = Quality.game_fps()      # the splash bar and the first frames run smooth
 	speed = float(Save.prefs.speed)
 	_apply_sound()
+	account = Account.new()                  # guest sign-in, wallet, claims; started after the splash (_start_account)
+	account.name = "Account"
+	account.enabled = Account.should_start(OS.get_cmdline_user_args())
+	add_child(account)
+	account.conflict_raised.connect(_on_conflict)
+	account.claim_answered.connect(_on_claim_answered)
 	baker = TexBaker.new()
 	baker.name = "Baker"
 	add_child(baker)
@@ -97,14 +115,16 @@ func _ready() -> void:
 	splash.set_progress(0.08)
 	await world.build_room(baker, func(f: float): splash.set_progress(0.08 + f * 0.72), str(Save.profile.room))
 	BootTrace.mark("room built")
-	await sl_board.build(baker)
-	BootTrace.mark("sl board built")
-	splash.set_progress(0.9)
+	splash.set_progress(0.9)                 # (the S&L board is painted by its scene: SLScenes.set_scene)
 	_build_screens()
 	apply_dice_skin()
 	BootTrace.mark("screens built")
 	await _warm_up()
 	BootTrace.mark("warm-up done")
+	if Quality.tier() == "low" and not (home.game == "sl" and bool(Save.prefs.welcome_seen)):
+		world.view_home()                        # (go_home frames it the same way)
+		await ShaderWarmUp.reveal_in_steps(world, world.camera, func(f: float): splash.set_progress(0.9 + 0.09 * f))
+		BootTrace.mark("café drawn in steps")
 	var first_run := not bool(Save.prefs.welcome_seen) and not Autoplay.requested()
 	go_home()
 	screen = "splash"                         # still loading: the home screen is ready underneath
@@ -117,6 +137,12 @@ func _ready() -> void:
 	await splash.finish()
 	_splash = null
 	BootTrace.end("splash gone")
+	_start_account()
+	if ShaderCensus.requested():                # debug: draw every material once, list the shader cache
+		home.visible = true
+		_set_screen("home")
+		ShaderCensus.run(self)
+		return
 	if Autoplay.maybe_start(self):
 		_set_screen("home")
 		return
@@ -124,9 +150,9 @@ func _ready() -> void:
 		_set_screen("home")
 		if not online.try_resume():              # a friends room kept from the last run comes back first
 			_maybe_open_daily()
+		_bg_warm_up()
 		return
-	_set_screen("welcome")
-	sl_scenes.set_scene(baker, SLScenes.scene_in_use())   # built in the background while the welcome shows
+	_set_screen("welcome")                      # (the S&L scene waits: _bg_warm_up after Home, if it is wanted at all)
 	var w := Welcome.new()
 	w.safe_top = safe_top
 	w.safe_bottom = safe_bottom
@@ -136,10 +162,11 @@ func _ready() -> void:
 	home.visible = true
 	home.refresh()
 	UIKit.pop_in(home)
+	if account.enabled:
+		account.push_identity()                 # the name and avatar picked on the welcome go to the server
 	_set_screen("home")                         # no daily reward on top of the welcome: it waits for the first game
+	_bg_warm_up()
 
-## Splash: draws the first-use shaders once (the dice, and the S&L scene when it may be needed soon) so the first
-## match doesn't freeze while they compile (PERF: ~1.2 s on the first S&L match, ~0.1 s on the first Ludo roll).
 ## UPDATE_ONCE turns itself into UPDATE_DISABLED after its frame: the dice must go back to drawing while visible,
 ## or they freeze on their first frame for the rest of the session (no visible rolls).
 func _restore_dice_updates(vps: Array[SubViewport]) -> void:
@@ -149,6 +176,12 @@ func _restore_dice_updates(vps: Array[SubViewport]) -> void:
 		if is_instance_valid(vp):
 			vp.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
 
+## (Low tier, under the splash: the café's first draw compiles every material Home shows, in one frame: 10-30 s on
+## the Android emulator, a few seconds on slow phones. ShaderWarmUp.reveal_in_steps draws it a material kind per
+## frame, so the bar keeps moving.)
+## Splash: draws the first-use shaders of what the first screen needs (PERF: shaders compile the first time they are
+## drawn: ~0.1 s on the first Ludo roll for the dice). The S&L scene only when Home opens on it (Home's switch was
+## left on Snakes & Ladders): otherwise _bg_warm_up() compiles it after Home is up.
 func _warm_up() -> void:
 	var dice_vps: Array[SubViewport] = []
 	for d in [hud.dice, sl.dice]:
@@ -156,18 +189,71 @@ func _warm_up() -> void:
 			d.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE   # draw once now, even while hidden
 			dice_vps.append(d.viewport)
 	_restore_dice_updates(dice_vps)
-	var last := str((Save.prefs.get("last_played", {}) as Dictionary).get("game", "")) if Save.prefs.get("last_played") is Dictionary else ""
-	if Quality.tier() != "low" or last == "sl":
+	if home.game == "sl" and bool(Save.prefs.welcome_seen):
 		await sl_scenes.set_scene(baker, SLScenes.scene_in_use())
-		BootTrace.mark("warm-up: scene built")
+		BootTrace.mark("warm-up: S&L scene built")
 		sl_board.visible = true
 		_show_world(false)
 		for i in 2:
 			await RenderingServer.frame_post_draw
-			BootTrace.mark("warm-up: scene frame %d" % i)
+			BootTrace.mark("warm-up: S&L scene frame %d" % i)
 		_show_world(true)
 		sl_board.visible = false
 	else:
+		await get_tree().process_frame
+
+## The S&L scene may be needed soon (a capable phone, or S&L was the last game played): build it and compile its
+## shaders in the background once Home is quiet, a material kind per step (ShaderWarmUp: drawn offscreen, never
+## shown), so the first S&L match doesn't freeze ~1.2 s while they compile. Stops when the scene is shown anyway.
+func _bg_warm_up() -> void:
+	var last := str((Save.prefs.get("last_played", {}) as Dictionary).get("game", "")) if Save.prefs.get("last_played") is Dictionary else ""
+	if _sl_seen or not (Quality.tier() != "low" or last == "sl"):
+		return
+	var id := SLScenes.scene_in_use()
+	await _until_quiet(1.0)
+	if _sl_seen or not is_inside_tree():
+		return
+	var t0 := Time.get_ticks_msec()
+	await sl_scenes.set_scene(baker, id)             # one texture per frame; the café stays up
+	if _sl_seen or sl_scenes.current != id or not is_inside_tree():
+		return
+	var built := Time.get_ticks_msec()
+	sl_board.setup_players([0, 1, 2, 3])            # (a match or Home's S&L backdrop sets its own)
+	sl_scenes.play(true, str(Save.prefs.get("sl_cam", "3d")))
+	_frame_sl_home()
+	sl_scenes.snap_camera()
+	sl_board.visible = true                          # (inside the hidden scene: drawn only by the warm-up)
+	var w := ShaderWarmUp.new()
+	w.name = "ShaderWarmUp"
+	add_child(w)
+	w.prepare(sl_scenes, sl_scenes.camera, get_viewport())
+	var worst := 0
+	while not w.finished():
+		await _until_quiet(0.2)
+		if _sl_seen or sl_scenes.current != id or not is_inside_tree():
+			break
+		var ts := Time.get_ticks_msec()
+		await w.step(world, world.camera)
+		worst = maxi(worst, Time.get_ticks_msec() - ts)
+	if not sl_scenes.visible:
+		sl_board.visible = false
+	if BootTrace.on():
+		print("[warm] S&L %s: built in %d ms, %d / %d shader steps (longest %d ms), done %d ms after Home was quiet" % [id,
+			built - t0, mini(w._next, w.steps()), w.steps(), worst, Time.get_ticks_msec() - t0])
+	w.queue_free()
+
+## Waits until Home has been quiet (on screen, no sheet, no animation boost, no splash) for `sec` seconds.
+func _until_quiet(sec: float) -> void:
+	var since := -1
+	while is_inside_tree():
+		var quiet := screen == "home" and _splash == null and home.visible and home.game != "sl" \
+			and _top_sheet() == null and not is_instance_valid(_result) and Time.get_ticks_msec() > _boost_until
+		if not quiet:
+			since = -1
+		elif since < 0:
+			since = Time.get_ticks_msec()
+		elif Time.get_ticks_msec() - since >= int(sec * 1000.0):
+			return
 		await get_tree().process_frame
 
 func _build_screens() -> void:
@@ -388,6 +474,7 @@ func _enter_ludo() -> void:
 	_set_screen("ludo")
 	_show_bar("ludo")
 	_xp_start = int(Save.profile.xp)
+	_begin_match_clock()
 
 func start_ludo(cfg: Dictionary) -> void:
 	last_ludo = cfg.duplicate(true)
@@ -405,8 +492,17 @@ func start_ludo(cfg: Dictionary) -> void:
 
 ## An online match from the room's `start` (or a `sync` taking back a match in progress). net: Online's NetClient.
 func start_online(msg: Dictionary, net: Object) -> void:
+	if str(msg.get("game", "ludo")) == "sl":
+		await _enter_sl()
+		if screen == "sl":
+			sl.start_online(msg, net)
+		return
 	_enter_ludo()
 	ludo.start_online(msg, net)
+
+## An online match is on screen (Ludo or Snakes & Ladders).
+func _online_match() -> bool:
+	return (screen == "ludo" and ludo.online) or (screen == "sl" and bool(sl.get("online")))
 
 ## The room's host changed (the result's Play again follows).
 func online_host_changed(is_host: bool) -> void:
@@ -415,7 +511,7 @@ func online_host_changed(is_host: bool) -> void:
 
 ## The room closed under us (gone on the server): back home.
 func online_closed() -> void:
-	if screen == "ludo" and ludo.online:
+	if _online_match():
 		go_home()
 
 ## Puts the S&L game screen up in the equipped scene (no match started yet). Coroutine (the scene may build).
@@ -429,10 +525,12 @@ func _enter_sl() -> void:
 	hud.visible = false
 	sl_hud.visible = true
 	_backdrop_id += 1
+	_sl_seen = true
 	_show_world(false)
 	_set_screen("sl")
 	_show_bar("sl")
 	_xp_start = int(Save.profile.xp)
+	_begin_match_clock()
 	await sl_scenes.set_scene(baker, SLScenes.scene_in_use())
 	sl_board.visible = true
 
@@ -467,6 +565,7 @@ func _home_backdrop() -> void:
 	await sl_scenes.set_scene(baker, SLScenes.scene_in_use())
 	if my != _backdrop_id or screen not in ["home", "splash"] or home.game != "sl":
 		return                                   # (a game started, or the switch moved on, while it built)
+	_sl_seen = true
 	sl_board.setup_players([])
 	sl_board.visible = true
 	sl_scenes.play(true, "3d")               # the match's 3D framing: the board fits the band, the table holds still
@@ -579,10 +678,12 @@ func continue_match() -> void:
 		last_sl = _sl_cfg_of(st)
 		await _enter_sl()
 		if screen == "sl":
+			_resumed = true
 			sl.resume(st)
 	else:
 		last_ludo = _ludo_cfg_of(st)
 		_enter_ludo()
+		_resumed = true
 		ludo.resume(st)
 
 ## The config of a kept Ludo match ({S, players, teams, opts}) for Restart / Play again (the bot level included).
@@ -651,6 +752,8 @@ func _on_tab(tab: String) -> void:
 			s.open(sheet_layer)
 		"free":
 			_claim_free()
+		"leaderboard", "ranks":
+			LeaderboardSheet.new().open(sheet_layer)
 		"profile":
 			var p := ProfileSheet.new()
 			p.profile_changed.connect(home.refresh)
@@ -703,7 +806,24 @@ func _claim_free() -> void:
 		Haptics.error()
 		return
 	var before := int(Save.profile.coins)
-	var n := Rewards.claim_free(Save.profile)
+	var n := 0
+	if Account.wallet_active():
+		if _free_busy:
+			return
+		_free_busy = true
+		home.hold_coins(2.5)                # the answer fires Save.changed: the counter waits for the coins to land
+		var r: Dictionary = await account.free_coins()
+		_free_busy = false
+		if not r.get("ok", false):
+			_home_toast(Account.error_text(str(r.get("error", "")), "claim"), "bad")
+			Haptics.error()
+			if from is SideButton:
+				(from as SideButton).shake()
+			home.refresh()
+			return
+		n = int(r.get("coins", 0))
+	else:
+		n = Rewards.claim_free(Save.profile)
 	if n <= 0:
 		return
 	Sound.sfx("coin", n)
@@ -773,7 +893,7 @@ func open_pause() -> void:
 	if top and not top.dismissable:
 		return                                   # a question is open: it holds the game anyway
 	paused = true
-	var on := screen == "ludo" and ludo.online
+	var on := _online_match()
 	var s := Sheet.new("Menu" if on else "Paused", UIKit.W.dialog, false, "pm")
 	s.dismissable = true                         # Back / a backdrop tap = Resume
 	_pause_sheet = s
@@ -795,14 +915,34 @@ func open_pause() -> void:
 		paused = _top_sheet() != null and screen in ["ludo", "sl"])
 	s.open(sheet_layer)
 
-## Online: leaving a match is for good (a bot takes your colour); ask first.
+## Online: leaving a match is for good (a bot takes your colour); ask first. Once your side has finished (play on)
+## nothing is lost: your place stands and is granted at the end.
 func _ask_leave_online() -> void:
-	if not await Sheet.confirm(self, "Leave this match?", "A bot plays your colour for the rest of the game.", "Leave", "Keep playing", true):
+	var done := _online_finished()
+	var body := "Your place is kept: your reward comes when the game ends." if done else "A bot plays your colour for the rest of the game."
+	if not await Sheet.confirm(self, "Leave this match?", body, "Leave", "Keep playing" if not done else "Keep watching", true):
 		return
-	if screen != "ludo" or not ludo.online:
+	if not _online_match():
 		return
 	online.leave()
 	go_home()
+
+## The finish card's Home (play on: your side has finished, the others play on): leave the room for Home. The
+## server keeps your place and grants it at the end.
+func leave_online_match() -> void:
+	if not _online_match():
+		return
+	online.leave()
+	go_home()
+
+## Your side has finished in the online match on screen (play on).
+func _online_finished() -> bool:
+	if screen == "ludo" and ludo.online and ludo.ns != null and ludo.ns.me >= 0 and not ludo.S.is_empty():
+		return LudoHUD.done_place(ludo.S, ludo.ns.me) > 0
+	if screen == "sl" and sl.online and sl.ns != null and not sl.G.is_empty():
+		var k: int = sl.ns.index_of(sl.ns.me)
+		return k >= 0 and SLMatch.done_place(sl.G, k) > 0
+	return false
 
 func _ask_restart() -> void:
 	var game := screen
@@ -879,6 +1019,11 @@ func _on_finished(result: Dictionary, game: String) -> void:
 	data.safe_top = safe_top
 	data.safe_bottom = safe_bottom
 	_home_fly = int(data.reward)
+	_claim_id = ""
+	if not net_game and account.enabled:
+		var info := _claim_info(game, data)
+		if not info.is_empty():
+			_claim_id = account.report_match(info)   # the server reconciles the local reward (queued when offline)
 	if net_game:
 		data.host = online.is_host()
 	var r := ResultScreen.new(data)
@@ -894,6 +1039,73 @@ func _on_finished(result: Dictionary, game: String) -> void:
 			_restart(game))
 		r.home.connect(go_home)
 	r.open(sheet_layer)
+
+## Launch: the guest account (a kept session is used at once; offline the game just carries on locally).
+func _start_account() -> void:
+	if account.enabled:
+		account.start()
+
+func _begin_match_clock() -> void:
+	_match_ms = Time.get_ticks_msec()
+	_pairs_start = int(Save.profile.get("stats", {}).get("pairsFormed", 0))
+	_resumed = false
+
+## The claim for a finished offline match (POST /v1/claims body, without the id): {} when there is nothing to claim.
+## A match continued from a saved one is credited the minimum duration (it began in an earlier session).
+func _claim_info(game: String, data: Dictionary) -> Dictionary:
+	var secs := int((Time.get_ticks_msec() - _match_ms) / 1000.0) + (60 if _resumed else 0)
+	var result := "win" if bool(data.get("human_won", false)) else "loss"
+	var placing := claim_placing(data.get("standings", []))   # play on: your final place decides the reward
+	if game == "ludo":
+		var seats: Array = (ludo.S.get("players", []) as Array).duplicate()
+		if seats.size() != 4:
+			return {}
+		var pairs := maxi(0, int(Save.profile.get("stats", {}).get("pairsFormed", 0)) - _pairs_start)
+		var info := {game = "ludo", mode = "cpu" if seats.has("cpu") else "pp", result = result, players = seats, duration_s = secs, pairs = pairs}
+		if placing > 0:
+			info.placing = placing
+		return info
+	var g: Dictionary = sl.G
+	if g.is_empty():
+		return {}
+	var info := {game = "sl", mode = str(g.get("mode", "cpu")), result = result, players = (g.players as Array).size(), duration_s = secs}
+	if placing > 0:
+		info.placing = placing
+	if info.mode == "cpu":
+		var rolls := []
+		for p: Dictionary in g.players:
+			if bool(p.get("you", false)):
+				for v in p.get("rolls", []):
+					rolls.append(int(v))
+		info.rolls = rolls
+		info.need_one = bool(g.get("need_one", false))
+	return info
+
+## Your (your team's) final place in a result's standings (1-based; 0: no "you", e.g. Pass & Play): the claim's
+## `placing`, which the server pays by (1 = the win reward, any other place the play reward).
+static func claim_placing(standings: Variant) -> int:
+	if standings is Array:
+		for e in standings:
+			if e is Dictionary and str(e.get("kind", "")) == "you":
+				return int(e.get("place", 0))
+	return 0
+
+## The server answered a claim: a limited one is said quietly (the result screen, else a toast) and the coins that
+## are still to fly to Home shrink to what was paid.
+func _on_claim_answered(id: String, ans: Dictionary) -> void:
+	var note := Account.claim_note(ans)
+	if id == _claim_id and id != "":
+		if bool(ans.get("limited", false)):
+			_home_fly = mini(_home_fly, int(ans.get("coins", 0)))
+		if note != "" and is_instance_valid(_result) and not _result.is_queued_for_deletion():
+			_result.set_claim_note(note)
+			return
+	if note != "" and screen == "home":
+		_home_toast(note)
+
+## Google sign-in needs a decision (this device's progress or the Google account's).
+func _on_conflict(_c: Dictionary) -> void:
+	ConflictSheet.present(sheet_layer, account)
 
 ## Standings for the result from the finished match state (when the match didn't send its own).
 func _standings(game: String) -> Array:

@@ -85,10 +85,8 @@ func _ready() -> void:
 	await sheet_shot(func(): main._on_tab("inventory"), "shop_owned")
 	# ---- Ludo setup ----
 	await sheet_shot(func(): main._open_setup("ludo", "cpu"), "setup_vs_computer")
-	main._open_setup("ludo", "cpu")
-	await _sleep(0.7)
-	var setup: Sheet = main._top_sheet()
-	for b in setup.find_children("*", "Button", true, false):
+	var setup: Sheet = await _top_after(func(): main._open_setup("ludo", "cpu"), 0.7)
+	for b in setup.find_children("*", "Button", true, false) if setup else []:
 		if b.text == "Teams (2 v 2)":
 			b.button_pressed = true
 	await _sleep(0.4)
@@ -254,20 +252,18 @@ func _lobby_states() -> void:
 	await close_top()
 	main.home.select_game("ludo")
 	await _sleep(0.6)
-	main._open_setup("ludo", "local")
-	await _sleep(0.8)
-	var su: Sheet = main._top_sheet()
-	for b in su.find_children("*", "Button", true, false):
+	var su: Sheet = await _top_after(func(): main._open_setup("ludo", "local"), 0.8)
+	for b in su.find_children("*", "Button", true, false) if su else []:
 		if b.text == "3":
 			b.button_pressed = true
-	for e: LineEdit in su.find_children("Name*", "LineEdit", true, false):
+	for e: LineEdit in su.find_children("Name*", "LineEdit", true, false) if su else []:
 		if e.name == "Name2":
 			e.text = "Rafi"
 			e.text_changed.emit("Rafi")
 	await _sleep(0.4)
 	await shot("lobby_setup_ludo_pass_play_names")
 	# Start it from the sheet (a real setup: last_setup + last_played are kept), then back Home: "Play again"
-	if su.has_method("_submit"):
+	if is_instance_valid(su) and su.has_method("_submit"):
 		su.call("_submit")
 	await _sleep(2.0)
 	print("names in the match: ", main.last_ludo.get("names", []))
@@ -281,7 +277,14 @@ func _lobby_states() -> void:
 	main._open_setup("ludo", "cpu")
 	await _sleep(0.8)
 	await shot("lobby_setup_ludo_cpu")
-	(main._top_sheet() as Object).call("_submit")
+	# the setup may have been dismissed meanwhile (a click on the window's dim backdrop, Escape): open it again
+	var sc: Sheet = main._top_sheet()
+	if not (sc and sc.has_method("_submit")):
+		sc = await _top_after(func(): main._open_setup("ludo", "cpu"), 0.5)
+	if sc and sc.has_method("_submit"):
+		sc.call("_submit")
+	else:
+		push_warning("tour: no setup sheet to start the Continue-match game from")
 	await _sleep(2.0)
 	main._flush_match()
 	var kept: Dictionary = MatchStore.load()
@@ -311,6 +314,19 @@ func _open_shop(t: String, owned := false) -> void:
 	else:
 		main._wire_shop(s)
 	s.open(main.sheet_layer)
+
+## Opens a sheet and returns the top sheet `wait` s later; when it was dismissed meanwhile (a stray click on the
+## tour's window lands on the dim backdrop, Escape), it is closed and opened once more. Null if it still isn't there.
+func _top_after(open: Callable, wait: float) -> Sheet:
+	for attempt in 2:
+		open.call()
+		await _sleep(wait)
+		var s: Sheet = main._top_sheet()
+		if s:
+			return s
+		push_warning("tour: the sheet was dismissed before its shot; opening it again")
+		main.close_all_sheets()
+	return null
 
 func sheet_shot(open: Callable, name: String, wait := 0.9) -> void:
 	open.call()

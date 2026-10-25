@@ -3,7 +3,8 @@ extends Sheet
 ## Settings (index.html #settingsSheet; PM look with the "Settings" ribbon and the single close X). Sections:
 ##   Sound & vibration  Sound on / off, Music / Effects volume ("70%"), Vibration on / off (no master slider: Save
 ##                      folded the old master level into the two channels once, Save.prefs.vol.master stays 100)
-##   Game           Game speed (Relaxed / Fast)
+##   Game           Game speed (Relaxed / Fast), Graphics (Auto (<detected>) / Low / Medium / High: Save.prefs.quality,
+##                  applied at once through Quality.set_tier; a note says when part of it waits for the next launch)
 ##   Camera view    Ludo (3D / Top), Snakes & Ladders (3D / Top)
 ##   House rules    Ask before pairing (pair_ask), Snakes & Ladders: Need a 1 to start (sl_need_one)
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
@@ -30,6 +31,7 @@ var _width := 360.0
 var _list: VBoxContainer
 var _switch: Switch                      # the Sound switch (previews flip it)
 var _vol_lines: Array[Control] = []
+var _gfx_note: Label                     # Graphics: "... on next launch" when the pick needs one
 
 
 func _init(width: float = UIKit.W.form) -> void:
@@ -45,6 +47,12 @@ func _build() -> void:
 	_vol_lines.clear()
 	var vol: Dictionary = Save.prefs.get("vol", {})
 	var sound_on := bool(Save.prefs.get("sound", true))
+
+	# --- Account (only where there is one): Guest / the Google name, opens the Profile
+	var acc := Account.instance()
+	if acc != null and acc.enabled:
+		_caption("Account")
+		_group().add_child(_account_line(acc))
 
 	# --- Sound
 	_caption("Sound & vibration")
@@ -68,6 +76,8 @@ func _build() -> void:
 	var g := _group()
 	g.add_child(_line("Game speed", "", _seg([[1.0, "Relaxed"], [0.55, "Fast"]], float(Save.prefs.get("speed", 1.0)),
 			func(v): _set_pref("speed", v))))
+	g.add_child(_divider())
+	g.add_child(_graphics_line())
 
 	# --- Camera view (one block, one row per game)
 	_caption("Camera view")
@@ -181,6 +191,44 @@ func _label_box(text: String, note: String, color := Palette.INK) -> VBoxContain
 		v.add_child(s)
 	return v
 
+## The Account row: "Guest" or the Google name with its state under it; a tap opens the Profile, where signing in lives.
+func _account_line(acc: Account) -> Control:
+	var row := Row.new()
+	row.name = "AccountLine"
+	row.custom_minimum_size.y = ROW_H
+	row.pressable = true
+	var h := UIKit.hbox(UIKit.SPACE.md)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(h)
+	var title := "Guest"
+	var note := "Your progress is saved on our server."
+	if not acc.is_guest():
+		title = acc.google_name() if acc.google_name() != "" else "Google Play Games"
+		note = "Signed in with Google Play Games"
+	elif not acc.has_session():
+		title = "Guest · offline"
+		note = "Your progress will sync when you’re back online."
+	h.add_child(_label_box(title, note))
+	if not acc.is_guest():
+		var ok := UIKit.hbox(UIKit.SPACE.xs)
+		ok.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ok.add_child(UIKit.glyph("ic_check", 16, Palette.TEAL_INK))
+		var sl := UIKit.caps_label("Synced", Palette.TEAL_INK)
+		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ok.add_child(sl)
+		h.add_child(ok)
+	var chev := UIKit.icon("ic_back", 18)
+	chev.flip_h = true
+	chev.modulate = Color(1, 1, 1, 0.7)
+	chev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(UIKit.margin(chev, 0, 0, 4, 0))
+	row.tapped.connect(func():
+		UIKit.press_fx()
+		var main := get_tree().root.get_node_or_null("Main") if is_inside_tree() else null
+		if main and main.has_method("_on_tab"):
+			main.call("_on_tab", "profile"))
+	return row
+
 ## A switch row for a boolean pref.
 func _switch_line(text: String, note: String, key: String) -> Control:
 	var sw := Switch.new(bool(Save.prefs.get(key, false)))
@@ -210,6 +258,38 @@ func _link_line(text: String, on_tap: Callable, danger := false) -> Control:
 		UIKit.press_fx()
 		on_tap.call())
 	return row
+
+## Graphics: the label (and the launch note under it) over a full-width Auto / Low / Medium / High choice; Auto names
+## the tier this phone gets (Quality.detected()).
+func _graphics_line() -> Control:
+	var row := Row.new()
+	row.name = "Graphics"
+	row.custom_minimum_size.y = ROW_H
+	var v := UIKit.vbox(UIKit.SPACE.xs)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(v)
+	var box := _label_box("Graphics", " ")
+	_gfx_note = box.get_child(1) as Label
+	v.add_child(box)
+	var opts := [["auto", "Auto (%s)" % Quality.detected().capitalize()], ["low", "Low"], ["medium", "Medium"], ["high", "High"]]
+	var seg := UIKit.segmented(opts, Quality.saved_pref(), _on_quality, "sm")
+	seg.name = "QualitySeg"
+	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(seg)
+	_gfx_hint(Quality.saved_pref())
+	return row
+
+## The launch note under Graphics: only when the pick changes something read at startup (Quality.needs_restart).
+func _gfx_hint(t: String) -> void:
+	if _gfx_note == null:
+		return
+	_gfx_note.text = "Texture detail applies on next launch." if Quality.needs_restart(t) else ""
+	_gfx_note.visible = _gfx_note.text != ""
+
+func _on_quality(t: Variant) -> void:
+	Quality.set_tier(str(t))                 # saves Save.prefs.quality, re-applies the main view and its SubViewports
+	_gfx_hint(str(t))
+	prefs_changed.emit()
 
 ## Two compact choices (UIKit.segmented "sm"), right-aligned.
 func _seg(options: Array, selected: Variant, on_pick: Callable, width := SEG_W) -> Control:
@@ -298,6 +378,9 @@ func _confirm_reset() -> void:
 	if not yes or not is_inside_tree():
 		return
 	Save.reset_progress()
+	var acc := Account.instance()
+	if acc != null:
+		acc.reset_identity()                  # a reset starts a new guest account (the old one keeps its progress)
 	Sound.set_enabled(bool(Save.prefs.get("sound", true)))
 	_build()
 	prefs_changed.emit()

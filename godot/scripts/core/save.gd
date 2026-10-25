@@ -45,11 +45,11 @@ func _ensure() -> void:
 		for k in 8:
 			s += abc[randi() % abc.length()]
 		p.id = "LZM-%s-%s" % [s.substr(0, 4), s.substr(4, 4)]
-	p.coins = int(p.get("coins", 5000))
-	p.xp = maxi(0, int(p.get("xp", 0)))
+	p.coins = maxi(0, as_int(p.get("coins"), 5000))      # null / text / negative in a damaged save: never a crash
+	p.xp = maxi(0, as_int(p.get("xp"), 0))
 	var st: Dictionary = p.get("stats", {}) if p.get("stats") is Dictionary else {}
 	for k in ["played", "wins", "losses", "streak", "bestStreak", "coinsEarned", "pairsFormed", "ppGames", "slPlayed", "slWins"]:
-		st[k] = int(st.get(k, 0))
+		st[k] = maxi(0, as_int(st.get(k), 0))
 	p.stats = st
 	# owned rooms (free ones always), the equipped room; owned dice skins, the equipped skin
 	var rooms: Array = p.get("rooms", []) if p.get("rooms") is Array else []
@@ -70,7 +70,7 @@ func _ensure() -> void:
 		p.daily = {}
 	if not p.get("last_spin") is String:
 		p.last_spin = ""
-	p.last_free = int(p.get("last_free", 0))
+	p.last_free = maxi(0, as_int(p.get("last_free"), 0))
 	# collection (Collection): equipped avatar / frame / nameplate / badge, bought characters, claimed achievements.
 	# Only missing or wrongly typed fields are filled; Collection.equipped() falls back when a saved one is locked.
 	if not p.get("avatar") is String or p.avatar == "":
@@ -88,9 +88,9 @@ func _ensure() -> void:
 	var pr := prefs
 	pr.sound = bool(pr.get("sound", true))
 	var vol: Dictionary = pr.get("vol", {}) if pr.get("vol") is Dictionary else {}
-	vol.master = clampi(int(vol.get("master", 70)), 0, 100)
-	vol.music = clampi(int(vol.get("music", 35)), 0, 100)
-	vol.sfx = clampi(int(vol.get("sfx", 60)), 0, 100)
+	vol.master = clampi(as_int(vol.get("master"), 70), 0, 100)
+	vol.music = clampi(as_int(vol.get("music"), 35), 0, 100)
+	vol.sfx = clampi(as_int(vol.get("sfx"), 60), 0, 100)
 	# calmer audio (2026-10-24): players still on the old defaults (80 / 50 / 85, sliders never moved) get the new
 	# quieter ones once; anyone who set their own levels keeps them
 	if not pr.get("audio_v2", false):
@@ -105,7 +105,7 @@ func _ensure() -> void:
 		for k in ["speed", "cam", "sl_cam", "sl_need_one", "pair_ask"]:
 			pr.erase(k)
 		pr.defaults_v3 = true
-	pr.speed = 0.55 if float(pr.get("speed", 1.0)) < 0.8 else 1.0   # 1.0 Relaxed, 0.55 Fast
+	pr.speed = 0.55 if (pr.get("speed") is float or pr.get("speed") is int) and float(pr.get("speed")) < 0.8 else 1.0   # 1.0 Relaxed, 0.55 Fast
 	pr.cam = "3d" if pr.get("cam", "top") == "3d" else "top"
 	pr.sl_cam = "3d" if pr.get("sl_cam", "top") == "3d" else "top"
 	pr.last_players = pr.get("last_players", ["human", "cpu", "cpu", "cpu"])
@@ -126,17 +126,32 @@ func _ensure() -> void:
 		pr.tutorial_done = played
 	pr.tutorial_done = bool(pr.tutorial_done)
 
+## A number from a save (JSON gives floats; a damaged file can hold null, text, a list): an int, else `dflt`.
+static func as_int(v: Variant, dflt := 0) -> int:
+	if v is int:
+		return v
+	if v is float:
+		return dflt if is_nan(v) or is_inf(v) else int(v)
+	if v is String and (v as String).strip_edges().is_valid_int():
+		return int((v as String).strip_edges())
+	return dflt
+
+## Re-checks the profile and preferences (fills what is missing, repairs what is damaged). Account calls it after
+## it wrote a server profile into Save.profile.
+func normalize() -> void:
+	_ensure()
+
 ## Settings has no master Volume slider any more (re-audit #40): the master level is folded into the two channels
 ## once, so nothing sounds louder or quieter. Each slider maps to gain (v / 100) ^ 1.5 (Sound._curve), so
 ## master x channel / 100 keeps the product of the two gains exactly; master becomes 100. A channel that was on
 ## never folds to 0 (muted). Safe to call again: with master at 100 it changes nothing.
 static func fold_master(vol: Dictionary) -> void:
-	var m := int(vol.get("master", 100))
+	var m := as_int(vol.get("master"), 100)
 	if m >= 100:
 		vol.master = 100
 		return
 	for k in ["music", "sfx"]:
-		var c := int(vol.get(k, 0))
+		var c := as_int(vol.get(k), 0)
 		vol[k] = 0 if c <= 0 else clampi(roundi(c * m / 100.0), 1, 100)
 	vol.master = 100
 
@@ -179,7 +194,7 @@ func _notification(what: int) -> void:
 # ---------- progress ----------
 
 func add_coins(n: int) -> void:
-	profile.coins += n
+	profile.coins = maxi(0, int(profile.coins) + n)
 	if n > 0:
 		profile.stats.coinsEarned += n
 	save()

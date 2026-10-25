@@ -1,11 +1,11 @@
 class_name FriendsSheet
 extends Sheet
-## "Play with friends" (Home's third mode, Ludo only): make a room and share its code, or join a friend's room with
+## "Play with friends" (Home, Ludo or Snakes & Ladders): make a room and share its code, or join a friend's room with
 ## theirs. The code field takes the 6-character room code: typed or pasted text is upper-cased and cleaned to the
 ## code alphabet (NetClient.clean_code), and Join stays off until the code is complete. The sheet only asks; the
 ## caller (Online) does the network work and calls set_busy() / set_busy("") around it.
 ##
-##   var s := FriendsSheet.new()
+##   var s := FriendsSheet.new("sl")           # the game a new room starts with (the host can change it in the lobby)
 ##   s.create_room.connect(...); s.join_room.connect(func(code): ...)
 ##   s.open(app.sheet_layer)
 
@@ -16,12 +16,14 @@ var code_edit: LineEdit
 var create_button: Button
 var join_button: Button
 var paste_button: Button
+var game := "ludo"
 var _busy := ""
 
 
-func _init() -> void:
+func _init(game_ := "ludo") -> void:
+	game = game_ if game_ in ["ludo", "sl"] else "ludo"
 	super("Play with friends", UIKit.W.form, true, Sheet.LOOK_PM)
-	set_kicker("Ludo online")
+	set_kicker("Snakes & Ladders online" if game == "sl" else "Ludo online")
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	var intro := UIKit.paragraph("Play with up to 3 friends on their own phones. Make a room and share the code, or join theirs.",
 		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)

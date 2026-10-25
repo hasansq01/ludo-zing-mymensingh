@@ -14,7 +14,18 @@ extends RefCounted
 ## Phases: "roll" -> "choose" (every legal unit may be tapped: see units()) -> "pair_ask" (only with the house rule
 ## pair_ask, for a human: make a pair?) -> ... "over". apply_roll no longer produces "pick" (the old Single / Pair
 ## step); choose_pick / picked still work for old callers. s.finished lists the colours in the order they got all
-## four pawns home (standings()).
+## four pawns home (standings()); at the end it holds every playing colour in final order.
+##
+## Play on after the first finish (real Ludo): a side that finishes (a colour with all four pawns home; in Teams both
+## partners, the team finishing together) gets its place (event {type "finished", c, place, team?}) and is skipped
+## from then on (next_active), while the others play on for the next places. The game is over ("over", one
+## game_over event {winner, team, order}) when fewer than two sides are left unfinished, or when no unfinished side
+## has a "human" seat (vs Computer: once you are done you don't watch the computers finish). Then the unfinished
+## sides are ranked by progress (standings()) and s.finished becomes the full order; s.winner is the first finisher
+## (in Teams: the colour that brought its team home). end_game(s) ends a game early the same way (the server's
+## {k: "end"}). Rule (b) is checked only when a side finishes (a seat switching between human and cpu never ends a
+## game by itself). Captures, pairs, splits, three 6s and Free Hand are unchanged: a finished colour has no pawn on
+## the track, so it can't block or be captured.
 ## Progress per token: -1 base, 0-50 track, 51-55 home column, 56 (GOAL) finished.
 ## Colours: 0 red, 1 green, 2 yellow, 3 blue.
 
@@ -91,12 +102,20 @@ static func poss(s: Dictionary, c: int, cap := true) -> String:
 static func verb(s: Dictionary, c: int, base: String, third: String) -> String:
 	return base if is_you(s, c) else third
 
+## The next colour that plays after c: active and its side not finished yet (play on: finished sides sit out).
 static func next_active(s: Dictionary, c: int) -> int:
 	for k in range(1, 5):
 		var n := (c + k) % 4
-		if active(s, n):
+		if active(s, n) and not side_done(s, n):
 			return n
 	return c
+
+## Colour c's side has finished (has its place): individual games, c is in s.finished; Teams, c and its partner
+## both have all four pawns home (a colour home alone still rolls: it helps its partner, Free Hand).
+static func side_done(s: Dictionary, c: int) -> bool:
+	if team_on(s):
+		return all_home(s, c) and all_home(s, mate_of(c))
+	return _finished(s).has(c)
 
 
 # ---------- Team (Pair Mode) games: 4 players, opposite seats are partners (Red + Yellow, Green + Blue) ----------
@@ -466,20 +485,17 @@ static func _finish_move(s: Dictionary, pend: Dictionary, ev: Array) -> void:
 		extra = true
 		ev.append({type = "home", c = c})
 		if all_home(s, c):
-			_mark_finished(s, c)
-	if team_on(s):
-		if all_home(s, c) and all_home(s, mate_of(c)):
-			_game_over(s, c, ev)                   # both partners home: the team wins
-			return
-	elif all_home(s, c):
-		_game_over(s, c, ev)
-		return
-	if team_on(s) and to >= GOAL and all_home(s, c):
-		ev.append({type = "finished", c = c})      # this colour just got its fourth pawn home
-	if extra:
+			_mark_finished(s, c)                   # (Teams: each colour's own order; standings() lists partners by it)
+			if not team_on(s) or all_home(s, mate_of(c)):
+				_side_finished(s, c, ev)           # a colour (Teams: both partners, the team together) has its place
+				if s.phase == "over":
+					return
+			else:
+				ev.append({type = "all_home", c = c})   # Teams: four home, the partner still playing (Free Hand next)
+	if extra and not side_done(s, s.turn):
 		_begin_turn(s, ev)
 	else:
-		_next_turn(s, ev)
+		_next_turn(s, ev)                          # (a side that just finished hands the turn on, extra or not)
 
 static func _begin_turn(s: Dictionary, ev: Array) -> void:   # the same player again; the 6s count carries on
 	s.phase = "roll"
@@ -493,13 +509,61 @@ static func _next_turn(s: Dictionary, ev: Array) -> void:
 	s.pick = ""
 	ev.append({type = "turn", c = s.turn, again = false})
 
-static func _game_over(s: Dictionary, c: int, ev: Array) -> void:
+## Colour c's side just finished (c: the colour whose pawn came home last): its place, then is the game over?
+static func _side_finished(s: Dictionary, c: int, ev: Array) -> void:
+	var place := 0
+	for side in _sides(s):
+		if side_done(s, side[0]):
+			place += 1
+	var e := {type = "finished", c = c, place = place}
+	if team_on(s):
+		e["team"] = [mini(c, mate_of(c)), maxi(c, mate_of(c))]
+	ev.append(e)
+	var left := 0
+	var human := false
+	for side in _sides(s):
+		if side_done(s, side[0]):
+			continue
+		left += 1
+		for k in side:
+			human = human or is_human(s, k)
+	if left < 2 or not human:
+		_game_over(s, c if place == 1 else -1, ev)
+
+## The sides of the game, each a list of colours: [[c], ...] for the active colours; Teams [[0, 2], [1, 3]].
+static func _sides(s: Dictionary) -> Array:
+	if team_on(s):
+		return [[0, 2], [1, 3]]
+	var out := []
+	for c in 4:
+		if active(s, c):
+			out.append([c])
+	return out
+
+## The end: the unfinished sides are ranked by progress after the finished ones (standings()), s.finished becomes
+## that full order and s.winner the first finisher (w; -1: the first in that order).
+static func _game_over(s: Dictionary, w: int, ev: Array) -> void:
+	if w < 0 and not team_on(s) and not _finished(s).is_empty():
+		w = s.finished[0]
+	s.winner = w                               # (Teams: standings() puts the winning team first)
+	var order := standings(s).map(func(e): return int(e.color))
+	if w < 0:
+		w = order[0]
+		s.winner = w
+	s.finished = order
 	s.phase = "over"
-	s.winner = c
-	_mark_finished(s, c)
-	if team_on(s) and not _finished(s).has(mate_of(c)):   # (a partner already home, e.g. in an old saved game)
-		s.finished.insert(s.finished.find(c), mate_of(c))
-	ev.append({type = "game_over", winner = c, team = winners(s)})
+	s.pick = ""
+	s.pending = {}
+	ev.append({type = "game_over", winner = w, team = winners(s), order = order.duplicate()})
+
+## Ends the game now (the server's {k: "end"}: only ghosts are left to finish, say): the unfinished sides are ranked
+## by progress, exactly as at a natural end. [] when the game is already over.
+static func end_game(s: Dictionary) -> Array:
+	if s.phase == "over":
+		return []
+	var ev := []
+	_game_over(s, -1, ev)
+	return ev
 
 static func _finished(s: Dictionary) -> Array:
 	if not s.get("finished") is Array:

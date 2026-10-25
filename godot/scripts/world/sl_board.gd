@@ -57,10 +57,31 @@ func _ready() -> void:
 	_make()
 
 ## Paint the tile face and make sure the frame, ladders and snakes exist (they need no texture). Coroutine.
+## A board on an SLScenes table skips both: its scene paints it in its own style (apply_style, from set_scene), and a
+## default face painted first would only be thrown away (a 2048 texture and every ladder and snake, twice).
 func build(baker: TexBaker) -> void:
 	_make()
+	if _on_scene():
+		return
+	if not has_node("LaddersSnakes"):
+		_add_pieces()
 	var tex := await baker.bake(Vector2i(2048, 2048), paint)
 	top_mesh.material_override = MeshKit.tex_mat(tex, 0.5)
+
+func _on_scene() -> bool:
+	var n := get_parent()
+	while n:
+		if n is SLScenes:
+			return true
+		n = n.get_parent()
+	return false
+
+func _add_pieces() -> void:
+	var pieces := Node3D.new()
+	pieces.name = "LaddersSnakes"
+	add_child(pieces)
+	_build_ladders(pieces)
+	_build_snakes(pieces)
 
 ## A scene's board look (SLScenes.SCENES[id].board, index.html B): tile bands, cream, grout, goal, star, number ink,
 ## frame / lip (+ roughness / metalness), ladder rails / rungs or a candy stripe, snake colours. Repaints the face and
@@ -72,16 +93,13 @@ func apply_style(baker: TexBaker, st: Dictionary) -> void:
 	_lip.material_override = MeshKit.mat(_sc("lip", "#f2b46e"), 0.35 if st.has("lip") else 0.3, float(st.get("lipM", 0.0)))
 	_pad.material_override = (get_node("Frame") as MeshInstance3D).material_override
 	_pad_lip.material_override = _lip.material_override
-	var old := get_node("LaddersSnakes")
-	remove_child(old)
-	old.queue_free()
+	var old := get_node_or_null("LaddersSnakes")
+	if old:
+		remove_child(old)
+		old.queue_free()
 	_obstacles.clear()
 	snake_rides.clear()
-	var pieces := Node3D.new()
-	pieces.name = "LaddersSnakes"
-	add_child(pieces)
-	_build_ladders(pieces)
-	_build_snakes(pieces)
+	_add_pieces()
 	var tex := await baker.bake(Vector2i(2048, 2048), func(c: Control): paint_styled(c, st))
 	top_mesh.material_override = MeshKit.tex_mat(tex, 0.5)
 
@@ -107,11 +125,8 @@ func _make() -> void:
 	_pad.name = "StartPad"
 	_pad.visible = false
 	_pad_lip.visible = false
-	var pieces := Node3D.new()
-	pieces.name = "LaddersSnakes"
-	add_child(pieces)
-	_build_ladders(pieces)
-	_build_snakes(pieces)
+	if not _on_scene():                     # (on a scene's table: apply_style builds them in the scene's style)
+		_add_pieces()
 	fx = Node3D.new()
 	add_child(fx)
 

@@ -2,7 +2,8 @@
 import { h, clear, replace, poll, fmtInt, timeEl, tickTimes } from "../dom.js";
 import { api } from "../api.js";
 import { lineChart, sparkline } from "../chart.js";
-import { card, levelBadge, codeLink, pidLink, emptyState, errorState, toastErr, skeletonBlock } from "../ui.js";
+import { card, levelBadge, codeLink, pidLink, emptyState, errorState, toastErr, skeletonBlock, helpTip, PAUSED_HELP } from "../ui.js";
+import { icon } from "../icons.js";
 import { pageHead, tile, tileSkeleton, refreshButton, updatedLabel } from "./common.js";
 
 export default function statusPage(root, _params, ctx) {
@@ -10,6 +11,8 @@ export default function statusPage(root, _params, ctx) {
   const upd = updatedLabel(ctx, { live: true, every: "15s" });
   const liveRow = h("div", { class: "tiles tiles-3" }, tileSkeleton(), tileSkeleton(), tileSkeleton());
   const todayRow = h("div", { class: "tiles tiles-4" }, tileSkeleton(), tileSkeleton(), tileSkeleton(), tileSkeleton());
+  const acctRow = h("div", { class: "tiles tiles-6" }, [1, 2, 3, 4, 5, 6].map(() => tileSkeleton()));
+  const acctGroup = h("section", { class: "group", "aria-labelledby": "g-acct" }, h("h3", { class: "group-title", id: "g-acct" }, "Accounts"), acctRow);
   const chartBox = h("div", { class: "chart-box" }, skeletonBlock(6));
   const eventsBox = h("div", null, skeletonBlock(5));
   let chartKey = "";
@@ -20,6 +23,7 @@ export default function statusPage(root, _params, ctx) {
     pageHead(null, "Live activity on the room server and the last 14 days.", [upd.el, refreshButton(() => load(true))]),
     h("section", { class: "group", "aria-labelledby": "g-live" }, h("h3", { class: "group-title", id: "g-live" }, "Live now"), liveRow),
     h("section", { class: "group", "aria-labelledby": "g-today" }, h("h3", { class: "group-title", id: "g-today" }, "Today ", h("span", { class: "muted" }, "(UTC day)")), todayRow),
+    acctGroup,
     h("div", { class: "grid-2-1" },
       card("Last 14 days", chartBox, { sub: "Matches started and distinct active players per UTC day." }),
       card("Recent warnings and errors", eventsBox, { actions: h("a", { href: "#/events?level=warn", class: "btn btn-sm btn-ghost" }, "All events") })),
@@ -37,7 +41,7 @@ export default function statusPage(root, _params, ctx) {
       upd.stale();
       if (!chartKey) {
         replace(chartBox, errorState(err, () => load(true)));
-        clear(liveRow); clear(todayRow);
+        clear(liveRow); clear(todayRow); clear(acctRow);
         clear(eventsBox);
       }
       if (manual || failed === 1) toastErr(err, "Overview");
@@ -58,13 +62,29 @@ export default function statusPage(root, _params, ctx) {
     };
     replace(liveRow,
       tile({ label: "Rooms in lobby", value: Number(live.rooms_lobby) || 0, ic: "rooms", foot: h("span", { class: "tile-sub" }, "Waiting for the host to start") }),
-      tile({ label: "Rooms playing", value: Number(live.rooms_playing) || 0, ic: "matches", tone: "tile-accent", foot: h("a", { href: "#/rooms?status=playing", class: "tile-link" }, "View live rooms") }),
+      tile({ label: "Rooms playing", value: Number(live.rooms_playing) || 0, ic: "matches", tone: "tile-accent", foot: [
+        h("a", { href: "#/rooms?status=playing", class: "tile-link" }, "View live rooms"),
+        pausedNote(Number(live.rooms_paused) || 0)] }),
       tile({ label: "Members online", value: Number(live.members_online) || 0, ic: "players", foot: h("span", { class: "tile-sub" }, "Connected sockets in rooms") }));
     replace(todayRow,
       tile({ label: "Rooms created", value: Number(today.rooms) || 0, foot: foot("rooms", "Rooms created") }),
       tile({ label: "Matches", value: Number(today.matches) || 0, foot: foot("matches", "Matches") }),
       tile({ label: "Active players", value: Number(today.players_active) || 0, foot: foot("players_active", "Active players") }),
       tile({ label: "New players", value: Number(today.new_players) || 0, foot: h("span", { class: "tile-sub" }, "First seen today") }));
+
+    const ac = o.accounts;
+    acctGroup.hidden = !ac;
+    if (ac) {
+      replace(acctRow,
+        tile({ label: "Accounts", value: Number(ac.total) || 0, ic: "accounts", foot: [
+          h("a", { href: "#/accounts", class: "tile-link" }, "View accounts"),
+          h("span", { class: "tile-sub" }, fmtInt(ac.banned) + " banned")] }),
+        tile({ label: "Google-linked", value: Number(ac.linked) || 0, foot: h("a", { href: "#/accounts?linked=1", class: "tile-link" }, "View linked") }),
+        tile({ label: "Guests", value: Number(ac.guests) || 0, foot: h("a", { href: "#/accounts?linked=0", class: "tile-link" }, "View guests") }),
+        tile({ label: "New today", value: Number(ac.new_today) || 0, foot: h("span", { class: "tile-sub" }, "Created today (UTC)") }),
+        tile({ label: "Coins in circulation", value: Number(ac.coins_in_circulation) || 0, ic: "coin", foot: h("span", { class: "tile-sub" }, "Sum of all balances") }),
+        tile({ label: "Claims limited today", value: Number(ac.claims_limited_today) || 0, tone: Number(ac.claims_limited_today) ? "tile-warn" : "", foot: h("span", { class: "tile-sub" }, "Bangladesh day") }));
+    }
 
     const key = JSON.stringify(days);
     if (key !== chartKey) {
@@ -94,6 +114,14 @@ export default function statusPage(root, _params, ctx) {
         e.code || e.pid ? h("div", { class: "ev-refs" }, e.code ? codeLink(e.code) : null, e.pid ? pidLink(e.pid) : null) : null))));
       tickTimes(eventsBox);
     }
+  }
+
+  /** "2 paused" (link to the Paused tab) + a tip: matches nobody is connected to are not counted as playing. */
+  function pausedNote(n) {
+    return h("span", { class: "tile-paused" + (n ? " has-paused" : "") },
+      h("a", { href: "#/rooms?status=paused", "aria-label": `${fmtInt(n)} paused (nobody online): view paused rooms` },
+        icon("moon", { size: 12 }), fmtInt(n) + " paused"),
+      helpTip("Paused (nobody online), not counted above. " + PAUSED_HELP, "About paused rooms"));
   }
 
   load();

@@ -1,7 +1,9 @@
 // The admin console's JSON API: /admin/api/* (ADMIN_API.md is the contract). Auth: one password (secret
 // ADMIN_PASSWORD) -> an HMAC-signed session cookie; X-Admin: 1 on every write (CSRF); every write is audited.
+import { ACCOUNT_RE, type AccountRow, type Step, adminAccountOut, getAccount, mutate } from "./accounts";
 import * as D from "./db";
-import { isCode, type Env, type Room } from "./room";
+import { BOARDS, PERIODS, type Board, type PeriodArg, countScores, periodKey, topScores } from "./leaderboard";
+import { isCode, type AdminSnapshot, type Env, type Room } from "./room";
 
 const COOKIE = "lz_admin";
 const SESSION_S = 12 * 60 * 60; // 43200
@@ -159,7 +161,8 @@ function oneOf<T extends string>(u: URL, k: string, allowed: readonly T[]): T | 
   return v as T;
 }
 
-const ROOM_STATUSES = ["lobby", "playing", "over", "closed"] as const;
+// "paused" = playing with nobody online; "playing" then means online > 0 (D.RoomFilter)
+const ROOM_STATUSES = ["lobby", "playing", "paused", "over", "closed"] as const satisfies readonly D.RoomFilter[];
 const MATCH_RESULTS = ["playing", "over", "abandoned", "closed"] as const;
 const LEVELS = ["info", "warn", "error"] as const;
 
@@ -250,6 +253,23 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
       case "audit":
         if (b !== undefined) break;
         return m === "GET" ? page(await D.listAudit(env.DB, pageArgs(url))) : fail(405, "method");
+      // ----- v2 (ONLINE_V2.md §6) -----
+      case "accounts":
+        if (b === undefined) return m === "GET" ? await accounts(c) : fail(405, "method");
+        if (d === undefined) {
+          if (m === "GET") return await accountDetail(c, b);
+          if (m === "PATCH") return await accountPatch(c, b);
+          return fail(405, "method");
+        }
+        if (d === "coins") return m === "POST" ? await accountCoins(c, b) : fail(405, "method");
+        if (d === "ban" || d === "unban") return m === "POST" ? await accountBan(c, b, d === "ban") : fail(405, "method");
+        break;
+      case "leaderboards":
+        if (b !== undefined) break;
+        return m === "GET" ? await leaderboards(c) : fail(405, "method");
+      case "quick":
+        if (b !== undefined) break;
+        return m === "GET" ? await quick(c) : fail(405, "method");
     }
     return fail(404, "not_found");
   } catch (e) {
@@ -303,9 +323,11 @@ function roomCode(s: string): string | null {
   return isCode(code) ? code : null;
 }
 
+/** The DO's snapshot plus `paused` (a match in progress, nobody connected); null when the room is gone. */
 async function liveSnapshot(env: Env, code: string) {
   try {
-    return await stub(env, code).adminSnapshot();
+    const s = (await stub(env, code).adminSnapshot()) as AdminSnapshot | null;
+    return s ? { ...s, paused: s.status === "playing" && !s.members.some((m) => m.online) } : null;
   } catch (e) {
     console.error("adminSnapshot failed:", e);
     return null;
@@ -369,15 +391,51 @@ async function playerDetail(c: Ctx, raw: string): Promise<Response> {
   const player = await D.getPlayer(c.env.DB, pid);
   if (!player) return fail(404, "not_found");
   const ms = await D.listMatches(c.env.DB, { pid, since: player.first_seen ?? undefined, limit: 20 });
-  return json({ player, matches: ms.items.map(D.matchOut) });
+  const dev = await deviceOf(c.env.DB, pid);
+  return json({ player, account_id: dev?.account_id ?? null, matches: ms.items.map(D.matchOut) });
 }
 
+async function deviceOf(db: D1Database, pid: string): Promise<{ account_id: string } | null> {
+  return db.prepare("SELECT account_id FROM devices WHERE pid = ?").bind(pid).first<{ account_id: string }>();
+}
+
+/**
+ * POST /admin/api/players/:pid/ban {reason} / unban. Ban sources (ADMIN_API.md "Ban sources"): the pid ban is
+ * "admin_pid"; it bans the device's account too ("pid:<pid>") unless that account is banned already. Unbanning the pid
+ * lifts the account ban only when this pid's ban caused it (another device of the account still banned on the
+ * Players page takes the cause over instead).
+ */
 async function playerBan(c: Ctx, raw: string, ban: boolean): Promise<Response> {
   const pid = pidOf(raw);
   if (!pid) return fail(404, "not_found");
   const o = await body(c.req);
   const reason = ban ? optString(o, "reason", 200, 3)! : null;
-  if (!(await D.setBan(c.env.DB, pid, ban, reason))) return fail(404, "not_found");
+  const db = c.env.DB;
+  const dev = await deviceOf(db, pid);
+  if (!(await D.setBan(db, pid, ban, reason, ban ? "admin_pid" : null))) {
+    // a v2 device that never joined a friend room has no players row yet: create it to hold the pid ban
+    if (!dev) return fail(404, "not_found");
+    await ensurePlayerRows(db, [pid]);
+    await D.setBan(db, pid, ban, reason, ban ? "admin_pid" : null);
+  }
+  let accountBanned: boolean | null = null;
+  if (dev) {
+    const acc = await db.prepare("SELECT banned, ban_source FROM accounts WHERE id = ?").bind(dev.account_id).first<{ banned: number; ban_source: string | null }>();
+    if (acc && ban && !acc.banned) {
+      await setAccountBan(db, dev.account_id, true, reason, `pid:${pid}`);
+    } else if (acc && !ban && acc.banned && acc.ban_source === `pid:${pid}`) {
+      const other = await db
+        .prepare(
+          `SELECT p.pid, p.ban_reason FROM devices d JOIN players p ON p.pid = d.pid
+           WHERE d.account_id = ? AND d.pid != ? AND p.banned = 1 AND p.ban_source = 'admin_pid' LIMIT 1`,
+        )
+        .bind(dev.account_id, pid)
+        .first<{ pid: string; ban_reason: string | null }>();
+      if (other) await setAccountBan(db, dev.account_id, true, other.ban_reason, `pid:${other.pid}`);
+      else await setAccountBan(db, dev.account_id, false, null, null);
+    }
+    accountBanned = ((await db.prepare("SELECT banned FROM accounts WHERE id = ?").bind(dev.account_id).first<{ banned: number }>())?.banned ?? 0) === 1;
+  }
   const player = await D.getPlayer(c.env.DB, pid);
   // best effort: the room of the player's latest join (players.last_room) kicks them / forgets its cached flag
   let kicked = false;
@@ -390,8 +448,24 @@ async function playerBan(c: Ctx, raw: string, ban: boolean): Promise<Response> {
       console.error("ban kick failed:", e);
     }
   }
-  await audit(c, ban ? "player.ban" : "player.unban", pid, ban ? { reason, kicked, room } : undefined);
-  return json(ban ? { ok: true, kicked, player } : { ok: true, player });
+  const account_id = dev?.account_id ?? null;
+  await audit(
+    c,
+    ban ? "player.ban" : "player.unban",
+    pid,
+    ban ? { reason, kicked, room, account_id: account_id ?? undefined, account_banned: accountBanned ?? undefined } : dev ? { account_id, account_banned: accountBanned } : undefined,
+  );
+  return json(ban ? { ok: true, kicked, player, account_id, account_banned: accountBanned } : { ok: true, player, account_id, account_banned: accountBanned });
+}
+
+/** players rows for v2 devices that never joined a friend room (they hold the pid bans). */
+async function ensurePlayerRows(db: D1Database, pids: string[]): Promise<void> {
+  if (!pids.length) return;
+  await db.batch(
+    pids.map((pid) =>
+      db.prepare("INSERT OR IGNORE INTO players (pid, first_seen, last_seen) SELECT pid, first_seen, last_seen FROM devices WHERE pid = ?").bind(pid),
+    ),
+  );
 }
 
 async function playerPatch(c: Ctx, raw: string): Promise<Response> {
@@ -449,4 +523,178 @@ async function configPut(c: Ctx): Promise<Response> {
   D.forgetConfig();
   if (Object.keys(patch).length) await audit(c, "config.update", null, patch);
   return json(await D.readConfig(c.env.DB));
+}
+
+// ----- v2: accounts -----
+
+const ADJUST_MAX = 1_000_000;
+
+/** source: "admin_account" | "pid:<pid>" (null when lifting). */
+async function setAccountBan(db: D1Database, id: string, ban: boolean, reason: string | null, source: string | null): Promise<boolean> {
+  const r = await db
+    .prepare("UPDATE accounts SET banned = ?, ban_reason = ?, ban_source = ? WHERE id = ?")
+    .bind(ban ? 1 : 0, ban ? reason : null, ban ? source : null, id)
+    .run();
+  return r.meta.changes > 0;
+}
+
+function accountId(raw: string): string | null {
+  const id = decode(raw);
+  return ACCOUNT_RE.test(id) ? id : null;
+}
+
+function flag(u: URL, k: string): boolean | undefined {
+  const v = oneOf(u, k, ["0", "1"] as const);
+  return v === undefined ? undefined : v === "1";
+}
+
+async function accounts(c: Ctx): Promise<Response> {
+  const q = param(c.url, "q");
+  const p = await D.listAccounts(c.env.DB, { q, banned: flag(c.url, "banned"), linked: flag(c.url, "linked"), ...pageArgs(c.url) });
+  return page(p, (r) => adminAccountOut(r as unknown as AccountRow));
+}
+
+async function accountDetail(c: Ctx, raw: string): Promise<Response> {
+  const id = accountId(raw);
+  if (!id) return fail(404, "not_found");
+  const db = c.env.DB;
+  const row = await getAccount(db, id);
+  if (!row) return fail(404, "not_found");
+  const [devices, ledger, claims, grants] = await db.batch([
+    db.prepare("SELECT * FROM devices WHERE account_id = ? ORDER BY last_seen DESC LIMIT 50").bind(id),
+    db.prepare("SELECT * FROM ledger WHERE account_id = ? ORDER BY id DESC LIMIT 50").bind(id),
+    db.prepare("SELECT id, at, game, mode, coins, xp, granted, limited, reason, payload FROM claims WHERE account_id = ? ORDER BY at DESC LIMIT 50").bind(id),
+    db.prepare("SELECT * FROM match_grants WHERE account_id = ? ORDER BY at DESC LIMIT 20").bind(id),
+  ]);
+  const devs = devices.results as Array<{ pid: string }>;
+  const ms = await D.matchesForAccount(db, id, devs.map((d) => d.pid), 20);
+  const claimRows = (claims.results as Array<Record<string, unknown>>).map((r) => ({ ...r, payload: parseJsonText(r.payload) }));
+  return json({
+    now: c.now,
+    account: adminAccountOut(row),
+    devices: devs,
+    ledger: ledger.results,
+    claims: claimRows,
+    grants: grants.results,
+    matches: ms.map(D.matchOut),
+  });
+}
+
+function parseJsonText(v: unknown): unknown {
+  if (typeof v !== "string") return v ?? null;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return v;
+  }
+}
+
+/** POST /admin/api/accounts/:id/coins {delta, reason}: a ledger row (reason "admin", ref = the reason), audited. */
+async function accountCoins(c: Ctx, raw: string): Promise<Response> {
+  const id = accountId(raw);
+  if (!id) return fail(404, "not_found");
+  const o = await body(c.req);
+  const delta = o.delta;
+  if (typeof delta !== "number" || !Number.isInteger(delta) || delta === 0 || Math.abs(delta) > ADJUST_MAX) {
+    throw new BadRequest(`delta: a non-zero integer, at most ${ADJUST_MAX} either way`);
+  }
+  const reason = optString(o, "reason", 200, 3)!;
+  const r = await mutate(c.env, id, c.now, (_row, p): Step<{ ok: boolean; coins: number }> => {
+    const coins = Math.trunc(p.coins) + delta;
+    if (coins < 0) return { result: { ok: false, coins: Math.trunc(p.coins) } };
+    const np = structuredClone(p);
+    np.coins = coins; // a correction, not coins earned (stats.coinsEarned unchanged)
+    return { result: { ok: true, coins }, write: { profile: np, ledger: { coins: delta, xp: 0, reason: "admin", ref: reason } } };
+  });
+  if (!r) return fail(404, "not_found");
+  if (!r.ok) return json({ error: "coins", msg: `the balance would go below 0 (it is ${r.coins})`, coins: r.coins }, 409);
+  await audit(c, "account.coins", id, { delta, reason, balance: r.coins });
+  return json({ ok: true, coins: r.coins, account: adminAccountOut((await getAccount(c.env.DB, id))!) });
+}
+
+/**
+ * POST /admin/api/accounts/:id/ban {reason} / unban. Ban: the account ("admin_account") and the pids of its devices
+ * that are not banned yet ("account:<id>"), each kicked from its latest room. Unban: the account, and the pid bans
+ * this account's ban caused (pid bans made on the Players page stay: `still_banned_pids`).
+ */
+async function accountBan(c: Ctx, raw: string, ban: boolean): Promise<Response> {
+  const id = accountId(raw);
+  if (!id) return fail(404, "not_found");
+  const o = await body(c.req);
+  const reason = ban ? optString(o, "reason", 200, 3)! : null;
+  const db = c.env.DB;
+  if (!(await setAccountBan(db, id, ban, reason, "admin_account"))) return fail(404, "not_found");
+  const devs = (await db.prepare("SELECT pid FROM devices WHERE account_id = ?").bind(id).all<{ pid: string }>()).results.map((r) => r.pid);
+  const src = `account:${id}`;
+  if (ban) {
+    await ensurePlayerRows(db, devs);
+    if (devs.length) {
+      await db.batch(
+        devs.map((pid) =>
+          db.prepare("UPDATE players SET banned = 1, ban_reason = ?, ban_source = ? WHERE pid = ? AND banned = 0").bind(reason, src, pid),
+        ),
+      );
+    }
+  } else {
+    // lift the pid bans this account's ban caused (also of devices that moved to another account since)
+    await db.prepare("UPDATE players SET banned = 0, ban_reason = NULL, ban_source = NULL WHERE banned = 1 AND ban_source = ?").bind(src).run();
+  }
+  const { results } = await db
+    .prepare("SELECT d.pid, p.last_room, COALESCE(p.banned, 0) AS banned FROM devices d LEFT JOIN players p ON p.pid = d.pid WHERE d.account_id = ?")
+    .bind(id)
+    .all<{ pid: string; last_room: string | null; banned: number }>();
+  let kicked = 0;
+  for (const r of results) {
+    if (!r.last_room || !isCode(r.last_room)) continue;
+    try {
+      if (ban) kicked += (await stub(c.env, r.last_room).adminBan(r.pid, reason ?? "")) ? 1 : 0;
+      else if (!r.banned) await stub(c.env, r.last_room).adminUnban(r.pid);
+    } catch (e) {
+      console.error("account ban kick failed:", e);
+    }
+  }
+  const stillBanned = results.filter((r) => r.banned === 1).map((r) => r.pid);
+  await audit(c, ban ? "account.ban" : "account.unban", id, ban ? { reason, kicked } : stillBanned.length ? { still_banned_pids: stillBanned } : undefined);
+  const account = adminAccountOut((await getAccount(db, id))!);
+  return json(ban ? { ok: true, kicked, account } : { ok: true, account, still_banned_pids: stillBanned });
+}
+
+async function accountPatch(c: Ctx, raw: string): Promise<Response> {
+  const id = accountId(raw);
+  if (!id) return fail(404, "not_found");
+  const o = await body(c.req);
+  if (!("note" in o)) throw new BadRequest("note: string or null");
+  const note = optString(o, "note", 500);
+  const r = await c.env.DB.prepare("UPDATE accounts SET note = ? WHERE id = ?").bind(note || null, id).run();
+  if (r.meta.changes === 0) return fail(404, "not_found");
+  await audit(c, "account.note", id, { note: note || null });
+  return json({ ok: true, account: adminAccountOut((await getAccount(c.env.DB, id))!) });
+}
+
+// ----- v2: leaderboards, quick match -----
+
+async function leaderboards(c: Ctx): Promise<Response> {
+  const board = (oneOf(c.url, "board", BOARDS) ?? "xp") as Board;
+  const period = (oneOf(c.url, "period", PERIODS) ?? "all") as PeriodArg;
+  const week = param(c.url, "week", 8);
+  if (week !== undefined && (period !== "week" || !/^\d{4}-W\d{2}$/.test(week))) throw new BadRequest("week: YYYY-Www, with period=week");
+  const l = c.url.searchParams.get("limit");
+  let limit = 50;
+  if (l !== null && l !== "") {
+    if (!/^\d{1,3}$/.test(l) || Number(l) < 1 || Number(l) > 200) throw new BadRequest("limit: 1-200");
+    limit = Number(l);
+  }
+  const key = periodKey(period, c.now, week);
+  const [top, total] = await Promise.all([topScores(c.env.DB, board, key, limit), countScores(c.env.DB, board, key)]);
+  return json({ board, period: key === "all" ? "all" : "week", week: key === "all" ? null : key.slice(5), total, top });
+}
+
+async function quick(c: Ctx): Promise<Response> {
+  const d = c.url.searchParams.get("days");
+  let days = 14;
+  if (d !== null && d !== "") {
+    if (!/^\d{1,2}$/.test(d) || Number(d) < 1 || Number(d) > 90) throw new BadRequest("days: 1-90");
+    days = Number(d);
+  }
+  return json(await D.quickReport(c.env.DB, days, c.now));
 }

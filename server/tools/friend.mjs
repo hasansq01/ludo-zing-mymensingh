@@ -2,7 +2,9 @@
 // own turns with a replica of the TypeScript rules, checking the server hash after every action.
 //   node tools/friend.mjs CODE [--url wss://ludo-zing-rooms.flipfold.workers.dev] [--name Robo] [--host-start]
 //                              [--delay 600] [--drop-at N --rejoin-after 25000]
-// --host-start: if this friend ends up host (it created nothing, so only when the host left), it starts the match.
+// --host-start: if this friend is host (it joined an empty room first, or the host left), it starts the match once
+// --start-at N members (default 2) are in.
+// Plays Ludo or Snakes & Ladders, whichever the host picked (start / sync carry `game`).
 // Exits 0 at `over` with no hash mismatches, 1 otherwise.
 import { build } from "esbuild";
 import { dirname, resolve } from "node:path";
@@ -27,10 +29,13 @@ const DELAY = Number(opt("delay", 600));
 const DROP_AT = Number(opt("drop-at", -1));
 const REJOIN_AFTER = Number(opt("rejoin-after", 25_000));
 const HOST_START = Boolean(opt("host-start", false));
+const START_AT = Number(opt("start-at", 2));      // --host-start waits for this many members
 
 const bundle = await build({
   stdin: {
-    contents: 'export * from "./src/rules/ludo.ts"; export { stateHash } from "./src/rules/hash.ts";',
+    contents:
+      'export * from "./src/rules/ludo.ts"; export { stateHash } from "./src/rules/hash.ts";' +
+      'export { applySlAction, turnColor as slTurnColor } from "./src/rules/sl.ts"; export { slStateHash } from "./src/rules/sl_hash.ts";',
     resolveDir: serverDir,
     loader: "ts",
   },
@@ -48,7 +53,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const COLORS = ["Red", "Green", "Yellow", "Blue"];
 const pid = "friend-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
-let ws, token, id = -1, state = null, n = 0, seats = [], dropped = false, over = null;
+let ws, token, id = -1, state = null, n = 0, seats = [], dropped = false, over = null, game = "ludo";
+const hash = () => (game === "sl" ? R.slStateHash(state) : R.stateHash(state));
 const stats = { acts: 0, mismatches: 0, syncs: 0, errors: {} };
 const color = () => seats.find((s) => s.id === id)?.color ?? -1;
 const send = (o) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(o));
@@ -61,7 +67,16 @@ function connect() {
 }
 
 async function play(c) {
-  if (!state || dropped || c !== color() || state.players[c] !== "human") return;
+  if (!state || dropped || c !== color()) return;
+  if (game === "sl") {
+    const me = state.players.find((p) => p.c === c);
+    if (!me || me.cpu || R.slTurnColor(state) !== c) return;
+    const at = n;
+    await sleep(DELAY);
+    if (n === at && state.phase === "roll") send({ t: "roll", n });
+    return;
+  }
+  if (state.players[c] !== "human") return;
   const at = n;
   await sleep(DELAY);
   if (n !== at || state.turn !== c) return;
@@ -79,24 +94,27 @@ function onMessage(m) {
       break;
     case "lobby":
       log(`lobby (${m.status ?? "lobby"}): ${m.members.map((x) => `${x.name}${x.id === m.host ? "*" : ""}`).join(", ")}`);
-      if (HOST_START && m.host === id && m.members.length >= 2 && (m.status ?? "lobby") !== "playing") send({ t: "start" });
+      if (HOST_START && m.host === id && m.members.length >= START_AT && (m.status ?? "lobby") !== "playing") send({ t: "start" });
       break;
     case "start":
     case "sync":
+      game = m.game ?? "ludo";
       state = structuredClone(m.state);
       n = m.n;
       seats = m.seats;
       if (m.t === "sync") stats.syncs++;
-      if (R.stateHash(state) !== m.h) stats.mismatches++;
+      if (hash() !== m.h) stats.mismatches++;
       log(`${m.t}: ${seats.map((s) => `${COLORS[s.color]}=${s.name}`).join(", ")}; I am ${COLORS[color()]}`);
       break;
     case "act":
       if (!state) break;
       if (m.n !== n) { send({ t: "sync_req" }); break; }
-      R.applyAction(state, m.a);
+      const ev = game === "sl" ? R.applySlAction(state, m.a) : R.applyAction(state, m.a);
       n = m.n + 1;
+      for (const e of ev) if (e.type === "finished") log(`${COLORS[e.c]} finished, place ${e.place} (the others play on)`);
+      if (m.a.k === "end") log("the server ended the match ({k: end}): the rest ranked by progress");
       stats.acts++;
-      if (R.stateHash(state) !== m.h) { stats.mismatches++; log(`HASH MISMATCH at ${m.n}`); send({ t: "sync_req" }); }
+      if (hash() !== m.h) { stats.mismatches++; log(`HASH MISMATCH at ${m.n}`); send({ t: "sync_req" }); }
       if (m.a.k === "roll" && m.a.c === color()) log(`I rolled ${m.a.v}`);
       if (m.a.k === "mode") log(`${COLORS[m.a.c]} is now ${m.a.mode === "cpu" ? "a bot" : "human again"}`);
       if (n === DROP_AT && !dropped) {

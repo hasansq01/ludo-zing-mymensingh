@@ -1,7 +1,7 @@
 // Cells shared by every match table (Matches, player detail, room detail).
 import { h, parseJson, duration, fmtInt, timeEl } from "../dom.js";
 import { icon } from "../icons.js";
-import { colorMark, COLORS, badge, resultBadge, codeLink } from "../ui.js";
+import { colorMark, COLORS, badge, resultBadge, codeLink, ghostTag } from "../ui.js";
 
 export const matchPlayers = (m) => {
   const p = parseJson(m.players, []);
@@ -19,8 +19,9 @@ export function playersCell(m) {
   if (!ps.length) return h("span", { class: "muted" }, "–");
   return h("ul", { class: "mplayers" }, ps.map((p) => h("li", { class: isWinner(m, p.color) ? "is-win" : "" },
     colorMark(p.color),
-    p.bot || !p.pid ? h("span", { class: "mp-name" }, p.name || COLORS[p.color]) : h("a", { href: "#/players/" + encodeURIComponent(p.pid), class: "mp-name link" }, p.name || "Player"),
-    p.bot ? h("span", { class: "tag tag-bot", title: "Bot" }, icon("bot", { size: 11 }), "bot") : null)));
+    p.bot || p.ghost || !p.pid ? h("span", { class: "mp-name" }, p.name || COLORS[p.color]) : h("a", { href: "#/players/" + encodeURIComponent(p.pid), class: "mp-name link" }, p.name || "Player"),
+    p.bot ? h("span", { class: "tag tag-bot", title: "Bot" }, icon("bot", { size: 11 }), "bot") : null,
+    p.ghost ? ghostTag() : null)));
 }
 
 export function winnerCell(m) {

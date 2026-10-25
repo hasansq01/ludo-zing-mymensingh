@@ -51,13 +51,16 @@ it("finish order and standings (Individual)", () => {
   let t = base(); t[1] = [56, 56, 56, 55]; t[0][0] = 30; t[2][0] = 10; t[3][0] = 40;
   let s = state(t, [], { ...vs, turn: 1, finished: [] });
   play(s, 1);
-  expect([s.phase, s.finished]).toEqual(["over", [1]]);
+  expect([s.phase, s.finished, s.turn, s.winner]).toEqual(["roll", [1], 2, -1]); // you are still playing: play on
   let st = Ludo.standings(s);
   expect(st.map((e) => e.color)).toEqual([1, 3, 0, 2]);
   expect(st.map((e) => e.place)).toEqual([1, 2, 3, 4]);
   expect([st[0].finished, st[1].finished]).toEqual([true, false]);
   expect(st.every((e) => e.progress >= 0 && e.progress <= 1)).toBe(true);
   expect(st[0].progress).toBeCloseTo(1.0);
+  expect(Ludo.endGame(s).map((e) => e.type)).toEqual(["game_over"]);
+  expect([s.phase, s.winner, s.finished]).toEqual(["over", 1, [1, 3, 0, 2]]);
+  expect(Ludo.standings(s).map((e) => e.color)).toEqual([1, 3, 0, 2]);
   t = base(); t[0][0] = 20; t[1][0] = 20;
   st = Ludo.standings(state(t, [], { players: ["human", "off", "human", "off"] }));
   expect(st.map((e) => e.color)).toEqual([0, 2]);
@@ -73,22 +76,21 @@ it("finish order and standings (Teams)", () => {
   let t = base(); t[0] = [56, 56, 56, 55]; t[2][0] = 10; t[1][0] = 5; t[3][0] = 30;
   let s = state(t, [], { teams: true, finished: [] });
   const ev = Ludo.move((Ludo.applyRoll(s, 1), s), 3);
-  expect(ev.map((e) => e.type)).toEqual(["move", "home", "finished", "turn"]);
+  expect(ev.map((e) => e.type)).toEqual(["move", "home", "all_home", "turn"]);
   expect([s.finished, s.phase, s.winner]).toEqual([[0], "roll", -1]);
   let st = Ludo.standings(s);
   expect(st.map((e) => e.color)).toEqual([0, 2, 3, 1]);
   expect(st.map((e) => e.place)).toEqual([1, 1, 2, 2]);
   s.tok[2] = [56, 56, 56, 55]; s.turn = 2; s.phase = "roll"; s.sixes = 0;
   play(s, 1);
-  expect([s.phase, s.finished]).toEqual(["over", [0, 2]]);
+  expect([s.phase, s.finished]).toEqual(["over", [0, 2, 3, 1]]);
   st = Ludo.standings(s);
   expect([st[0].place, st[1].place, st[0].finished, st[1].finished, st[2].place]).toEqual([1, 1, true, true, 2]);
   t = base(); t[0] = HOME(); t[2] = [56, 56, 56, 55];
   s = state(t, [], { teams: true, finished: [], free: [true, false, false, false] });
   play(s, 1);
   expect(s.phase).toBe("over");
-  expect([...(s.finished ?? [])].sort()).toEqual([0, 2]);
-  expect(s.finished).toEqual([0, 2]); // Yellow wins; Red (home earlier, not recorded) goes in before it
+  expect(s.finished).toEqual([2, 0, 1, 3]); // Yellow brought the team home; Red (home earlier, not recorded) next
   t = base(); t[1][0] = 50; t[3][0] = 2;
   st = Ludo.standings(state(t, [], { teams: true, finished: [] }));
   expect([st[0].color, st[0].place, st[2].place]).toEqual([1, 1, 2]);

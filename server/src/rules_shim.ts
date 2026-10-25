@@ -11,6 +11,7 @@ export {
   pickAi,
   winners,
   standings,
+  sideDone,
   applyAction,
 } from "./rules/ludo";
 export { stateHash } from "./rules/hash";

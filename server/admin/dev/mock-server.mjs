@@ -7,7 +7,8 @@
 //   MOCK_LATENCY=400 …  extra latency per API call (ms), to see skeletons
 //
 // Data is fake and in memory (seeded, so it's the same on every start). Three rooms play live matches whose
-// state advances on a timer, so the room page's board animates.
+// state advances on a timer, so the room page's board animates; a fourth is paused (a match in progress with
+// nobody connected: its bots wait, like the real Room DO).
 
 import http from "node:http";
 import fs from "node:fs";
@@ -154,7 +155,7 @@ function startMatch(L, scramble) {
     const m = L.members[k];
     pl[color] = "human";
     names[color] = m.name;
-    return { color, id: m.id, name: m.name, avatar: m.avatar, frame: m.frame, bot: false, online: m.online, pid: m.pid, left: false };
+    return { color, id: m.id, name: m.name, avatar: m.avatar, frame: m.frame, bot: false, online: m.online, pid: m.pid, left: false, ghost: m.ghost || undefined };
   });
   const tok = [[-1, -1, -1, -1], [-1, -1, -1, -1], [-1, -1, -1, -1], [-1, -1, -1, -1]];
   if (scramble) {
@@ -170,7 +171,7 @@ function startMatch(L, scramble) {
     teams: Boolean(L.settings.teams && cols.length === 4), free: [false, false, false, false], pending: {}, pair_ask: Boolean(L.settings.pair_ask), finished: [],
   };
   const m = addMatch(L.room.code, L.members, Date.now() - (scramble ? ri(3, 12) * 60e3 : 0), { result: "playing" });
-  m.players = seats.map((s) => ({ pid: s.pid, name: s.name, color: s.color, bot: false }));
+  m.players = seats.map((s) => ({ pid: s.ghost ? null : s.pid, name: s.name, color: s.color, bot: false, ghost: s.ghost || undefined }));
   m.teams = state.teams ? 1 : 0;
   L.match = { n: scramble ? ri(40, 180) : 0, state, seats, deadline: Date.now() + 2500, started_at: m.started_at, _row: m };
   L.status = "playing";
@@ -279,10 +280,23 @@ for (const r of rooms.filter((x) => x.status === "over" && NOW0 - x.updated_at <
   L.match.state.players[L.match.seats[2].color] = "cpu";
 }
 
+// one paused room: a match in progress, everyone disconnected (all seats bots now; nothing moves until someone is back)
+{
+  const r = addRoom("playing", NOW0 - 33 * 60e3, 2);
+  const L = liveFromRoom(r, true);
+  for (const m of L.members) m.online = false;
+  for (const st of L.match.seats) { st.online = false; st.bot = true; L.match.state.players[st.color] = "cpu"; }
+  L.match.deadline = 0;
+  r.online = 0;
+  r.updated_at = NOW0 - 4 * 60e3;
+}
+
+const anyOnline = (L) => L.members.some((m) => m.online);
+
 setInterval(() => {
   const now = Date.now();
   for (const L of live.values()) {
-    if (L.match && L.status === "playing" && L.match.deadline && now >= L.match.deadline) step(L);
+    if (L.match && L.status === "playing" && L.match.deadline && now >= L.match.deadline && anyOnline(L)) step(L);
   }
 }, 200);
 
@@ -322,6 +336,154 @@ addAudit(NOW0 - 1 * DAY + 95e3, "198.51.100.23", "player.ban", players[40].pid, 
 addAudit(NOW0 - 20 * 3600e3, "198.51.100.23", "player.note", players[3].pid, { note: players[3].note });
 addAudit(NOW0 - 5 * 3600e3, "198.51.100.23", "logout", null);
 
+// ---------- v2: accounts, ledger, claims, leaderboards, quick match (ADMIN_API.md "v2") ----------
+const B32 = "abcdefghijklmnopqrstuvwxyz234567";
+const ACC_RE = /^acc_[a-z2-7]{16}$/;
+const LEDGER_REASONS = ["daily", "spin", "free", "buy", "achievement", "claim", "match"];
+const levelOf = (xp) => 1 + Math.floor(Math.sqrt(Math.max(0, xp) / 40));
+
+const accounts = [];
+const accById = new Map();
+const ledgerOf = new Map();
+const claimsOf = new Map();
+const grantsOf = new Map();
+const devicesOf = new Map();
+let ledgerId = 1;
+
+for (let k = 0; k < 52; k++) {
+  const p = players[k];
+  const id = "acc_" + randStr(16, B32);
+  const created = p.first_seen;
+  const linked = k % 3 === 0;
+  const acc = {
+    id, created_at: created, last_seen: p.last_seen, google_player_id: linked ? "g" + ri(1e8, 9e8) + ri(1e8, 9e8) : null,
+    google_name: linked ? p.name + " Google" : null, public_id: "LZM-" + randStr(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789") + "-" + randStr(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
+    name: p.name, avatar: p.avatar, frame: p.frame, plate: "", badge: "", coins: 0, xp: 0, online_wins: 0, completed_matches: 0,
+    stats: { wins: ri(0, 20), games: ri(0, 60), coinsEarned: ri(5000, 90000) }, owned: { rooms: ["classic"], dice_owned: ["bone"], scenes: [], av_owned: [p.avatar || "pawn-red"] },
+    equipped: { room: "classic", dice: "bone", scene: "" }, rewards: { daily: ri(0, 6), last_spin: created, last_free: created }, achievements: { claimed: [] },
+    banned: 0, ban_reason: null, ban_source: null, note: null, merged_into: null, imported: k % 7 === 0 ? 1 : 0, version: ri(3, 140),
+    _xpWeek: 0, _winsWeek: 0,
+  };
+  accounts.push(acc);
+  accById.set(id, acc);
+  devicesOf.set(id, [{ pid: p.pid, account_id: id, first_seen: created, last_seen: p.last_seen }]);
+  if (k % 5 === 0 && players[52 + k / 5]) {
+    const q = players[52 + k / 5];
+    devicesOf.get(id).push({ pid: q.pid, account_id: id, first_seen: q.first_seen, last_seen: q.last_seen });
+  }
+  // ledger: the first 5,000, then a mix; sum = coins
+  const rows = [{ id: ledgerId++, account_id: id, at: created, delta_coins: 5000, delta_xp: 0, reason: "start", ref: null, balance_after: 5000 }];
+  let bal = 5000;
+  let xp = 0;
+  const n = ri(8, k % 4 === 0 ? 70 : 34);
+  for (let i = 0; i < n; i++) {
+    const reason = pick(LEDGER_REASONS);
+    let dc = reason === "buy" ? -ri(2, 40) * 50 : reason === "match" ? ri(1, 8) * 50 : reason === "spin" ? ri(1, 10) * 100 : reason === "achievement" ? ri(2, 10) * 100 : ri(1, 5) * 100;
+    if (bal + dc < 0) dc = 100;
+    const dx = reason === "match" ? ri(20, 120) : reason === "achievement" ? ri(30, 90) : reason === "daily" ? 10 : 0;
+    bal += dc; xp += dx;
+    const at = created + Math.floor(((i + 1) / (n + 1)) * Math.max(3600e3, acc.last_seen - created));
+    rows.push({ id: ledgerId++, account_id: id, at, delta_coins: dc, delta_xp: dx, reason, ref: reason === "match" ? "m" + ri(1000, 9999) : reason === "buy" ? pick(["dice:gold", "room:night", "avatar:robot"]) : reason === "achievement" ? pick(["first_win", "ten_games", "streak_3"]) : null, balance_after: bal });
+  }
+  acc.coins = bal; acc.xp = xp; acc.level = levelOf(xp);
+  acc.online_wins = ri(0, 30); acc.completed_matches = k % 9 === 4 ? ri(0, 2) : ri(3, 80);
+  acc._xpWeek = Math.floor(xp * rnd() * 0.3); acc._winsWeek = Math.floor(acc.online_wins * rnd() * 0.4);
+  ledgerOf.set(id, rows);
+  const grants = rows.filter((r) => r.reason === "match").slice(-20).map((r, i) => ({ match_id: "ln_" + r.ref + "_" + i, account_id: id, at: r.at, game: i % 4 ? "ludo" : "sl", outcome: pick(["win", "finish", "finish", "loss"]), coins: r.delta_coins, xp: r.delta_xp }));
+  grantsOf.set(id, grants);
+  const claims = [];
+  const nc = ri(2, k % 6 === 0 ? 24 : 9);
+  for (let i = 0; i < nc; i++) {
+    const limited = k % 6 === 0 && i % 4 === 1 ? 1 : 0;
+    const at = acc.last_seen - i * ri(5, 90) * 60e3;
+    claims.push({ id: "clm_" + randStr(10), at, game: pick(["ludo", "sl"]), mode: pick(["online", "cpu", "pass"]), coins: limited ? 0 : ri(1, 6) * 50, xp: limited ? 0 : ri(10, 80), granted: limited ? 0 : 1, limited, reason: limited ? "daily limit" : null, payload: { outcome: pick(["win", "finish"]), players: ri(2, 4), turns: ri(60, 300), seed: randStr(6) } });
+  }
+  claimsOf.set(id, claims);
+}
+// moderation states: account 12 banned from the Accounts page, account 40's mirrors a pid ban
+const accOfPid = new Map();
+for (const [id, ds] of devicesOf) for (const d of ds) accOfPid.set(d.pid, accounts.find((a) => a.id === id));
+Object.assign(accounts[12], { banned: 1, ban_reason: "Abusive name, 3 reports", ban_source: "admin_account" });
+Object.assign(accounts[40], { banned: 1, ban_reason: "XSS attempt in the display name", ban_source: "pid:" + players[40].pid });
+accounts[3].note = "Tester from the Mymensingh club. Reports bugs on WhatsApp.";
+const pidBanSource = new Map([[players[12].pid, "admin_account"], [players[40].pid, "admin_pid"]]);
+for (const p of players) { /* players.ban_source lives in this map */ if (p.banned && !pidBanSource.has(p.pid)) pidBanSource.set(p.pid, "admin_pid"); }
+pidBanSource.set(players[12].pid, "account:" + accounts[12].id);
+
+// ghosts show in the console only: a couple of past matches, one live seat
+{
+  let g = 0;
+  for (const m of matches) {
+    if (m.players.filter((x) => !x.bot).length >= 2 && ++g % 6 === 0) {
+      const last = m.players.filter((x) => !x.bot).slice(-1)[0];
+      last.ghost = true; last.pid = null; last.account_id = null;
+      m.quick = 1; m.ghosts = 1; m.game = "ludo";
+    }
+  }
+  const L = live.get(liveRooms[1].code);
+  if (L) {
+    const mem = L.members[1];
+    mem.ghost = true; mem.pid = "";
+    const seat = L.match.seats.find((s) => s.id === mem.id);
+    seat.ghost = true; seat.pid = "";
+    const row = L.match._row.players.find((x) => x.color === seat.color);
+    row.ghost = true; row.pid = null;
+    L.room.quick = 1;
+  }
+}
+
+// quick_stats: 90 days, games ludo / sl, sizes 2 and 4
+const quickRows = [];
+for (let d = 0; d < 90; d++) {
+  const day = new Date(Math.floor((NOW0 - d * DAY) / DAY) * DAY).toISOString().slice(0, 10);
+  for (const game of ["ludo", "sl"]) for (const size of [2, 4]) {
+    if (game === "sl" && size === 4 && d % 3) continue;
+    const scale = (game === "ludo" ? 1 : 0.5) * (size === 2 ? 1 : 0.6) * (d === 0 ? 0.5 : 1) * (d > 60 ? 0.3 : 1);
+    const queued = Math.round(ri(8, 60) * scale);
+    if (!queued) continue;
+    const matched = Math.max(0, queued - ri(0, Math.max(1, Math.round(queued * 0.25))));
+    const ghost_filled = Math.round(matched * ri(15, 60) / 100 * (size === 4 ? 1.2 : 0.8));
+    const finished = Math.round((matched + ghost_filled) / size * 0.8);
+    const human_wins = Math.round(finished * ri(40, 70) / 100);
+    quickRows.push({ day, game, size, queued, matched, ghost_filled, wait_ms_total: matched * ri(4000, 22000), human_wins, ghost_wins: finished - human_wins });
+  }
+}
+const quickShape = (r) => {
+  const seats = r.matched + r.ghost_filled;
+  const fin = r.human_wins + r.ghost_wins;
+  return { day: r.day, game: r.game, size: r.size, queued: r.queued, matched: r.matched, ghost_filled: r.ghost_filled,
+    ghost_fill_rate: seats > 0 ? r.ghost_filled / seats : null, avg_wait_ms: r.matched > 0 ? Math.round(r.wait_ms_total / r.matched) : null,
+    human_wins: r.human_wins, ghost_wins: r.ghost_wins, human_win_rate: fin > 0 ? r.human_wins / fin : null };
+};
+function quickReport(days) {
+  const from = new Date(Math.floor((Date.now() - (days - 1) * DAY) / DAY) * DAY).toISOString().slice(0, 10);
+  const rowsIn = quickRows.filter((r) => r.day >= from);
+  const tot = new Map();
+  for (const r of rowsIn) {
+    const k = r.game + ":" + r.size;
+    const t = tot.get(k) || { day: "total", game: r.game, size: r.size, queued: 0, matched: 0, ghost_filled: 0, wait_ms_total: 0, human_wins: 0, ghost_wins: 0 };
+    for (const f of ["queued", "matched", "ghost_filled", "wait_ms_total", "human_wins", "ghost_wins"]) t[f] += r[f];
+    tot.set(k, t);
+  }
+  return { days, from, rows: rowsIn.map(quickShape), totals: [...tot.values()].map(quickShape) };
+}
+
+const isoWeek = (t) => {
+  const d = new Date(t);
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const y = d.getUTCFullYear();
+  const w = Math.ceil(((d - Date.UTC(y, 0, 1)) / DAY + 1) / 7);
+  return y + "-W" + String(w).padStart(2, "0");
+};
+const accountOut = (a) => { const { _xpWeek, _winsWeek, ...r } = a; return { ...r, level: levelOf(a.xp), linked: a.google_player_id !== null }; };
+function addLedger(a, delta, reason, ref) {
+  a.coins += delta;
+  const row = { id: ledgerId++, account_id: a.id, at: Date.now(), delta_coins: delta, delta_xp: 0, reason, ref, balance_after: a.coins };
+  ledgerOf.get(a.id).push(row);
+  a.version++;
+}
+
 // ---------- http helpers ----------
 const sessions = new Set();
 const loginAttempts = new Map(); // ip -> [ts]
@@ -356,7 +518,8 @@ function paginate(list, url) {
   return { items, next };
 }
 
-const pub = (r) => { const { _members, ...rest } = r; return rest; };
+const isPaused = (r) => r.status === "playing" && !(r.online > 0);
+const pub = (r) => { const { _members, ...rest } = r; return { ...rest, paused: isPaused(r) }; };
 const matchOut = (m) => ({ ...m });
 
 function snapshot(L) {
@@ -368,6 +531,7 @@ function snapshot(L) {
     members: L.members.map((m) => ({ ...m, color: M && L.status === "playing" ? (M.seats.find((s) => s.id === m.id && !s.left)?.color ?? -1) : m.color })),
     settings: { ...L.settings },
     match: M ? { n: M.n, state: M.state, seats: M.seats, deadline: L.status === "playing" ? Math.round(M.deadline) : 0, started_at: M.started_at } : null,
+    paused: L.status === "playing" && !anyOnline(L),
   };
 }
 
@@ -389,13 +553,20 @@ function overview() {
     now,
     live: {
       rooms_lobby: lv.filter((L) => L.status === "lobby").length,
-      rooms_playing: lv.filter((L) => L.status === "playing").length,
+      rooms_playing: lv.filter((L) => L.status === "playing" && anyOnline(L)).length,
+      rooms_paused: lv.filter((L) => L.status === "playing" && !anyOnline(L)).length,
       members_online: lv.reduce((a, L) => a + L.members.filter((m) => m.online).length, 0),
     },
     today: { rooms: t.rooms, matches: t.matches, players_active: t.players_active, new_players: players.filter((p) => p.first_seen >= todayStart).length },
     days,
     recent_events: events.filter((e) => e.level !== "info").sort((a, b) => b.at - a.at).slice(0, 10),
     maintenance: config.maintenance,
+    accounts: {
+      total: accounts.length, linked: accounts.filter((a) => a.google_player_id).length, guests: accounts.filter((a) => !a.google_player_id).length,
+      banned: accounts.filter((a) => a.banned).length, new_today: accounts.filter((a) => a.created_at >= todayStart).length,
+      coins_in_circulation: accounts.reduce((t, a) => t + a.coins, 0),
+      claims_limited_today: [...claimsOf.values()].flat().filter((c) => c.limited && c.at >= todayStart).length + 2,
+    },
   };
 }
 
@@ -456,7 +627,8 @@ async function api(req, res, url) {
       if (!sub[1]) {
         const st = q("status");
         const qq = q("q").toLowerCase();
-        let list = rooms.filter((r) => (!st || r.status === st) && (!qq || r.code.toLowerCase().startsWith(qq) || (r.host_name || "").toLowerCase().includes(qq)));
+        const okStatus = (r) => !st || (st === "paused" ? isPaused(r) : st === "playing" ? r.status === "playing" && !isPaused(r) : r.status === st);
+        let list = rooms.filter((r) => okStatus(r) && (!qq || r.code.toLowerCase().startsWith(qq) || (r.host_name || "").toLowerCase().includes(qq)));
         list = list.sort((a, b) => b.created_at - a.created_at).map(pub);
         return send(res, 200, paginate(list, url));
       }
@@ -499,7 +671,7 @@ async function api(req, res, url) {
       if (!p) return fail(res, 404, "not_found");
       if (!sub[2] && m === "GET") {
         const ms = matches.filter((x) => x.players.some((pp) => pp.pid === p.pid)).sort((a, b) => b.started_at - a.started_at).slice(0, 20).map(matchOut);
-        return send(res, 200, { player: p, matches: ms });
+        return send(res, 200, { player: { ...p, account_id: accOfPid.get(p.pid)?.id ?? null, ban_source: p.banned ? pidBanSource.get(p.pid) ?? null : null }, matches: ms });
       }
       if (!sub[2] && m === "PATCH") {
         const body = await readBody(req);
@@ -511,16 +683,20 @@ async function api(req, res, url) {
       if (sub[2] === "ban" && m === "POST") {
         const body = await readBody(req);
         const reason = String(body?.reason || "").slice(0, 200);
-        p.banned = 1; p.ban_reason = reason || null;
+        p.banned = 1; p.ban_reason = reason || null; pidBanSource.set(p.pid, "admin_pid");
+        const pa = accOfPid.get(p.pid);
+        if (pa && !pa.banned) Object.assign(pa, { banned: 1, ban_reason: reason || null, ban_source: "pid:" + p.pid });
         let kicked = false; let room = null;
         for (const L of live.values()) { const mem = L.members.find((x) => x.pid === p.pid); if (mem) { expel(L, mem.id); kicked = true; room = L.room.code; } }
         addAudit(Date.now(), ip, "player.ban", p.pid, { reason, kicked, room });
-        return send(res, 200, { ok: true, kicked, player: p });
+        return send(res, 200, { ok: true, kicked, player: p, account_id: pa?.id ?? null, account_banned: pa ? Boolean(pa.banned) : null });
       }
       if (sub[2] === "unban" && m === "POST") {
-        p.banned = 0; p.ban_reason = null;
+        p.banned = 0; p.ban_reason = null; pidBanSource.delete(p.pid);
+        const ua = accOfPid.get(p.pid);
+        if (ua && ua.banned && ua.ban_source === "pid:" + p.pid) Object.assign(ua, { banned: 0, ban_reason: null, ban_source: null });
         addAudit(Date.now(), ip, "player.unban", p.pid);
-        return send(res, 200, { ok: true, player: p });
+        return send(res, 200, { ok: true, player: p, account_id: ua?.id ?? null, account_banned: ua ? Boolean(ua.banned) : null });
       }
       return fail(res, 405, "method");
     }
@@ -557,6 +733,89 @@ async function api(req, res, url) {
         return send(res, 200, config);
       }
       return fail(res, 405, "method");
+    }
+    case "accounts": {
+      if (!sub[1]) {
+        const qq = q("q").toLowerCase();
+        const list = accounts.filter((a) => (!q("banned") || (q("banned") === "1") === Boolean(a.banned)) && (!q("linked") || (q("linked") === "1") === Boolean(a.google_player_id))
+          && (!qq || a.name.toLowerCase().includes(qq) || a.id.startsWith(qq) || a.google_player_id === q("q") || a.public_id === q("q").toUpperCase()
+            || devicesOf.get(a.id).some((d) => d.pid.toLowerCase().startsWith(qq))))
+          .sort((a, b) => b.last_seen - a.last_seen).map(accountOut);
+        return send(res, 200, paginate(list, url));
+      }
+      const acc = ACC_RE.test(sub[1]) ? accById.get(sub[1]) : null;
+      if (!acc) return fail(res, 404, "not_found");
+      if (!sub[2] && m === "GET") {
+        const devs = devicesOf.get(acc.id);
+        const pids = new Set(devs.map((d) => d.pid));
+        const ms = matches.filter((x) => x.players.some((pp) => pp.pid && pids.has(pp.pid))).sort((a, b) => b.started_at - a.started_at).slice(0, 20).map(matchOut);
+        return send(res, 200, {
+          now: Date.now(), account: accountOut(acc), devices: devs.slice().sort((a, b) => b.last_seen - a.last_seen),
+          ledger: ledgerOf.get(acc.id).slice().reverse().slice(0, 50), claims: claimsOf.get(acc.id).slice(0, 50),
+          grants: grantsOf.get(acc.id).slice().reverse().slice(0, 20), matches: ms,
+        });
+      }
+      if (!sub[2] && m === "PATCH") {
+        const body = await readBody(req);
+        if (!body || !("note" in body) || (body.note !== null && typeof body.note !== "string") || (body.note || "").length > 500) return fail(res, 400, "bad_request", "note: string or null, at most 500 characters");
+        acc.note = body.note || null;
+        addAudit(Date.now(), ip, "account.note", acc.id, { note: acc.note });
+        return send(res, 200, { ok: true, account: accountOut(acc) });
+      }
+      if (sub[2] === "coins" && m === "POST") {
+        const body = await readBody(req);
+        const d = body?.delta;
+        const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+        if (typeof d !== "number" || !Number.isInteger(d) || d === 0 || Math.abs(d) > 1e6) return fail(res, 400, "bad_request", "delta: a non-zero integer, at most 1000000 either way");
+        if (reason.length < 3 || reason.length > 200) return fail(res, 400, "bad_request", "reason: 3-200 characters");
+        if (acc.coins + d < 0) return send(res, 409, { error: "coins", msg: `the balance would go below 0 (it is ${acc.coins})`, coins: acc.coins });
+        addLedger(acc, d, "admin", reason);
+        addAudit(Date.now(), ip, "account.coins", acc.id, { delta: d, reason, balance: acc.coins });
+        return send(res, 200, { ok: true, coins: acc.coins, account: accountOut(acc) });
+      }
+      if ((sub[2] === "ban" || sub[2] === "unban") && m === "POST") {
+        const body = await readBody(req);
+        const devs = devicesOf.get(acc.id).map((d) => byPid.get(d.pid)).filter(Boolean);
+        if (sub[2] === "ban") {
+          const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+          if (reason.length < 3 || reason.length > 200) return fail(res, 400, "bad_request", "reason: 3-200 characters");
+          Object.assign(acc, { banned: 1, ban_reason: reason, ban_source: "admin_account" });
+          let kicked = 0;
+          for (const p of devs) {
+            if (!p.banned) { p.banned = 1; p.ban_reason = reason; pidBanSource.set(p.pid, "account:" + acc.id); }
+            for (const L of live.values()) { const mem = L.members.find((x) => x.pid === p.pid); if (mem) { expel(L, mem.id); kicked++; } }
+          }
+          addAudit(Date.now(), ip, "account.ban", acc.id, { reason, kicked });
+          return send(res, 200, { ok: true, kicked, account: accountOut(acc) });
+        }
+        Object.assign(acc, { banned: 0, ban_reason: null, ban_source: null });
+        for (const p of players) if (p.banned && pidBanSource.get(p.pid) === "account:" + acc.id) { p.banned = 0; p.ban_reason = null; pidBanSource.delete(p.pid); }
+        const still = devs.filter((p) => p.banned).map((p) => p.pid);
+        addAudit(Date.now(), ip, "account.unban", acc.id, still.length ? { still_banned_pids: still } : undefined);
+        return send(res, 200, { ok: true, account: accountOut(acc), still_banned_pids: still });
+      }
+      return fail(res, 405, "method");
+    }
+    case "leaderboards": {
+      const board = q("board") === "wins" ? "wins" : "xp";
+      const period = q("period") === "week" ? "week" : "all";
+      const wk = q("week");
+      if (wk && (period !== "week" || !/^\d{4}-W\d{2}$/.test(wk))) return fail(res, 400, "bad_request", "week: YYYY-Www, with period=week");
+      const limit = Number(q("limit") || 50);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 200) return fail(res, 400, "bad_request", "limit: 1-200");
+      const cur = isoWeek(Date.now());
+      const weekKey = period === "week" ? wk || cur : null;
+      const past = weekKey && weekKey !== cur;
+      const val = (a) => (board === "xp" ? (period === "all" ? a.xp : past ? Math.floor(a._xpWeek * 0.7) : a._xpWeek) : period === "all" ? a.online_wins : past ? Math.floor(a._winsWeek * 0.7) : a._winsWeek);
+      const pool = accounts.filter((a) => !a.banned && !a.merged_into && a.completed_matches >= 3 && val(a) > 0).sort((a, b) => val(b) - val(a) || a.id.localeCompare(b.id));
+      const top = pool.slice(0, limit).map((a, i) => ({ rank: i + 1, account_id: a.id, name: a.name, avatar: a.avatar, frame: a.frame, level: levelOf(a.xp), value: val(a), updated_at: a.last_seen }));
+      return send(res, 200, { board, period, week: weekKey, total: pool.length, top });
+    }
+    case "quick": {
+      const d = q("days");
+      const days = d === "" ? 14 : Number(d);
+      if (!Number.isInteger(days) || days < 1 || days > 90) return fail(res, 400, "bad_request", "days: 1-90");
+      return send(res, 200, quickReport(days));
     }
     case "audit": return send(res, 200, paginate(audit.slice().sort((a, b) => b.at - a.at), url));
     default: return fail(res, 404, "not_found");

@@ -5,6 +5,8 @@ import { expect } from "vitest";
 import type { Env, TestHooks } from "../src/room";
 import { applyAction, units, type LudoState } from "../src/rules/ludo";
 import { stateHash } from "../src/rules/hash";
+import { applySlAction, turnColor, type SlAction, type SlState } from "../src/rules/sl";
+import { slStateHash } from "../src/rules/sl_hash";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Msg = Record<string, any>;
@@ -44,9 +46,16 @@ export interface Policy {
   pairYes?: boolean;
 }
 
+/** The state hash for a game ("ludo" | "sl"). */
+export function hashOf(game: string, s: unknown): string {
+  return game === "sl" ? slStateHash(s as SlState) : stateHash(s as LudoState);
+}
+
 export class Client {
   ws: WebSocket;
   log: Msg[] = [];
+  /** Date.now() when each log entry arrived. */
+  at: number[] = [];
   private cursor = 0;
   private waiters: Array<() => void> = [];
   closed = false;
@@ -58,8 +67,13 @@ export class Client {
   id = -1;
   token = "";
 
+  /** Sent as `session` in hello when set. */
+  session: string | undefined;
+
   // replica
-  state: LudoState | null = null;
+  game = "ludo";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  state: any = null;
   n = 0;
   seats: Msg[] = [];
   hashMismatches = 0;
@@ -92,8 +106,9 @@ export class Client {
   }
 
   /** Opens a socket, says hello and waits for welcome. */
-  static async join(code: string, opts: { pid?: string; name?: string; token?: string } = {}): Promise<Client> {
+  static async join(code: string, opts: { pid?: string; name?: string; token?: string; session?: string } = {}): Promise<Client> {
     const c = await Client.open(code, opts.pid ?? newPid(), opts.name ?? "Tester");
+    c.session = opts.session;
     c.hello(opts.token);
     const w = await c.waitFor((m) => m.t === "welcome" || m.t === "error");
     if (w.t === "error") throw new Error(`join refused: ${w.code}`);
@@ -101,7 +116,7 @@ export class Client {
   }
 
   hello(token?: string): void {
-    this.send({ t: "hello", v: 1, pid: this.pid, name: this.name, avatar: "a1", frame: "f1", token });
+    this.send({ t: "hello", v: 1, pid: this.pid, name: this.name, avatar: "a1", frame: "f1", token, session: this.session });
   }
 
   send(o: Msg): void {
@@ -130,20 +145,23 @@ export class Client {
 
   private onMessage(m: Msg): void {
     this.log.push(m);
+    this.at.push(Date.now());
     if (m.t === "welcome") {
       this.id = m.id;
       this.token = m.token;
     } else if (m.t === "start" || m.t === "sync") {
+      this.game = m.game ?? "ludo";
       this.state = JSON.parse(JSON.stringify(m.state));
       this.n = m.n;
       this.seats = m.seats;
-      expect(stateHash(this.state!)).toBe(m.h);
+      expect(hashOf(this.game, this.state)).toBe(m.h);
     } else if (m.t === "act" && this.state) {
       if (m.n !== this.n) this.orderErrors++;
-      applyAction(this.state, m.a);
+      if (this.game === "sl") applySlAction(this.state, m.a as SlAction);
+      else applyAction(this.state, m.a);
       this.n = m.n + 1;
       this.acts++;
-      if (stateHash(this.state) !== m.h) this.hashMismatches++;
+      if (hashOf(this.game, this.state) !== m.h) this.hashMismatches++;
     } else if (m.t === "turn" && this.autoplay) {
       this.playTurn(m.c);
     }
@@ -153,6 +171,12 @@ export class Client {
   /** Plays one step for colour c if it is ours and a human (not a bot) holds it. */
   playTurn(c: number): void {
     const s = this.state;
+    if (this.game === "sl") {
+      const me = s?.players?.find((p: { c: number }) => p.c === c);
+      if (!s || c !== this.color || turnColor(s) !== c || !me || me.cpu || s.phase !== "roll") return;
+      this.send({ t: "roll", n: this.n });
+      return;
+    }
     if (!s || c !== this.color || s.turn !== c || s.players[c] !== "human") return;
     if (s.phase === "roll") this.send({ t: "roll", n: this.n });
     else if (s.phase === "choose") {

@@ -132,9 +132,24 @@ func _spin() -> void:
 		Sound.sfx("error")
 		_render()
 		return
-	var r := Rewards.spin(profile, rng, _day(), false)
-	if not r.ok:
-		return
+	var r: Dictionary
+	if Account.wallet_active() and is_same(profile, Save.profile):
+		_spinning = true                                   # the server draws the prize; the wheel waits for it
+		_go.disabled = true
+		r = await Account.instance().spin(false)
+		if not is_instance_valid(self) or _closing:
+			return
+		if not r.get("ok", false):
+			_spinning = false
+			Haptics.error()
+			Sound.sfx("error")
+			Toast.show(self, Account.error_text(str(r.get("error", "")), "spin"), card, 2.4, "bad")
+			_render()
+			return
+	else:
+		r = Rewards.spin(profile, rng, _day(), false)
+		if not r.ok:
+			return
 	_spinning = true
 	_result = {}
 	_ticks = 0

@@ -16,6 +16,8 @@ extends Control
 ## only on your turn (hold_dice while your roll request is out), set_timer() draws the server's turn countdown on the
 ## active tile, set_badges() puts "Offline" / "Bot" on tiles, show_away() the "I’m back" prompt, set_banner() the
 ## "Reconnecting…" pill under the top tiles.
+## Play on: a side that has finished while the game goes on shows its place badge and is dimmed (update(), from the
+## state); show_finish() is the "You finished 1st!" card (Keep watching / Home: finish_home_pressed) for your side.
 
 signal dice_pressed
 signal pause_pressed
@@ -23,6 +25,7 @@ signal settings_pressed
 signal pick_chosen(kind: String)         # legacy (the Single / Pair step is gone); never emitted
 signal pair_answered(yes: bool)
 signal away_pressed                      # online: "I’m back" (a bot was playing your seat)
+signal finish_home_pressed               # the finish card's Home (online: leave the room)
 
 const POS := ["bl", "tl", "tr", "br"]
 const DICE := 72.0                       # the die's control (its face is DICE_FILL of it, ≈ 62 px)
@@ -55,6 +58,7 @@ var hold_dice := false                   # online: your roll request is out (the
 var banner: PanelContainer               # online: "Reconnecting…"
 var away_box: PanelContainer             # online: "You were away…" + I’m back
 var away_button: Button
+var finish_card: FinishCard              # play on: "You finished 1st!" while the others play on
 var tutorial := false:
 	set(v):
 		tutorial = v
@@ -106,12 +110,19 @@ class Tile extends PlayerTile:
 			_badge = UIKit.tag("Bot" if b == "bot" else "Offline", "ink" if b == "bot" else "white")
 			_badge.name = "Badge"
 			add_child(_badge)
+		_apply_done()
 		_layout()
 
 	## The countdown disc's centre (the avatar's outer top corner).
 	func timer_center() -> Vector2:
 		var ap := _ava_pos()
 		return ap + (Vector2(-3, -3) if side != "right" else Vector2(AVA + 3, -3))
+
+	## (the ⓘ icons beside your nameplate stay as they are on a finished tile)
+	func _apply_done() -> void:
+		super()
+		if help and is_instance_valid(help):
+			help.modulate.a = 1.0
 
 	func _init(c := 0, side_ := "left") -> void:
 		super(c, side_)
@@ -210,6 +221,9 @@ func _ready() -> void:
 	add_child(dice)
 	_build_pair_box()
 	_build_online()
+	finish_card = FinishCard.new()
+	finish_card.home_pressed.connect(func(): finish_home_pressed.emit())
+	add_child(finish_card)
 	_pop_layer = Control.new()
 	_pop_layer.name = "Pops"
 	_pop_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -346,6 +360,7 @@ func setup(s: Dictionary) -> void:
 	top.show_bar()
 	top.clear()
 	pair_box.visible = false
+	finish_card.visible = false
 	for c in 4:
 		var t: Tile = tiles[c]
 		t.visible = LudoRules.active(s, c)
@@ -357,6 +372,7 @@ func setup(s: Dictionary) -> void:
 		if online and kind == "human" and seats.has(c):
 			t.set_look(str(seats[c].get("avatar", "")), str(seats[c].get("frame", "")))
 		t.set_place(0)
+		t.set_done(0)
 		t.set_progress_visible(not tutorial)
 		t.set_chip_colors([])
 	_place_help(_own_tile(s))
@@ -424,6 +440,8 @@ func _layout() -> void:
 		_place_pair_box()
 	if away_box and away_box.visible:
 		_place_bottom(away_box)
+	if finish_card and finish_card.visible:
+		_place_bottom(finish_card)
 	if banner and banner.visible:
 		_place_banner()
 
@@ -484,6 +502,7 @@ func update(s: Dictionary, turn: int) -> void:
 			var m := LudoRules.mate_of(c)
 			t.set_chip_colors([mini(c, m), maxi(c, m)])
 		t.set_state(c == turn and not over, mover == c and mover != turn and not over, home, LudoRules.progress(s, c), chip)
+		t.set_done(done_place(s, c))
 	top.set_turn(turn)
 	dice.visible = turn >= 0 and not over
 	if turn >= 0:
@@ -503,6 +522,27 @@ func update(s: Dictionary, turn: int) -> void:
 	_set_info(_pair_info, you_pair)
 	_sync_help()
 	_layout()
+
+## Play on: the place colour c's side finished in (its pawns all home: Teams, both partners'), else 0. A side ranked
+## by progress at the end is not "done" (no badge).
+static func done_place(s: Dictionary, c: int) -> int:
+	if not LudoRules.all_home(s, c):
+		return 0
+	if LudoRules.team_on(s):
+		return 1 if LudoRules.all_home(s, LudoRules.mate_of(c)) else 0
+	var fin: Variant = s.get("finished", [])
+	var k := (fin as Array).find(c) if fin is Array else -1
+	return k + 1 if k >= 0 else 0
+
+## The "You finished 1st!" card over the board (your side finished, the game goes on). home: offer Home.
+func show_finish(place: int, team := false, home := true) -> void:
+	if _over:
+		return
+	finish_card.present(place, team, home)
+	_place_bottom(finish_card)
+
+func hide_finish() -> void:
+	finish_card.visible = false
 
 ## The team chip under a tile in Teams (2 v 2), led by the two teammates' colour dots: "With Yellow" on your tile,
 ## "With you" on your teammate's, "Rivals" on the other team's (no you: "With <teammate's colour>" on every tile).
@@ -550,6 +590,7 @@ func hide_for_result() -> void:
 	pair_box.visible = false
 	away_box.visible = false
 	banner.visible = false
+	finish_card.visible = false
 	set_timer(-1, 0.0, 1.0)
 
 ## A short pop text that rises and fades at a screen point (UI pixels): "+1 roll", "Home!". Pops sit on their own

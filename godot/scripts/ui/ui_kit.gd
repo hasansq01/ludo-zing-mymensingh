@@ -451,9 +451,10 @@ static func wire_press(b: BaseButton, sound := "tap") -> void:
 		b.set_meta("kit_fx", sound)
 		return
 	b.set_meta("kit_fx", sound)
-	var fx := func() -> void:
-		press_fx(str(b.get_meta("kit_fx", sound)) if is_instance_valid(b) else sound)
-	b.pressed.connect(fx, CONNECT_DEFERRED)
+	# The feedback still plays deferred (after the press handlers), but only the sound name is deferred: a deferred
+	# lambda capturing `b` would outlive a button freed by its own press ("Lambda capture at index 0 was freed").
+	b.pressed.connect(func() -> void:
+		press_fx.call_deferred(str(b.get_meta("kit_fx", sound))))
 
 ## The tap feedback itself (for custom controls that are not Buttons): light haptic + sound (see wire_press).
 static func press_fx(sound := "tap") -> void:

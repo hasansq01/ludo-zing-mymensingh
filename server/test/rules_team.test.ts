@@ -89,7 +89,7 @@ it("wins", () => {
   t = base(); t[0] = [56, 56, 56, 55];
   s = team(t, { teams: false });
   play(s, 1);
-  expect([s.phase, s.winner]).toEqual(["over", 0]);
+  expect([s.phase, s.winner, s.finished, s.turn]).toEqual(["roll", -1, [0], 1]); // Individual: the others play on
 });
 
 it("computer players follow the same rules", () => {

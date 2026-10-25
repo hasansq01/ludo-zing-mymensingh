@@ -1,5 +1,8 @@
-// D1 (binding DB, database "ludo-zing-admin"): every SQL statement the Worker and the Room DO run lives here.
-// Schema: migrations/0001_init.sql. Contract: ADMIN_API.md. Times are epoch ms.
+// D1 (binding DB, database "ludo-zing-admin"): the SQL of the friend rooms, the admin console and quick-match stats.
+// The accounts / economy / leaderboard SQL (ONLINE_V2.md) lives next to its logic in accounts.ts, wallet.ts and
+// leaderboard.ts. Schema: migrations/0001_init.sql, 0002_accounts.sql, 0003_policy.sql. Contract: ADMIN_API.md. Times are epoch ms.
+
+import { dayKey, dayStart } from "./econ";
 
 // ---------- row shapes ----------
 
@@ -15,13 +18,37 @@ export interface PlayerRow {
   wins: number;
   banned: number;
   ban_reason: string | null;
+  /** v2: "admin_pid" | "account:<id>" (why the pid is banned). */
+  ban_source?: string | null;
   note: string | null;
   last_room: string | null;
 }
 
 export type RoomStatus = "lobby" | "playing" | "over" | "closed";
 
+/**
+ * The admin console's room status filter: a RoomStatus, or "paused" = a match in progress (status playing) with
+ * nobody connected (online = 0). The Room pauses its bots then; "playing" in a filter means online > 0.
+ */
+export type RoomFilter = RoomStatus | "paused";
+
+/** SQL for one RoomFilter (constant strings; the status value is bound). */
+function roomFilterSql(f: RoomFilter): { sql: string; params: unknown[] } {
+  if (f === "paused") return { sql: "status = 'playing' AND online = 0", params: [] };
+  if (f === "playing") return { sql: "status = 'playing' AND online > 0", params: [] };
+  return { sql: "status = ?", params: [f] };
+}
+
+/** A paused room: a match in progress with nobody connected (bots wait; cleanup deletes it after 10 min empty). */
+export function isPaused(r: { status: string; online: number }): boolean {
+  return r.status === "playing" && !(Number(r.online) > 0);
+}
+
 export interface RoomRow {
+  /** v2 (0002): game "ludo" | "sl", public / quick flags. */
+  game?: string | null;
+  public?: number | null;
+  quick?: number | null;
   code: string;
   created_at: number;
   updated_at: number;
@@ -55,6 +82,11 @@ export interface MatchRow {
   finished: string | null; // json colours
   actions: number | null;
   result: MatchResult;
+  /** v2 (0002): "ludo" | "sl", quick match flag, ghost seats, a human won (null: unknown / not a quick match). */
+  game?: string | null;
+  quick?: number | null;
+  ghosts?: number | null;
+  human_won?: number | null;
 }
 
 export type EventLevel = "info" | "warn" | "error";
@@ -164,6 +196,10 @@ export interface RoomState {
   online: number;
   settings: { teams: boolean; pair_ask: boolean };
   closed_reason: string | null;
+  /** v2 (optional; omitted = a Ludo friend room): "ludo" | "sl", listed publicly, a quick-match room. */
+  game?: "ludo" | "sl";
+  public?: boolean;
+  quick?: boolean;
 }
 
 /**
@@ -173,13 +209,15 @@ export interface RoomState {
 export function upsertRoom(db: D1Database, r: RoomState, now: number, fresh = false): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO rooms (code, created_at, updated_at, host_pid, host_name, status, members, online, settings, closed_reason)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+      `INSERT INTO rooms (code, created_at, updated_at, host_pid, host_name, status, members, online, settings, closed_reason,
+                          game, public, quick)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
        ON CONFLICT(code) DO UPDATE SET
          ${fresh ? "created_at = excluded.created_at," : ""}
          updated_at = excluded.updated_at, host_pid = excluded.host_pid, host_name = excluded.host_name,
          status = excluded.status, members = excluded.members, online = excluded.online,
-         settings = excluded.settings, closed_reason = excluded.closed_reason`,
+         settings = excluded.settings, closed_reason = excluded.closed_reason,
+         game = excluded.game, public = excluded.public, quick = excluded.quick`,
     )
     .bind(
       r.code,
@@ -192,6 +230,9 @@ export function upsertRoom(db: D1Database, r: RoomState, now: number, fresh = fa
       r.online,
       JSON.stringify(r.settings),
       r.closed_reason,
+      r.game ?? "ludo",
+      r.public ? 1 : 0,
+      r.quick ? 1 : 0,
     );
 }
 
@@ -219,35 +260,186 @@ export function playerSeen(
   ];
 }
 
-/** The ban flag for one pid (null when the player has never been seen). */
+/**
+ * The ban flag for one pid: the pid's own ban (players) or the ban of the account the device belongs to (v2, devices
+ * -> accounts). Null when the pid has never been seen (no players row, no device).
+ */
 export async function readBan(db: D1Database, pid: string): Promise<{ banned: boolean; reason: string } | null> {
-  const row = await db.prepare("SELECT banned, ban_reason FROM players WHERE pid = ?").bind(pid).first<{ banned: number; ban_reason: string | null }>();
-  return row ? { banned: row.banned === 1, reason: row.ban_reason ?? "" } : null;
+  const row = await db
+    .prepare(
+      `SELECT p.pid AS p, p.banned AS pb, p.ban_reason AS pr, d.pid AS d, a.banned AS ab, a.ban_reason AS ar
+       FROM (SELECT ? AS pid) x
+       LEFT JOIN players p ON p.pid = x.pid
+       LEFT JOIN devices d ON d.pid = x.pid
+       LEFT JOIN accounts a ON a.id = d.account_id`,
+    )
+    .bind(pid)
+    .first<{ p: string | null; pb: number | null; pr: string | null; d: string | null; ab: number | null; ar: string | null }>();
+  if (!row || (row.p === null && row.d === null)) return null;
+  if (row.pb === 1) return { banned: true, reason: row.pr ?? "" };
+  if (row.ab === 1) return { banned: true, reason: row.ar ?? "" };
+  return { banned: false, reason: "" };
 }
 
+/**
+ * A match started. v2 fields are optional (omitted: a Ludo friend-room match): `game`, `quick`, `ghosts` (the number
+ * of ghost seats). `players` may carry extra per-seat fields (e.g. account_id, ghost: the console sees them).
+ */
 export function insertMatch(
   db: D1Database,
-  m: { code: string; started_at: number; players: MatchPlayer[]; teams: boolean; pair_ask: boolean },
+  m: {
+    code: string;
+    started_at: number;
+    players: MatchPlayer[];
+    teams: boolean;
+    pair_ask: boolean;
+    game?: "ludo" | "sl";
+    quick?: boolean;
+    ghosts?: number;
+  },
 ): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO matches (code, started_at, players, teams, pair_ask, actions, result)
-       VALUES (?, ?, ?, ?, ?, 0, 'playing')`,
+      `INSERT INTO matches (code, started_at, players, teams, pair_ask, actions, result, game, quick, ghosts)
+       VALUES (?, ?, ?, ?, ?, 0, 'playing', ?, ?, ?)`,
     )
-    .bind(m.code, m.started_at, JSON.stringify(m.players), m.teams ? 1 : 0, m.pair_ask ? 1 : 0);
+    .bind(
+      m.code,
+      m.started_at,
+      JSON.stringify(m.players),
+      m.teams ? 1 : 0,
+      m.pair_ask ? 1 : 0,
+      m.game ?? "ludo",
+      m.quick ? 1 : 0,
+      Math.max(0, Math.trunc(m.ghosts ?? 0)),
+    );
 }
 
 /** Ends the match identified by (code, started_at). Only a match still `playing` changes. */
+/** Ends the match identified by (code, started_at). Only a match still `playing` changes. `human_won` (v2, optional):
+ * whether a human (not a ghost) won; omitted keeps the column as it is. */
 export function endMatch(
   db: D1Database,
-  m: { code: string; started_at: number; ended_at: number; winner: number | null; finished: number[]; actions: number; result: MatchResult },
+  m: {
+    code: string;
+    started_at: number;
+    ended_at: number;
+    winner: number | null;
+    finished: number[];
+    actions: number;
+    result: MatchResult;
+    human_won?: boolean | null;
+  },
 ): D1PreparedStatement {
+  const hw = m.human_won === undefined || m.human_won === null ? null : m.human_won ? 1 : 0;
   return db
     .prepare(
-      `UPDATE matches SET ended_at = ?, winner = ?, finished = ?, actions = ?, result = ?
+      `UPDATE matches SET ended_at = ?, winner = ?, finished = ?, actions = ?, result = ?, human_won = COALESCE(?, human_won)
        WHERE code = ? AND started_at = ? AND result = 'playing'`,
     )
-    .bind(m.ended_at, m.winner, JSON.stringify(m.finished), m.actions, m.result, m.code, m.started_at);
+    .bind(m.ended_at, m.winner, JSON.stringify(m.finished), m.actions, m.result, hw, m.code, m.started_at);
+}
+
+// ---------- quick match stats (quick_stats, 0002) ----------
+
+/**
+ * One quick-match stats increment for (day, game, size); missing counters add 0. day: UTC "YYYY-MM-DD" (default:
+ * today). queued: humans who joined the queue; matched: humans placed in a match; ghost_filled: ghost seats created;
+ * wait_ms (or wait_ms_total): the matched humans' waits, summed; human_wins / ghost_wins: finished quick matches with
+ * ghosts won by a human / by a ghost.
+ */
+export interface QuickStatInc {
+  day?: string;
+  game: string;
+  size: number;
+  queued?: number;
+  matched?: number;
+  ghost_filled?: number;
+  wait_ms?: number;
+  wait_ms_total?: number;
+  human_wins?: number;
+  ghost_wins?: number;
+}
+
+function inc(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.trunc(v) : 0;
+}
+
+export function quickStatStmt(db: D1Database, s: QuickStatInc, now = Date.now()): D1PreparedStatement {
+  const game = s.game === "sl" ? "sl" : "ludo";
+  const size = Math.trunc(Number(s.size)) || 0;
+  const day = typeof s.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.day) ? s.day : utcDay(now);
+  return db
+    .prepare(
+      `INSERT INTO quick_stats (day, game, size, queued, matched, ghost_filled, wait_ms_total, human_wins, ghost_wins)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (day, game, size) DO UPDATE SET
+         queued = queued + excluded.queued, matched = matched + excluded.matched,
+         ghost_filled = ghost_filled + excluded.ghost_filled, wait_ms_total = wait_ms_total + excluded.wait_ms_total,
+         human_wins = human_wins + excluded.human_wins, ghost_wins = ghost_wins + excluded.ghost_wins`,
+    )
+    .bind(day, game, size, inc(s.queued), inc(s.matched), inc(s.ghost_filled), inc(s.wait_ms ?? s.wait_ms_total), inc(s.human_wins), inc(s.ghost_wins));
+}
+
+/** quickStatStmt, run (the Matchmaker / Room call this fire-and-forget). */
+export async function recordQuickStat(env: { DB: D1Database }, s: QuickStatInc): Promise<void> {
+  await quickStatStmt(env.DB, s).run();
+}
+
+export interface QuickDay {
+  day: string;
+  game: string;
+  size: number;
+  queued: number;
+  matched: number;
+  ghost_filled: number;
+  /** ghost_filled / (matched + ghost_filled): the share of seats that were ghosts (null without seats). */
+  ghost_fill_rate: number | null;
+  /** wait_ms_total / matched (null when nobody was matched). */
+  avg_wait_ms: number | null;
+  human_wins: number;
+  ghost_wins: number;
+  /** human_wins / (human_wins + ghost_wins) (null without finished ghost matches). */
+  human_win_rate: number | null;
+}
+
+/** The admin quick-match report: the last `days` UTC days (today included), newest first, per game and size. */
+export async function quickReport(db: D1Database, days: number, now: number): Promise<{ days: number; from: string; rows: QuickDay[]; totals: QuickDay[] }> {
+  const from = utcDay(now - (days - 1) * DAY);
+  const { results } = await db
+    .prepare("SELECT * FROM quick_stats WHERE day >= ? ORDER BY day DESC, game, size")
+    .bind(from)
+    .all<{ day: string; game: string; size: number; queued: number; matched: number; ghost_filled: number; wait_ms_total: number; human_wins: number; ghost_wins: number }>();
+  const shape = (r: { day: string; game: string; size: number; queued: number; matched: number; ghost_filled: number; wait_ms_total: number; human_wins: number; ghost_wins: number }): QuickDay => {
+    const seats = r.matched + r.ghost_filled;
+    const fin = r.human_wins + r.ghost_wins;
+    return {
+      day: r.day,
+      game: r.game,
+      size: r.size,
+      queued: r.queued,
+      matched: r.matched,
+      ghost_filled: r.ghost_filled,
+      ghost_fill_rate: seats > 0 ? r.ghost_filled / seats : null,
+      avg_wait_ms: r.matched > 0 ? Math.round(r.wait_ms_total / r.matched) : null,
+      human_wins: r.human_wins,
+      ghost_wins: r.ghost_wins,
+      human_win_rate: fin > 0 ? r.human_wins / fin : null,
+    };
+  };
+  const tot = new Map<string, { day: string; game: string; size: number; queued: number; matched: number; ghost_filled: number; wait_ms_total: number; human_wins: number; ghost_wins: number }>();
+  for (const r of results) {
+    const k = `${r.game}:${r.size}`;
+    const t = tot.get(k) ?? { day: "total", game: r.game, size: r.size, queued: 0, matched: 0, ghost_filled: 0, wait_ms_total: 0, human_wins: 0, ghost_wins: 0 };
+    t.queued += r.queued;
+    t.matched += r.matched;
+    t.ghost_filled += r.ghost_filled;
+    t.wait_ms_total += r.wait_ms_total;
+    t.human_wins += r.human_wins;
+    t.ghost_wins += r.ghost_wins;
+    tot.set(k, t);
+  }
+  return { days, from, rows: results.map(shape), totals: [...tot.values()].map(shape) };
 }
 
 /** Over: one more match for a human seat, plus a win for the winners. */
@@ -298,9 +490,9 @@ function parseJson(s: unknown, fallback: unknown): unknown {
   }
 }
 
-/** Rows as the admin API returns them: JSON text columns parsed. */
+/** Rows as the admin API returns them: JSON text columns parsed, plus the computed `paused` flag. */
 export function roomOut(r: RoomRow): Record<string, unknown> {
-  return { ...r, settings: parseJson(r.settings, { teams: false, pair_ask: false }) };
+  return { ...r, settings: parseJson(r.settings, { teams: false, pair_ask: false }), paused: isPaused(r) };
 }
 
 export function matchOut(m: MatchRow): Record<string, unknown> {
@@ -368,13 +560,14 @@ function likeEscape(s: string): string {
 
 export async function listRooms(
   db: D1Database,
-  o: { status?: string; q?: string; limit: number; cursor?: string | null },
+  o: { status?: RoomFilter; q?: string; limit: number; cursor?: string | null },
 ): Promise<Page<RoomRow>> {
   const where: string[] = [];
   const params: unknown[] = [];
   if (o.status) {
-    where.push("status = ?");
-    params.push(o.status);
+    const f = roomFilterSql(o.status);
+    where.push(f.sql);
+    params.push(...f.params);
   }
   if (o.q) {
     where.push("(code LIKE ? ESCAPE '\\' OR host_name LIKE ? ESCAPE '\\')");
@@ -416,14 +609,55 @@ export async function getPlayer(db: D1Database, pid: string): Promise<PlayerRow 
   return db.prepare("SELECT * FROM players WHERE pid = ?").bind(pid).first<PlayerRow>();
 }
 
-export async function setBan(db: D1Database, pid: string, banned: boolean, reason: string | null): Promise<boolean> {
-  const r = await db.prepare("UPDATE players SET banned = ?, ban_reason = ? WHERE pid = ?").bind(banned ? 1 : 0, banned ? reason : null, pid).run();
+/** source (v2, migration 0003): "admin_pid" (Players page) | "account:<id>" (an account ban reached the device). */
+export async function setBan(db: D1Database, pid: string, banned: boolean, reason: string | null, source: string | null = banned ? "admin_pid" : null): Promise<boolean> {
+  const r = await db
+    .prepare("UPDATE players SET banned = ?, ban_reason = ?, ban_source = ? WHERE pid = ?")
+    .bind(banned ? 1 : 0, banned ? reason : null, banned ? source : null, pid)
+    .run();
   return r.meta.changes > 0;
 }
 
 export async function setNote(db: D1Database, pid: string, note: string | null): Promise<boolean> {
   const r = await db.prepare("UPDATE players SET note = ? WHERE pid = ?").bind(note, pid).run();
   return r.meta.changes > 0;
+}
+
+// ---------- admin: accounts (v2) ----------
+
+export async function listAccounts(
+  db: D1Database,
+  o: { q?: string; banned?: boolean; linked?: boolean; limit: number; cursor?: string | null },
+): Promise<Page<Record<string, unknown>>> {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (o.q) {
+    where.push(
+      `(name LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\' OR google_player_id = ? OR public_id = ?
+        OR EXISTS (SELECT 1 FROM devices d WHERE d.account_id = accounts.id AND d.pid LIKE ? ESCAPE '\\'))`,
+    );
+    params.push("%" + likeEscape(o.q) + "%", likeEscape(o.q) + "%", o.q, o.q.toUpperCase(), likeEscape(o.q) + "%");
+  }
+  if (o.banned !== undefined) {
+    where.push("banned = ?");
+    params.push(o.banned ? 1 : 0);
+  }
+  if (o.linked !== undefined) where.push(o.linked ? "google_player_id IS NOT NULL" : "google_player_id IS NULL");
+  return pageQuery<Record<string, unknown>>(db, { from: "accounts", where, params, keys: ["last_seen", "id"], ...o });
+}
+
+/** The last matches any of these pids played (players[].pid) or this account played (players[].account_id). */
+export async function matchesForAccount(db: D1Database, accountId: string, pids: string[], limit = 20): Promise<MatchRow[]> {
+  const ps = pids.slice(0, 10);
+  const cond = [
+    "json_extract(j.value, '$.account_id') = ?",
+    ...(ps.length ? [`json_extract(j.value, '$.pid') IN (${ps.map(() => "?").join(", ")})`] : []),
+  ].join(" OR ");
+  const { results } = await db
+    .prepare(`SELECT * FROM matches WHERE EXISTS (SELECT 1 FROM json_each(matches.players) AS j WHERE ${cond}) ORDER BY id DESC LIMIT ?`)
+    .bind(accountId, ...ps, limit)
+    .all<MatchRow>();
+  return results;
 }
 
 const HAS_PID = "EXISTS (SELECT 1 FROM json_each(matches.players) AS j WHERE json_extract(j.value, '$.pid') = ?)";
@@ -481,11 +715,12 @@ export async function overview(db: D1Database, now: number): Promise<Record<stri
   const today = Math.floor(now / DAY) * DAY;
   const from = today - 13 * DAY;
   const dayExpr = (col: string) => `strftime('%Y-%m-%d', ${col} / 1000, 'unixepoch')`;
-  const [live, rooms, matches, active, fresh, events, cfg] = await db.batch([
+  const [live, rooms, matches, active, fresh, events, cfg, acc, lim] = await db.batch([
     db.prepare(
       `SELECT
          COALESCE(SUM(status = 'lobby'), 0) AS rooms_lobby,
-         COALESCE(SUM(status = 'playing'), 0) AS rooms_playing,
+         COALESCE(SUM(status = 'playing' AND online > 0), 0) AS rooms_playing,
+         COALESCE(SUM(status = 'playing' AND online = 0), 0) AS rooms_paused,
          COALESCE(SUM(online), 0) AS members_online
        FROM rooms WHERE status IN ('lobby', 'playing', 'over')`,
     ),
@@ -495,7 +730,14 @@ export async function overview(db: D1Database, now: number): Promise<Record<stri
     db.prepare("SELECT COUNT(*) AS n FROM players WHERE first_seen >= ?").bind(today),
     db.prepare("SELECT * FROM events WHERE level IN ('warn', 'error') ORDER BY id DESC LIMIT 10"),
     db.prepare("SELECT value FROM config WHERE key = 'maintenance'"),
+    db.prepare(
+      `SELECT COUNT(*) AS total, COALESCE(SUM(google_player_id IS NOT NULL), 0) AS linked,
+         COALESCE(SUM(coins), 0) AS coins, COALESCE(SUM(created_at >= ?), 0) AS new_today, COALESCE(SUM(banned = 1), 0) AS banned
+       FROM accounts WHERE merged_into IS NULL`,
+    ).bind(today),
+    db.prepare("SELECT COUNT(*) AS n FROM claims WHERE at >= ? AND limited = 1").bind(dayStart(dayKey(Math.floor(now / 1000))) * 1000),
   ]);
+  const a = (acc.results[0] ?? {}) as Record<string, number>;
   const byDay = (res: D1Result) => new Map((res.results as Array<{ day: string; n: number }>).map((r) => [r.day, r.n]));
   const R = byDay(rooms);
   const M = byDay(matches);
@@ -509,7 +751,12 @@ export async function overview(db: D1Database, now: number): Promise<Record<stri
   const l = (live.results[0] ?? {}) as Record<string, number>;
   return {
     now,
-    live: { rooms_lobby: l.rooms_lobby ?? 0, rooms_playing: l.rooms_playing ?? 0, members_online: l.members_online ?? 0 },
+    live: {
+      rooms_lobby: l.rooms_lobby ?? 0,
+      rooms_playing: l.rooms_playing ?? 0,
+      rooms_paused: l.rooms_paused ?? 0,
+      members_online: l.members_online ?? 0,
+    },
     today: {
       rooms: t.rooms,
       matches: t.matches,
@@ -519,6 +766,16 @@ export async function overview(db: D1Database, now: number): Promise<Record<stri
     days,
     recent_events: events.results,
     maintenance: (cfg.results[0] as { value: string } | undefined)?.value === "1",
+    // v2: accounts (merged-away accounts not counted); claims_limited_today counts the economy (Bangladesh) day
+    accounts: {
+      total: a.total ?? 0,
+      linked: a.linked ?? 0,
+      guests: (a.total ?? 0) - (a.linked ?? 0),
+      banned: a.banned ?? 0,
+      new_today: a.new_today ?? 0,
+      coins_in_circulation: a.coins ?? 0,
+      claims_limited_today: (lim.results[0] as { n: number } | undefined)?.n ?? 0,
+    },
   };
 }
 
@@ -526,21 +783,43 @@ export async function overview(db: D1Database, now: number): Promise<Record<stri
 
 export const RETENTION_MS = 30 * DAY;
 
-export async function prune(db: D1Database, now: number): Promise<{ events: number; login_attempts: number; player_days: number }> {
+/** Guest-creation rows (the per-IP rate limit, accounts.ts GUEST_LIMITS) are kept a day. */
+export const GUEST_CREATIONS_MS = DAY;
+
+/**
+ * The daily prune: events, login attempts and player_days after 30 days, guest_creations after a day, weekly
+ * leaderboard rows of weeks before `oldestWeek` ("YYYY-Www": the cron passes the week 26 weeks back).
+ */
+export async function prune(
+  db: D1Database,
+  now: number,
+  oldestWeek?: string,
+): Promise<{ events: number; login_attempts: number; player_days: number; guest_creations: number; scores: number }> {
   const cut = now - RETENTION_MS;
-  const [e, l, p] = await db.batch([
+  const stmts = [
     db.prepare("DELETE FROM events WHERE at < ?").bind(cut),
     db.prepare("DELETE FROM login_attempts WHERE at < ?").bind(cut),
     db.prepare("DELETE FROM player_days WHERE day < ?").bind(utcDay(cut)),
-  ]);
-  return { events: e.meta.changes, login_attempts: l.meta.changes, player_days: p.meta.changes };
+    db.prepare("DELETE FROM guest_creations WHERE at < ?").bind(now - GUEST_CREATIONS_MS),
+  ];
+  // "week:2026-W05" < "week:2026-W43" < "week:2027-W01": the keys sort by time
+  if (oldestWeek) stmts.push(db.prepare("DELETE FROM scores WHERE period >= 'week:' AND period < ?").bind(`week:${oldestWeek}`));
+  const [e, l, p, g, w] = await db.batch(stmts);
+  return {
+    events: e.meta.changes,
+    login_attempts: l.meta.changes,
+    player_days: p.meta.changes,
+    guest_creations: g.meta.changes,
+    scores: w?.meta.changes ?? 0,
+  };
 }
 
-/** Rooms rows still marked live but untouched for a while (their DO may be gone: the cron double-checks). */
-export async function staleLiveRooms(db: D1Database, before: number, limit = 100): Promise<string[]> {
+/** Rooms rows in one of `statuses` untouched since `before` (their DO may be gone or stuck: the cron checks). */
+export async function staleRooms(db: D1Database, statuses: readonly RoomStatus[], before: number, limit = 100): Promise<{ code: string; status: RoomStatus }[]> {
+  if (!statuses.length) return [];
   const { results } = await db
-    .prepare("SELECT code FROM rooms WHERE status IN ('lobby', 'playing', 'over') AND updated_at < ? LIMIT ?")
-    .bind(before, limit)
-    .all<{ code: string }>();
-  return results.map((r) => r.code);
+    .prepare(`SELECT code, status FROM rooms WHERE status IN (${statuses.map(() => "?").join(", ")}) AND updated_at < ? ORDER BY updated_at LIMIT ?`)
+    .bind(...statuses, before, limit)
+    .all<{ code: string; status: RoomStatus }>();
+  return results;
 }

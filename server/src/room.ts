@@ -1,23 +1,48 @@
-// The Room Durable Object: one per room code. Server-authoritative Ludo over hibernatable WebSockets
-// (PROTOCOL.md is the spec). Everything the room needs to resume after hibernation or eviction lives in one
+// The Room Durable Object: one per room code. Server-authoritative Ludo and Snakes & Ladders over hibernatable
+// WebSockets (PROTOCOL.md is the spec). Everything the room needs to resume after hibernation or eviction lives in one
 // storage value ("room"), written synchronously with the SQLite-backed KV API after every change; per-socket
-// identity lives in the socket attachment. A single alarm covers every timer (turn deadline / bot action,
-// disconnect grace, empty-room and stale-room cleanup): schedule() always sets it to the earliest due event.
+// identity lives in the socket attachment. A single alarm covers every timer (turn deadline / bot or ghost action,
+// disconnect grace, quick-room auto-start, grant retries, empty-room and stale-room cleanup): schedule() always sets
+// it to the earliest due event.
+//
+// Two kinds of rooms: friend rooms (POST /v1/rooms, a lobby, a host, rematches) and quick rooms (created by the
+// Matchmaker, src/matchmaker.ts: every seat pre-registered, auto-start, no lobby, no rematch). Quick rooms may hold
+// ghosts: seats the server plays itself that look exactly like people (src/ghosts.ts). Whether a seat is a ghost is
+// stored here only (Member.ghost / Seat.ghost) and is never part of any client message; the admin console sees it.
+//
+// Play on (PROTOCOL.md "Play on after the first finish"): a match runs past the first finish until the rules end it
+// (fewer than two sides left, or no "human" seat left unfinished). The room ends it early with an explicit
+// {k: "end"} act (the rules' endGame, which clients apply too) once no real person (a seated, not-left, non-ghost
+// member) is left unfinished while one is still there to see the result: quick matches never make people watch
+// ghosts. Each seat's grant outcome is fixed when its side is ranked (Match.ranked / Match.away).
 import { DurableObject } from "cloudflare:workers";
 import * as R from "./rules_shim";
+import * as SL from "./rules/sl";
+import { slStateHash } from "./rules/sl_hash";
 import * as D from "./db";
+import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineOutcome } from "./accounts_shim";
+import { ghostDelay, ghostPairYes, ghostPick, makeGhosts } from "./ghosts";
+import type { Matchmaker } from "./matchmaker";
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
+  /** Quick-match queues: one Matchmaker per "game:size" (src/matchmaker.ts). */
+  MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   /** D1 "ludo-zing-admin" (ADMIN_API.md): rooms / players / matches / events / config. */
   DB: D1Database;
   /** The admin console's static files (server/admin/, served at /admin). */
   ASSETS?: Fetcher;
   /** Admin console password (a secret; locally .dev.vars). Unset: the admin API answers 503. */
   ADMIN_PASSWORD?: string;
+  /** Session HMAC key (accounts, ONLINE_V2.md §1; a secret). */
+  SESSION_KEY?: string;
+  GOOGLE_WEB_CLIENT_ID?: string;
+  GOOGLE_WEB_CLIENT_SECRET?: string;
   /** "1" only under vitest (vitest.config.ts miniflare bindings). Never set in wrangler.jsonc. */
   TEST_MODE?: string;
 }
+
+export type { GameKind };
 
 // ---------- constants ----------
 
@@ -37,10 +62,25 @@ export const TIMING = {
   stale: 2 * 60 * 60_000, // no action (or lobby change) for this long -> the room is deleted
 };
 
+/** Quick rooms (ONLINE_V2.md §3). */
+export const QUICK = {
+  autoStart: 10_000, // start this long after creation even if not every human connected
+  overKeep: 2 * 60_000, // a finished quick room is deleted this long after `over`
+};
+
+/** Online reward grants (accounts.grantOnlineMatch) are retried this often, this many times. */
+const GRANT = { retryMs: 30_000, tries: 5 };
+
 export const LIMITS = { maxMembers: 4, maxMsgBytes: 4096, ratePerSec: 20, maxSockets: 16 };
 
-/** Playing colours by member count, in join order (PROTOCOL.md "Colours"). */
+/** Ludo playing colours by member count, in join order (PROTOCOL.md "Colours"). */
 const SEAT_COLORS: Record<number, number[]> = { 1: [0], 2: [0, 2], 3: [0, 1, 2], 4: [0, 1, 2, 3] };
+
+/** Playing colours for k members: Ludo uses opposite corners for 2; Snakes & Ladders Red, Green, Yellow, Blue. */
+export function seatColors(game: GameKind, k: number): number[] {
+  if (game === "sl") return [0, 1, 2, 3].slice(0, Math.max(1, k));
+  return SEAT_COLORS[Math.max(1, Math.min(4, k))];
+}
 
 /** Close codes the server uses after a fatal error or a replaced / closed session. */
 export const CLOSE = { fatal: 4000, replaced: 4001, left: 4002, banned: 4003, closed: 4004 };
@@ -49,7 +89,7 @@ export const CLOSE = { fatal: 4000, replaced: 4001, left: 4002, banned: 4003, cl
 const TELEMETRY = {
   roomDebounce: 5_000, // at most one rooms-row write per room per 5 s (status changes are written at once)
   playerRepeat: 60_000, // a member reconnecting within this of the last players upsert is not written again
-  banCache: 60_000, // a pid's ban flag is re-read from D1 after this
+  banCache: 60_000, // a pid's ban flag (and an identity lookup) is re-read after this
   readTimeout: 2_000, // a D1 read on the gameplay path (ban check, turn timers) gives up after this
   eventsPerMin: 20, // events written per room object per minute, at most
 };
@@ -57,9 +97,11 @@ const TELEMETRY = {
 // ---------- persisted shapes ----------
 
 type Status = "lobby" | "playing" | "over";
-// The rules state is the GDScript LudoRules dictionary shape (snake_case keys); the rules module owns its type.
+// The rules states are the GDScript dictionary shapes (snake_case keys); the rules modules own their types.
 type LudoState = R.LudoState;
-type Action = R.Action;
+type SlState = SL.SlState;
+type AnyState = LudoState | SlState;
+type Action = R.Action | SL.SlAction;
 
 interface Member {
   id: number;
@@ -70,6 +112,12 @@ interface Member {
   frame: string;
   /** Epoch ms when the disconnect grace runs out (0 = none). */
   graceAt: number;
+  /** The account (sessions, ONLINE_V2.md §1); null / missing = none known. */
+  account?: string | null;
+  /** The account's level (public profile); missing = unknown (shown as 1). */
+  level?: number;
+  /** Quick rooms: a seat the server plays (never sent to clients). */
+  ghost?: boolean;
 }
 
 interface Seat {
@@ -82,23 +130,38 @@ interface Seat {
   frame: string;
   /** The member left the match: a bot plays this colour for good. */
   left: boolean;
+  account?: string | null;
+  level?: number;
+  /** Never sent to clients (see the file comment). */
+  ghost?: boolean;
 }
 
 interface Match {
+  /** Missing in matches stored before S&L: Ludo. */
+  game?: GameKind;
   seats: Seat[];
-  state: LudoState;
+  state: AnyState;
   /** Number of actions applied so far (= the index the next action gets). */
   n: number;
-  /** Epoch ms of the current step's deadline (human) or planned action (bot); 0 = nothing pending. */
+  /** Epoch ms of the current step's deadline (human), planned action (bot, ghost); 0 = nothing pending. */
   due: number;
+  /** The deadline clients are shown (`turn.deadline`): due, except for a ghost (a human's deadline). */
+  shown?: number;
   /** Timeouts in a row per colour. */
   strikes: number[];
-  /** Bot RNG (Mulberry32) state, so bot choices continue across wake-ups. */
+  /** Bot / ghost RNG (Mulberry32) state, so bot choices continue across wake-ups. */
   rng: number;
-  /** Epoch ms of the start (with the code, identifies the D1 matches row). */
+  /** Epoch ms of the start (with the code, identifies the D1 matches row and the grant's match id). */
   startedAt?: number;
   /** Human turn deadlines for this match (ms), from D1 config at start; missing -> TIMING. */
   timers?: TurnTimers;
+  /**
+   * Colours whose side has been ranked (finished, or ranked at the end), in that order, and those of them that were
+   * away then (the seat had left, or a bot played it): their grant is "left". Missing in matches stored before play
+   * on (the outcome is then read at `over`, as before).
+   */
+  ranked?: number[];
+  away?: number[];
 }
 
 interface TurnTimers {
@@ -110,6 +173,23 @@ interface TurnTimers {
 interface Settings {
   teams: boolean;
   pair_ask: boolean;
+  /** Missing in rooms stored before S&L: Ludo. */
+  game?: GameKind;
+}
+
+interface QuickInfo {
+  size: number;
+  /** Epoch ms: start then even if not every human is connected. */
+  startBy: number;
+  timers?: TurnTimers;
+  /** Epoch ms of `over` (0 = not over). */
+  overAt: number;
+}
+
+interface PendingGrant {
+  g: OnlineMatchGrant;
+  tries: number;
+  next: number;
 }
 
 interface RoomData {
@@ -117,34 +197,137 @@ interface RoomData {
   code: string;
   created: number;
   status: Status;
-  host: number; // member id, -1 when the room has no members
+  host: number; // member id, -1 when the room has no members (always -1 in quick rooms)
   nextId: number;
-  members: Member[]; // join order
+  members: Member[]; // join order (quick rooms: seat order)
   settings: Settings;
   match: Match | null;
   touched: number; // last action / lobby change (stale cleanup)
   emptySince: number; // 0 while somebody is connected
   alarmAt: number; // the alarm currently set (0 = none)
+  /** Quick rooms only. */
+  quick?: QuickInfo;
+  /** Online reward grants not yet confirmed by the accounts module. */
+  grants?: PendingGrant[];
   /** Signature of the rooms-row fields last queued for D1, and the status they had (see commit()). */
   dbSig?: string;
   dbStatus?: Status;
+  /** Whether the rows last queued for D1 had nobody online (see commit()). */
+  dbIdle?: boolean;
 }
 
 /** Test-only knobs. Honoured only when env.TEST_MODE === "1" (vitest); set through testHooks() via RPC. */
 export interface TestHooks {
   /** Dice values used, in order, before falling back to random rolls. */
   dice?: number[];
-  /** Token progress per colour applied to the state at `start` (to make games short). */
+  /** Ludo: token progress per colour applied to the state at `start` (to make games short). */
   tok?: number[][];
-  /** Multiplies every duration in TIMING (e.g. 0.01 makes a 20 s grace 200 ms). */
+  /** S&L: starting square per player (turn order) applied at `start`. */
+  slPos?: number[];
+  /** Multiplies every duration in TIMING / QUICK / ghost delays (e.g. 0.01 makes a 20 s grace 200 ms). */
   timeScale?: number;
   /** Replaces LIMITS.ratePerSec (test clients play far faster than people tap). */
   ratePerSec?: number;
 }
 
+/** What the Matchmaker hands a new quick room. */
+export interface QuickSpec {
+  game: GameKind;
+  size: number;
+  humans: Array<{ account_id: string; pid: string; name: string; avatar: string; frame: string; level: number }>;
+  /** Tests only (TEST_MODE). */
+  hooks?: TestHooks;
+}
+
 interface Att {
   /** Member id; -1 before hello, -2 for a socket the server is closing (replaced / left). */
   mid: number;
+}
+
+interface Identity {
+  account: string | null;
+  ban: string | null;
+  level: number | null;
+}
+
+// ---------- the two games behind one interface ----------
+
+interface GameOps {
+  hash(s: AnyState): string;
+  apply(s: AnyState, a: Action): void;
+  /** The colour whose turn it is. */
+  turnColor(s: AnyState): number;
+  /** Colour c is played by a (labelled) bot. */
+  isCpu(s: AnyState, c: number): boolean;
+  phase(s: AnyState): string;
+  winners(s: AnyState): number[];
+  /** The finish order (colours); at `over` the full final order. */
+  finished(s: AnyState): number[];
+  /** Colours whose side has its place now (Ludo Teams: only at the end, the team finishing ends the game). */
+  ranked(s: AnyState): number[];
+  /** Playing colours whose side has not finished yet. */
+  unfinished(s: AnyState): number[];
+  winner(s: AnyState): number;
+  standings(s: AnyState): unknown[];
+}
+
+const LUDO: GameOps = {
+  hash: (s) => R.stateHash(s as LudoState),
+  apply: (s, a) => void R.applyAction(s as LudoState, a as R.Action),
+  turnColor: (s) => (s as LudoState).turn,
+  isCpu: (s, c) => (s as LudoState).players[c] === "cpu",
+  phase: (s) => (s as LudoState).phase,
+  winners: (s) => R.winners(s as LudoState),
+  finished: (s) => [...((s as LudoState).finished ?? [])],
+  ranked: (s) => {
+    const ls = s as LudoState;
+    return ls.phase === "over" || !ls.teams ? [...(ls.finished ?? [])] : [];
+  },
+  unfinished: (s) => {
+    const ls = s as LudoState;
+    if (ls.phase === "over") return [];
+    return [0, 1, 2, 3].filter((c) => ls.players[c] !== "off" && !R.sideDone(ls, c));
+  },
+  winner: (s) => (s as LudoState).winner,
+  standings: (s) => R.standings(s as LudoState),
+};
+
+function slWinnerColor(g: SlState): number {
+  return g.winner >= 0 && g.players[g.winner] ? g.players[g.winner].c : -1;
+}
+
+/** The S&L finish order as colours (the rules keep player indices). */
+function slFinishedColors(g: SlState): number[] {
+  return SL.finishedOf(g)
+    .filter((k) => g.players[k])
+    .map((k) => g.players[k].c);
+}
+
+const SNAKES: GameOps = {
+  hash: (s) => slStateHash(s as SlState),
+  apply: (s, a) => void SL.applySlAction(s as SlState, a as SL.SlAction),
+  turnColor: (s) => SL.turnColor(s as SlState),
+  isCpu: (s, c) => (s as SlState).players.some((p) => p.c === c && p.cpu),
+  phase: (s) => (s as SlState).phase,
+  winners: (s) => (slWinnerColor(s as SlState) >= 0 ? [slWinnerColor(s as SlState)] : []),
+  finished: (s) => slFinishedColors(s as SlState),
+  ranked: (s) => slFinishedColors(s as SlState),
+  unfinished: (s) => {
+    const g = s as SlState;
+    if (g.phase === "over") return [];
+    const fin = SL.finishedOf(g);
+    return g.players.filter((_p, k) => !fin.includes(k)).map((p) => p.c);
+  },
+  winner: (s) => slWinnerColor(s as SlState),
+  standings: (s) => SL.standings(s as SlState),
+};
+
+function opsFor(game: GameKind | undefined): GameOps {
+  return game === "sl" ? SNAKES : LUDO;
+}
+
+export function isGame(x: unknown): x is GameKind {
+  return x === "ludo" || x === "sl";
 }
 
 // ---------- helpers ----------
@@ -178,6 +361,10 @@ function randomToken(): string {
   return [...randomBytes(18)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function randomSeed(): number {
+  return new DataView(randomBytes(4).buffer).getUint32(0);
+}
+
 function rollDie(): number {
   return cryptoInt(6) + 1;
 }
@@ -192,11 +379,16 @@ export function cleanName(x: unknown): string {
 }
 
 /** Catalog ids (avatar, frame): strings of at most 32 safe characters, else "". */
-function cleanId(x: unknown): string {
+export function cleanId(x: unknown): string {
   return typeof x === "string" && x.length <= 32 && /^[A-Za-z0-9_.:-]*$/.test(x) ? x : "";
 }
 
-const PID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+export const PID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+
+/** A session token as sent in hello (opaque here; accounts.verifySession checks it). */
+export function isSessionShape(x: unknown): x is string {
+  return typeof x === "string" && x.length > 0 && x.length <= 512;
+}
 
 function isInt(x: unknown, lo: number, hi: number): x is number {
   return typeof x === "number" && Number.isInteger(x) && x >= lo && x <= hi;
@@ -217,13 +409,23 @@ export class Room extends DurableObject<Env> {
   private roomDirty = false;
   private playerSeenAt = new Map<string, number>();
   private banCache = new Map<string, { at: number; banned: boolean; reason: string }>();
+  private idCache = new Map<string, { at: number; id: Identity }>();
   private eventWindow = { start: 0, count: 0 };
   private reported = new WeakSet<object>();
+  private granting = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.room = ctx.storage.kv.get<RoomData>("room") ?? null;
     if (env.TEST_MODE === "1") this.hooks = ctx.storage.kv.get<TestHooks>("hooks") ?? {};
+  }
+
+  private get game(): GameKind {
+    return this.room?.match?.game ?? this.room?.settings.game ?? "ludo";
+  }
+
+  private get ops(): GameOps {
+    return opsFor(this.game);
   }
 
   // ----- RPC from the Worker -----
@@ -240,7 +442,7 @@ export class Room extends DurableObject<Env> {
       host: -1,
       nextId: 1,
       members: [],
-      settings: { teams: false, pair_ask: false },
+      settings: { teams: false, pair_ask: false, game: "ludo" },
       match: null,
       touched: now,
       emptySince: now, // nobody connected yet: a code nobody joins is dropped after TIMING.empty
@@ -250,13 +452,70 @@ export class Room extends DurableObject<Env> {
     return true;
   }
 
+  /**
+   * Creates this room as a quick room (Matchmaker): the humans are pre-registered (seated even though the room is
+   * closed to strangers), the other seats get ghosts, seats are shuffled. Returns each human's room token (by
+   * account), or null when the code is already in use.
+   */
+  async initQuick(code: string, spec: QuickSpec): Promise<{ tokens: Record<string, string> } | null> {
+    if (this.room) return null;
+    if (this.env.TEST_MODE === "1" && spec.hooks) {
+      this.hooks = { ...spec.hooks, dice: spec.hooks.dice ? [...spec.hooks.dice] : undefined };
+      this.ctx.storage.kv.put("hooks", this.hooks);
+    }
+    const timers = await this.turnTimers();
+    if (this.room) return null;
+    const now = Date.now();
+    const size = Math.max(2, Math.min(4, spec.size));
+    const humans = spec.humans.slice(0, size);
+    const g = new R.Mulberry32(randomSeed());
+    const ghosts = makeGhosts(size - humans.length, humans, g);
+    const entries: Array<Omit<Member, "id">> = [
+      ...humans.map((h) => ({
+        pid: h.pid,
+        token: randomToken(),
+        name: cleanName(h.name),
+        avatar: cleanId(h.avatar),
+        frame: cleanId(h.frame),
+        graceAt: 0,
+        account: h.account_id,
+        level: Math.max(1, Math.trunc(h.level) || 1),
+      })),
+      ...ghosts.map((gh) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, graceAt: 0, account: null, level: gh.level, ghost: true })),
+    ];
+    for (let k = entries.length - 1; k > 0; k--) {
+      const j = cryptoInt(k + 1);
+      [entries[k], entries[j]] = [entries[j], entries[k]];
+    }
+    const members: Member[] = entries.map((e, j) => ({ id: j + 1, ...e }));
+    this.room = {
+      v: 1,
+      code,
+      created: now,
+      status: "lobby",
+      host: -1,
+      nextId: members.length + 1,
+      members,
+      settings: { teams: false, pair_ask: false, game: spec.game },
+      match: null,
+      touched: now,
+      emptySince: now,
+      alarmAt: 0,
+      quick: { size, startBy: now + this.ms(QUICK.autoStart), timers, overAt: 0 },
+    };
+    this.commit();
+    const tokens: Record<string, string> = {};
+    for (const m of members) if (!m.ghost && m.account) tokens[m.account] = m.token;
+    return { tokens };
+  }
+
   /** GET /v1/rooms/<CODE>; null when the room doesn't exist. */
   async info(): Promise<{ code: string; open: boolean; members: number; started: boolean } | null> {
     const r = this.room;
     if (!r) return null;
     return {
       code: r.code,
-      open: r.status !== "playing" && r.members.length < LIMITS.maxMembers,
+      open: !r.quick && r.status !== "playing" && r.members.length < LIMITS.maxMembers,
       members: r.members.length,
       started: r.status === "playing",
     };
@@ -272,12 +531,13 @@ export class Room extends DurableObject<Env> {
 
   // ----- RPC from the admin API (src/admin.ts; no public route reaches these) -----
 
-  /** The live room for the console; null when the room doesn't exist. */
+  /** The live room for the console; null when the room doesn't exist. The console is the only place ghosts show. */
   async adminSnapshot(): Promise<AdminSnapshot | null> {
     const r = this.room;
     if (!r) return null;
     const m = r.match;
-    const colors = SEAT_COLORS[Math.max(1, r.members.length)];
+    const colors = seatColors(this.game, r.members.length);
+    const seatsOut = m ? this.seatsOut() : [];
     return {
       code: r.code,
       status: r.status,
@@ -285,27 +545,54 @@ export class Room extends DurableObject<Env> {
       created: r.created,
       touched: r.touched,
       sockets: this.sockets().length,
+      game: this.game,
+      quick: !!r.quick,
       members: r.members.map((mm, j) => ({
         id: mm.id,
         pid: mm.pid,
         name: mm.name,
         avatar: mm.avatar,
         frame: mm.frame,
-        online: this.online(mm.id),
+        online: this.memberOnline(mm),
         color:
           r.status === "playing" && m ? (m.seats.find((st) => st.id === mm.id && !st.left)?.color ?? -1) : colors[j],
+        account: mm.account ?? undefined,
+        level: mm.level,
+        ghost: mm.ghost ? true : undefined,
       })),
-      settings: { ...r.settings },
+      settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask },
       match: m
         ? {
             n: m.n,
+            game: m.game ?? "ludo",
             state: m.state,
-            seats: m.seats.map((st, k) => ({ ...this.seatsOut()[k], pid: this.seatPid(st), left: st.left })),
-            deadline: r.status === "playing" ? Math.round(m.due) : 0,
+            seats: m.seats.map((st, k) => ({
+              ...seatsOut[k],
+              pid: this.seatPid(st),
+              left: st.left,
+              account: st.account ?? undefined,
+              ghost: st.ghost ? true : undefined,
+            })),
+            deadline: r.status === "playing" ? Math.round(m.shown || m.due) : 0,
             started_at: m.startedAt ?? 0,
           }
         : null,
     };
+  }
+
+  /**
+   * The daily cron's sweep of rooms rows that look stale: re-runs the timers (as the alarm would), then deletes the
+   * room if no person is connected (ghosts don't count), recording a running match as "abandoned" (reason
+   * "stale-sweep"). "gone": no such room (or the timers deleted it); "live": someone is connected; "swept": deleted.
+   */
+  async sweepStale(): Promise<"gone" | "live" | "swept"> {
+    if (!this.room) return "gone";
+    await this.onAlarm();
+    const r = this.room;
+    if (!r) return "gone";
+    if (r.members.some((m) => !m.ghost && this.online(m.id))) return "live";
+    await this.destroy("stale-sweep", "abandoned");
+    return "swept";
   }
 
   /** Admin close: every socket gets error not_found + close 4004, the storage is deleted. False if no room. */
@@ -318,25 +605,45 @@ export class Room extends DurableObject<Env> {
   /** Admin kick of one member (lobby: removed; match: the seat is a bot for good). False if no such member. */
   async adminKick(memberId: number): Promise<boolean> {
     const mem = this.room?.members.find((m) => m.id === memberId);
-    if (!mem) return false;
+    if (!mem || mem.ghost) return false;
     this.expel(mem, CLOSE.left, "kicked", "you were removed from the room");
     this.commit();
+    await this.settle();
     return true;
   }
 
   /** A pid was banned: remember it (no rejoin) and remove that member if present. True if they were here. */
   async adminBan(pid: string, reason: string): Promise<boolean> {
     this.banCache.set(pid, { at: Date.now(), banned: true, reason });
-    const mem = this.room?.members.find((m) => m.pid === pid);
+    this.idCache.clear();
+    const mem = pid ? this.room?.members.find((m) => m.pid === pid && !m.ghost) : undefined;
     if (!mem) return false;
     this.expel(mem, CLOSE.banned, "banned", banMsg(reason));
     this.commit();
+    await this.settle();
     return true;
   }
 
   /** A pid was unbanned: forget the cached flag. */
   async adminUnban(pid: string): Promise<void> {
     this.banCache.delete(pid);
+    this.idCache.clear();
+  }
+
+  /** An account was banned: remove that member if present. True if they were here. */
+  async adminBanAccount(account: string, reason: string): Promise<boolean> {
+    this.idCache.clear();
+    const mem = account ? this.room?.members.find((m) => m.account === account && !m.ghost) : undefined;
+    if (!mem) return false;
+    this.expel(mem, CLOSE.banned, "banned", banMsg(reason));
+    this.commit();
+    await this.settle();
+    return true;
+  }
+
+  /** An account was unbanned: forget cached identities. */
+  async adminUnbanAccount(_account: string): Promise<void> {
+    this.idCache.clear();
   }
 
   // ----- WebSocket upgrade -----
@@ -360,7 +667,7 @@ export class Room extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
     // Messages of one socket are handled in order. Most handling is synchronous (the queue is then a no-op); a hello
-    // (ban check) or a start (turn timers) awaits one D1 read, and that socket's next messages wait for it.
+    // (ban / session check) or a start (turn timers) awaits a D1 read, and that socket's next messages wait for it.
     const prev = this.queue.get(ws);
     const run = (prev ? prev.then(() => this.onMessage(ws, data)) : this.onMessage(ws, data)).catch((e) => {
       this.crashed("message", e);
@@ -401,18 +708,19 @@ export class Room extends DurableObject<Env> {
     if (att.mid === -2) return;
     if (att.mid < 0) {
       if (msg.t !== "hello") return this.error(ws, "bad_message", "say hello first");
+      let who: Identity = { account: null, ban: null, level: null };
       if (msg.v === 1 && typeof msg.pid === "string" && PID_RE.test(msg.pid)) {
-        const ban = await this.banOf(msg.pid);
+        who = await this.identify(msg.pid, msg.session);
         if (ws.readyState !== 1 || this.att(ws).mid !== -1) return; // closed (or replaced) meanwhile
         if (!this.room) return this.fatal(ws, "not_found", "this room no longer exists");
-        if (ban) {
-          this.event("warn", "banned", `banned pid refused: ${ban}`.slice(0, 200), msg.pid);
-          this.error(ws, "banned", banMsg(ban));
+        if (who.ban) {
+          this.event("warn", "banned", `banned player refused: ${who.ban}`.slice(0, 200), msg.pid);
+          this.error(ws, "banned", banMsg(who.ban));
           this.closeWith(ws, CLOSE.banned, "banned");
           return;
         }
       }
-      this.hello(ws, msg);
+      this.hello(ws, msg, who);
       this.commit();
       return;
     }
@@ -457,6 +765,7 @@ export class Room extends DurableObject<Env> {
         return this.error(ws, "bad_message", `unknown type ${String(msg.t).slice(0, 20)}`);
     }
     this.commit();
+    await this.settle();
   }
 
   async webSocketClose(ws: WebSocket, code: number, _reason: string, _clean: boolean): Promise<void> {
@@ -506,6 +815,17 @@ export class Room extends DurableObject<Env> {
       await this.destroy("empty", "abandoned");
       return;
     }
+    const q = r.quick;
+    if (q && r.status === "lobby" && now >= q.startBy) {
+      if (!this.startQuick()) {
+        await this.destroy("no_show", "abandoned"); // nobody came
+        return;
+      }
+    }
+    if (q && r.status === "over" && q.overAt && now >= q.overAt + this.ms(QUICK.overKeep)) {
+      await this.destroy("done", "over");
+      return;
+    }
     for (const mem of [...r.members]) {
       if (!mem.graceAt) continue;
       if (this.online(mem.id)) mem.graceAt = 0;
@@ -513,12 +833,14 @@ export class Room extends DurableObject<Env> {
     }
     const m = r.match;
     if (r.status === "playing" && m && m.due && m.due <= now) this.step();
+    if (r.grants?.some((g) => g.next <= now)) this.ctx.waitUntil(this.runGrants());
     this.commit();
+    await this.settle();
   }
 
   // ---------- connection handling ----------
 
-  private hello(ws: WebSocket, msg: Record<string, unknown>): void {
+  private hello(ws: WebSocket, msg: Record<string, unknown>, who: Identity): void {
     const r = this.room!;
     if (msg.v !== 1) return this.fatal(ws, "version", "unsupported protocol version");
     if (typeof msg.pid !== "string" || !PID_RE.test(msg.pid)) {
@@ -529,7 +851,11 @@ export class Room extends DurableObject<Env> {
     const avatar = cleanId(msg.avatar);
     const frame = cleanId(msg.frame);
     const token = typeof msg.token === "string" ? msg.token : "";
-    let mem = (token && r.members.find((m) => m.token === token)) || r.members.find((m) => m.pid === pid);
+    const humans = r.members.filter((m) => !m.ghost);
+    let mem =
+      (token && humans.find((m) => m.token === token)) ||
+      (who.account && humans.find((m) => m.account === who.account)) ||
+      humans.find((m) => m.pid === pid);
     const now = Date.now();
     if (mem) {
       // the same member again: this socket replaces any older one
@@ -542,15 +868,22 @@ export class Room extends DurableObject<Env> {
           /* gone */
         }
       }
-      mem.name = name;
-      mem.avatar = avatar;
-      mem.frame = frame;
+      if (!r.quick) {
+        // quick rooms keep the identity sent to the queue (ghost names were chosen not to clash with it)
+        mem.name = name;
+        mem.avatar = avatar;
+        mem.frame = frame;
+      }
+      if (who.account && !mem.account) mem.account = who.account;
+      if (who.level !== null) mem.level = who.level;
       mem.graceAt = 0;
-      this.playerSeen(mem, false);
+      this.playerSeen(mem, r.quick ? !this.playerSeenAt.has(mem.pid) : false);
     } else {
+      if (r.quick) return this.fatal(ws, "full", "the room is full");
       if (r.status === "playing") return this.fatal(ws, "started", "the match is in progress");
       if (r.members.length >= LIMITS.maxMembers) return this.fatal(ws, "full", "the room is full");
-      mem = { id: r.nextId++, pid, token: randomToken(), name, avatar, frame, graceAt: 0 };
+      mem = { id: r.nextId++, pid, token: randomToken(), name, avatar, frame, graceAt: 0, account: who.account };
+      if (who.level !== null) mem.level = who.level;
       r.members.push(mem);
       if (r.host < 0) r.host = mem.id;
       r.touched = now;
@@ -566,13 +899,16 @@ export class Room extends DurableObject<Env> {
       this.broadcast({ t: "presence", id: mem.id, online: true }, ws);
       this.sendSnapshot(ws);
       const s = m.state;
-      if (seat && s.players[seat.color] === "cpu") {
+      if (seat && this.ops.isCpu(s, seat.color)) {
         m.strikes[seat.color] = 0;
         this.act({ k: "mode", c: seat.color, mode: "human" });
-        if (s.turn === seat.color || !m.due) this.planStep();
+        if (this.ops.turnColor(s) === seat.color || !m.due) this.planStep();
       } else if (!m.due) {
         this.planStep(); // bots were paused while nobody was online
       }
+    } else if (r.quick) {
+      if (r.status === "over" && m) this.sendSnapshot(ws);
+      else if (r.status === "lobby" && humans.every((h) => this.online(h.id))) this.startQuick();
     } else {
       if (r.status === "over" && m) this.sendSnapshot(ws);
       this.broadcast(this.lobbyMsg());
@@ -593,9 +929,13 @@ export class Room extends DurableObject<Env> {
     const mem = r.members.find((m) => m.id === att.mid);
     if (mem && !this.online(mem.id, ws)) {
       const now = Date.now();
-      mem.graceAt = now + this.ms(TIMING.grace);
-      if (r.status === "playing") this.broadcast({ t: "presence", id: mem.id, online: false }, ws);
-      else this.broadcast(this.lobbyMsg(), ws);
+      if (r.status === "playing") {
+        mem.graceAt = now + this.ms(TIMING.grace);
+        this.broadcast({ t: "presence", id: mem.id, online: false }, ws);
+      } else if (!r.quick) {
+        mem.graceAt = now + this.ms(TIMING.grace);
+        this.broadcast(this.lobbyMsg(), ws);
+      }
     }
     if (this.sockets(ws).length === 0) r.emptySince = Date.now();
     this.commit();
@@ -608,11 +948,12 @@ export class Room extends DurableObject<Env> {
     const m = r.match;
     if (r.status === "playing" && m) {
       const seat = m.seats.find((st) => st.id === mem.id && !st.left);
-      if (seat && m.state.players[seat.color] === "human") {
+      // (a seat whose side has finished never plays again: no bot needed)
+      if (seat && !seat.ghost && !this.ops.isCpu(m.state, seat.color) && !this.ops.ranked(m.state).includes(seat.color)) {
         this.act({ k: "mode", c: seat.color, mode: "cpu" });
-        if (m.state.turn === seat.color) this.planStep();
+        if (this.ops.turnColor(m.state) === seat.color) this.planStep();
       }
-    } else {
+    } else if (!r.quick) {
       this.removeMember(mem);
       this.broadcast(this.lobbyMsg());
     }
@@ -621,7 +962,7 @@ export class Room extends DurableObject<Env> {
   private removeMember(mem: Member): void {
     const r = this.room!;
     r.members = r.members.filter((m) => m !== mem);
-    if (r.host === mem.id) r.host = r.members.length ? r.members[0].id : -1;
+    if (r.host === mem.id) r.host = r.quick ? -1 : r.members.length ? r.members[0].id : -1;
     r.touched = Date.now();
   }
 
@@ -647,30 +988,48 @@ export class Room extends DurableObject<Env> {
       this.broadcast({ t: "presence", id: mem.id, online: false });
       if (seat) {
         seat.left = true;
-        if (m.state.players[seat.color] !== "cpu") {
+        if (!this.ops.isCpu(m.state, seat.color) && !this.ops.ranked(m.state).includes(seat.color)) {
           this.act({ k: "mode", c: seat.color, mode: "cpu" });
-          if (m.state.turn === seat.color) this.planStep();
+          if (this.ops.turnColor(m.state) === seat.color) this.planStep();
         }
       }
-      if (hostWas !== r.host) this.broadcast(this.lobbyMsg()); // tells everyone who the new host is
-    } else {
+      if (this.onlyBotsLeft()) {
+        this.act({ k: "end" }); // the last person still playing left: the finished ones get their result now
+        this.finish();
+      }
+      if (hostWas !== r.host && !r.quick) this.broadcast(this.lobbyMsg()); // tells everyone who the new host is
+    } else if (!r.quick) {
       this.broadcast(this.lobbyMsg());
     }
     if (this.sockets().length === 0 && !r.emptySince) r.emptySince = Date.now();
+  }
+
+  /**
+   * After a handler: a quick match whose humans have all left is abandoned at once (the ghosts would only play for
+   * nobody; nothing is granted, the matches row says abandoned).
+   */
+  private async settle(): Promise<void> {
+    const r = this.room;
+    if (!r?.quick || r.status !== "playing" || !r.match) return;
+    const humans = r.match.seats.filter((st) => !st.ghost);
+    if (humans.length && humans.every((st) => st.left)) await this.destroy("abandoned", "abandoned");
   }
 
   // ---------- lobby ----------
 
   private settings(ws: WebSocket, mem: Member, msg: Record<string, unknown>): void {
     const r = this.room!;
+    if (r.quick) return this.error(ws, "bad_action", "quick matches have no settings");
     if (r.host !== mem.id) return this.error(ws, "not_host", "only the host changes settings");
     if (r.status === "playing") return this.error(ws, "bad_action", "the match is in progress");
     if (msg.teams !== undefined && typeof msg.teams !== "boolean") return this.error(ws, "bad_message", "teams: bool");
     if (msg.pair_ask !== undefined && typeof msg.pair_ask !== "boolean") {
       return this.error(ws, "bad_message", "pair_ask: bool");
     }
+    if (msg.game !== undefined && !isGame(msg.game)) return this.error(ws, "bad_message", 'game: "ludo" | "sl"');
     if (typeof msg.teams === "boolean") r.settings.teams = msg.teams;
     if (typeof msg.pair_ask === "boolean") r.settings.pair_ask = msg.pair_ask;
+    if (isGame(msg.game)) r.settings.game = msg.game;
     r.touched = Date.now();
     this.broadcast(this.lobbyMsg());
   }
@@ -678,62 +1037,116 @@ export class Room extends DurableObject<Env> {
   /** Why mem can't start the match now ([code, msg]), or null. */
   private startError(mem: Member): [string, string] | null {
     const r = this.room!;
+    if (r.quick) return ["bad_action", "quick matches have no rematch: queue again"];
     if (r.host !== mem.id) return ["not_host", "only the host starts the match"];
     if (r.status === "playing") return ["bad_action", "the match is in progress"];
     const k = r.members.length;
     if (k < 2) return ["too_few", "at least 2 players are needed"];
-    if (r.settings.teams && k !== 4) return ["teams_need_4", "teams need exactly 4 players"];
+    if ((r.settings.game ?? "ludo") === "ludo" && r.settings.teams && k !== 4) {
+      return ["teams_need_4", "teams need exactly 4 players"];
+    }
     return null;
   }
 
   private start(ws: WebSocket, mem: Member, timers?: TurnTimers): void {
-    const r = this.room!;
     const err = this.startError(mem);
     if (err) return this.error(ws, err[0], err[1]);
+    this.startMatch(timers);
+  }
+
+  /** A quick room starts (every human connected, or the auto-start time). False when no human is connected. */
+  private startQuick(): boolean {
+    const r = this.room!;
+    if (r.status !== "lobby" || !r.quick) return true;
+    const humans = r.members.filter((m) => !m.ghost);
+    if (!humans.some((h) => this.online(h.id))) return false;
+    this.startMatch(r.quick.timers);
+    // humans who never connected: their seat becomes a bot after the grace, as for a disconnect
+    const now = Date.now();
+    for (const h of humans) if (!this.online(h.id)) h.graceAt = now + this.ms(TIMING.grace);
+    return true;
+  }
+
+  /** Seats the members (join / seat order), deals the new state and broadcasts `start`. */
+  private startMatch(timers?: TurnTimers): void {
+    const r = this.room!;
+    const game: GameKind = r.settings.game ?? "ludo";
     const k = r.members.length;
-    const colors = SEAT_COLORS[k];
-    const players = ["off", "off", "off", "off"];
-    for (const c of colors) players[c] = "human";
-    const s = R.newGame(players, r.settings.teams, { pair_ask: r.settings.pair_ask });
-    const seats: Seat[] = r.members.map((mm, j) => ({
-      color: colors[j],
-      id: mm.id,
-      pid: mm.pid,
-      name: mm.name,
-      avatar: mm.avatar,
-      frame: mm.frame,
-      left: false,
-    }));
-    for (let c = 0; c < 4; c++) s.names[c] = "";
-    for (const st of seats) s.names[st.color] = st.name;
-    if (this.hooks.tok) {
-      for (const st of seats) if (this.hooks.tok[st.color]) s.tok[st.color] = [...this.hooks.tok[st.color]];
+    const colors = seatColors(game, k);
+    const seats: Seat[] = r.members.map((mm, j) => {
+      const st: Seat = {
+        color: colors[j],
+        id: mm.id,
+        pid: mm.pid,
+        name: mm.name,
+        avatar: mm.avatar,
+        frame: mm.frame,
+        left: false,
+        account: mm.account ?? null,
+      };
+      if (mm.level !== undefined) st.level = mm.level;
+      if (mm.ghost) st.ghost = true;
+      return st;
+    });
+    let s: AnyState;
+    if (game === "sl") {
+      const g = SL.newGame("local", k, 0, { need_one: false });
+      g.mode = "online";
+      seats.forEach((st, j) => {
+        const p = g.players[j];
+        p.c = st.color;
+        p.name = st.name;
+        p.you = false;
+        p.cpu = false;
+        const pos = this.hooks.slPos?.[j];
+        if (this.env.TEST_MODE === "1" && typeof pos === "number") p.pos = pos;
+      });
+      s = g;
+    } else {
+      const players = ["off", "off", "off", "off"];
+      for (const c of colors) players[c] = "human";
+      const g = R.newGame(players, r.settings.teams, { pair_ask: r.settings.pair_ask });
+      for (let c = 0; c < 4; c++) g.names[c] = "";
+      for (const st of seats) g.names[st.color] = st.name;
+      if (this.hooks.tok) {
+        for (const st of seats) if (this.hooks.tok[st.color]) g.tok[st.color] = [...this.hooks.tok[st.color]];
+      }
+      s = g;
     }
-    const seedBytes = randomBytes(4);
     const now = Date.now();
     const m: Match = {
+      game,
       seats,
       state: s,
       n: 0,
       due: 0,
+      shown: 0,
       strikes: [0, 0, 0, 0],
-      rng: new DataView(seedBytes.buffer).getUint32(0),
+      rng: randomSeed(),
       startedAt: now,
       timers,
     };
     r.match = m;
     r.status = "playing";
     r.touched = now;
-    this.db("match start", [
-      D.insertMatch(this.env.DB, {
-        code: r.code,
-        started_at: now,
-        players: seats.map((st) => ({ pid: st.pid ?? "", name: st.name, color: st.color, bot: false })),
-        teams: r.settings.teams,
-        pair_ask: r.settings.pair_ask,
+    const ghosts = seats.filter((st) => st.ghost).length;
+    const row = {
+      code: r.code,
+      started_at: now,
+      players: seats.map((st) => {
+        const p: D.MatchPlayer & { ghost?: boolean } = { pid: st.pid ?? "", name: st.name, color: st.color, bot: false };
+        if (st.ghost) p.ghost = true;
+        return p;
       }),
-    ]);
-    this.broadcast({ t: "start", n: 0, seats: this.seatsOut(), state: s, h: R.stateHash(s) });
+      teams: game === "ludo" && r.settings.teams,
+      pair_ask: game === "ludo" && r.settings.pair_ask,
+      // matches.game / quick / ghosts (migration 0002; db.ts ignores them until it writes those columns)
+      game,
+      quick: !!r.quick,
+      ghosts,
+    };
+    this.db("match start", [D.insertMatch(this.env.DB, row)]);
+    this.broadcast({ t: "start", n: 0, game, seats: this.seatsOut(), state: s, h: this.ops.hash(s) });
     // members offline at the start keep their grace; it now turns their seat into a bot
     this.planStep();
   }
@@ -746,28 +1159,36 @@ export class Room extends DurableObject<Env> {
     if (r.status !== "playing" || !m) return this.error(ws, "bad_action", "no match in progress");
     if (!isInt(msg.n, 0, Number.MAX_SAFE_INTEGER)) return this.error(ws, "bad_message", "n: int");
     if (msg.n !== m.n) return this.error(ws, "stale", `expected n ${m.n}`);
+    const O = this.ops;
     const s = m.state;
     const seat = m.seats.find((st) => st.id === mem.id && !st.left);
-    if (!seat || seat.color !== s.turn) return this.error(ws, "not_your_turn", "it is not your turn");
+    if (!seat || seat.color !== O.turnColor(s)) return this.error(ws, "not_your_turn", "it is not your turn");
     const c = seat.color;
     let a: Action;
-    if (msg.t === "roll") {
+    if ((m.game ?? "ludo") === "sl") {
+      if (msg.t !== "roll") return this.error(ws, "bad_action", "snakes & ladders only has roll");
       if (s.phase !== "roll") return this.error(ws, "bad_action", `phase is ${s.phase}`);
       a = { k: "roll", c, v: this.dice() };
-    } else if (msg.t === "move") {
-      if (s.phase !== "choose") return this.error(ws, "bad_action", `phase is ${s.phase}`);
-      if (!isInt(msg.i, 0, 3)) return this.error(ws, "bad_action", "i: token index 0-3");
-      const i = msg.i;
-      const u = R.units(s).find((uu) => uu.tokens.includes(i));
-      if (!u) return this.error(ws, "bad_action", "that pawn can't move");
-      a = { k: "move", c, i: u.token };
     } else {
-      if (s.phase !== "pair_ask") return this.error(ws, "bad_action", `phase is ${s.phase}`);
-      if (typeof msg.yes !== "boolean") return this.error(ws, "bad_message", "yes: bool");
-      a = { k: "pair", c, yes: msg.yes };
+      const ls = s as LudoState;
+      if (msg.t === "roll") {
+        if (ls.phase !== "roll") return this.error(ws, "bad_action", `phase is ${ls.phase}`);
+        a = { k: "roll", c, v: this.dice() };
+      } else if (msg.t === "move") {
+        if (ls.phase !== "choose") return this.error(ws, "bad_action", `phase is ${ls.phase}`);
+        if (!isInt(msg.i, 0, 3)) return this.error(ws, "bad_action", "i: token index 0-3");
+        const i = msg.i;
+        const u = R.units(ls).find((uu) => uu.tokens.includes(i));
+        if (!u) return this.error(ws, "bad_action", "that pawn can't move");
+        a = { k: "move", c, i: u.token };
+      } else {
+        if (ls.phase !== "pair_ask") return this.error(ws, "bad_action", `phase is ${ls.phase}`);
+        if (typeof msg.yes !== "boolean") return this.error(ws, "bad_message", "yes: bool");
+        a = { k: "pair", c, yes: msg.yes };
+      }
     }
     m.strikes[c] = 0;
-    if (s.players[c] === "cpu") this.act({ k: "mode", c, mode: "human" }); // acting yourself counts as "back"
+    if (O.isCpu(s, c)) this.act({ k: "mode", c, mode: "human" }); // acting yourself counts as "back"
     this.act(a);
     this.afterActs();
   }
@@ -777,26 +1198,34 @@ export class Room extends DurableObject<Env> {
     const m = r.match;
     if (r.status !== "playing" || !m) return;
     const seat = m.seats.find((st) => st.id === mem.id && !st.left);
-    if (!seat || m.state.players[seat.color] !== "cpu") return;
+    if (!seat || !this.ops.isCpu(m.state, seat.color)) return;
     m.strikes[seat.color] = 0;
     this.act({ k: "mode", c: seat.color, mode: "human" });
-    if (m.state.turn === seat.color) this.planStep();
+    if (this.ops.turnColor(m.state) === seat.color) this.planStep();
   }
 
-  /** The current step is due: a timeout for a human, or a bot's action. */
+  private seatOfColor(c: number): Seat | undefined {
+    return this.room?.match?.seats.find((st) => st.color === c);
+  }
+
+  /** The current step is due: a timeout for a human, a ghost's or a bot's action. */
   private step(): void {
     const m = this.room!.match!;
+    const O = this.ops;
     const s = m.state;
-    const c: number = s.turn;
-    if (s.players[c] === "human") {
+    const c = O.turnColor(s);
+    if (this.seatOfColor(c)?.ghost && !O.isCpu(s, c)) {
+      this.ghostAct(c); // ghosts never time out and play on like people (no pause when nobody watches)
+    } else if (!O.isCpu(s, c)) {
       m.strikes[c]++;
       this.autoAct(c, "easy", true);
-      if (s.phase !== "over" && m.strikes[c] >= 2 && s.players[c] === "human") {
+      if (O.phase(s) !== "over" && m.strikes[c] >= 2 && !O.isCpu(s, c)) {
         this.act({ k: "mode", c, mode: "cpu" });
       }
     } else {
       if (!this.anyOnline()) {
         m.due = 0; // nobody is watching: pause the bots until somebody reconnects
+        m.shown = 0;
         return;
       }
       this.autoAct(c, "normal", false);
@@ -804,22 +1233,56 @@ export class Room extends DurableObject<Env> {
     this.afterActs();
   }
 
+  private rng(): { g: R.Mulberry32; done: () => void } {
+    const m = this.room!.match!;
+    const g = new R.Mulberry32(0);
+    g.state = m.rng;
+    return { g, done: () => void (m.rng = g.state) };
+  }
+
   private autoAct(c: number, level: string, timeout: boolean): void {
     const m = this.room!.match!;
-    const s = m.state;
+    if ((m.game ?? "ludo") === "sl") {
+      const a = SL.botAction(m.state as SlState, this.dice());
+      if (a) this.act(a);
+      return;
+    }
+    const s = m.state as LudoState;
     if (s.phase === "roll") {
       this.act({ k: "roll", c, v: this.dice() });
     } else if (s.phase === "choose") {
       let i = timeout ? R.autoMoveToken(s) : -1;
       if (i < 0) {
-        const g = new R.Mulberry32(0);
-        g.state = m.rng;
+        const { g, done } = this.rng();
         i = R.pickAi(s, R.movables(s), g, level);
-        m.rng = g.state;
+        done();
       }
       this.act({ k: "move", c, i });
     } else if (s.phase === "pair_ask") {
       this.act({ k: "pair", c, yes: true });
+    }
+  }
+
+  /** A ghost's step: the same actions a person's requests become. */
+  private ghostAct(c: number): void {
+    const m = this.room!.match!;
+    if ((m.game ?? "ludo") === "sl") {
+      if (m.state.phase === "roll") this.act({ k: "roll", c, v: this.dice() });
+      return;
+    }
+    const s = m.state as LudoState;
+    if (s.phase === "roll") {
+      this.act({ k: "roll", c, v: this.dice() });
+    } else if (s.phase === "choose") {
+      const { g, done } = this.rng();
+      const i = ghostPick(s, g);
+      done();
+      if (i >= 0) this.act({ k: "move", c, i });
+    } else if (s.phase === "pair_ask") {
+      const { g, done } = this.rng();
+      const yes = ghostPairYes(g);
+      done();
+      this.act({ k: "pair", c, yes });
     }
   }
 
@@ -828,61 +1291,106 @@ export class Room extends DurableObject<Env> {
     const r = this.room!;
     const m = r.match!;
     const s = m.state;
-    R.applyAction(s, a);
+    this.ops.apply(s, a);
     const n = m.n++;
     r.touched = Date.now();
-    this.broadcast({ t: "act", n, a, h: R.stateHash(s) });
+    this.noteRanked(m);
+    this.broadcast({ t: "act", n, a, h: this.ops.hash(s) });
+  }
+
+  /** Records the sides ranked by the last action, and which of their seats were away then (their grant: "left"). */
+  private noteRanked(m: Match): void {
+    const O = opsFor(m.game);
+    const ranked = (m.ranked ??= []);
+    for (const c of O.ranked(m.state)) {
+      if (ranked.includes(c)) continue;
+      ranked.push(c);
+      const st = m.seats.find((x) => x.color === c);
+      if (st && (st.left || O.isCpu(m.state, c))) (m.away ??= []).push(c);
+    }
+  }
+
+  /**
+   * Play on: no real person (seated, not left, not a ghost) is left unfinished, while there is someone the result
+   * is for: a person still seated, or one whose side already finished (left afterwards: the place is kept). The
+   * match is then ended with {k: "end"} (the rest ranked by progress). Nobody finished and everyone left: false
+   * (settle() abandons a quick match; a friend room waits for the empty-room timer, as before).
+   */
+  private onlyBotsLeft(): boolean {
+    const r = this.room!;
+    const m = r.match;
+    if (r.status !== "playing" || !m || m.state.phase === "over") return false;
+    const open = new Set(this.ops.unfinished(m.state));
+    if (m.seats.some((st) => !st.ghost && !st.left && open.has(st.color))) return false;
+    const ranked = m.ranked ?? [];
+    return m.seats.some((st) => !st.ghost && (!st.left || ranked.includes(st.color)));
   }
 
   private afterActs(): void {
     const r = this.room!;
     const m = r.match!;
+    if (m.state.phase !== "over" && this.onlyBotsLeft()) this.act({ k: "end" });
     if (m.state.phase === "over") this.finish();
     else this.planStep();
   }
 
-  /** Sets the deadline (human) or the action time (bot) for the current step and announces it. */
+  /**
+   * Sets the deadline (human), the action time (bot, ghost) for the current step and announces it. A ghost's turn is
+   * announced with a human's deadline (the configured turn timer), whatever its planned action time.
+   */
   private planStep(): void {
     const r = this.room!;
     const m = r.match!;
+    const O = this.ops;
     const s = m.state;
     if (r.status !== "playing" || s.phase === "over") {
       m.due = 0;
+      m.shown = 0;
       return;
     }
     const now = Date.now();
-    const c: number = s.turn;
-    if (s.players[c] === "cpu") {
+    const c = O.turnColor(s);
+    const phase = O.phase(s);
+    const timers = (m.timers ?? TIMING) as unknown as Record<string, number>;
+    const humanMs = this.ms(timers[phase] ?? TIMING.roll);
+    if (O.isCpu(s, c)) {
       if (!this.anyOnline()) {
         m.due = 0;
+        m.shown = 0;
         return;
       }
-      const [lo, hi] =
-        s.phase === "roll" ? [TIMING.botRollMin, TIMING.botRollMax] : [TIMING.botStepMin, TIMING.botStepMax];
+      const [lo, hi] = phase === "roll" ? [TIMING.botRollMin, TIMING.botRollMax] : [TIMING.botStepMin, TIMING.botStepMax];
       m.due = now + this.ms(lo + Math.random() * (hi - lo));
+      m.shown = m.due;
+    } else if (this.seatOfColor(c)?.ghost) {
+      m.due = now + this.ms(ghostDelay(phase, { randf: Math.random }));
+      m.shown = now + humanMs;
     } else {
-      const timers = (m.timers ?? TIMING) as unknown as Record<string, number>;
-      const t = timers[s.phase] ?? TIMING.roll;
-      m.due = now + this.ms(t);
+      m.due = now + humanMs;
+      m.shown = m.due;
     }
-    this.broadcast({ t: "turn", c, deadline: Math.round(m.due), now });
+    this.broadcast({ t: "turn", c, deadline: Math.round(m.shown), now });
+  }
+
+  private overMsg(m: Match): Record<string, unknown> {
+    const O = opsFor(m.game);
+    return { t: "over", finished: O.finished(m.state), winner: O.winner(m.state), standings: O.standings(m.state) };
   }
 
   private finish(): void {
     const r = this.room!;
     const m = r.match!;
-    const s = m.state;
     r.status = "over";
     m.due = 0;
+    m.shown = 0;
     this.matchOver();
-    this.broadcast({
-      t: "over",
-      finished: [...(s.finished ?? [])],
-      winner: s.winner,
-      standings: R.standings(s),
-    });
-    // back to lobby rules: members still offline are dropped after the grace
+    this.broadcast(this.overMsg(m));
     const now = Date.now();
+    if (r.quick) {
+      r.quick.overAt = now; // no lobby, no rematch: the room is deleted a little later
+      return;
+    }
+    // back to lobby rules: members still offline are dropped after the grace
     for (const mem of r.members) if (!this.online(mem.id) && !mem.graceAt) mem.graceAt = now + this.ms(TIMING.grace);
     this.broadcast(this.lobbyMsg());
   }
@@ -901,7 +1409,7 @@ export class Room extends DurableObject<Env> {
 
   private lobbyMsg(): Record<string, unknown> {
     const r = this.room!;
-    const colors = SEAT_COLORS[Math.max(1, r.members.length)];
+    const colors = seatColors(r.settings.game ?? "ludo", r.members.length);
     return {
       t: "lobby",
       code: r.code,
@@ -911,25 +1419,29 @@ export class Room extends DurableObject<Env> {
         name: m.name,
         avatar: m.avatar,
         frame: m.frame,
-        online: this.online(m.id),
+        level: m.level ?? 1,
+        online: this.memberOnline(m),
         color: colors[j],
       })),
-      settings: { ...r.settings },
+      settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask, game: r.settings.game ?? "ludo" },
       max: LIMITS.maxMembers,
       status: r.status,
     };
   }
 
+  /** The seats as clients see them. Ghost seats are built exactly like the others (same keys, bot false, online). */
   private seatsOut(): Array<Record<string, unknown>> {
     const m = this.room!.match!;
+    const O = opsFor(m.game);
     return m.seats.map((st) => ({
       color: st.color,
       id: st.id,
       name: st.name,
       avatar: st.avatar,
       frame: st.frame,
-      bot: m.state.players[st.color] === "cpu",
-      online: !st.left && this.online(st.id),
+      level: st.level ?? 1,
+      bot: O.isCpu(m.state, st.color),
+      online: st.ghost ? true : !st.left && this.online(st.id),
     }));
   }
 
@@ -937,12 +1449,16 @@ export class Room extends DurableObject<Env> {
   private sendSnapshot(ws: WebSocket): void {
     const r = this.room!;
     const m = r.match;
-    if (!m) return this.send(ws, this.lobbyMsg());
-    this.send(ws, { t: "sync", n: m.n, seats: this.seatsOut(), state: m.state, h: R.stateHash(m.state) });
+    if (!m) {
+      if (!r.quick) this.send(ws, this.lobbyMsg());
+      return;
+    }
+    const O = opsFor(m.game);
+    this.send(ws, { t: "sync", n: m.n, game: m.game ?? "ludo", seats: this.seatsOut(), state: m.state, h: O.hash(m.state) });
     if (r.status === "playing" && m.due) {
-      this.send(ws, { t: "turn", c: m.state.turn, deadline: Math.round(m.due), now: Date.now() });
+      this.send(ws, { t: "turn", c: O.turnColor(m.state), deadline: Math.round(m.shown || m.due), now: Date.now() });
     } else if (r.status === "over") {
-      this.send(ws, { t: "over", finished: [...(m.state.finished ?? [])], winner: m.state.winner, standings: R.standings(m.state) });
+      this.send(ws, this.overMsg(m));
     }
   }
 
@@ -1003,6 +1519,11 @@ export class Room extends DurableObject<Env> {
     return this.sockets(except).some((ws) => this.att(ws).mid === mid);
   }
 
+  /** What clients are told about a member's presence: ghosts are always online. */
+  private memberOnline(mem: Member): boolean {
+    return mem.ghost ? true : this.online(mem.id);
+  }
+
   private anyOnline(): boolean {
     return this.sockets().length > 0;
   }
@@ -1040,6 +1561,9 @@ export class Room extends DurableObject<Env> {
     if (r.emptySince) due.push(r.emptySince + this.ms(TIMING.empty));
     if (r.status === "playing" && r.match?.due) due.push(r.match.due);
     for (const mem of r.members) if (mem.graceAt) due.push(mem.graceAt);
+    if (r.quick && r.status === "lobby") due.push(r.quick.startBy);
+    if (r.quick && r.status === "over" && r.quick.overAt) due.push(r.quick.overAt + this.ms(QUICK.overKeep));
+    for (const g of r.grants ?? []) due.push(g.next);
     const next = Math.ceil(Math.min(...due));
     if (next !== r.alarmAt) {
       r.alarmAt = next;
@@ -1047,10 +1571,15 @@ export class Room extends DurableObject<Env> {
     }
     const sig = this.roomSig();
     if (sig !== r.dbSig) {
-      const statusChanged = r.dbStatus !== r.status;
+      // Written at once (not debounced): a status change, and the online count reaching 0 or leaving 0. The console
+      // shows a playing room with online = 0 as paused, and a debounce timer would not survive an eviction
+      // (dbSig is already advanced), which could leave the row saying online > 0 for good.
+      const idle = !r.members.some((m) => !m.ghost && this.online(m.id));
+      const immediate = r.dbStatus !== r.status || r.dbIdle !== idle;
       r.dbSig = sig;
       r.dbStatus = r.status;
-      this.roomChanged(statusChanged);
+      r.dbIdle = idle;
+      this.roomChanged(immediate);
     }
     try {
       this.ctx.storage.kv.put("room", r);
@@ -1080,12 +1609,63 @@ export class Room extends DurableObject<Env> {
         /* gone */
       }
     }
+    const pending = r?.grants?.length ? r.grants : null;
     this.room = null;
     this.hooks = {};
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+    if (pending) for (const g of pending) this.ctx.waitUntil(this.grantOnce(g.g).catch(() => undefined)); // last try
     // the room is gone anyway: give its last D1 writes a moment instead of leaving them to waitUntil alone
     await Promise.race([this.dbChain, new Promise((res) => setTimeout(res, 3000))]);
+  }
+
+  // ---------- online rewards (accounts.grantOnlineMatch) ----------
+
+  /**
+   * win / finish / left for one seat at `over`: the first side wins, every other side that finished or was ranked at
+   * the end finishes; "left" only when the seat was away (it had left, or a bot played it) when its side was ranked
+   * (a player who finished and then left keeps their outcome). Matches stored before play on: away at `over`.
+   */
+  private outcome(m: Match, st: Seat, won: Set<number>): OnlineOutcome {
+    const away = m.ranked ? (m.away ?? []).includes(st.color) : st.left || opsFor(m.game).isCpu(m.state, st.color);
+    if (away) return "left";
+    return won.has(st.color) ? "win" : "finish";
+  }
+
+  private async grantOnce(g: OnlineMatchGrant): Promise<void> {
+    await withTimeout(Promise.resolve(accounts(this.env).grantOnlineMatch(this.env, g)), 10_000);
+  }
+
+  /** Sends every pending grant that is due; failures are retried from the alarm (GRANT.tries in all). */
+  private async runGrants(): Promise<void> {
+    if (this.granting) return;
+    this.granting = true;
+    try {
+      for (;;) {
+        const r = this.room;
+        const p = r?.grants?.find((x) => x.next <= Date.now());
+        if (!r || !p) return;
+        try {
+          await this.grantOnce(p.g);
+          if (this.room === r) r.grants = (r.grants ?? []).filter((x) => x !== p);
+        } catch (e) {
+          p.tries++;
+          console.error("grantOnlineMatch failed:", e);
+          if (p.tries >= GRANT.tries) {
+            this.event("error", "grant", `grant ${p.g.match_id} gave up: ${String(e)}`.slice(0, 500));
+            if (this.room === r) r.grants = (r.grants ?? []).filter((x) => x !== p);
+          } else {
+            p.next = Date.now() + this.ms(GRANT.retryMs * p.tries);
+          }
+        }
+        if (this.room === r) {
+          if (!r.grants?.length) delete r.grants;
+          this.commit();
+        }
+      }
+    } finally {
+      this.granting = false;
+    }
   }
 
   // ---------- D1 telemetry (ADMIN_API.md). Never blocks or breaks gameplay. ----------
@@ -1105,24 +1685,29 @@ export class Room extends DurableObject<Env> {
   private roomState(): D.RoomState {
     const r = this.room!;
     const host = r.members.find((m) => m.id === r.host);
-    return {
+    const st = {
       code: r.code,
       created_at: r.created,
       host_pid: host?.pid ?? null,
       host_name: host?.name ?? null,
       status: r.status,
       members: r.members.length,
-      online: r.members.filter((m) => this.online(m.id)).length,
-      settings: { ...r.settings },
+      online: r.members.filter((m) => !m.ghost && this.online(m.id)).length,
+      settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask },
       closed_reason: null,
+      // rooms.game / public / quick (migration 0002; db.ts ignores them until it writes those columns)
+      game: r.settings.game ?? "ludo",
+      public: !!r.quick,
+      quick: !!r.quick,
     };
+    return st;
   }
 
   /** What the rooms row shows, as a string: a change queues a (debounced) write. */
   private roomSig(): string {
     const r = this.room!;
-    const ms = r.members.map((m) => `${m.id}${this.online(m.id) ? "+" : "-"}`).join(",");
-    return `${r.status}|${r.host}|${ms}|${r.settings.teams ? 1 : 0}${r.settings.pair_ask ? 1 : 0}`;
+    const ms = r.members.map((m) => `${m.id}${!m.ghost && this.online(m.id) ? "+" : "-"}`).join(",");
+    return `${r.status}|${r.host}|${ms}|${r.settings.teams ? 1 : 0}${r.settings.pair_ask ? 1 : 0}|${r.settings.game ?? "ludo"}`;
   }
 
   /** A status change is written at once; anything else at most once per TELEMETRY.roomDebounce (plus a final one). */
@@ -1149,6 +1734,7 @@ export class Room extends DurableObject<Env> {
 
   /** players upsert on hello (rooms+1 on the first join of this room); a quick reconnect is not written again. */
   private playerSeen(mem: Member, firstJoin: boolean): void {
+    if (mem.ghost || !mem.pid) return;
     const now = Date.now();
     const last = this.playerSeenAt.get(mem.pid);
     if (!firstJoin && last !== undefined && now - last < TELEMETRY.playerRepeat) return;
@@ -1158,34 +1744,98 @@ export class Room extends DurableObject<Env> {
   }
 
   private seatPid(st: Seat): string {
+    if (st.ghost) return "";
     return st.pid ?? this.room?.members.find((m) => m.id === st.id)?.pid ?? "";
   }
 
   private endMatchStmt(m: Match, result: D.MatchResult, now: number): D1PreparedStatement {
+    const O = opsFor(m.game);
     const s = m.state;
-    return D.endMatch(this.env.DB, {
+    const done = result === "over";
+    const win = done ? O.winner(s) : -1;
+    const winSeat = win >= 0 ? m.seats.find((st) => st.color === win) : undefined;
+    const row = {
       code: this.room!.code,
       started_at: m.startedAt ?? 0,
       ended_at: now,
-      winner: result === "over" ? s.winner : null,
-      finished: [...(s.finished ?? [])],
+      winner: done ? win : null,
+      finished: O.finished(s),
       actions: m.n,
       result,
-    });
+      // matches.human_won (migration 0002): quick matches only, null while unknown
+      human_won: this.room?.quick && done && winSeat ? !winSeat.ghost : null,
+    };
+    return D.endMatch(this.env.DB, row);
   }
 
-  /** over: the matches row, matches+1 for every seat's player, wins+1 for the winners who stayed. */
+  /** over: the matches row, players stats, online rewards for the humans, quick-match stats. */
   private matchOver(): void {
     const r = this.room!;
     const m = r.match!;
+    const O = opsFor(m.game);
     const now = Date.now();
-    const won = new Set<number>(R.winners(m.state));
+    const won = new Set<number>(O.winners(m.state));
     const stmts = [this.endMatchStmt(m, "over", now)];
     for (const st of m.seats) {
+      if (st.ghost) continue;
       const pid = this.seatPid(st);
-      if (pid) stmts.push(D.playerResult(this.env.DB, pid, won.has(st.color) && !st.left, now));
+      if (pid) stmts.push(D.playerResult(this.env.DB, pid, won.has(st.color) && this.outcome(m, st, won) === "win", now));
     }
     this.db("match over", stmts);
+
+    const results = m.seats
+      .filter((st) => !st.ghost && st.account)
+      .map((st) => ({ account_id: st.account as string, outcome: this.outcome(m, st, won) }));
+    if (results.length) {
+      const g: OnlineMatchGrant = { match_id: `${r.code}-${m.startedAt ?? 0}`, game: m.game ?? "ludo", results };
+      (r.grants ??= []).push({ g, tries: 0, next: now });
+      this.ctx.waitUntil(this.runGrants());
+    }
+    if (r.quick) {
+      const win = O.winner(m.state);
+      const ws = m.seats.find((st) => st.color === win);
+      const stat = ws?.ghost ? { ghost_wins: 1 } : { human_wins: 1 };
+      this.ctx.waitUntil(quickStat(this.env, { game: m.game ?? "ludo", size: r.quick.size, ...stat }));
+    }
+  }
+
+  /**
+   * Who is saying hello: the account (session, else the pid's account), the level, and whether they are banned
+   * (the pid's legacy ban, the pid's account, the session's account). Cached TELEMETRY.banCache. Fails open.
+   */
+  private async identify(pid: string, session: unknown): Promise<Identity> {
+    const ban = await this.banOf(pid);
+    if (ban) return { account: null, ban, level: null };
+    const sess = isSessionShape(session) ? session : "";
+    const key = `${pid}|${sess}`;
+    const now = Date.now();
+    const c = this.idCache.get(key);
+    if (c && now - c.at < TELEMETRY.banCache) return c.id;
+    const A = accounts(this.env);
+    const id: Identity = { account: null, ban: null, level: null };
+    try {
+      if (sess) {
+        const v = await withTimeout(A.verifySession(this.env, sess), TELEMETRY.readTimeout);
+        if (v?.account_id) {
+          id.account = v.account_id;
+          if (v.banned) id.ban = v.ban_reason || "banned";
+        }
+      }
+      const pa = await withTimeout(A.accountForPid(this.env, pid), TELEMETRY.readTimeout);
+      if (pa) {
+        id.account ??= pa.account_id;
+        if (pa.banned) id.ban ??= pa.ban_reason || "banned";
+      }
+      if (id.account && !id.ban) {
+        const prof = await withTimeout(A.getPublicProfile(this.env, id.account), TELEMETRY.readTimeout);
+        if (prof && Number.isFinite(prof.level)) id.level = Math.max(1, Math.trunc(prof.level));
+      }
+    } catch (e) {
+      console.error("account lookup failed (allowing):", e);
+    }
+    this.idCache.set(key, { at: Date.now(), id });
+    if (this.idCache.size > 256) this.idCache.delete(this.idCache.keys().next().value!);
+    return id;
   }
 
   /** The ban reason for pid ("" reason -> still banned: returns a non-empty default), or null. Fails open. */
@@ -1265,16 +1915,39 @@ export interface AdminSnapshot {
   created: number;
   touched: number;
   sockets: number;
-  members: Array<{ id: number; pid: string; name: string; avatar: string; frame: string; online: boolean; color: number }>;
-  settings: Settings;
-  match: { n: number; state: LudoState; seats: Array<Record<string, unknown>>; deadline: number; started_at: number } | null;
+  /** "ludo" | "sl". */
+  game: GameKind;
+  /** A quick-match room (Matchmaker): no host, no lobby, may hold ghosts. */
+  quick: boolean;
+  /** `account`, `level` and `ghost: true` are present only when known / true. */
+  members: Array<{
+    id: number;
+    pid: string;
+    name: string;
+    avatar: string;
+    frame: string;
+    online: boolean;
+    color: number;
+    account?: string;
+    level?: number;
+    ghost?: boolean;
+  }>;
+  settings: { teams: boolean; pair_ask: boolean };
+  match: {
+    n: number;
+    game: GameKind;
+    state: AnyState;
+    seats: Array<Record<string, unknown>>;
+    deadline: number;
+    started_at: number;
+  } | null;
 }
 
 function banMsg(reason: string): string {
   return reason && reason !== "banned" ? `You are banned from online play: ${reason}` : "You are banned from online play.";
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((res, rej) => {
     const t = setTimeout(() => rej(new Error(`timed out after ${ms} ms`)), ms);
     p.then(

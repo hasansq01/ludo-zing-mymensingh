@@ -10,8 +10,11 @@ extends Node
 ##   net.send_msg({t = "roll", n = 12})
 ##   net.leave()
 ##
-## Identity: a random player id kept in Save.prefs.net_pid; the room token from `welcome` is kept in memory and in
-## Save.prefs.net_room {code, token}, so a dropped socket (and an app restart, resume()) takes back the same seat.
+## Identity: a random player id kept in Save.prefs.net_pid, plus the account session (Account.session(), sent as
+## `session` in every hello when there is one: rewards, bans and level follow the account; without one the server
+## falls back to the pid). The room token from `welcome` is kept in memory and in Save.prefs.net_room {code, token,
+## quick, game}, so a dropped socket (and an app restart, resume()) takes back the same seat. Quick-match rooms
+## (join(code, token, true) after NetQuick's `matched`) work the same; quick says so (no lobby, no host).
 ## A dropped socket reconnects by itself with backoff (BACKOFF) while you are in a room; status says where it is:
 ## "idle" (no room), "connecting" (first join), "open" (welcomed), "reconnecting". A first join that never connects
 ## gives up after JOIN_TRIES with error {code = "no_connection"}; a room that is gone (404) stops the retries with
@@ -20,7 +23,8 @@ extends Node
 ##
 ## Server URL: the --net=ws://host:port command line argument (debug builds), else Save.prefs.net_url, else
 ## PROD_URL. HTTP goes to the same host (ws -> http, wss -> https).
-## Tests: set prefs / persist / profile_fn / make_transport / http_fn before use (NetFake provides a room).
+## Tests: set prefs / persist / profile_fn / session_fn / make_transport / http_fn before use (NetFake provides a
+## room and a matchmaker).
 
 signal status_changed(status: String)
 signal message(msg: Dictionary)          ## every server message, after the typed signal
@@ -55,6 +59,7 @@ var persist := Callable()                ## saves prefs (Save.save by default)
 var profile_fn := Callable()             ## () -> {name, avatar, frame} (the Save profile by default)
 var make_transport := Callable()         ## () -> NetTransport (NetTransport.WS by default)
 var http_fn := Callable()                ## (method: int, path: String) -> {status: int, data} (coroutine)
+var session_fn := Callable()             ## () -> String: the account session ("" = none; Account.session() by default)
 
 var status := "idle"
 var code := ""                           ## the room joined (or being joined)
@@ -62,6 +67,7 @@ var token := ""
 var member_id := ""                      ## your member id (welcome.id)
 var host_id := ""
 var last_lobby := {}
+var quick := false                       ## the room is a quick-match room (no lobby, no host, no rematch)
 var rtt_ms := -1
 var clock_offset_ms := 0.0               ## server clock - local clock
 var log_sent: Array = []                 ## the last messages sent (tests, debugging)
@@ -144,12 +150,16 @@ static func ensure_pid(p: Dictionary) -> String:
 		p.net_pid = pid
 	return pid
 
-## The room to take back after an app restart: {code, token} or {}.
+## The room to take back after an app restart: {code, token, quick} or {}.
 static func saved_room(p: Dictionary) -> Dictionary:
 	var r: Variant = p.get("net_room", {})
 	if r is Dictionary and valid_code(str((r as Dictionary).get("code", ""))) and str((r as Dictionary).get("token", "")) != "":
-		return {code = str(r.code), token = str(r.token)}
+		return {code = str(r.code), token = str(r.token), quick = bool((r as Dictionary).get("quick", false))}
 	return {}
+
+## The account session for hellos ("" when there is none): the Account of this run (scripts/net/account.gd).
+static func account_session() -> String:
+	return Account.session()
 
 ## A name the server accepts (1–16 characters, trimmed); the profile's placeholder "You" goes out as "Player".
 static func wire_name(n: String) -> String:
@@ -187,6 +197,12 @@ static func error_text(code_: String) -> String:
 			return "You can’t play online right now."
 		"kicked":
 			return "You were removed from the room."
+		"session":
+			return "We couldn’t sign you in. Check your internet and try again."
+		"replaced":
+			return "You started a search on another device."
+		"busy":
+			return "You’re already being matched on another device."
 	return "Something went wrong. Please try again."
 
 
@@ -255,12 +271,14 @@ func _http(method: int, path: String) -> Dictionary:
 # =====================================================================================================================
 
 ## Join a room (the creator too). token: the seat to take back ("" = the kept one for this code, if any).
-func join(code_: String, token_ := "") -> void:
+## quick_: a quick-match room (token from `matched`).
+func join(code_: String, token_ := "", quick_ := false) -> void:
 	_defaults()
 	close_socket()
 	code = clean_code(code_)
 	var kept := saved_room(prefs)
 	token = token_ if token_ != "" else (str(kept.token) if kept.get("code", "") == code else "")
+	quick = quick_ or (token_ == "" and kept.get("code", "") == code and bool(kept.get("quick", false)))
 	member_id = ""
 	host_id = ""
 	last_lobby = {}
@@ -275,7 +293,7 @@ func resume() -> bool:
 	var r := saved_room(prefs)
 	if r.is_empty():
 		return false
-	join(r.code, r.token)
+	join(r.code, r.token, bool(r.get("quick", false)))
 	_ever_open = true                         # a seat we had: keep trying like a dropped socket
 	return true
 
@@ -293,6 +311,7 @@ func leave() -> void:
 	member_id = ""
 	host_id = ""
 	last_lobby = {}
+	quick = false
 	_set_status("idle")
 
 ## Forget the kept room (Save.prefs.net_room).
@@ -332,7 +351,7 @@ func send_msg(msg: Dictionary) -> bool:
 	return transport.send(JSON.stringify(msg)) == OK
 
 func _open_socket() -> void:
-	transport = make_transport.call() if make_transport.is_valid() else NetTransport.WS.new()
+	transport = make_transport.call() if make_transport.is_valid() else NetTransport.make()
 	_hello_sent = false
 	_welcomed = false
 	_connect_left = CONNECT_SEC
@@ -348,10 +367,17 @@ func _hello() -> void:
 		avatar = str(p.get("avatar", "")).substr(0, 32), frame = str(p.get("frame", "")).substr(0, 32)}
 	if token != "":
 		m.token = token
+	var sess := session()
+	if sess != "":
+		m.session = sess
 	_hello_sent = true
 	if prefs.get("net_pid") != null:
 		_persist()
 	send_msg(m)
+
+## The session sent in hellos now ("" = none).
+func session() -> String:
+	return str(session_fn.call()) if session_fn.is_valid() else (account_session() if use_save else "")
 
 func _profile() -> Dictionary:
 	var save := _save_node() if use_save else null
@@ -457,7 +483,7 @@ func handle(msg: Dictionary) -> void:
 			_ever_open = true
 			_retry = 0
 			_ping_left = PING_SEC
-			prefs.net_room = {code = code, token = token}
+			prefs.net_room = {code = code, token = token, quick = quick}
 			_persist()
 			_set_status("open")
 			ping()                                # the round trip and the server clock, early

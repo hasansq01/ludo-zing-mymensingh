@@ -5,8 +5,8 @@ import { api, enc } from "../api.js";
 import { icon } from "../icons.js";
 import { createBoard, dieFace, GOAL } from "../board.js";
 import {
-  card, kv, badge, statusBadge, colorMark, COLORS, onlineDot, avatar, pidLink, copyBtn, openDialog, toast, toastErr,
-  errorState, emptyState, skeletonBlock,
+  card, kv, badge, roomStatusBadge, PAUSED_HELP, colorMark, COLORS, onlineDot, avatar, pidLink, copyBtn, openDialog, toast, toastErr,
+  errorState, emptyState, skeletonBlock, ghostTag,
 } from "../ui.js";
 import { refreshButton, updatedLabel } from "./common.js";
 import { matchColumns } from "./match_cells.js";
@@ -63,6 +63,7 @@ export default function roomPage(root, [codeRaw], ctx) {
     const p = {
       heroBadges: h("div", { class: "hero-badges" }),
       heroMeta: h("div", { class: "hero-meta" }),
+      heroNote: h("p", { class: "hero-note", hidden: true }),
       closeBtn: h("button", { class: "btn btn-danger btn-sm", type: "button" }, icon("power", { size: 14 }), "Close room"),
       boardHost: h("div", { class: "board-wrap" }, board.el),
       boardOverlay: h("div", { class: "board-overlay", hidden: true }),
@@ -77,7 +78,7 @@ export default function roomPage(root, [codeRaw], ctx) {
     p.closeBtn.addEventListener("click", closeRoom);
     const hero = h("section", { class: "hero hero-room" },
       h("div", { class: "room-code", "aria-label": "Room code " + code }, code, copyBtn(code, "Copy code")),
-      h("div", { class: "hero-main" }, p.heroBadges, p.heroMeta),
+      h("div", { class: "hero-main" }, p.heroBadges, p.heroMeta, p.heroNote),
       h("div", { class: "hero-actions" }, upd.el, refreshButton(() => load(true)), p.closeBtn));
     replace(body,
       hero,
@@ -102,7 +103,9 @@ export default function roomPage(root, [codeRaw], ctx) {
     upd.setLive(isLive);
 
     // hero
-    replace(p.heroBadges, statusBadge(live?.status || room.status),
+    // paused: a match in progress with nobody connected (live view when there is one, else the D1 row)
+    const paused = live ? Boolean(live.paused) : Boolean(room.paused);
+    replace(p.heroBadges, roomStatusBadge(live?.status || room.status, paused),
       isLive ? badge("Live", "ok") : badge("Not live", "muted"),
       live?.settings?.teams ? badge("Teams", "neutral") : null);
     replace(p.heroMeta,
@@ -110,6 +113,10 @@ export default function roomPage(root, [codeRaw], ctx) {
       room.host_pid ? pidLink(room.host_pid) : null,
       h("span", null, "Created ", timeEl(room.created_at)),
       h("span", null, "Updated ", timeEl(room.updated_at)));
+    // (a paused row without a live room is a lost final write: the board overlay says the room is gone)
+    const showNote = paused && live?.status === "playing";
+    if (showNote) replace(p.heroNote, icon("moon", { size: 14 }), h("span", null, h("strong", null, "Paused. "), PAUSED_HELP));
+    p.heroNote.hidden = !showNote;
     p.closeBtn.disabled = room.status === "closed" && !live;
 
     // board
@@ -132,8 +139,9 @@ export default function roomPage(root, [codeRaw], ctx) {
           h("span", { class: "mrow-av" }, avatar(m.avatar, m.name, 32), h("span", { class: "mrow-dot" }, onlineDot(m.online))),
           h("div", { class: "mrow-main" },
             h("div", { class: "mrow-name" }, colorMark(m.color), h("span", null, m.name || "Player"),
-              m.id === live.host ? h("span", { class: "tag tag-host", title: "Host" }, icon("crown", { size: 11 }), "host") : null),
-            h("div", { class: "mrow-sub" }, m.pid ? pidLink(m.pid) : null, h("span", { class: "muted" }, " · member " + shortId(String(m.id ?? ""), 6)), h("span", { class: "muted" }, m.online ? " · online" : " · offline"))),
+              m.id === live.host ? h("span", { class: "tag tag-host", title: "Host" }, icon("crown", { size: 11 }), "host") : null,
+              m.ghost ? ghostTag() : null),
+            h("div", { class: "mrow-sub" }, m.pid ? pidLink(m.pid) : null, h("span", { class: "muted" }, " · member " + shortId(String(m.id ?? ""), 6)), h("span", { class: "muted" }, m.ghost ? " · server-played" : m.online ? " · online" : " · offline"))),
           kick);
       })));
     }
@@ -148,7 +156,7 @@ export default function roomPage(root, [codeRaw], ctx) {
 
     // D1 record
     replace(p.record, kv([
-      ["Status", statusBadge(room.status)],
+      ["Status", roomStatusBadge(room.status, room.paused)],
       ["Members", membersCell(room)],
       ["Host", room.host_name || "–"],
       ["Created", timeEl(room.created_at)],
@@ -191,7 +199,8 @@ export default function roomPage(root, [codeRaw], ctx) {
       h("div", { class: "turn-who" },
         h("span", { class: "kicker" }, over ? "Winner" : "Turn"),
         h("div", { class: "turn-name" }, colorMark(over ? st.winner : c, { size: 14 }), h("strong", null, over ? winnerName(match, st) : name),
-          !over && (seat?.bot || st.players?.[c] === "cpu") ? h("span", { class: "tag tag-bot" }, icon("bot", { size: 11 }), "bot") : null)),
+          !over && !seat?.ghost && (seat?.bot || st.players?.[c] === "cpu") ? h("span", { class: "tag tag-bot" }, icon("bot", { size: 11 }), "bot") : null,
+          !over && seat?.ghost ? ghostTag() : null)),
       h("div", { class: "turn-grid" },
         h("div", { class: "turn-cell" }, h("span", { class: "kicker" }, "Dice"), dieFace(Number(st.dice) || 0, 36)),
         h("div", { class: "turn-cell" }, h("span", { class: "kicker" }, "Phase"), h("span", { class: "phase phase-" + st.phase }, PHASE[st.phase] || st.phase)),
@@ -223,8 +232,9 @@ export default function roomPage(root, [codeRaw], ctx) {
         colorMark(c, { size: 13 }),
         h("div", { class: "seat-main" },
           h("div", { class: "seat-name" }, h("span", null, seat.name || COLORS[c]),
-            mode === "cpu" || seat.bot ? h("span", { class: "tag tag-bot" }, icon("bot", { size: 11 }), "bot") : null,
-            seat.bot ? null : onlineDot(seat.online),
+            !seat.ghost && (mode === "cpu" || seat.bot) ? h("span", { class: "tag tag-bot" }, icon("bot", { size: 11 }), "bot") : null,
+            seat.ghost ? ghostTag() : null,
+            seat.bot || seat.ghost ? null : onlineDot(seat.online),
             place >= 0 ? h("span", { class: "tag tag-place" }, "#" + (place + 1)) : null),
           h("div", { class: "seat-prog", title: `${home} of 4 pawns home` },
             h("span", { class: "bar" }, h("span", { class: "bar-fill cm-bg-" + c, style: { width: Math.round(prog * 100) + "%" } })),
