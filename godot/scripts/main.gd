@@ -155,6 +155,7 @@ func _ready() -> void:
 		var opened := notifications.take_launch()    # the notification that started the app goes first
 		if not online.try_resume() and not opened:   # a friends room kept from the last run comes back next
 			_maybe_open_daily()
+		notifications.maybe_ask()                   # the notifications question, once Home is quiet (if it is due)
 		_bg_warm_up()
 		return
 	_set_screen("welcome")                      # (the S&L scene waits: _bg_warm_up after Home, if it is wanted at all)
@@ -170,6 +171,7 @@ func _ready() -> void:
 	if account.enabled:
 		account.push_identity()                 # the name and avatar picked on the welcome go to the server
 	_set_screen("home")                         # no daily reward on top of the welcome: it waits for the first game
+	notifications.maybe_ask()                   # the notifications question, right after the welcome
 	_bg_warm_up()
 
 ## UPDATE_ONCE turns itself into UPDATE_DISABLED after its frame: the dice must go back to drawing while visible,
@@ -435,7 +437,7 @@ func go_home() -> void:
 		var flying := _home_fly > 0 and _home_coins() != null
 		_fly_winnings.call_deferred()
 		_maybe_open_daily(1.6 if flying else 0.6)   # after the coins have landed
-		notifications.maybe_ask()                   # a win asks once about notifications, when Home is quiet
+		notifications.maybe_ask()                   # back from a game: the notifications question, if it is due
 
 ## The coins won in the last game fly into the home counter (it counts up from the old balance).
 func _fly_winnings() -> void:
@@ -1019,8 +1021,6 @@ func _on_finished(result: Dictionary, game: String) -> void:
 		data.xp_after = int(Save.profile.xp)
 	data.reward = int(data.get("reward", 0))
 	data.human_won = bool(data.get("human_won", false))
-	if data.human_won:
-		notifications.note_win()
 	var target := _home_coins()
 	if target and target.is_visible_in_tree():
 		data.coin_target = target

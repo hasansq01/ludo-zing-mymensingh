@@ -23,6 +23,8 @@ class FakePlugin extends RefCounted:
 
 	func permission_state() -> String:
 		return permission
+	func open_settings() -> void:
+		calls.append("open_settings")
 	func request_permission() -> void:
 		calls.append("request_permission")
 		permission = "granted"
@@ -104,6 +106,8 @@ func _stub() -> void:
 	n.cancel_all()
 	check("stub: cancel_all", n.scheduled().is_empty() and n.stub_scheduled.is_empty(), n.stub_scheduled)
 	check("stub: no launch data", n.take_launch_data() == {})
+	n.open_settings()
+	check("stub: open_settings is counted (nothing to open)", n.stub_settings_opened == 1 and _log.is_empty(), _log)
 	n.request_permission()
 	check("stub: request_permission -> permission_result(false)", _log == [["permission_result", false]], _log)
 	_log.clear()
@@ -152,6 +156,8 @@ func _plugin_local() -> void:
 	check("plugin: request_permission -> permission_result(true)",
 		_log == [["permission_result", true]] and fake.calls == ["request_permission"], [_log, fake.calls])
 	check("plugin: then granted", n.permission_state() == "granted")
+	n.open_settings()
+	check("plugin: open_settings passes through", fake.calls.back() == "open_settings", fake.calls)
 	n.schedule("free", 9_000_000_000, "rewards", "Free coins", "Free coins are ready", "free")
 	check("plugin: schedule passes everything (64-bit time)", fake.calls.back() == "schedule:free:9000000000:rewards"
 		and fake.items.free == [9_000_000_000, "rewards", "Free coins", "Free coins are ready", "free"], fake.items)

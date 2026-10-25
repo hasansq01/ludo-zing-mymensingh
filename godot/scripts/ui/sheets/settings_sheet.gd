@@ -7,9 +7,10 @@ extends Sheet
 ##                  applied at once through Quality.set_tier; a note says when part of it waits for the next launch)
 ##   Camera view    Ludo (3D / Top), Snakes & Ladders (3D / Top)
 ##   House rules    Ask before pairing (pair_ask), Snakes & Ladders: Need a 1 to start (sl_need_one)
-##   Notifications  a master switch (the phone's permission is asked when it goes on) and Rewards, Reminders, Game
-##                  alerts, News & offers (Save.prefs notif, notif_rewards, notif_reminders, notif_game, notif_offers);
-##                  "Turn on notifications for Ludo Zing in your phone settings" under the master when the phone said no
+##   Notifications  a master switch, on only while the player wants them AND the phone allows them (turning it on asks
+##                  the phone, or opens its settings once it can't ask any more), and Rewards, Reminders, Game alerts,
+##                  News & offers (Save.prefs notif, notif_rewards, notif_reminders, notif_game, notif_offers); a note
+##                  under the master says what a tap will do while the phone doesn't allow them
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
 ##   Help           How to play, Credits (+ Privacy policy / Support once their pages exist: URLS)
 ##   Reset progress (confirm first), then the version line and the Support ID (the player ID; nothing else uses it
@@ -35,7 +36,8 @@ var _list: VBoxContainer
 var _switch: Switch                      # the Sound switch (previews flip it)
 var _vol_lines: Array[Control] = []
 var _gfx_note: Label                     # Graphics: "... on next launch" when the pick needs one
-var _notif_note: Label                   # Notifications: the "phone settings" hint
+var _notif_note: Label                   # Notifications: what a tap does while the phone doesn't allow them
+var _notif_master: Switch
 var _notif_lines: Array[Control] = []    # the four kinds (dimmed while the master switch is off)
 
 
@@ -104,7 +106,8 @@ func _build() -> void:
 	# --- Notifications (the master switch, then what to be told about)
 	_caption("Notifications")
 	var nt := _group()
-	var master := Switch.new(bool(Save.prefs.get("notif", true)))
+	var master := Switch.new(_notif_shown())
+	_notif_master = master
 	master.toggled.connect(_on_notif)
 	var master_line := _line("Notifications", " ", master, master)
 	_notif_note = master_line.get_child(0).get_child(0).get_child(1) as Label
@@ -262,21 +265,37 @@ func _switch_line(text: String, note: String, key: String) -> Control:
 	sw.toggled.connect(func(on: bool): _set_pref(key, on))
 	return _line(text, note, sw, sw)
 
-## The hint under the master switch (only when it is on and the phone said no) and the dimmed kinds (master off).
+## The master switch as shown: on only while the player wants notifications and the phone allows them ("unsupported":
+## desktop, the player's choice alone).
+static func _notif_shown() -> bool:
+	return bool(Save.prefs.get("notif", true)) and Notifications.permission() in ["granted", "unsupported"]
+
+## The master switch follows the phone (a dialog answered, settings changed while away), the note under it says what a
+## tap will do while the phone doesn't allow them, and the kinds dim while it is off.
 func _refresh_notif(_state: Variant = null) -> void:
-	var on := bool(Save.prefs.get("notif", true))
+	var on := _notif_shown()
+	if _notif_master != null and _notif_master.button_pressed != on:
+		_notif_master.set_pressed_no_signal(on)
+		_notif_master._set_t(1.0 if on else 0.0)
 	if _notif_note != null:
-		_notif_note.text = "Turn on notifications for Ludo Zing in your phone settings" if on and Notifications.permission() == "denied" else ""
+		match Notifications.permission():
+			"ask": _notif_note.text = "Tap to allow notifications on this phone."
+			"denied": _notif_note.text = "Off in your phone settings. Tap to open them."
+			_: _notif_note.text = ""
 		_notif_note.visible = _notif_note.text != ""
 	for l in _notif_lines:
 		l.modulate.a = 1.0 if on else 0.4
 
+## On: the player wants them, and the phone is asked (the system dialog) or, when it can't ask any more, its settings
+## open; the switch shows the phone's answer when it comes. Off: the player's choice.
 func _on_notif(on: bool) -> void:
 	Save.prefs.notif = on
 	Save.save()
 	var notifs := Notifications.instance()
-	if on and notifs != null and Notifications.permission() == "ask":
-		notifs.ask_permission()
+	if on and notifs != null:
+		match Notifications.permission():
+			"ask": notifs.ask_permission()
+			"denied": notifs.open_settings()
 	_refresh_notif()
 	prefs_changed.emit()
 

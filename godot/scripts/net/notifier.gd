@@ -11,6 +11,7 @@ extends Node
 ##   route(n.take_launch_data())                 # ...or the one that started the game ({} = none); each tap comes once,
 ##                                               # either here or as opened, never both
 ##   if n.permission_state() == "ask": n.request_permission()     # -> permission_result(granted)
+##   if n.permission_state() == "denied": n.open_settings()       # the phone's notification settings for the game
 ##   n.cancel_all(); n.schedule("daily", at_unix, "rewards", "Daily reward", "Your daily reward is ready", "daily")
 ##   if n.push_configured(): n.push_init_from_settings()          # -> push_token(token) or push_failed(code)
 ##   n.push_subscribe("promos"); n.push_received.connect(toast)   # a push while the game is on screen
@@ -47,6 +48,8 @@ var stub_scheduled: Dictionary = {}
 var stub_launch: Dictionary = {}
 var stub_permission := "unsupported"
 var stub_grant := false
+## Stub only: how many times open_settings() was called.
+var stub_settings_opened := 0
 
 var _pg: Object = null
 var _deferred := true
@@ -92,6 +95,14 @@ func request_permission() -> void:
 		_later(permission_result.emit.bind(stub_permission == "granted"))
 		return
 	_pg.call("request_permission")
+
+## The phone's notification settings for this app: the way to turn them on once the dialog can't be shown ("denied").
+## The answer comes as the state on the next resume.
+func open_settings() -> void:
+	if _pg == null:
+		stub_settings_opened += 1
+		return
+	_pg.call("open_settings")
 
 ## A local notification at `at_unix` (seconds), replacing one with the same id. Android may show it some minutes
 ## late (inexact alarm); it survives a reboot (dropped if its time passed meanwhile).

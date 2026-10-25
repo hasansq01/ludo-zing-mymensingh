@@ -70,9 +70,12 @@ class FakePlugin extends RefCounted:
 	var inits := 0
 	var token := "TOK1"
 	var topic_calls: Array = []           # ["sub" | "unsub", topic]
+	var settings_opened := 0
 
 	func permission_state() -> String:
 		return permission
+	func open_settings() -> void:
+		settings_opened += 1
 	func request_permission() -> void:
 		requests += 1
 		permission = "granted" if grant else "denied"
@@ -416,8 +419,8 @@ func _soft_prompt() -> void:
 	var p: FakePlugin = r.plugin
 	var app: FakeApp = r.app
 	p.permission = "ask"
-	n.note_win()
-	check("prompt: a win with the phone not asked wants the prompt", n._ask_wanted)
+	n.want_ask()
+	check("prompt: Home with the phone not asked wants the prompt", n._ask_wanted)
 	n._ask()
 	var sheet := Sheet.top_sheet(app.sheet_layer)
 	check("prompt: the sheet asks the contract's question", sheet != null and sheet.has_meta("confirm") and _texts(sheet).has(Notifications.ASK_TEXT), _texts(sheet) if sheet else null)
@@ -427,41 +430,41 @@ func _soft_prompt() -> void:
 	no.pressed.emit()
 	check("prompt: Not now does not ask the phone", p.requests == 0)
 	purge(app)
-	n.note_win()
-	check("prompt: ... and not again at the next win straight away", not n._ask_wanted)
+	n.want_ask()
+	check("prompt: ... and not again at the next Home straight away", not n._ask_wanted)
 	Save.prefs.notif_asked_at = NOW - Notifications.ASK_GAP_SEC - 1
-	n.note_win()
-	check("prompt: 3 days later a win asks again", n._ask_wanted)
+	n.want_ask()
+	check("prompt: 3 days later Home asks again", n._ask_wanted)
 	n._ask()
 	sheet = Sheet.top_sheet(app.sheet_layer)
 	check("prompt: second ask counted", Save.prefs.notif_asked == 2)
 	(sheet.find_child("Yes", true, false) as Button).pressed.emit()
 	purge(app)
 	check("prompt: Yes asks the phone (the system dialog)", p.requests == 1 and p.permission == "granted")
-	n.note_win()
+	n.want_ask()
 	check("prompt: granted: never again", not n._ask_wanted)
 	# the third and last
 	p.permission = "ask"
 	Save.prefs.notif_asked = 2
 	Save.prefs.notif_asked_at = 1
-	n.note_win()
+	n.want_ask()
 	n._ask()
 	Sheet.top_sheet(app.sheet_layer).find_child("No", true, false).pressed.emit()
 	purge(app)
 	Save.prefs.notif_asked_at = 1
-	n.note_win()
+	n.want_ask()
 	check("prompt: three asks in all", Save.prefs.notif_asked == 3 and not n._ask_wanted)
 	# a sheet already open: no prompt over it
 	reset_prefs()
 	p.permission = "ask"
-	n.note_win()
+	n.want_ask()
 	app.top = FakeShop.new()
 	n._ask()
 	check("prompt: not over another sheet (and not counted)", Save.prefs.notif_asked == 0 and Sheet.top_sheet(app.sheet_layer) == null)
 	app.top = null
 	# notifications off
 	Save.prefs.notif = false
-	n.note_win()
+	n.want_ask()
 	check("prompt: notifications off: no prompt", not n._ask_wanted)
 	Save.prefs.notif = true
 	check("prompt: the permission shown to Settings is the phone's", Notifications.permission() == "ask")
@@ -576,12 +579,25 @@ func _settings() -> void:
 	check("settings: master on with permission granted asks nothing", p.requests == 1)
 	p.permission = "denied"
 	s._on_notif(false)
-	check("settings: denied with the master off: no hint", not s._notif_note.visible)
+	check("settings: blocked on the phone: the note says a tap opens the phone settings", s._notif_note.visible
+		and s._notif_note.text == "Off in your phone settings. Tap to open them.", s._notif_note.text)
 	s._on_notif(true)
-	check("settings: denied with the master on: the one-line hint", s._notif_note.visible and s._notif_note.text == "Turn on notifications for Ludo Zing in your phone settings" and p.requests == 1, s._notif_note.text)
+	check("settings: master on while blocked: the phone's settings open (no dialog)", p.settings_opened == 1 and p.requests == 1, [p.settings_opened, p.requests])
+	check("settings: ... and the switch stays off until the phone allows them", not s._notif_master.button_pressed and Save.prefs.notif == true)
 	p.permission = "granted"
 	n.permission_changed.emit("granted")
-	check("settings: the hint goes when the phone says yes", not s._notif_note.visible)
+	check("settings: allowed in the phone settings: the switch goes on and the note goes", s._notif_master.button_pressed and not s._notif_note.visible)
+	# the phone not asked yet: the switch shows off even though the player never turned it off
+	p.permission = "ask"
+	n.permission_changed.emit("ask")
+	check("settings: not asked yet: the switch shows off with 'Tap to allow'", not s._notif_master.button_pressed
+		and s._notif_note.text == "Tap to allow notifications on this phone.", s._notif_note.text)
+	p.grant = false
+	s._notif_master.button_pressed = true
+	check("settings: a tap asks the phone; refused: the switch goes back off", p.requests == 2 and not s._notif_master.button_pressed, [p.requests, s._notif_master.button_pressed])
+	p.grant = true
+	p.permission = "granted"
+	n.permission_changed.emit("granted")
 	var ids := ["notif_rewards", "notif_reminders", "notif_game", "notif_offers"]
 	var sw: Array = []
 	for line in s._notif_lines:

@@ -39,6 +39,7 @@ Methods (all safe to call any time; results via signals, never thrown):
   13 answers at once with the current state).
 - `schedule(id: String, at_unix: int, channel: String, title: String, body: String, link: String)` (replaces the
   same id), `cancel(id: String)`, `cancel_all()` (local only), `scheduled() -> Array` of ids.
+- `open_settings()`: the phone's notification settings for the game (the way back once it can't ask any more).
 - `take_launch_data() -> Dictionary`: `{link, cid, source}` of the notification that opened the app (cold start or
   `onNewIntent`), once, then `{}`. Also signal `opened(data: Dictionary)` when tapped while the game is running.
 - Push (FCM, initialised manually with `FirebaseOptions`, no google-services.json / Gradle plugin):
@@ -59,10 +60,16 @@ Export: debug + release Gradle presets enable the plugin; `POST_NOTIFICATIONS`, 
   (Save.settings keys `notif` (bool, default true), `notif_rewards`, `notif_reminders`, `notif_game`,
   `notif_offers`, all default true). Turning the master on while permission is `ask` requests it; `denied` shows a
   one-line hint "Turn on notifications for Ludo Zing in your phone settings".
-- **Permission moment:** never at launch. After the player's first win (any mode), once: an in-game soft prompt
-  ("Get a heads-up when your free spin and daily reward are ready?" Not now / Yes) → Yes calls
-  `request_permission()`. Not now: ask again after the next win at least 3 days later, at most 3 times in all.
-  `Save.settings.notif_asked` (count) and `notif_asked_at`.
+- **Permission moment:** in context, with our own explanation first, never as the system dialog on a cold screen:
+  whenever Home comes up (after the welcome on the first run, at launch, back from any game) and the phone has not
+  been asked, once Home is quiet: an in-game soft prompt ("Get a heads-up when your free spin and daily reward are
+  ready?" Not now / Yes) → Yes calls `request_permission()`. Not now: asked again at least 3 days later, at most 3
+  times in all. `Save.prefs.notif_asked` (count) and `notif_asked_at`. (Was "after the first win" until 2026-10-25:
+  players who never won were never asked.)
+- **Settings switch follows the phone:** the master switch shows on only while `notif` is on AND the phone allows
+  notifications; a tap asks the phone (`ask`) or opens its notification settings for the game (`denied`,
+  `open_settings()`), and the switch follows the answer (also on resume). The note under it: "Tap to allow
+  notifications on this phone." / "Off in your phone settings. Tap to open them."
 - **Local schedule** (pure policy `scripts/core/notif_plan.gd`, `NotifPlan.plan(now_unix, tz_offset_s, state)
   -> Array[{id, at, channel, title, body, link}]`, unit-tested): run on every app pause/close (cancel_all then
   schedule) and cancel_all on resume/launch (the player is here). Inputs: the reward times (server `/v1/rewards`

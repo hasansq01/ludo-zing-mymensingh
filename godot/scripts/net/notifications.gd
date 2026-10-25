@@ -7,7 +7,9 @@ extends Node
 ##   schedule_now()          the app is going away: cancel_all, then NotifPlan's reminders (also on pause / close)
 ##   prefs_changed()         a Settings switch moved: push preferences and the promos topic follow
 ##   ask_permission()        Settings' master switch turned on while the phone has not been asked
-##   note_win() / maybe_ask() after a win: the soft prompt once the player is home (should_ask has the rules)
+##   open_settings()         ... or while the phone can't ask any more: its notification settings for the game
+##   maybe_ask()             Home is up (launch, after the welcome, back from a game): the soft prompt once it is
+##                           quiet (should_ask has the rules)
 ##   route(link)             open a deep link: home, daily, spin, free, shop[:kind:id], room:CODE, leaderboard
 ## Local reminders and the plugin come from Notifier (scripts/net/notifier.gd, a safe stub off Android); the account
 ## session and the push endpoints from Account; the room's `away` signal goes through Online's NetClient.
@@ -246,6 +248,11 @@ func _on_toast_input(e: InputEvent, d: Dictionary, pill: Control) -> void:
 func ask_permission() -> void:
 	notifier.call("request_permission")
 
+## Settings' master switch went on while the phone can't ask any more ("denied"): its notification settings for the
+## game (the new state comes with the resume).
+func open_settings() -> void:
+	notifier.call("open_settings")
+
 func _on_permission_result(_granted: Variant) -> void:
 	permission_changed.emit(permission())
 
@@ -259,15 +266,16 @@ static func should_ask(prefs: Dictionary, state: String, now: int) -> bool:
 		return false
 	return asked == 0 or now - Save.as_int(prefs.get("notif_asked_at"), 0) >= ASK_GAP_SEC
 
-## A match was won (any mode): maybe_ask() may ask once the player is home.
-func note_win() -> void:
+## Whether the soft prompt is due now (the rules of should_ask with the phone's state); maybe_ask() acts on it.
+func want_ask() -> bool:
 	_ask_wanted = should_ask(Save.prefs, str(notifier.call("permission_state")), _now())
+	return _ask_wanted
 
-## Asks the soft question once Home is quiet (no sheet over it; a daily reward may open first), for up to 25 s after a short wait. Yes
-## opens the system dialog; either answer counts as one ask.
+## Home is up: asks the soft question once Home is quiet (no sheet over it; a daily reward may open first), for up to
+## 25 s after a short wait. Yes opens the system dialog; either answer counts as one ask.
 func maybe_ask() -> void:
-	if not _ask_wanted:
-		return
+	if _ask_wanted or not want_ask():
+		return                                       # (already waiting for a quiet Home, or not due)
 	await get_tree().create_timer(2.4).timeout       # the coins land and a daily reward opens first
 	for i in 50:
 		if not _ask_wanted or app == null or str(app.get("screen")) != "home":

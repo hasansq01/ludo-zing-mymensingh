@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import com.google.android.gms.common.ConnectionResult
@@ -158,6 +159,27 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
                 Log.w(TAG, "requestPermissions failed", t)
                 asking = false
                 emitSignal(SIG_PERMISSION.name, false)
+            }
+        }
+    }
+
+    /** The phone's notification settings for this app (the way back once the dialog can't be shown any more). */
+    @UsedByGodot
+    fun open_settings() {
+        val act = activity ?: return
+        runOnUiThread {
+            val pkg = act.packageName
+            val intents = listOf(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, pkg),
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", pkg, null)),
+            )
+            for (i in intents) {
+                try {
+                    act.startActivity(i)
+                    return@runOnUiThread
+                } catch (t: Throwable) {
+                    Log.w(TAG, "open_settings: ${i.action} failed", t)
+                }
             }
         }
     }
