@@ -196,6 +196,8 @@ export interface Note {
   channel: Channel;
   /** collapse_key and notification tag: a phone shows the latest push of a tag only. */
   tag?: string;
+  /** FCM delivery priority; default by channel (game high, offers normal: Android may hold those while dozing). */
+  priority?: "high" | "normal";
   ttl_s: number;
 }
 
@@ -214,7 +216,7 @@ export function fcmMessage(t: Target, n: Note): Record<string, unknown> {
   const data: Record<string, string> = { link: n.link, kind: n.kind };
   if (n.cid) data.cid = n.cid;
   const android: Record<string, unknown> = {
-    priority: n.channel === "game" ? "high" : "normal",
+    priority: n.priority ?? (n.channel === "game" ? "high" : "normal"),
     ttl: `${n.ttl_s}s`,
     notification: n.tag ? { channel_id: n.channel, tag: n.tag } : { channel_id: n.channel },
   };

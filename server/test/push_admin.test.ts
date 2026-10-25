@@ -352,7 +352,7 @@ describe("test sends", () => {
     const r = await api(cookie, "push/test", { body: { title: "Test", body: "Hello me", link: "daily", account_id: a } });
     expect(r).toEqual({ sent: 2, failed: 1, tokens: 3 });
     expect(fcm.delivered.map((m) => m.token).sort()).toEqual([t1, t2].sort());
-    expect(fcm.delivered[0]).toMatchObject({ notification: { title: "Test", body: "Hello me" }, data: { link: "daily", kind: "test" }, android: { notification: { channel_id: "offers" } } });
+    expect(fcm.delivered[0]).toMatchObject({ notification: { title: "Test", body: "Hello me" }, data: { link: "daily", kind: "test" }, android: { priority: "high", notification: { channel_id: "offers" } } }); // arrives now, even dozing
     expect(fcm.delivered[0].data.cid).toBeUndefined();
     expect(await rows("SELECT token FROM push_tokens WHERE token = ?", t3)).toEqual([]);
     const log = await rows<Json>("SELECT target, detail FROM admin_log WHERE action = 'push.test'");

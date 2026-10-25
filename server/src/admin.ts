@@ -788,7 +788,7 @@ async function pushTest(c: Ctx): Promise<Response> {
     return fail(429, "rate_limited", `at most ${PUSH_LIMITS.testsPerHour} test sends per hour`);
   }
   if (!(await getAccount(c.env.DB, id))) return fail(404, "not_found", "no such account");
-  const r = await P.pushAccount(c.env, id, { kind: "test", ...content, channel: "offers", tag: "test", ttl_s: P.EVENT_TTL_S }, { pref: null, count: false });
+  const r = await P.pushAccount(c.env, id, { kind: "test", ...content, channel: "offers", tag: "test", ttl_s: P.EVENT_TTL_S, priority: "high" }, { pref: null, count: false });
   await audit(c, "push.test", id, { title: content.title, sent: r.sent, failed: r.failed });
   return json(r);
 }
