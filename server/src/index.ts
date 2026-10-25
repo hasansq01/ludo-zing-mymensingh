@@ -1,18 +1,20 @@
 // Ludo Zing online rooms: the Worker routes /v1/... to one Room Durable Object per room code (PROTOCOL.md), the
 // accounts / wallet / leaderboard endpoints (ONLINE_V2.md §1, §2, §4), quick match (/v1/quick/*, quick.ts), serves
 // the admin console at /admin (static files from ./admin) and its API at /admin/api (ADMIN_API.md), and runs the
-// daily cron (D1 pruning).
+// daily cron (D1 pruning, the weekly-result pushes), plus the push endpoints (/v1/push/*, NOTIFICATIONS.md).
 import * as A from "./accounts";
 import { CSP, handleAdmin } from "./admin";
 import { cron } from "./cron";
 import * as D from "./db";
 import { handleLeaderboard } from "./leaderboard";
+import * as P from "./push";
 import { handleQuick } from "./quick";
 import { isCode, randomCode, Room, type Env as RoomEnv } from "./room";
 import * as W from "./wallet";
 
 export { Room };
 export { Matchmaker } from "./matchmaker"; // the quick-match queue DO (wrangler.jsonc MATCHMAKER, migration v2)
+export { Pusher } from "./pusher"; // the push queue DO (wrangler.jsonc PUSHER, migration v3)
 /** The Worker's bindings: the Room's plus the accounts secrets (SESSION_KEY, GOOGLE_WEB_CLIENT_ID / _SECRET). */
 export type Env = A.AccEnv;
 
@@ -62,9 +64,13 @@ const POST_AUTHED: Record<string, (req: Request, env: Env, a: A.Authed, now: num
   "rewards/free": (_req, env, a, now) => W.rewardFree(env, a, now),
   "achievements/claim": W.achievementClaim,
   claims: W.postClaim,
+  "push/token": P.postToken,
 };
 
-/** /v1/auth/*, /v1/me, /v1/shop/*, /v1/rewards*, /v1/achievements/*, /v1/claims, /v1/leaderboard (ONLINE_V2.md). */
+/**
+ * /v1/auth/*, /v1/me, /v1/shop/*, /v1/rewards*, /v1/achievements/*, /v1/claims, /v1/leaderboard (ONLINE_V2.md),
+ * /v1/push/* (NOTIFICATIONS.md).
+ */
 async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]): Promise<Response | null> {
   const path = parts.slice(1).join("/");
   const m = req.method;
@@ -81,6 +87,14 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
         if (m !== "GET") return json({ error: "method" }, 405);
         const me = await A.optionalAccount(req, env, now);
         return await handleLeaderboard(env.DB, ctx, new URL(req.url), me, now, env.TEST_MODE === "1");
+      }
+      case "push/opened":
+        return m === "POST" ? await P.postOpened(req, env, now) : json({ error: "method" }, 405);
+      case "push/token": {
+        if (m !== "DELETE") break; // POST: below
+        const a = await A.authenticate(req, env, now);
+        if (a instanceof Response) return a;
+        return await P.deleteToken(req, env, a);
       }
       case "me":
       case "rewards": {

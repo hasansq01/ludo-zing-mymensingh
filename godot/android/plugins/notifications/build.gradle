@@ -1,0 +1,58 @@
+// Versions follow the Godot 4.7.2 Android build template (godot/android/build/config.gradle) so the AAR
+// links cleanly into the Gradle export: AGP 8.6.1, Kotlin 2.1.21, Java 17, compileSdk 36, minSdk 24.
+plugins {
+    id 'com.android.library' version '8.6.1'
+    id 'org.jetbrains.kotlin.android' version '2.1.21'
+}
+
+ext {
+    // Must match the editor / export templates (godot --version).
+    godotVersion = '4.7.2.stable'
+    // Latest stable on Google Maven (checked 2026-10-25; the same version as in firebase-bom 35.1.0). Keep in
+    // sync with FIREBASE_MESSAGING_DEPENDENCY in godot/addons/notifications/export_plugin.gd: that is what the app
+    // build actually links.
+    firebaseMessagingVersion = '26.0.1'
+}
+
+android {
+    namespace 'com.flipfold.ludozing.notifications'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    // Release and debug AARs carry the same code; the Godot export picks the one matching the export mode.
+    libraryVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "Notifications-${variant.name}.aar"
+        }
+    }
+}
+
+dependencies {
+    // Provided by the Godot app at runtime (godot-lib in the export template): compile against it only.
+    compileOnly "org.godotengine:godot:$godotVersion"
+    // Not bundled into the AAR either: the export plugin adds it to the app build as a Maven dependency. It brings
+    // firebase-common (FirebaseApp / FirebaseOptions) with it.
+    implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
+    // GoogleApiAvailability: a runtime dependency of firebase-messaging 26.0.1 (same version), so the app has it
+    // anyway; only compiled against here.
+    compileOnly "com.google.android.gms:play-services-base:18.9.0"
+}

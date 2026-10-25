@@ -197,6 +197,9 @@ A session of a merged-away (`keep: "here"` on the other device) or banned accoun
 | POST | `/v1/achievements/claim` | `{id}` → `{ok, profile, coins, progress}`; `404 unknown`, `409 not_done \| claimed` |
 | POST | `/v1/claims` | `{id (8–64 [A-Za-z0-9_-], unique per account), game, mode, result, players, duration_s, pairs?, rolls? (S&L), need_one?}` → `{ok, id, limited, granted, reason?, coins, xp, would?, profile}`; a retry with the same id → the first answer + `duplicate: true` + the current profile; malformed → `400 {error: "invalid", detail}` |
 | GET | `/v1/leaderboard` | `?board=xp\|wins&period=all\|week` → `{board, period, week?, min_matches: 3, top: [{rank, name, avatar, frame, level, value}], me: {rank, value, listed} \| null}` (session optional; `me.rank` null while the value is 0; `listed: false` while the account has fewer than `min_matches` completed matches: it is not in `top`, but `rank` is still its place among the listed accounts) |
+| POST | `/v1/push/token` | `{token, platform?: "android", prefs?: {game, offers}, tz_offset_min?}` → `{ok}` (NOTIFICATIONS.md "N-SRV"; stored with push off too) |
+| DELETE | `/v1/push/token` | `{token}` → `{ok}` (this account's token only) |
+| POST | `/v1/push/opened` | `{cid}` → `{ok}` (session optional: counted once per account, only with one) |
 
 `next_at` values are unix seconds. Days (daily, spin, claim caps) start at midnight Bangladesh time; leaderboard
 weeks are ISO weeks starting Monday 00:00 Bangladesh time.

@@ -218,4 +218,55 @@ v1); a lobby / playing room that exists but whose `adminSnapshot` shows nobody o
 online; ghosts don't count) → closed through the Room's `adminClose("stale-sweep")` (`closed_reason`
 `stale-sweep`; the Room records a match still playing as `closed`); a room with someone online, or in `over`
 (its own alarm deletes it), is left alone. Returns `{pruned: {events, login_attempts, player_days,
-guest_creations, scores}, reconciled, swept}`.
+guest_creations, scores}, reconciled, swept, weekly}` (`weekly`: the weekly-result pushes queued on a Monday,
+Bangladesh time, else `null`; see "Notifications"). It also deletes `push_events` rows older than 30 days.
+
+## Notifications (NOTIFICATIONS.md "N-SRV")
+
+Push notifications through Firebase Cloud Messaging. Secret `FCM_SERVICE_ACCOUNT` (the Firebase project's
+service-account JSON, whole: `tools/cf.sh secret put FCM_SERVICE_ACCOUNT`); unset (or not a service-account JSON)
+= push off: `GET` answers with `configured: false`, preview works, campaign and test sends answer
+`409 {error: "push_off"}`. Same rules as v1 (session cookie, `X-Admin: 1` on writes, audited: actions
+`push.campaign`, `push.test`, `push.cancel`). Bulk sends go through the `Pusher` Durable Object (a queue drained by
+its alarm, at most 40 sends per invocation); a campaign's status and counters are updated as it goes.
+
+### D1 schema (migrations/0004_push.sql)
+
+```
+push_tokens(token TEXT PRIMARY KEY /* FCM registration token */, account_id, platform /* android */,
+            prefs_game, prefs_offers /* 0 | 1: the game's Game alerts / News & offers toggles */,
+            tz_offset_min NULL, created_at, updated_at)         -- an account keeps its 5 latest tokens
+push_campaigns(id TEXT PRIMARY KEY /* cmp_ + 12 base32 */, title, body, link, audience JSON,
+               status /* draft | scheduled | sending | sent | canceled | failed */, run_at NULL, created_by,
+               created_at, sent_at NULL, targeted, sent, failed, opened)
+push_opens(cid, account_id, at, PRIMARY KEY (cid, account_id))   -- POST /v1/push/opened, once per account
+push_events(day /* UTC */, kind /* turn | joined | rematch | weekly */, sent, failed, PRIMARY KEY (day, kind))
+```
+Times are epoch ms (as everywhere in D1).
+
+### Endpoints
+
+| method | path | result |
+|---|---|---|
+| GET | `/admin/api/push` | `{now, configured, project_id (null when off), tokens: {total, offers, game} (devices; offers / game: with that toggle on), events: [{day, kind, sent, failed}] (event pushes, the last 14 UTC days, oldest first, days without pushes left out), campaigns: [campaign] (the latest 50, newest first), limits: {campaigns_per_day: 4, campaigns_left, tests_per_hour: 20, tests_left}}` |
+| POST | `/admin/api/push/campaigns` `{title (1–60), body (1–180), link?, audience, run_at?}` | → the campaign. `run_at` (unix seconds, or epoch ms; at most 30 days ahead) in the future → `status: "scheduled"`, sent then; absent / past → `"sending"`, queued now. `targeted` is the estimate at creation (the preview count), replaced by the devices actually sent to. `429 rate_limited` past 4 campaigns in the last 24 h (canceled ones don't count) |
+| POST | `/admin/api/push/preview` `{audience}` | → `{targeted}`: the devices the audience reaches now (nothing sent) |
+| POST | `/admin/api/push/test` `{title, body, link?, account_id}` | sends to every device of that account now (whatever its toggles; channel `offers`, `kind: "test"`, no `cid`) → `{sent, failed, tokens}`; `404` unknown account; `429 rate_limited` past 20 test sends in the last hour (counted in `admin_log`) |
+| POST | `/admin/api/push/campaigns/:id/cancel` | a scheduled campaign → the campaign with `status: "canceled"`; any other status → `409 {error: "bad_state"}`; unknown id → 404 |
+
+`campaign` = the `push_campaigns` row with `audience` parsed: `{id, title, body, link, audience, status, run_at,
+created_by: "admin", created_at, sent_at, targeted, sent, failed, opened}` (times epoch ms).
+
+- `link`: one of `home` (default), `daily`, `spin`, `free`, `shop`, `shop:<kind>:<id>`, `room:<CODE>`,
+  `leaderboard`; anything else → 400.
+- `audience`: `{kind: "all"}`: one send to the FCM topic `promos` (every device with News & offers on subscribes to
+  it); `targeted` = devices with offers on, `sent` = `targeted` when FCM accepted it (else `failed` = `targeted`,
+  status `failed`). `{kind: "segment", inactive_days?, new_days?, level_min?, level_max?}` (integers; days 1–365,
+  levels 1–500, `level_min ≤ level_max`; no filters = every device with offers on): one send per device with
+  `prefs_offers` of accounts that are not banned or merged and match **all** given filters: `inactive_days` — last
+  seen (or, never seen, created) more than N days ago; `new_days` — created within the last N days; `level_min` /
+  `level_max` — the level from the account's XP. Unknown filters → 400.
+- Delivery: `sent` / `failed` per device as FCM answers; a token FCM calls unregistered (or not a valid registration
+  token, or of another sender) is deleted and counted failed; FCM busy / unreachable is retried after 1 and 2 min,
+  then counted failed. Status `sent` when the queue is done (`failed` if nothing was delivered and something
+  failed). `opened` = accounts that opened it (`POST /v1/push/opened {cid}` from the game, once per account).

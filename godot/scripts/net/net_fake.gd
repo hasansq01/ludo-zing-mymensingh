@@ -115,6 +115,7 @@ class Room extends RefCounted:
 	var finished_once := false
 	var n := 0
 	var acts: Array = []                  ## every act sent ({n, a, h})
+	var aways: Array = []                 ## every {t: "away"} seen: {id, on} (the app went to the background / came back)
 	var rng := RandomNumberGenerator.new()
 	var dice: Array = []                  ## scripted rolls, front first (else random)
 	var corrupt_next := false             ## tests: the next act carries a wrong hash
@@ -229,6 +230,8 @@ class Room extends RefCounted:
 					_send(pipe, _sync_msg())
 			"emote":
 				_emote(pipe, me, str(m.get("id", "")))
+			"away":
+				aways.append({id = me.id, on = bool(m.get("on", false))})
 			"leave":
 				_leave(me)
 			_:

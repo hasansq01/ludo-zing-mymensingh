@@ -30,6 +30,7 @@ var sl: SLMatch
 var sl_hud: Control
 var online: Online                      # friend rooms (scripts/net/online.gd)
 var account: Account                    # the server account, wallet and claims (scripts/net/account.gd)
+var notifications: Notifications        # reminders, push and the permission question (scripts/net/notifications.gd)
 var screen := "splash"                  # splash | welcome | home | ludo | sl
 var paused := false
 var speed := 1.0
@@ -70,6 +71,9 @@ func _ready() -> void:
 	add_child(account)
 	account.conflict_raised.connect(_on_conflict)
 	account.claim_answered.connect(_on_claim_answered)
+	notifications = Notifications.new(self)
+	notifications.name = "Notifications"
+	add_child(notifications)
 	baker = TexBaker.new()
 	baker.name = "Baker"
 	add_child(baker)
@@ -148,7 +152,8 @@ func _ready() -> void:
 		return
 	if not first_run:
 		_set_screen("home")
-		if not online.try_resume():              # a friends room kept from the last run comes back first
+		var opened := notifications.take_launch()    # the notification that started the app goes first
+		if not online.try_resume() and not opened:   # a friends room kept from the last run comes back next
 			_maybe_open_daily()
 		_bg_warm_up()
 		return
@@ -430,6 +435,7 @@ func go_home() -> void:
 		var flying := _home_fly > 0 and _home_coins() != null
 		_fly_winnings.call_deferred()
 		_maybe_open_daily(1.6 if flying else 0.6)   # after the coins have landed
+		notifications.maybe_ask()                   # a win asks once about notifications, when Home is quiet
 
 ## The coins won in the last game fly into the home counter (it counts up from the old balance).
 func _fly_winnings() -> void:
@@ -869,6 +875,7 @@ func _on_prefs_changed() -> void:
 	speed = float(Save.prefs.speed)
 	world.board.speed = speed
 	_apply_sound()
+	notifications.prefs_changed()
 	if screen == "ludo":
 		world.set_top_view(Save.prefs.cam == "top")
 	elif screen == "sl":
@@ -1012,6 +1019,8 @@ func _on_finished(result: Dictionary, game: String) -> void:
 		data.xp_after = int(Save.profile.xp)
 	data.reward = int(data.get("reward", 0))
 	data.human_won = bool(data.get("human_won", false))
+	if data.human_won:
+		notifications.note_win()
 	var target := _home_coins()
 	if target and target.is_visible_in_tree():
 		data.coin_target = target
@@ -1191,6 +1200,7 @@ func _back() -> void:
 
 func _confirm_quit() -> void:
 	if await Sheet.confirm(self, "Leave the café?", "Your progress is saved.", "Quit", "Stay", true):
+		notifications.schedule_now()
 		Save.flush()
 		get_tree().quit()
 

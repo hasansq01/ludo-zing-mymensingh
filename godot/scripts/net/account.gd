@@ -50,6 +50,7 @@ var account: Dictionary = {}             ## the server's account record {id, gue
 var conflict: Dictionary = {}            ## a Google sign-in waiting for a decision (conflict_raised)
 var banned := false
 var last_claim: Dictionary = {}          ## the last claim answer ({id, limited, reason, coins, would, ...})
+var rewards_at: Dictionary = {}          ## when each reward is next claimable by the server's clock {daily, spin, free: unix s}
 
 var _session := ""
 var _pg: Object = null
@@ -369,6 +370,7 @@ func reset_identity() -> void:
 	account = {}
 	conflict = {}
 	_server_ident = {}
+	rewards_at = {}
 	_persist()
 	signed_in_changed.emit()
 	account_changed.emit()
@@ -517,6 +519,7 @@ func daily(notify := true) -> Dictionary:
 		r.char = str(r.get("char", "")) if r.get("char") != null else ""
 		r.coins = _int(r.get("coins"), 0)
 		r.day = _int(r.get("day"), 1)
+	_note_next("daily", r)
 	return r
 
 ## POST /v1/rewards/spin -> {ok, index, prize, next_at}. `notify` false holds Save.changed (the wheel is still turning).
@@ -525,11 +528,34 @@ func spin(notify := false) -> Dictionary:
 	if r.ok:
 		r.index = _int(r.get("index"), 0)
 		r.prize = _int(r.get("prize"), 0)
+	_note_next("spin", r)
 	return r
 
 ## POST /v1/rewards/free -> {ok, coins, next_at}.
 func free_coins(notify := true) -> Dictionary:
-	return await _write(HTTPClient.METHOD_POST, "/v1/rewards/free", {}, notify)
+	var r: Dictionary = await _write(HTTPClient.METHOD_POST, "/v1/rewards/free", {}, notify)
+	_note_next("free", r)
+	return r
+
+## Keeps the `next_at` of a reward answer (a claim, or the "already claimed" refusal) for the reminders.
+func _note_next(key: String, r: Dictionary) -> void:
+	var at := _int(r.get("next_at"), 0)
+	if at > 0 and (r.get("ok", false) or r.get("error", "") in ["claimed", "spun", "cooldown"]):
+		rewards_at[key] = at
+
+## GET /v1/rewards: when the daily reward, the spin and Free Coins are next claimable ({daily, spin, free: unix s},
+## empty when unknown). The reminders schedule from it while signed in. Does nothing without a session.
+func fetch_rewards() -> Dictionary:
+	if not has_session() or not enabled:
+		return rewards_at
+	var r: Dictionary = await request(HTTPClient.METHOD_GET, "/v1/rewards")
+	if r.ok:
+		for key: String in ["daily", "spin", "free"]:
+			var part: Variant = r.data.get(key)
+			var at := _int((part as Dictionary).get("next_at"), 0) if part is Dictionary else 0
+			if at > 0:
+				rewards_at[key] = at
+	return rewards_at
 
 ## POST /v1/achievements/claim {id} -> {ok, coins, progress}.
 func claim_ach(id: String, notify := true) -> Dictionary:
@@ -616,6 +642,42 @@ static func claim_note(ans: Dictionary) -> String:
 		"replay":
 			return "We couldn’t verify that win"
 	return "Daily limit reached"
+
+
+# =====================================================================================================================
+# Push (server/NOTIFICATIONS.md "N-SRV")
+# =====================================================================================================================
+
+## POST /v1/push/token {token, platform, prefs: {game, offers}, tz_offset_min}: registers this phone's push token for
+## the account (the server moves it over when another account had it). {ok, error}.
+func push_register(token: String, game: bool, offers: bool, tz_offset_min: int) -> Dictionary:
+	if not has_session():
+		return {ok = false, error = "offline"}
+	var r: Dictionary = await request(HTTPClient.METHOD_POST, "/v1/push/token", {token = token, platform = "android",
+		prefs = {game = game, offers = offers}, tz_offset_min = tz_offset_min})
+	return {ok = r.ok, error = r.error}
+
+## DELETE /v1/push/token {token} with the session the token was registered under (the account may be gone from this
+## phone already: sign-out, a switch). {ok, error}.
+func push_delete(token: String, session_: String) -> Dictionary:
+	if session_ == "" or not enabled:
+		return {ok = false, error = "unauthorized"}
+	_defaults()
+	var r: Dictionary
+	if http_fn.is_valid():
+		var out: Variant = await http_fn.call(HTTPClient.METHOD_DELETE, "/v1/push/token", {token = token}, session_)
+		r = out if out is Dictionary else {status = 0}
+	else:
+		r = await _real_http(HTTPClient.METHOD_DELETE, "/v1/push/token", {token = token}, session_)
+	var st := int(r.get("status", 0))
+	return {ok = st >= 200 and st < 300, error = "" if st >= 200 and st < 300 else _error_code(st, {})}
+
+## POST /v1/push/opened {cid}: a campaign notification was opened (the session is optional). {ok, error}.
+func push_opened(cid: String) -> Dictionary:
+	if cid == "" or not enabled:
+		return {ok = false, error = "offline"}
+	var r: Dictionary = await request(HTTPClient.METHOD_POST, "/v1/push/opened", {cid = cid}, has_session())
+	return {ok = r.ok, error = r.error}
 
 
 # =====================================================================================================================

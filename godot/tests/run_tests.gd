@@ -35,12 +35,15 @@ const SUITES := [
 	"res://tests/test_net_online.gd",
 	"res://tests/test_net_ping.gd",
 	"res://tests/test_play_games.gd",
+	"res://tests/test_notifier.gd",
 	"res://tests/test_account.gd",
 	"res://tests/test_account_ui.gd",
 	"res://tests/test_emote_art.gd",
 	"res://tests/test_emote_shop.gd",
 	"res://tests/test_emote_sfx.gd",
 	"res://tests/test_emotes_hud.gd",
+	"res://tests/test_notif_plan.gd",
+	"res://tests/test_notifications.gd",
 ]
 
 func _initialize() -> void:

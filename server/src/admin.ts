@@ -3,6 +3,7 @@
 import { ACCOUNT_RE, type AccountRow, type Step, adminAccountOut, getAccount, mutate } from "./accounts";
 import * as D from "./db";
 import { BOARDS, PERIODS, type Board, type PeriodArg, countScores, periodKey, topScores } from "./leaderboard";
+import * as P from "./push";
 import { isCode, type AdminSnapshot, type Env, type Room } from "./room";
 
 const COOKIE = "lz_admin";
@@ -209,7 +210,7 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
   if (write && req.headers.get("X-Admin") !== "1") return fail(403, "csrf", "write requests need the header X-Admin: 1");
 
   try {
-    const [a, b, d, ...rest] = path;
+    const [a, b, d, e, ...rest] = path;
     if (a === "login" && path.length === 1) return req.method === "POST" ? await login(c, password) : fail(405, "method");
     if (a === "logout" && path.length === 1) return req.method === "POST" ? await logout(c, password) : fail(405, "method");
     const authed = await validSession(req, password, c.now);
@@ -218,7 +219,7 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
       return authed ? json({ ok: true }) : fail(401, "unauthorized", "log in first");
     }
     if (!authed) return fail(401, "unauthorized", "log in first");
-    if (rest.length) return fail(404, "not_found");
+    if (rest.length || (e !== undefined && !(a === "push" && b === "campaigns"))) return fail(404, "not_found");
     const m = req.method;
     switch (a) {
       case "overview":
@@ -270,6 +271,15 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
       case "quick":
         if (b !== undefined) break;
         return m === "GET" ? await quick(c) : fail(405, "method");
+      // ----- notifications (NOTIFICATIONS.md "N-SRV") -----
+      case "push":
+        if (b === undefined) return m === "GET" ? await pushOverview(c) : fail(405, "method");
+        if (d !== undefined && b !== "campaigns") break;
+        if (b === "preview") return m === "POST" ? await pushPreview(c) : fail(405, "method");
+        if (b === "test") return m === "POST" ? await pushTest(c) : fail(405, "method");
+        if (b === "campaigns" && d === undefined) return m === "POST" ? await pushCampaign(c) : fail(405, "method");
+        if (b === "campaigns" && e === "cancel") return m === "POST" ? await pushCancel(c, d!) : fail(405, "method");
+        break;
     }
     return fail(404, "not_found");
   } catch (e) {
@@ -697,4 +707,146 @@ async function quick(c: Ctx): Promise<Response> {
     days = Number(d);
   }
   return json(await D.quickReport(c.env.DB, days, c.now));
+}
+
+// ----- notifications (NOTIFICATIONS.md "N-SRV") -----
+
+/** At most this many campaigns in any 24 h (canceled ones don't count), and test sends per hour. */
+export const PUSH_LIMITS = { campaignsPerDay: 4, testsPerHour: 20 };
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+/** A campaign may be scheduled at most this far ahead. */
+const SCHEDULE_MAX_MS = 30 * DAY_MS;
+
+function pushOff(): Response {
+  return fail(409, "push_off", "Push is not configured: set the FCM_SERVICE_ACCOUNT secret (tools/cf.sh secret put FCM_SERVICE_ACCOUNT).");
+}
+
+async function pushUsage(c: Ctx): Promise<{ campaigns: number; tests: number }> {
+  const db = c.env.DB;
+  const [camps, tests] = await db.batch([
+    db.prepare("SELECT COUNT(*) AS n FROM push_campaigns WHERE created_at >= ? AND status != 'canceled'").bind(c.now - DAY_MS),
+    db.prepare("SELECT COUNT(*) AS n FROM admin_log WHERE action = 'push.test' AND at >= ?").bind(c.now - HOUR_MS),
+  ]);
+  return { campaigns: (camps.results[0] as { n: number }).n, tests: (tests.results[0] as { n: number }).n };
+}
+
+/** GET /admin/api/push: whether push is on, device counts, the event-push counters (14 UTC days), the latest campaigns. */
+async function pushOverview(c: Ctx): Promise<Response> {
+  const db = c.env.DB;
+  const [tokens, events, campaigns] = await db.batch([
+    db.prepare("SELECT COUNT(*) AS total, COALESCE(SUM(prefs_offers = 1), 0) AS offers, COALESCE(SUM(prefs_game = 1), 0) AS game FROM push_tokens"),
+    db.prepare("SELECT day, kind, sent, failed FROM push_events WHERE day >= ? ORDER BY day, kind").bind(D.utcDay(c.now - 13 * DAY_MS)),
+    db.prepare("SELECT * FROM push_campaigns ORDER BY created_at DESC, id DESC LIMIT 50"),
+  ]);
+  const used = await pushUsage(c);
+  return json({
+    now: c.now,
+    configured: P.pushConfigured(c.env),
+    project_id: P.pushProject(c.env),
+    tokens: tokens.results[0],
+    events: events.results,
+    campaigns: (campaigns.results as unknown as P.CampaignRow[]).map(P.campaignOut),
+    limits: {
+      campaigns_per_day: PUSH_LIMITS.campaignsPerDay,
+      campaigns_left: Math.max(0, PUSH_LIMITS.campaignsPerDay - used.campaigns),
+      tests_per_hour: PUSH_LIMITS.testsPerHour,
+      tests_left: Math.max(0, PUSH_LIMITS.testsPerHour - used.tests),
+    },
+  });
+}
+
+function audienceOf(o: Record<string, unknown>): P.Audience {
+  const a = P.parseAudience(o.audience);
+  if (typeof a === "string") throw new BadRequest(a);
+  return a;
+}
+
+/** title 1-60, body 1-180, link (a deep link, default "home"). */
+function pushContent(o: Record<string, unknown>): { title: string; body: string; link: string } {
+  const title = optString(o, "title", 60, 1)!;
+  const text = optString(o, "body", 180, 1)!;
+  const link = optString(o, "link", 80) || "home";
+  if (!P.isLink(link)) throw new BadRequest("link: home, daily, spin, free, shop, shop:<kind>:<id>, room:<CODE> or leaderboard");
+  return { title, body: text, link };
+}
+
+/** POST /admin/api/push/preview {audience} -> {targeted}: the devices it reaches now (nothing is sent). */
+async function pushPreview(c: Ctx): Promise<Response> {
+  const aud = audienceOf(await body(c.req));
+  return json({ targeted: await P.countAudience(c.env.DB, aud, c.now) });
+}
+
+/** POST /admin/api/push/test {title, body, link?, account_id} -> {sent, failed, tokens}: to every device of the account, now. */
+async function pushTest(c: Ctx): Promise<Response> {
+  const o = await body(c.req);
+  const content = pushContent(o);
+  const id = typeof o.account_id === "string" ? accountId(o.account_id) : null;
+  if (!id) throw new BadRequest("account_id: an account id");
+  if (!P.pushConfigured(c.env)) return pushOff();
+  if ((await pushUsage(c)).tests >= PUSH_LIMITS.testsPerHour) {
+    return fail(429, "rate_limited", `at most ${PUSH_LIMITS.testsPerHour} test sends per hour`);
+  }
+  if (!(await getAccount(c.env.DB, id))) return fail(404, "not_found", "no such account");
+  const r = await P.pushAccount(c.env, id, { kind: "test", ...content, channel: "offers", tag: "test", ttl_s: P.EVENT_TTL_S }, { pref: null, count: false });
+  await audit(c, "push.test", id, { title: content.title, sent: r.sent, failed: r.failed });
+  return json(r);
+}
+
+/**
+ * POST /admin/api/push/campaigns {title, body, link?, audience, run_at?} -> the campaign. run_at (unix seconds or
+ * epoch ms) in the future: status "scheduled", else "sending" and queued now. The Pusher sends it.
+ */
+async function pushCampaign(c: Ctx): Promise<Response> {
+  const o = await body(c.req);
+  const content = pushContent(o);
+  const aud = audienceOf(o);
+  let runAt: number | null = null;
+  if (o.run_at !== undefined && o.run_at !== null) {
+    const v = o.run_at;
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 0) throw new BadRequest("run_at: unix seconds or epoch ms");
+    runAt = v < 1e11 ? v * 1000 : v;
+    if (runAt > c.now + SCHEDULE_MAX_MS) throw new BadRequest("run_at: at most 30 days ahead");
+    if (runAt <= c.now) runAt = null;
+  }
+  if (!P.pushConfigured(c.env)) return pushOff();
+  if ((await pushUsage(c)).campaigns >= PUSH_LIMITS.campaignsPerDay) {
+    return fail(429, "rate_limited", `at most ${PUSH_LIMITS.campaignsPerDay} campaigns per day`);
+  }
+  const db = c.env.DB;
+  const id = P.newCampaignId();
+  const targeted = await P.countAudience(db, aud, c.now);
+  const row = await db
+    .prepare(
+      `INSERT INTO push_campaigns (id, title, body, link, audience, status, run_at, created_by, created_at, targeted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'admin', ?, ?) RETURNING *`,
+    )
+    .bind(id, content.title, content.body, content.link, JSON.stringify(aud), runAt ? "scheduled" : "sending", runAt, c.now, targeted)
+    .first<P.CampaignRow>();
+  try {
+    await P.pusher(c.env).enqueueCampaign(id, runAt ?? c.now);
+  } catch (e) {
+    await db.prepare("UPDATE push_campaigns SET status = 'failed' WHERE id = ?").bind(id).run();
+    throw e;
+  }
+  await audit(c, "push.campaign", id, { title: content.title, audience: aud, run_at: runAt, targeted });
+  return json(P.campaignOut(row!));
+}
+
+/** POST /admin/api/push/campaigns/:id/cancel: a scheduled campaign only (409 bad_state otherwise). */
+async function pushCancel(c: Ctx, raw: string): Promise<Response> {
+  const id = decode(raw);
+  if (!P.CAMPAIGN_RE.test(id)) return fail(404, "not_found");
+  const db = c.env.DB;
+  const r = await db.prepare("UPDATE push_campaigns SET status = 'canceled' WHERE id = ? AND status = 'scheduled'").bind(id).run();
+  const row = await db.prepare("SELECT * FROM push_campaigns WHERE id = ?").bind(id).first<P.CampaignRow>();
+  if (!row) return fail(404, "not_found");
+  if (r.meta.changes === 0) return fail(409, "bad_state", `only a scheduled campaign can be canceled (this one is ${row.status})`);
+  try {
+    await P.pusher(c.env).cancelCampaign(id);
+  } catch (e) {
+    console.error("pusher cancel failed:", e); // its start finds the campaign canceled and drops it
+  }
+  await audit(c, "push.cancel", id, { title: row.title });
+  return json(P.campaignOut(row));
 }

@@ -1,0 +1,6 @@
+# Gradle build output and caches (the built AARs are copied to godot/addons/notifications/bin/ by
+# tools/build-notifications-plugin.sh and tracked there)
+/build/
+/.gradle/
+/.kotlin/
+/local.properties

@@ -7,6 +7,9 @@ extends Sheet
 ##                  applied at once through Quality.set_tier; a note says when part of it waits for the next launch)
 ##   Camera view    Ludo (3D / Top), Snakes & Ladders (3D / Top)
 ##   House rules    Ask before pairing (pair_ask), Snakes & Ladders: Need a 1 to start (sl_need_one)
+##   Notifications  a master switch (the phone's permission is asked when it goes on) and Rewards, Reminders, Game
+##                  alerts, News & offers (Save.prefs notif, notif_rewards, notif_reminders, notif_game, notif_offers);
+##                  "Turn on notifications for Ludo Zing in your phone settings" under the master when the phone said no
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
 ##   Help           How to play, Credits (+ Privacy policy / Support once their pages exist: URLS)
 ##   Reset progress (confirm first), then the version line and the Support ID (the player ID; nothing else uses it
@@ -32,6 +35,8 @@ var _list: VBoxContainer
 var _switch: Switch                      # the Sound switch (previews flip it)
 var _vol_lines: Array[Control] = []
 var _gfx_note: Label                     # Graphics: "... on next launch" when the pick needs one
+var _notif_note: Label                   # Notifications: the "phone settings" hint
+var _notif_lines: Array[Control] = []    # the four kinds (dimmed while the master switch is off)
 
 
 func _init(width: float = UIKit.W.form) -> void:
@@ -45,6 +50,7 @@ func _build() -> void:
 	for c in _list.get_children():
 		c.queue_free()
 	_vol_lines.clear()
+	_notif_lines.clear()
 	var vol: Dictionary = Save.prefs.get("vol", {})
 	var sound_on := bool(Save.prefs.get("sound", true))
 
@@ -94,6 +100,27 @@ func _build() -> void:
 	h.add_child(_switch_line("Ask before pairing", "Choose each time your pawns could pair.", "pair_ask"))
 	h.add_child(_divider())
 	h.add_child(_switch_line("Need a 1 to start", "Snakes & Ladders: only a 1 enters.", "sl_need_one"))
+
+	# --- Notifications (the master switch, then what to be told about)
+	_caption("Notifications")
+	var nt := _group()
+	var master := Switch.new(bool(Save.prefs.get("notif", true)))
+	master.toggled.connect(_on_notif)
+	var master_line := _line("Notifications", " ", master, master)
+	_notif_note = master_line.get_child(0).get_child(0).get_child(1) as Label
+	nt.add_child(master_line)
+	for k: Array in [["notif_rewards", "Rewards", "Daily reward, free spin and free coins."],
+			["notif_reminders", "Reminders", "A nudge when you have been away."],
+			["notif_game", "Game alerts", "Your turn and friends joining a room."],
+			["notif_offers", "News & offers", "Gifts and updates from Ludo Zing."]]:
+		nt.add_child(_divider())
+		var line := _switch_line(k[1], k[2], k[0])
+		_notif_lines.append(line)
+		nt.add_child(line)
+	_refresh_notif()
+	var notifs := Notifications.instance()
+	if notifs != null and not notifs.permission_changed.is_connected(_refresh_notif):
+		notifs.permission_changed.connect(_refresh_notif)
 
 	# --- Accessibility
 	_caption("Accessibility")
@@ -234,6 +261,24 @@ func _switch_line(text: String, note: String, key: String) -> Control:
 	var sw := Switch.new(bool(Save.prefs.get(key, false)))
 	sw.toggled.connect(func(on: bool): _set_pref(key, on))
 	return _line(text, note, sw, sw)
+
+## The hint under the master switch (only when it is on and the phone said no) and the dimmed kinds (master off).
+func _refresh_notif(_state: Variant = null) -> void:
+	var on := bool(Save.prefs.get("notif", true))
+	if _notif_note != null:
+		_notif_note.text = "Turn on notifications for Ludo Zing in your phone settings" if on and Notifications.permission() == "denied" else ""
+		_notif_note.visible = _notif_note.text != ""
+	for l in _notif_lines:
+		l.modulate.a = 1.0 if on else 0.4
+
+func _on_notif(on: bool) -> void:
+	Save.prefs.notif = on
+	Save.save()
+	var notifs := Notifications.instance()
+	if on and notifs != null and Notifications.permission() == "ask":
+		notifs.ask_permission()
+	_refresh_notif()
+	prefs_changed.emit()
 
 ## A tappable row with a chevron (Help) or a red text row (danger).
 func _link_line(text: String, on_tap: Callable, danger := false) -> Control:

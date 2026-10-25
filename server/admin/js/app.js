@@ -16,6 +16,7 @@ import accountsPage from "./pages/accounts.js";
 import accountPage from "./pages/account.js";
 import leaderboardsPage from "./pages/leaderboards.js";
 import quickPage from "./pages/quick.js";
+import notificationsPage from "./pages/notifications.js";
 
 const NAV = [
   { id: "status", label: "Status", icon: "status" },
@@ -26,6 +27,7 @@ const NAV = [
   { id: "quick", label: "Quick match", icon: "quick" },
   { id: "leaderboards", label: "Leaderboards", icon: "crown" },
   { id: "events", label: "Events", icon: "events" },
+  { id: "notifications", label: "Notifications", icon: "send" },
   { id: "config", label: "Config", icon: "config" },
   { id: "audit", label: "Audit", icon: "audit" },
 ];
@@ -36,6 +38,7 @@ const ROUTES = [
   { re: /^\/accounts\/([^/]+)$/, nav: "accounts", page: accountPage },
   { re: /^\/leaderboards$/, nav: "leaderboards", page: leaderboardsPage },
   { re: /^\/quick$/, nav: "quick", page: quickPage },
+  { re: /^\/notifications$/, nav: "notifications", page: notificationsPage },
   { re: /^\/players$/, nav: "players", page: playersPage },
   { re: /^\/players\/([^/]+)$/, nav: "players", page: playerPage },
   { re: /^\/rooms$/, nav: "rooms", page: roomsPage },

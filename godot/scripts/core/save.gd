@@ -32,6 +32,7 @@ func load_data() -> void:
 	_ensure()
 
 const BOT_LEVELS := ["easy", "normal", "hard"]
+const NOTIF_KEYS := ["notif", "notif_rewards", "notif_reminders", "notif_game", "notif_offers"]
 
 ## Fill only missing fields, never overwrite saved ones.
 func _ensure() -> void:
@@ -122,6 +123,10 @@ func _ensure() -> void:
 	pr.bot_level = str(pr.get("bot_level")) if BOT_LEVELS.has(pr.get("bot_level")) else "normal"   # computer skill
 	pr.colorblind = bool(pr.get("colorblind", false))
 	pr.reduce_motion = bool(pr.get("reduce_motion", false))
+	for k in NOTIF_KEYS:                       # Notifications: the master switch and the four kinds, all on until changed
+		pr[k] = pr[k] if pr.get(k) is bool else true
+	pr.notif_asked = maxi(0, as_int(pr.get("notif_asked"), 0))         # how often the soft permission prompt was shown
+	pr.notif_asked_at = maxi(0, as_int(pr.get("notif_asked_at"), 0))   # ... and when last (unix seconds)
 	if not pr.get("last_setup") is Dictionary:
 		pr.last_setup = {}                     # the last game setup per game ({ludo: {...}, sl: {...}})
 	# first-run flags: a player who has already played (or named themselves) has seen the welcome / basics
@@ -163,10 +168,10 @@ static func fold_master(vol: Dictionary) -> void:
 	vol.master = 100
 
 ## Settings "Reset progress": a brand-new profile (coins, XP, stats, items, rewards, a new player ID) and default
-## preferences, except the sound switch and volumes, which are kept. Saved at once.
+## preferences, except the sound switch, volumes and notification choices, which are kept. Saved at once.
 func reset_progress() -> void:
 	var keep := {}
-	for k in ["sound", "vol"]:
+	for k in ["sound", "vol", "notif_asked", "notif_asked_at"] + NOTIF_KEYS:
 		if prefs.has(k):
 			keep[k] = prefs[k]
 	profile = {}

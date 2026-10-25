@@ -1,7 +1,8 @@
 {
   // Ludo Zing online rooms. One Durable Object (class Room, SQLite storage) per room code, one Matchmaker per
   // quick-match queue ("ludo:2", "ludo:4", "sl:2", "sl:4"; src/matchmaker.ts), plus the admin console
-  // (ADMIN_API.md): D1 "ludo-zing-admin" for stats / bans / config, the console UI from ./admin at /admin.
+  // (ADMIN_API.md): D1 "ludo-zing-admin" for stats / bans / config, the console UI from ./admin at /admin, and one
+  // Pusher (src/pusher.ts): the queue of bulk push notifications (NOTIFICATIONS.md).
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ludo-zing-rooms",
   "main": "src/index.ts",
@@ -9,12 +10,14 @@
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "Room" },
-      { "name": "MATCHMAKER", "class_name": "Matchmaker" }
+      { "name": "MATCHMAKER", "class_name": "Matchmaker" },
+      { "name": "PUSHER", "class_name": "Pusher" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Room"] },
-    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] }
+    { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },
+    { "tag": "v3", "new_sqlite_classes": ["Pusher"] }
   ],
   "d1_databases": [
     {
@@ -33,8 +36,10 @@
     "html_handling": "none",
     "not_found_handling": "none"
   },
-  // Daily at 03:17 UTC: prune events / login_attempts older than 30 days, reconcile rooms rows of vanished rooms.
+  // Daily at 03:17 UTC: prune events / login_attempts older than 30 days, reconcile rooms rows of vanished rooms;
+  // on Mondays also queue the weekly-result pushes.
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }
   // Secret (not here): ADMIN_PASSWORD (tools/cf.sh secret put ADMIN_PASSWORD; locally .dev.vars).
+  // Optional secret: FCM_SERVICE_ACCOUNT (the Firebase service-account JSON; unset = push off).
 }

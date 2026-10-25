@@ -20,6 +20,9 @@ var drop_session := false                ## authed calls answer 401 unauthorized
 var board := {top = [], me = null, min_matches = 3}
 var prices := {room_neon = 3000, dice_gold = 900, emotes_pawns = 2500, emotes_friends = 4000, emotes_game = 3500}
 var daily_taken := false
+var rewards_next := {daily = 1793000000, spin = 1793000000, free = 1793003600}   ## GET /v1/rewards next_at per reward
+var push_tokens := {}                    ## token -> {session, prefs, tz_offset_min}: POST / DELETE /v1/push/token
+var push_opens: Array = []               ## the cids POST /v1/push/opened saw
 
 func _init() -> void:
 	profile = base_profile()
@@ -80,6 +83,18 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 						profile[k] = b[k]
 				return _ok({ok = true, profile = _prof()})
 			return _ok({account = account, profile = _prof(), session = SESSION})
+		"/v1/rewards":
+			return _ok({today = "2026-10-25", now = 1793000000, daily = {state = {}, next_at = rewards_next.daily},
+				spin = {available = true, next_at = rewards_next.spin, prizes = []}, free = {available = true, next_at = rewards_next.free, amount = 300}})
+		"/v1/push/token":
+			if method == HTTPClient.METHOD_DELETE:
+				push_tokens.erase(str(b.get("token", "")))
+			else:
+				push_tokens[str(b.get("token", ""))] = {session = session, prefs = b.get("prefs"), tz_offset_min = b.get("tz_offset_min")}
+			return _ok({ok = true})
+		"/v1/push/opened":
+			push_opens.append(str(b.get("cid", "")))
+			return _ok({ok = true})
 		"/v1/shop/buy":
 			var key := "%s_%s" % [b.get("kind"), b.get("id")]
 			var price := int(prices.get(key, -1))

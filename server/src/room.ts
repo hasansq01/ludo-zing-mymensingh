@@ -24,11 +24,15 @@ import * as D from "./db";
 import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineOutcome } from "./accounts_shim";
 import { ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, ghostPick, makeGhosts, newGhostMemory, packOfEmote, progressLead, type GhostMemory, type GhostSituation, type GhostTrigger, type Persona } from "./ghosts";
 import type { Matchmaker } from "./matchmaker";
+import { EVENT_TTL_S, pushAccount, pushConfigured, type PushKind } from "./push";
+import type { Pusher } from "./pusher";
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
   /** Quick-match queues: one Matchmaker per "game:size" (src/matchmaker.ts). */
   MATCHMAKER: DurableObjectNamespace<Matchmaker>;
+  /** The push queue (src/pusher.ts; one instance, "pusher"). */
+  PUSHER: DurableObjectNamespace<Pusher>;
   /** D1 "ludo-zing-admin" (ADMIN_API.md): rooms / players / matches / events / config. */
   DB: D1Database;
   /** The admin console's static files (server/admin/, served at /admin). */
@@ -39,6 +43,8 @@ export interface Env {
   SESSION_KEY?: string;
   GOOGLE_WEB_CLIENT_ID?: string;
   GOOGLE_WEB_CLIENT_SECRET?: string;
+  /** The Firebase service-account JSON (push notifications, NOTIFICATIONS.md; a secret). Unset: push is off. */
+  FCM_SERVICE_ACCOUNT?: string;
   /** "1" only under vitest (vitest.config.ts miniflare bindings). Never set in wrangler.jsonc. */
   TEST_MODE?: string;
 }
@@ -81,6 +87,9 @@ export const QUICK = {
 const GRANT = { retryMs: 30_000, tries: 5 };
 
 export const LIMITS = { maxMembers: 4, maxMsgBytes: 4096, ratePerSec: 20, maxSockets: 16 };
+
+/** Event pushes (NOTIFICATIONS.md): at most one per member and kind per `everyMs` (a turn push also once per turn). */
+export const PUSH = { everyMs: 3 * 60_000 };
 
 /** Ludo playing colours by member count, in join order (PROTOCOL.md "Colours"). */
 const SEAT_COLORS: Record<number, number[]> = { 1: [0], 2: [0, 2], 3: [0, 1, 2], 4: [0, 1, 2, 3] };
@@ -133,6 +142,8 @@ interface Member {
   persona?: Persona;
   /** Ghosts only: what the ghost remembers about the chat (spam heat, conversations, recent emotes); never sent. */
   emo?: GhostMemory;
+  /** Event pushes sent to this member (epoch ms per kind) and the turn of the last turn push; never sent. */
+  pushed?: { turn?: number; joined?: number; rematch?: number; turnKey?: string };
 }
 
 interface Seat {
@@ -273,6 +284,8 @@ export interface QuickSpec {
 interface Att {
   /** Member id; -1 before hello, -2 for a socket the server is closing (replaced / left). */
   mid: number;
+  /** The client said its app is in the background ({t: "away", on: true}); pushes only. */
+  away?: boolean;
 }
 
 interface Identity {
@@ -753,6 +766,7 @@ export class Room extends DurableObject<Env> {
 
     const att = this.att(ws);
     if (att.mid === -2) return;
+    if (msg.t === "away" && att.mid < 0) return; // nobody to mark yet
     if (att.mid < 0) {
       if (msg.t !== "hello") return this.error(ws, "bad_message", "say hello first");
       let who: Identity = { account: null, ban: null, level: null };
@@ -773,6 +787,7 @@ export class Room extends DurableObject<Env> {
     }
     let mem = r.members.find((m) => m.id === att.mid);
     if (!mem) {
+      if (msg.t === "away") return; // ignored for unknown members (NOTIFICATIONS.md)
       // removed while this socket stayed open (left from another socket, dropped from the lobby)
       this.fatal(ws, "not_found", "you are no longer in this room");
       return;
@@ -808,6 +823,10 @@ export class Room extends DurableObject<Env> {
       case "emote":
         await this.emote(ws, mem, msg);
         return; // emotes never touch the match: nothing to commit or settle
+      case "away":
+        if (typeof msg.on !== "boolean") return this.error(ws, "bad_message", "on: bool");
+        ws.serializeAttachment({ ...att, away: msg.on } satisfies Att);
+        return; // only decides event pushes: nothing to commit
       case "leave":
         this.leave(ws, mem);
         break;
@@ -944,6 +963,7 @@ export class Room extends DurableObject<Env> {
       (who.account && humans.find((m) => m.account === who.account)) ||
       humans.find((m) => m.pid === pid);
     const now = Date.now();
+    const fresh = !mem;
     if (mem) {
       // the same member again: this socket replaces any older one
       for (const other of this.socketsOf(mem.id)) {
@@ -1000,6 +1020,8 @@ export class Room extends DurableObject<Env> {
     } else {
       if (r.status === "over" && m) this.sendSnapshot(ws);
       this.broadcast(this.lobbyMsg());
+      const host = r.members.find((h) => h.id === r.host);
+      if (fresh && host && host !== mem) this.pushTo(host, "joined", "Friend joined", `${mem.name} joined your room ${r.code}`);
     }
   }
 
@@ -1459,6 +1481,7 @@ export class Room extends DurableObject<Env> {
       m.shown = m.due;
     }
     this.broadcast({ t: "turn", c, deadline: Math.round(m.shown), now });
+    if (phase === "roll" && !O.isCpu(s, c) && !r.quick) this.pushTurn(m, c);
   }
 
   private overMsg(m: Match): Record<string, unknown> {
@@ -1482,6 +1505,10 @@ export class Room extends DurableObject<Env> {
     // back to lobby rules: members still offline are dropped after the grace
     for (const mem of r.members) if (!this.online(mem.id) && !mem.graceAt) mem.graceAt = now + this.ms(TIMING.grace);
     this.broadcast(this.lobbyMsg());
+    for (const mem of r.members) {
+      const by = this.presentName(mem);
+      if (by) this.pushTo(mem, "rematch", "Rematch?", `${by} wants a rematch in room ${r.code}`);
+    }
   }
 
   private dice(): number {
@@ -1615,6 +1642,52 @@ export class Room extends DurableObject<Env> {
 
   private anyOnline(): boolean {
     return this.sockets().length > 0;
+  }
+
+  // ---------- event pushes (NOTIFICATIONS.md; never part of the match) ----------
+
+  /** Away for pushes: no open socket, or every open one said `away`. */
+  private away(mem: Member): boolean {
+    return !this.sockets().some((ws) => {
+      const a = this.att(ws);
+      return a.mid === mem.id && !a.away;
+    });
+  }
+
+  /** The name of a person here (not away) other than `to`, the host first; null when nobody is. */
+  private presentName(to: Member): string | null {
+    const r = this.room!;
+    const here = r.members.filter((x) => x !== to && !x.ghost && !this.away(x));
+    return (here.find((x) => x.id === r.host) ?? here[0])?.name ?? null;
+  }
+
+  /** "It's your turn" for the member seated at colour c (a person, not a bot, holds it) when away and someone waits. */
+  private pushTurn(m: Match, c: number): void {
+    const st = this.seatOfColor(c);
+    const mem = st && !st.left && !st.ghost ? this.room!.members.find((x) => x.id === st.id) : undefined;
+    if (!mem) return;
+    const by = this.presentName(mem);
+    if (by) this.pushTo(mem, "turn", "It's your turn", `${by} is waiting for you in room ${this.room!.code}`, `${m.startedAt ?? 0}:${m.n}`);
+  }
+
+  /**
+   * An event push to an away member of a friend room with an account (Game alerts on, NOTIFICATIONS.md), sent in the
+   * background: never to ghosts or in quick rooms, at most once per member and kind per PUSH.everyMs, a turn push
+   * once per turn. Only `mem.pushed` changes (saved with the handler's commit); push off: nothing at all.
+   */
+  private pushTo(mem: Member, kind: PushKind & keyof NonNullable<Member["pushed"]>, title: string, body: string, turnKey?: string): void {
+    const r = this.room!;
+    if (r.quick || mem.ghost || !mem.account || !pushConfigured(this.env) || !this.away(mem)) return;
+    const now = Date.now();
+    const p = (mem.pushed ??= {});
+    if (turnKey !== undefined && p.turnKey === turnKey) return;
+    if (now - (p[kind] ?? 0) < PUSH.everyMs) return;
+    p[kind] = now;
+    if (turnKey !== undefined) p.turnKey = turnKey;
+    const note = { kind, title, body, link: `room:${r.code}`, channel: "game", tag: `room:${r.code}`, ttl_s: EVENT_TTL_S } as const;
+    this.ctx.waitUntil(
+      pushAccount(this.env, mem.account, note, { pref: "game", count: true }).catch((e) => console.error(`${kind} push failed:`, e)),
+    );
   }
 
   // ---------- emotes (EMOTES.md; never part of the match) ----------

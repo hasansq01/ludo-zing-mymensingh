@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Android 13+: runtime permission, asked by request_permission() (never at launch) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- re-arms the scheduled local notifications after a reboot (alarms don't survive one) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- No SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM: local notifications use inexact setAndAllowWhileIdle. -->
+
+    <application>
+        <!-- Godot v2 plugin registration: org.godotengine.plugin.v2.<singleton name> = init class -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.NotificationsPlugin"
+            android:value="com.flipfold.ludozing.notifications.NotificationsPlugin" />
+
+        <!-- a scheduled local notification is due (explicit intents from our own alarms only) -->
+        <receiver
+            android:name="com.flipfold.ludozing.notifications.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- re-arm after a reboot or an app update; both are protected system broadcasts -->
+        <receiver
+            android:name="com.flipfold.ludozing.notifications.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- FCM: replaces firebase-messaging's own service (that one has priority -500) -->
+        <service
+            android:name="com.flipfold.ludozing.notifications.PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Push notifications shown by the system while the game is in the background: our icon and colour, and the
+             "game" channel when a message names none (or one this phone doesn't have). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/lz_notif_icon" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/lz_notif_color" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="game" />
+
+        <!-- FirebaseInitProvider (firebase-common) is removed by the export plugin (app manifest, so the removal wins
+             the merge): there is no google-services.json, FirebaseApp is initialised by push_init() instead. -->
+    </application>
+
+</manifest>

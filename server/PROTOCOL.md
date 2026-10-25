@@ -51,6 +51,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 | `leave` | – | leave the room (lobby: frees the seat; in a match: a bot takes the seat for good) |
 | `emote` | `id` | any time (see "Emotes") |
 | `ping` | – | keep-alive every 20 s; send exactly `{"t":"ping"}` (see "Keep-alive") |
+| `away` | `on: bool` | the app went to the background (`true`) / came back (`false`); for push notifications only (see "Away and event pushes") |
 
 `n` is the index of the action this request would become (the client's `n` = number of actions applied so far).
 A request with a stale `n` is ignored with `error {code: "stale"}` (protects against double taps and races).
@@ -338,6 +339,19 @@ Clarifications of the tables above; nothing here changes a message the client se
 - **Matchmaker storage**: the queue is the waiting sockets' attachments (account, identity, queue time, wait) plus
   one storage value (game, size, empty-since, sequence) and one alarm (the next fill time / hello timeout of 10 s),
   so an evicted queue resumes as it was.
+- **Away and event pushes** (NOTIFICATIONS.md): `away` may be sent any time after `hello` (before it, and from a
+  socket that is not a member, it is ignored); it is answered with nothing, changes no message anyone gets (not
+  `presence`, not `lobby`), nothing in the match (`n`, the hash, timers) and is not saved (it lives on the socket: a
+  new connection starts not away). `on` that is not a bool → `bad_message`. A member counts as **away** when every
+  open socket of theirs said `away: true`, or they have none (also during the disconnect grace). Friend rooms only
+  (never quick rooms, never ghosts), only for members with an account and a device with Game alerts on, sent in
+  the background through FCM with `link: "room:<CODE>"` and one notification tag per room (a phone shows the latest):
+  - "It's your turn" when a turn (`roll` phase, a person holding the seat, not a bot) starts for an away member while
+    someone else in the room is here (not away; their name is in the text, the host's first); at most once per
+    member per 3 min, and once per turn.
+  - "Friend joined" to an away host when a new member joins the lobby (or after `over`); at most once per 3 min.
+  - "Rematch?" to every away member when a match ends (`over`, back under lobby rules) while someone is here; at most
+    once per member per 3 min.
 - **Tests only**: the Room has test hooks (fixed dice, starting token positions, a time scale, a rate limit) that
   work only when the `TEST_MODE` binding is `"1"`, which only `vitest.config.ts` sets; no route reaches them.
 

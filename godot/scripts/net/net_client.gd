@@ -362,6 +362,11 @@ func send_msg(msg: Dictionary) -> bool:
 func send_emote(id: String) -> bool:
 	return send_msg({t = "emote", id = id})
 
+## The app went to the background / came back: {t: "away", on}, so the server can push "it's your turn" while we are
+## away (server/NOTIFICATIONS.md). False when not in a room with an open socket.
+func send_away(on: bool) -> bool:
+	return in_room() and _welcomed and send_msg({t = "away", on = on})
+
 func _open_socket() -> void:
 	transport = make_transport.call() if make_transport.is_valid() else NetTransport.make()
 	_hello_sent = false

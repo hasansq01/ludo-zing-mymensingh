@@ -21,6 +21,7 @@ const PORT = Number(process.env.PORT || 8790);
 const PASSWORD = "dev";
 const DISABLED = process.env.MOCK_DISABLED === "1";
 const LATENCY = Number(process.env.MOCK_LATENCY || 120);
+const PUSH_OFF = process.env.MOCK_PUSH_OFF === "1"; // push not configured (no FCM_SERVICE_ACCOUNT)
 const DAY = 86400e3;
 
 // ---------- seeded RNG ----------
@@ -324,6 +325,18 @@ events.sort((a, b) => a.at - b.at).forEach((e, i) => (e.id = i + 1));
 eventId = events.length + 1;
 
 const config = { maintenance: false, motd: "Eid tournament this Friday at 8 pm. Invite your friends!", turn_roll_s: 15, turn_choose_s: 20, turn_pair_s: 10 };
+const pushCampaigns = (() => {
+  const t = Math.floor(NOW0 / 1000);
+  const mk = (id, title, body, link, aud, status, createdAgo, runAt, targeted, sent, failed, opened) => ({
+    id, title, body, link, audience: JSON.stringify(aud), status, run_at: runAt, created_by: "admin", created_at: t - createdAgo,
+    sent_at: status === "sent" ? t - createdAgo : null, targeted, sent, failed, opened,
+  });
+  return [
+    mk("cmp_seed0001", "Weekend tournament", "Double coins on every win until Sunday. Jump in!", "shop", { kind: "all" }, "sent", 3 * 86400, null, 412, 405, 7, 96),
+    mk("cmp_seed0002", "We miss you!", "Your free spin and daily reward are waiting.", "daily", { kind: "segment", inactive_days: 7 }, "sent", 6 * 86400, null, 88, 80, 8, 14),
+    mk("cmp_seed0003", "New emote pack", "Say it with stickers: the Mymensingh pack is out.", "shop:emote:pack-mymensingh", { kind: "segment", level_min: 3 }, "scheduled", 3600, t + 2 * 86400, 140, 0, 0, 0),
+  ];
+})();
 const audit = [];
 let auditId = 1;
 function addAudit(at, ip, action, target, detail) { audit.push({ id: auditId++, at, ip, action, target, detail: detail === undefined ? null : JSON.stringify(detail) }); }
@@ -816,6 +829,69 @@ async function api(req, res, url) {
       const days = d === "" ? 14 : Number(d);
       if (!Number.isInteger(days) || days < 1 || days > 90) return fail(res, 400, "bad_request", "days: 1-90");
       return send(res, 200, quickReport(days));
+    }
+    case "push": {
+      const nowS = Math.floor(Date.now() / 1000);
+      if (!sub[1] && m === "GET") {
+        const events = [];
+        for (let d = 13; d >= 0; d--) {
+          const day = new Date(Date.now() - d * DAY).toISOString().slice(0, 10);
+          for (const [kind, base] of [["turn", 40], ["joined", 12], ["rematch", 9]]) events.push({ day, kind, sent: base + ((d * 7 + base) % 13), failed: (d + base) % 4 === 0 ? 1 : 0 });
+        }
+        return send(res, 200, {
+          configured: !PUSH_OFF,
+          tokens: { total: Math.round(accounts.length * 0.8), offers: Math.round(accounts.length * 0.6), game: Math.round(accounts.length * 0.7) },
+          events: PUSH_OFF ? [] : events,
+          campaigns: pushCampaigns.slice().sort((a, b) => b.created_at - a.created_at),
+        });
+      }
+      const segCount = (aud) => {
+        const base = Math.round(accounts.length * 0.6);
+        if (aud?.kind !== "segment") return base;
+        let n = base;
+        if (aud.inactive_days) n = Math.round(n * 0.4);
+        if (aud.new_days) n = Math.round(n * 0.3);
+        if (aud.level_min || aud.level_max) n = Math.round(n * 0.5);
+        return n;
+      };
+      if (sub[1] === "preview" && m === "POST") {
+        const body = await readBody(req);
+        if (!body || !["all", "segment"].includes(body.audience?.kind)) return fail(res, 400, "bad_input", "audience.kind must be all or segment");
+        return send(res, 200, { targeted: segCount(body.audience) });
+      }
+      if (sub[1] === "test" && m === "POST") {
+        const body = await readBody(req);
+        if (!body || !body.title || !body.body || !body.account_id) return fail(res, 400, "bad_input", "title, body and account_id are required");
+        if (!accounts.some((a) => a.id === body.account_id)) return fail(res, 404, "not_found", "no such account");
+        addAudit(Date.now(), ip, "push.test", body.account_id, { title: body.title });
+        return send(res, 200, PUSH_OFF ? { sent: 0, failed: 0 } : { sent: 1, failed: 0 });
+      }
+      if (sub[1] === "campaigns" && !sub[2] && m === "POST") {
+        const body = await readBody(req);
+        if (!body || typeof body.title !== "string" || !body.title || body.title.length > 60) return fail(res, 400, "bad_input", "title must be 1–60 characters");
+        if (typeof body.body !== "string" || !body.body || body.body.length > 180) return fail(res, 400, "bad_input", "body must be 1–180 characters");
+        if (!["all", "segment"].includes(body.audience?.kind)) return fail(res, 400, "bad_input", "audience.kind must be all or segment");
+        const today = pushCampaigns.filter((c) => c.created_at > nowS - 86400).length;
+        if (today >= 4) return fail(res, 429, "rate_limited", "At most 4 campaigns per day.");
+        const later = Number(body.run_at) > nowS;
+        const c = {
+          id: "cmp_" + randStr(8), title: body.title, body: body.body, link: body.link || "", audience: JSON.stringify(body.audience),
+          status: later ? "scheduled" : "sending", run_at: later ? Number(body.run_at) : null, created_by: "admin", created_at: nowS, sent_at: null,
+          targeted: segCount(body.audience), sent: 0, failed: 0, opened: 0,
+        };
+        pushCampaigns.push(c);
+        addAudit(Date.now(), ip, "push.campaign", c.id, { title: c.title, audience: body.audience, run_at: c.run_at });
+        return send(res, 200, c);
+      }
+      if (sub[1] === "campaigns" && sub[3] === "cancel" && m === "POST") {
+        const c = pushCampaigns.find((x) => x.id === sub[2]);
+        if (!c) return fail(res, 404, "not_found");
+        if (c.status !== "scheduled") return fail(res, 409, "bad_state", "Only scheduled campaigns can be canceled.");
+        c.status = "canceled";
+        addAudit(Date.now(), ip, "push.cancel", c.id);
+        return send(res, 200, c);
+      }
+      return fail(res, 404, "not_found");
     }
     case "audit": return send(res, 200, paginate(audit.slice().sort((a, b) => b.at - a.at), url));
     default: return fail(res, 404, "not_found");

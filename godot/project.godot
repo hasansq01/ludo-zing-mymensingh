@@ -34,7 +34,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/play_games/plugin.cfg")
+enabled=PackedStringArray("res://addons/notifications/plugin.cfg", "res://addons/play_games/plugin.cfg")
 
 [input_devices]
 

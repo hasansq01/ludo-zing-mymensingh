@@ -118,6 +118,16 @@ func open_friends(game_ := "") -> void:
 	friends.join_room.connect(_join)
 	friends.open(_layer())
 
+## A notification's link to a room (room:CODE): rejoin it, the lobby or the match, through the usual join. Nothing
+## when we are in a room or searching already.
+func join_code(code: String) -> void:
+	var c := NetClient.clean_code(code)
+	if state != "idle" or not NetClient.valid_code(c):
+		return
+	if NetClient.saved_room(net.prefs).get("code", "") == c and try_resume():
+		return
+	_join(c)
+
 func _create() -> void:
 	if friends:
 		friends.set_busy("create")
