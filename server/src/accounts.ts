@@ -96,6 +96,8 @@ export function rowToProfile(r: AccountRow): Profile {
     room: eq.room,
     dice_owned: owned.dice_owned,
     dice: eq.dice,
+    emote_sets: owned.emote_sets,
+    emote_set: eq.emote_set,
     scenes: owned.scenes,
     scene: eq.scene,
     daily: rw.daily,
@@ -114,9 +116,9 @@ export function rowToProfile(r: AccountRow): Profile {
 
 /** The profile -> the accounts columns it is stored in. */
 export function profileColumns(p: Profile): Record<string, string | number | null> {
-  const owned: Record<string, unknown> = { rooms: p.rooms, dice_owned: p.dice_owned, av_owned: p.av_owned };
+  const owned: Record<string, unknown> = { rooms: p.rooms, dice_owned: p.dice_owned, av_owned: p.av_owned, emote_sets: p.emote_sets };
   if (p.scenes !== undefined) owned.scenes = p.scenes;
-  const eq: Record<string, unknown> = { room: p.room, dice: p.dice };
+  const eq: Record<string, unknown> = { room: p.room, dice: p.dice, emote_set: p.emote_set };
   if (p.scene !== undefined) eq.scene = p.scene;
   return {
     public_id: typeof p.id === "string" ? p.id : String(p.id ?? ""),

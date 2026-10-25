@@ -20,10 +20,13 @@ extends Node
 ## played in order). Every seat that isn't a bot is a person here: nothing tells ghost seats apart.
 ## Errors become friendly toasts (NetClient.error_text) or the quick sheet's message. Request errors during a match
 ## (stale, not_your_turn, bad_action) go to the match quietly: they are races, not mistakes.
+## Emotes (server/EMOTES.md): another member's {t: "emote", c, id} goes to the match's net_emote while it is up
+## (dropped while it opens: a reaction is only worth showing now); emote_locked / emote_rate are ignored quietly.
 
 signal state_changed(state: String)
 
 const QUIET := ["stale", "not_your_turn", "bad_action", "rate"]
+const QUIET_EMOTE := ["emote_locked", "emote_rate"]   ## a refused emote: nothing to say, nothing to retry
 const REFRESH_AFTER := [1.5, 6.0]          ## s after `over`: GET /v1/me (the server grants the rewards at over)
 
 var app: Node
@@ -64,6 +67,7 @@ func _ready() -> void:
 	net.over.connect(_on_over)
 	net.turn.connect(func(m: Dictionary): _deliver("net_turn", m))
 	net.presence.connect(func(m: Dictionary): _deliver("net_presence", m))
+	net.emote.connect(_on_emote)
 	net.error.connect(_on_error)
 	net.status_changed.connect(_on_status)
 	quick_q.queued.connect(_on_queued)
@@ -385,8 +389,16 @@ func _deliver(method: String, m: Variant) -> void:
 		return
 	_match_call(method, m)
 
+## Another member's emote: to the match on screen (lobby emotes, c = -1, aren't shown).
+func _on_emote(m: Dictionary) -> void:
+	if _holding or not in_match() or int(m.get("c", -1)) < 0:
+		return
+	_match_call("net_emote", m)
+
 func _on_error(m: Dictionary) -> void:
 	var code := str(m.get("code", ""))
+	if code in QUIET_EMOTE:
+		return
 	match state:
 		"joining":
 			if net.quick:

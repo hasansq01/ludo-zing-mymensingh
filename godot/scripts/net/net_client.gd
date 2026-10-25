@@ -37,6 +37,7 @@ signal turn(msg: Dictionary)
 signal presence(msg: Dictionary)
 signal over(msg: Dictionary)
 signal error(msg: Dictionary)
+signal emote(msg: Dictionary)            ## another member's emote {c, id} (lobby: c = -1, member); see server/EMOTES.md
 
 const PROD_URL := "wss://ludo-zing-rooms.flipfold.workers.dev"
 const VERSION := 1
@@ -350,6 +351,10 @@ func send_msg(msg: Dictionary) -> bool:
 		return false
 	return transport.send(JSON.stringify(msg)) == OK
 
+## An emote for the others in the room ({t: "emote", id}; the server checks the pack and the rate and relays it).
+func send_emote(id: String) -> bool:
+	return send_msg({t = "emote", id = id})
+
 func _open_socket() -> void:
 	transport = make_transport.call() if make_transport.is_valid() else NetTransport.make()
 	_hello_sent = false
@@ -504,6 +509,8 @@ func handle(msg: Dictionary) -> void:
 			presence.emit(msg)
 		"over":
 			over.emit(msg)
+		"emote":
+			emote.emit(msg)
 		"pong":
 			var now := Time.get_unix_time_from_system() * 1000.0
 			if _ping_at > 0.0:

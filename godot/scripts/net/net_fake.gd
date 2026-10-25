@@ -22,6 +22,11 @@ extends RefCounted
 ## Play on (PROTOCOL.md "Play on after the first finish"): `over` only at the end of the game; after an act (and a
 ## leave) the room sends {k: "end"} when no real person (not a ghost, not left) is left unfinished while one is still
 ## seated, like the server.
+## Emotes (server/EMOTES.md): {t: "emote", id} is relayed to the others as {t: "emote", c, id} (lobby: c = -1 and
+## member), after the server's checks: the member owns the emote's pack (Starter always; a member's packs are
+## mem.emote_sets, set them in a test) and at most 1 per EMOTE_GAP ms and EMOTE_MAX per EMOTE_WINDOW ms (clock_ms()
+## is the clock: set `clock` to fake it); refusals are {t: "error", code: "emote_locked" | "emote_rate"}.
+## ghost_emote(c, id) sends a ghost's (or any seat's) emote to everyone, exactly like a person's.
 ## Pipe is the client end of a socket; pipe.drop() cuts it from the server side.
 
 const GHOST_NAMES := ["Rafi", "Mitu", "Tanvir", "Nusrat", "Sakib", "Ayesha", "Shuvo", "Tania"]
@@ -117,6 +122,10 @@ class Room extends RefCounted:
 	var held: Array = []
 	var _ids := 0
 	var pipes: Array = []
+	var clock := Callable()               ## () -> ms for the emote rate limit (Time.get_ticks_msec by default)
+	const EMOTE_GAP := 2000
+	const EMOTE_WINDOW := 30000
+	const EMOTE_MAX := 6
 
 	func _init(code_ := "K7QX2M", seed_ := 7) -> void:
 		code = code_
@@ -218,10 +227,45 @@ class Room extends RefCounted:
 			"sync_req":
 				if playing or finished_once:
 					_send(pipe, _sync_msg())
+			"emote":
+				_emote(pipe, me, str(m.get("id", "")))
 			"leave":
 				_leave(me)
 			_:
 				_send(pipe, {t = "error", code = "bad_message", msg = t})
+
+	## A member's emote: the pack check, the rate limit, then to everyone else.
+	func _emote(pipe: Pipe, me: Dictionary, id: String) -> void:
+		var pack := str(EmoteArt.info(id).get("set", ""))
+		if pack == "":
+			_send(pipe, {t = "error", code = "bad_message", msg = "emote"})
+			return
+		var owned: Array = me.get("emote_sets", ["starter"])
+		if pack != "starter" and not owned.has(pack):
+			_send(pipe, {t = "error", code = "emote_locked", msg = ""})
+			return
+		var now := clock_ms()
+		var times: Array = (me.get("emote_times", []) as Array).filter(func(x): return now - int(x) < EMOTE_WINDOW)
+		if (not times.is_empty() and now - int(times.back()) < EMOTE_GAP) or times.size() >= EMOTE_MAX:
+			me.emote_times = times
+			_send(pipe, {t = "error", code = "emote_rate", msg = ""})
+			return
+		times.append(now)
+		me.emote_times = times
+		var c := _color(me.id) if playing or finished_once else -1
+		var msg := {t = "emote", c = c, id = id}
+		if c < 0:
+			msg.member = me.id
+		for mem in members:
+			if mem.pipe != null and mem.pipe != pipe:
+				_send(mem.pipe, msg)
+
+	## Colour c's emote to every connected member (a ghost reacting, like the server's ghosts).
+	func ghost_emote(c: int, id: String) -> void:
+		_broadcast({t = "emote", c = c, id = id})
+
+	func clock_ms() -> int:
+		return int(clock.call()) if clock.is_valid() else Time.get_ticks_msec()
 
 	func _hello(pipe: Pipe, m: Dictionary) -> void:
 		if int(m.get("v", 0)) != 1:

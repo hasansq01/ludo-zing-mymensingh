@@ -823,3 +823,20 @@ export async function staleRooms(db: D1Database, statuses: readonly RoomStatus[]
     .all<{ code: string; status: RoomStatus }>();
   return results;
 }
+
+/**
+ * The emote packs an account owns (EMOTES.md): `emote_sets` in the account's `owned` JSON (next to rooms, scenes ...),
+ * "starter" always included. Unknown account or unreadable JSON -> just starter. Read-only.
+ */
+export async function readEmoteSets(db: D1Database, accountId: string): Promise<string[]> {
+  const row = await db.prepare("SELECT owned FROM accounts WHERE id = ?").bind(accountId).first<{ owned: string | null }>();
+  const out = new Set<string>(["starter"]);
+  try {
+    const owned = row?.owned ? JSON.parse(row.owned) : null;
+    const sets = owned && typeof owned === "object" ? (owned as Record<string, unknown>).emote_sets : null;
+    if (Array.isArray(sets)) for (const s of sets) if (typeof s === "string") out.add(s);
+  } catch {
+    /* bad JSON: starter only */
+  }
+  return [...out];
+}

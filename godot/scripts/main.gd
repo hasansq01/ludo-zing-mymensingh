@@ -1173,6 +1173,8 @@ func _back() -> void:
 		return
 	if Info.close():                         # Back closes an open ⓘ bubble first
 		return
+	if EmotePicker.close_open():             # then an open emote picker
+		return
 	if Sheet.back(sheet_layer):
 		return
 	if is_instance_valid(_result) and not _result.is_queued_for_deletion():

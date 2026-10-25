@@ -144,3 +144,48 @@ export function ghostPick(s: LudoState, rng: Rng, mistake = GHOST_MISTAKE): numb
 export function ghostPairYes(rng: Rng): boolean {
   return rng.randf() < 0.85;
 }
+
+// ---------- emotes (EMOTES.md) ----------
+
+/** The emote packs in manifest order (ids of the 24 emotes; `starter` is free and always owned). */
+export const EMOTE_PACKS: Readonly<Record<string, readonly string[]>> = {
+  starter: ["happy", "laugh", "cool", "angry", "love", "party"],
+  pawns: ["champ", "sleepy", "sob", "gasp", "confused", "hi"],
+  friends: ["cry", "wow", "facepalm", "cheer", "think", "tease"],
+  game: ["dice", "crown", "highfive", "flag", "sad", "peek"],
+};
+export const PAID_PACKS: readonly string[] = ["pawns", "friends", "game"];
+
+/** The pack that contains emote `id`, or "" when it is not one of the 24. */
+export function packOfEmote(id: unknown): string {
+  if (typeof id !== "string") return "";
+  for (const [p, ids] of Object.entries(EMOTE_PACKS)) if (ids.includes(id)) return p;
+  return "";
+}
+
+/** What made a ghost want to react. */
+export type EmoteKind = "capture" | "captured" | "six" | "finish" | "reply";
+
+/** Emotes that fit each moment, best first (a ghost uses the first few it owns, picked at random). */
+const MOOD: Record<EmoteKind, readonly string[]> = {
+  capture: ["laugh", "cool", "tease", "champ", "party", "highfive", "happy"],
+  captured: ["angry", "sob", "cry", "sad", "gasp", "wow", "confused", "facepalm"],
+  six: ["party", "cool", "happy", "cheer", "dice", "wow"],
+  finish: ["party", "happy", "love", "cheer", "crown", "champ", "highfive"],
+  reply: ["happy", "laugh", "love", "hi", "wow", "cheer", "highfive", "tease", "cool"],
+};
+
+/** Ghost emote tuning: chance per event, delay (ms) and the minimum gap per ghost (ms). */
+export const GHOST_EMOTE = { chance: 0.25, delay: [800, 2500], gap: 8000 } as const;
+
+/** One random paid pack, the second pack a ghost "owns" (besides starter). */
+export function ghostPack(rng: Rng): string {
+  return pick(PAID_PACKS, rng);
+}
+
+/** The emote a ghost owning `pack` (and starter) sends for this moment. */
+export function ghostEmote(kind: EmoteKind, pack: string, rng: Rng): string {
+  const owned = new Set([...EMOTE_PACKS.starter, ...(EMOTE_PACKS[pack] ?? [])]);
+  const fit = MOOD[kind].filter((id) => owned.has(id));
+  return pick(fit.length ? fit : EMOTE_PACKS.starter, rng);
+}

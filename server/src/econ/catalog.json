@@ -43,6 +43,46 @@
       "unlock": null
     },
     {
+      "kind": "emotes",
+      "id": "starter",
+      "name": "Starter Set",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "emotes",
+      "id": "pawns",
+      "name": "Pawn Pals",
+      "price": 2500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "emotes",
+      "id": "friends",
+      "name": "Friends Set",
+      "price": 4000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "emotes",
+      "id": "game",
+      "name": "Game Set",
+      "price": 3500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null
+    },
+    {
       "kind": "room",
       "id": "night",
       "name": "Moonlit Café",
@@ -666,6 +706,10 @@
       "cafe"
     ],
     "room": "night",
+    "emote_sets": [
+      "starter"
+    ],
+    "emote_set": "starter",
     "dice_owned": [
       "classic"
     ],

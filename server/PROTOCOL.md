@@ -49,6 +49,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 | `back` | – | you were turned into a bot (timeouts) and tapped "I'm back" |
 | `sync_req` | – | your hash didn't match, or after a reconnect hiccup |
 | `leave` | – | leave the room (lobby: frees the seat; in a match: a bot takes the seat for good) |
+| `emote` | `id` | any time (see "Emotes") |
 | `ping` | – | keep-alive every 20 s |
 
 `n` is the index of the action this request would become (the client's `n` = number of actions applied so far).
@@ -67,6 +68,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | `presence` | `id, online` |
 | `over` | `finished: [colours in final order], winner` (colour, or −1); sent once, at the end of the game (see "Play on after the first finish") |
 | `error` | `code, msg` |
+| `emote` | `c, id` (+ `member` when `c` = -1; see "Emotes") |
 | `pong` | `now` |
 
 `seats`: `[{color, id, name, avatar, frame, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
@@ -119,6 +121,27 @@ rules (the same in GDScript and TS, so clients get there from the acts alone):
 
 Members are seated in join order. At `start` the playing colours are: 2 players → Red, Yellow (0, 2: opposite
 corners); 3 → Red, Green, Yellow (0, 1, 2); 4 → all. Teams needs 4 (Red + Yellow vs Green + Blue).
+
+## Emotes
+
+Quick reactions (24 stickers in 4 packs, ids and packs in `EMOTES.md`). They never touch the match: no action, no `n`,
+no hash, no timer; they are not stored in the action log.
+
+- Client → server `{t: "emote", id}`: any time after `hello` (lobby or match). `id` is one of the 24 emote ids.
+- Server → everyone **except the sender**: `{t: "emote", c, id}`, `c` = the sender's colour. In a lobby (no match yet)
+  `c` is `-1` and the message carries `member` (the sender's member id): `{t: "emote", c: -1, member, id}`. The sender
+  shows its own reaction locally at once and gets nothing back.
+- Ownership: the sender's account must own the pack containing `id` (`starter` always; a member with no account owns
+  only `starter`). The packs are read from the account (`owned.emote_sets`), cached per member until its next `hello`
+  (a reconnect re-reads them). A refused emote: `error {code: "emote_locked"}`.
+- Rate limit per member: 1 emote per 2 s and 6 per 30 s; over it: `error {code: "emote_rate"}`. Clients ignore both
+  quietly. An unknown `id` (or a missing one) is `error {code: "bad_message"}`.
+- The general 20 msg/s limit still applies, but the first 5 emote messages per second per socket are not counted
+  against it, so a spammed picker cannot starve rolls and moves.
+- Quick-match ghosts emote like people (same `{t: "emote", c, id}`): after their own capture, being captured (S&L: a
+  snake), a 6, finishing, or a human's emote, each with about 25% chance, 0.8-2.5 s later, at most one per 8 s per
+  ghost, from starter plus one random paid pack. They are indistinguishable from a person's emote. Ghost emotes are
+  alarm-driven and stored with the match (they survive hibernation).
 
 ## State hash
 
@@ -246,7 +269,7 @@ profile (`GET /v1/me`) after `over`; rewards are not part of any room message.
 
 `version` (unsupported v), `not_found`, `full` (4 members), `started` (match in progress and you have no seat),
 `not_host`, `not_your_turn`, `bad_action` (illegal for the rules), `stale`, `too_few`, `teams_need_4`, `rate`
-(over 20 messages/s), `bad_message`, `banned` (your pid is banned from online play; `msg` says so, with the
+(over 20 messages/s), `bad_message`, `emote_locked` / `emote_rate` (see "Emotes"), `banned` (your pid is banned from online play; `msg` says so, with the
 reason; the socket then closes with 4003: on hello, or while you are in a room when the ban happens), `kicked` (an
 admin removed you from the room; the socket then closes with 4002). `banned` also covers a banned account (by
 session or by the pid's account). In a quick room `full` means you have no seat in it.

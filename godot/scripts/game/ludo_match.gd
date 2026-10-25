@@ -31,6 +31,12 @@ extends Node
 ## the FinishCard (Keep watching / Home = leave the room; the server still grants your place at the end). The result
 ## screen at the end shows the full standings; rewards follow your place (1st = the win reward). The server's
 ## {k: "end"} act (online: only ghosts / leavers left to finish) ends the game the same way.
+##
+## Emotes (server/EMOTES.md, the HUD's EmotePicker / EmoteLayer): the sender is the only human vs the computer, the
+## player to move in Pass & Play (whoever holds the phone) and your seat online. A pick shows at once on the sender's
+## seat; online it also goes to the server ({t: "emote", id}) and the others' arrive through net_emote ({t: "emote",
+## c, id}; quick-match ghosts' too). Offline the computers react now and then to captures, finishes and the end
+## (EmoteLayer.react_*, throttled). Purely visual: no state, rule, turn or hash is touched.
 
 signal finished(result: Dictionary)
 ## result (ResultScreen-ready): {game "ludo", title, sub, standings [{color, name, kind "you"|"cpu"|"human", cpu_id,
@@ -102,6 +108,11 @@ func _ready() -> void:
 		hud.away_pressed.connect(_net_back)
 	if hud.has_signal("finish_home_pressed"):
 		hud.finish_home_pressed.connect(_finish_home)
+	if hud.get("emote_picker") != null:
+		hud.emote_picker.picked.connect(_emote_send)
+		hud.emote_picker.guard = func() -> bool: return app.paused or _sheet_open()
+		hud.emotes.is_cpu_fn = func(c: int) -> bool: return not online and not S.is_empty() and S.players[c] == "cpu"
+		hud.emotes.is_human_fn = func(c: int) -> bool: return not S.is_empty() and S.players[c] == "human"
 
 ## A dice tap counts only on a human's turn, while nothing is animating and no sheet is open.
 func _on_dice() -> void:
@@ -251,6 +262,7 @@ func _open(s: Dictionary, fresh: bool) -> void:
 	board.set_movable([])
 	board.relayout(S)
 	hud.setup(S)
+	_emote_sync()
 	hud.dice.set_active(false)
 	_view_key = ""
 	_frame_view(true)
@@ -290,6 +302,9 @@ func stop() -> void:
 	hud.cancel_pair()
 	board.cancel_all()
 	board.set_movable([])
+	_emote_sync()
+	if hud.get("emotes") != null:
+		hud.emotes.clear()
 
 # ---------- the 3D view framing ----------
 
@@ -425,6 +440,7 @@ func _begin_turn() -> void:
 	board.set_movable([])
 	hud.update(S, c)
 	_idle_line()
+	_emote_sync()
 	if online:
 		return                               # the server says who rolls; nothing is played here
 	_save()
@@ -691,6 +707,8 @@ func _side_finished(e: Dictionary, roller: int, ending: bool) -> void:
 		return
 	var at := LudoBoard.to_world(LudoBoard.grid_of(c, LudoRules.GOAL, 0))
 	hud.pop(text, _screen(at + Vector3(0, 1.6, 0)), Palette.GOLD_HI if place == 1 else Palette.HONEY, 30, true)
+	if not online and tut == null and hud.get("emotes") != null:
+		hud.emotes.react_finish(c)
 	Sound.sfx("win", {soft = not mine})
 	if mine:
 		Haptics.success()
@@ -726,6 +744,8 @@ func _capture(c: int, victims: Array, soft: bool, roller: int) -> void:
 		Haptics.medium()
 	_shake()
 	hud.pop("+1 roll", _screen(at + Vector3(0, 1.3, 0)), Palette.HONEY, 28, true)
+	if not online and tut == null and hud.get("emotes") != null:
+		hud.emotes.react_capture(roller, victims.map(func(v): return int(v[0])))
 	await board.send_home(victims)
 
 func _shake() -> void:
@@ -847,6 +867,8 @@ func _game_over() -> void:
 	var id := _id
 	MatchStore.clear("ludo")
 	var winners := LudoRules.winners(S)
+	if tut == null and hud.get("emotes") != null:
+		hud.emotes.react_win(winners, [0, 1, 2, 3].filter(func(k): return LudoRules.active(S, k)))
 	var human_won := winners.any(func(k): return LudoRules.is_human(S, k))
 	var vs_cpu: bool = S.players.has("cpu")
 	Sound.sfx("win" if human_won else "lose")
@@ -926,6 +948,40 @@ static func result_copy(s: Dictionary) -> Dictionary:
 	var home := " · you got all four home" if k == 4 else (" · %d of 4 pawns home" % k if k > 0 else "")
 	return {title = "You finished %s" % ResultScreen.ordinal(maxi(place, 2)), sub = "%s won" % LudoRules.pname(s, w) + home}
 
+
+# ---------- emotes ----------
+
+## Who sends from this phone: your seat online; vs the computer the only human; Pass & Play the player to move
+## (whoever holds the phone). -1: nobody (watching online, a table of computers, no game).
+func emote_sender() -> int:
+	return emote_sender_of(S, (ns.me if ns != null else -1) if online else -2)
+
+## emote_sender() for a state: me = your colour online (-1: watching), -2 offline.
+static func emote_sender_of(s: Dictionary, me := -2) -> int:
+	if s.is_empty() or s.get("phase", "") == "over":
+		return -1
+	if me != -2:
+		return me if me >= 0 and LudoRules.active(s, me) else -1
+	var hs := [0, 1, 2, 3].filter(func(k): return LudoRules.is_human(s, k))
+	if hs.size() == 1:
+		return int(hs[0])
+	if LudoRules.is_human(s, int(s.turn)):
+		return int(s.turn)
+	return int(hs[0]) if not hs.is_empty() else -1
+
+## The emote button shows while someone here may send (never in the tutorial or after the game).
+func _emote_sync() -> void:
+	if hud.has_method("set_emotes"):
+		hud.set_emotes(tut == null and not autoplay and emote_sender() >= 0)
+
+## A pick from the picker: shown on the sender's seat at once (online the server relays it to the others).
+func _emote_send(id: String) -> void:
+	var c := emote_sender()
+	if c < 0:
+		return
+	if online:
+		_net_send({t = "emote", id = id})
+	hud.emotes.show_emote(c, id)
 
 # ---------- online (friend rooms and quick match: every seat that isn't a bot is a person) ----------
 
@@ -1172,6 +1228,15 @@ func net_error(msg: Dictionary) -> void:
 func net_status(st: String) -> void:
 	if online and hud.has_method("set_banner"):
 		hud.set_banner("Reconnecting…" if st in ["reconnecting", "connecting"] else "")
+
+## {t: "emote", c, id}: another seat's reaction (a friend, a quick-match player); the lobby's (c = -1) and your
+## own colour are left out.
+func net_emote(msg: Dictionary) -> void:
+	if not online or S.is_empty() or hud.get("emotes") == null:
+		return
+	var got := EmoteLayer.incoming(msg, ns.me, func(c: int) -> bool: return LudoRules.active(S, c))
+	if not got.is_empty():
+		hud.emotes.show_emote(int(got[0]), str(got[1]))
 
 ## "I’m back": your seat is yours again (the server answers with a `mode human` act).
 func _net_back() -> void:

@@ -18,7 +18,7 @@ var google_body: Dictionary = {}
 var resolve_body: Dictionary = {}
 var drop_session := false                ## authed calls answer 401 unauthorized
 var board := {top = [], me = null, min_matches = 3}
-var prices := {room_neon = 3000, dice_gold = 900}
+var prices := {room_neon = 3000, dice_gold = 900, emotes_pawns = 2500, emotes_friends = 4000, emotes_game = 3500}
 var daily_taken := false
 
 func _init() -> void:
@@ -27,7 +27,7 @@ func _init() -> void:
 static func base_profile() -> Dictionary:
 	return {name = "You", id = "LZM-TEST-0001", coins = 5000, xp = 0,
 		stats = {played = 0, wins = 0, losses = 0, streak = 0, bestStreak = 0, coinsEarned = 0, pairsFormed = 0, ppGames = 0, slPlayed = 0, slWins = 0},
-		rooms = ["night", "cafe"], room = "night", dice_owned = ["classic"], dice = "classic", scenes = ["jungle"], scene = "jungle",
+		rooms = ["night", "cafe"], room = "night", dice_owned = ["classic"], dice = "classic", emote_sets = ["starter"], emote_set = "starter", scenes = ["jungle"], scene = "jungle",
 		daily = {}, last_spin = "", last_free = 0, avatar = "pawn-red", av_owned = [], frame = "classic", plate = "plain", badge = "", claimed = []}
 
 func count(path: String) -> int:
@@ -91,11 +91,14 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 			if b.kind == "room":
 				profile.rooms.append(b.id)
 				profile.room = b.id
+			elif b.kind == "emotes":
+				profile.emote_sets.append(b.id)
+				profile.emote_set = b.id
 			else:
 				profile.dice_owned.append(b.id)
 			return _ok({ok = true, profile = _prof(), price = price})
 		"/v1/shop/equip":
-			profile[("room" if b.kind == "room" else str(b.kind))] = b.id
+			profile[("emote_set" if b.kind == "emotes" else str(b.kind))] = b.id
 			return _ok({ok = true, profile = _prof()})
 		"/v1/rewards/daily":
 			if daily_taken:

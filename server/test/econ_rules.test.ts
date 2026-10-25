@@ -26,6 +26,7 @@ import {
   isPlayerId,
   levelInfo,
   newProfile,
+  normalizeProfile,
   nextDayAt,
   rollSpin,
   spin,
@@ -426,5 +427,43 @@ describe("import of the local profile", () => {
     expect(d.ok && d.day).toBe(4);
     const past = importProfile({ last_spin: "2026-10-23", daily: { streak: 9, last: "2027-01-01" } }, base, today, T0);
     expect(past.ok && [past.profile.last_spin, past.profile.daily]).toEqual(["2026-10-23", { cycle: 0, streak: 0, last: "", last_at: 0, auto_on: "", history: [] }]);
+  });
+});
+
+
+describe("emote packs", () => {
+  it("a new profile owns and uses the Starter Set", () => {
+    const p = newProfile();
+    expect(p.emote_sets).toEqual(["starter"]);
+    expect(p.emote_set).toBe("starter");
+  });
+
+  it("buy pays once, owns and equips; equip needs ownership", () => {
+    const p = newProfile();
+    p.coins = 10_000;
+    const r = buy(p, "emotes", "friends");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.profile).toMatchObject({ coins: 6000, emote_sets: ["starter", "friends"], emote_set: "friends" });
+    expect(buy(r.profile, "emotes", "friends")).toMatchObject({ ok: false, error: "owned" });
+    expect(buy(p, "emotes", "starter")).toMatchObject({ ok: false, error: "owned" });
+    expect(buy(p, "emotes", "nope")).toMatchObject({ ok: false, error: "unknown" });
+    expect(buy(newProfile(), "emotes", "pawns")).toMatchObject({ ok: true });
+    const poor = newProfile();
+    poor.coins = 100;
+    expect(buy(poor, "emotes", "pawns")).toMatchObject({ ok: false, error: "coins", short: 2400 });
+    expect(equip(p, "emotes", "game")).toMatchObject({ ok: false, error: "locked" });
+    expect(equip(p, "emotes", "nope")).toMatchObject({ ok: false, error: "unknown" });
+    const e = equip(r.profile, "emotes", "starter");
+    expect(e.ok && e.profile.emote_set).toBe("starter");
+  });
+
+  it("normalize repairs damaged emote fields; import keeps only known owned packs", () => {
+    expect(normalizeProfile({ emote_sets: "x", emote_set: 4 }, () => "id")).toMatchObject({ emote_sets: ["starter"], emote_set: "starter" });
+    expect(normalizeProfile({ emote_sets: ["game"], emote_set: "pawns" }, () => "id")).toMatchObject({ emote_sets: ["starter", "game"], emote_set: "starter" });
+    const r = importProfile({ emote_sets: ["game", "bogus", "game"], emote_set: "game" }, newProfile("LZM-BASE-0001"), "2026-10-24", T0);
+    expect(r.ok && r.profile).toMatchObject({ emote_sets: ["starter", "game"], emote_set: "game" });
+    const bad = importProfile({ emote_sets: [], emote_set: "pawns" }, newProfile("LZM-BASE-0001"), "2026-10-24", T0);
+    expect(bad.ok && bad.profile.emote_set).toBe("starter");
   });
 });

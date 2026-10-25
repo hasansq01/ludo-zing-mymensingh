@@ -2,7 +2,7 @@
 // field that would tell a ghost from a person; ghost identities look like people's; ghosts act in human time windows
 // and never time out.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FEMALE_NAMES, FREE_AVATARS, GHOST_TIMING, MALE_NAMES } from "../src/ghosts";
+import { EMOTE_PACKS, FEMALE_NAMES, FREE_AVATARS, GHOST_TIMING, MALE_NAMES, packOfEmote } from "../src/ghosts";
 import type { AdminSnapshot } from "../src/room";
 import { Client, NEAR_GOAL, finishAll, stubFor, type Msg } from "./room_client";
 import { QuickClient, guest, joinMatched, mmHooks, queueAll, resetSpies, walk, type Guest } from "./quick_client";
@@ -25,7 +25,7 @@ interface Played {
 
 /** A full quick match with these humans (autoplay), returning everything every client received. */
 async function play(game: string, size: number, humans: number, names: string[]): Promise<Played> {
-  await mmHooks(game, size, { wait: 150, room: { timeScale: SCALE, ...(game === "ludo" ? { tok: NEAR_GOAL } : { slPos: [80, 80, 80, 80] }) } });
+  await mmHooks(game, size, { wait: 150, room: { timeScale: SCALE, emoteChance: 1, ...(game === "ludo" ? { tok: NEAR_GOAL } : { slPos: [80, 80, 80, 80] }) } });
   const gs: Guest[] = [];
   for (let k = 0; k < humans; k++) gs.push(await guest());
   const { qs, matched } = await queueAll(game, size, gs, names);
@@ -34,6 +34,7 @@ async function play(game: string, size: number, humans: number, names: string[])
   const cs: Client[] = [];
   for (let k = 0; k < humans; k++) cs.push(await joinMatched(code, matched[k].token, gs[k], names[k]));
   await Promise.all(cs.map((c) => c.wait("start", 5000)));
+  for (const c of cs) c.send({ t: "emote", id: "happy" }); // a human's emote (ghosts may answer it)
   for (const c of cs) {
     c.autoplay = true;
     c.playTurn(game === "sl" ? c.state.players[c.state.turn].c : c.state.turn);
@@ -63,7 +64,7 @@ function audit(p: Played, game: string, humanNames: string[]): void {
   for (const c of p.cs) {
     for (let k = 0; k < c.log.length; k++) {
       const m = c.log[k];
-      expect(["welcome", "start", "sync", "act", "turn", "presence", "over", "error", "pong"]).toContain(m.t);
+      expect(["welcome", "start", "sync", "act", "turn", "presence", "over", "error", "pong", "emote"]).toContain(m.t);
       if (m.t === "welcome") expect(m.host).toBe(-1);
       if (m.t === "start" || m.t === "sync") {
         expect(m.game).toBe(game);
@@ -101,6 +102,12 @@ function audit(p: Played, game: string, humanNames: string[]): void {
         // a ghost's turn carries a person's deadline (the configured turn timer), like everyone's
         expect(Object.values(TIMERS)).toContain(m.deadline - m.now);
       }
+      if (m.t === "emote") {
+        // exactly a person's shape (key order included), a colour in the match, one of the 24 ids
+        expect(Object.keys(m)).toEqual(["t", "c", "id"]);
+        expect(packOfEmote(m.id)).not.toBe("");
+        expect(c.seats.some((x) => x.color === m.c)).toBe(true);
+      }
       if (m.t === "presence") expect(p.ghostIds.has(m.id)).toBe(false);
       if (m.t === "over") {
         expect(Object.keys(m).sort()).toEqual(["finished", "standings", "t", "winner"]);
@@ -128,6 +135,19 @@ describe("no ghost leaks", () => {
     const p = await play("sl", 4, 2, ["Karim", "Mim"]);
     expect(p.ghostColors.size).toBe(2);
     audit(p, "sl", ["Karim", "Mim"]);
+  }, 30_000);
+
+  it("ghost emotes (chance 1): human shape, starter + one pack per ghost, 8 s gap, no ghost word", async () => {
+    const p = await play("ludo", 4, 1, ["Rahim"]);
+    const em = p.cs[0].log.filter((m) => m.t === "emote" && p.ghostColors.has(m.c));
+    expect(em.length).toBeGreaterThan(0);
+    for (const col of p.ghostColors) {
+      const mine = em.filter((m) => m.c === col);
+      const packs = new Set(mine.map((m) => packOfEmote(m.id)).filter((x) => x !== "starter"));
+      expect(packs.size).toBeLessThanOrEqual(1);
+      for (const id of mine.map((m) => m.id)) expect(Object.values(EMOTE_PACKS).flat()).toContain(id);
+    }
+    audit(p, "ludo", ["Rahim"]);
   }, 30_000);
 
   it("a reconnect (sync) mid-match shows the ghosts like everyone else", async () => {

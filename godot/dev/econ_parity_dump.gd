@@ -131,6 +131,7 @@ func day(offset: int) -> String:
 func room_ids() -> Array: return ids(Rooms.LIST)
 func dice_ids() -> Array: return ids(Catalog.DICE)
 func scene_ids() -> Array: return ids(SLScenes.LIST)
+func emote_ids() -> Array: return ids(Catalog.EMOTE_PACKS)
 func char_ids() -> Array: return ids(Collection.CHARS)
 func avatar_ids() -> Array: return ids(Collection.AVATARS)
 func frame_ids() -> Array: return ids(Collection.FRAMES)
@@ -175,6 +176,10 @@ func rand_raw() -> Dictionary:
 		raw.scenes = subset(scene_ids(), 0.3)
 	if chance(0.6):
 		raw.scene = pick(scene_ids())
+	if chance(0.6):
+		raw.emote_sets = subset(emote_ids(), 0.35)
+	if chance(0.6):
+		raw.emote_set = pick(emote_ids() + ["bogus"])
 	raw.av_owned = subset(char_ids(), 0.2)
 	raw.avatar = pick(avatar_ids() + char_ids())
 	raw.frame = pick(frame_ids())
@@ -227,6 +232,9 @@ func normalize_cases() -> Array:
 		avatar = "", av_owned = "x", frame = null, plate = "", badge = 0, claimed = {}})
 	raws.append({rooms = ["dream", 3, "cafe"], room = "dream", dice_owned = ["gold"], dice = "gold", stats = {wins = 2.0, extra = 5}})
 	raws.append({rooms = ["dream"], room = "studio", dice_owned = ["classic", "classic"], dice = "crema", stats = []})
+	raws.append({emote_sets = ["game", 3, "pawns"], emote_set = "friends"})
+	raws.append({emote_sets = "x", emote_set = 4})
+	raws.append({emote_sets = ["friends"], emote_set = "friends"})
 	raws.append({name = "\tAna\n", id = "LZM-AAAA-BBBB", extra_field = {a = 1}})
 	for k in 60:
 		var raw := rand_raw()
@@ -270,9 +278,9 @@ func buy_code(err: String) -> String:
 
 func buy_cases() -> Array:
 	var out := []
-	var kinds := {room = room_ids() + ["nope"], dice = dice_ids() + ["nope"], scene = scene_ids() + ["nope"],
+	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], dice = dice_ids() + ["nope"], scene = scene_ids() + ["nope"],
 		char = char_ids() + ["pawn-red", "nope"]}
-	for k in 320:
+	for k in 420:
 		var p := rand_profile()
 		var kind: String = pick(kinds.keys())
 		var id: String = pick(kinds[kind])
@@ -285,6 +293,7 @@ func buy_cases() -> Array:
 		match kind:
 			"room": err = Catalog.buy_room(id)
 			"dice": err = Catalog.buy_dice(id)
+			"emotes": err = Catalog.buy_emotes(id)
 			"scene": err = SLScenes.buy_scene(id)
 			"char": err = Collection.buy_char(id, true)
 		var code := buy_code(err)
@@ -294,9 +303,9 @@ func buy_cases() -> Array:
 
 func equip_cases() -> Array:
 	var out := []
-	var kinds := {room = room_ids() + ["nope"], dice = dice_ids(), scene = scene_ids(), avatar = avatar_ids() + char_ids(),
+	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], dice = dice_ids(), scene = scene_ids(), avatar = avatar_ids() + char_ids(),
 		char = char_ids(), frame = frame_ids(), plate = plate_ids(), badge = Collection.BADGES}
-	for k in 260:
+	for k in 340:
 		var p := rand_profile()
 		var kind: String = pick(kinds.keys())
 		var id: String = pick(kinds[kind])
@@ -307,6 +316,7 @@ func equip_cases() -> Array:
 		match kind:
 			"room": ok = Catalog.equip_room(id)
 			"dice": ok = Catalog.equip_dice(id)
+			"emotes": ok = Catalog.equip_emotes(id)
 			"scene": ok = SLScenes.equip_scene(id)
 			_: ok = Collection.equip(kind, id)
 		out.append({p = before, kind = kind, id = id, ok = ok, out = copy(p)})

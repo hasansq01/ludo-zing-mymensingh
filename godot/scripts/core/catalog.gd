@@ -16,6 +16,15 @@ const DICE := [
 	{id = "espresso", name = "Espresso", price = 2500, bg = Color("#4a2c1a"), edge = Color("#2a170c"), pip = Color("#f3e3cc"), one = Color("#f2b632")},
 	{id = "gold", name = "Royal Gold", price = 6000, bg = Color("#f6c945"), edge = Color("#c99a1c"), pip = Color("#3a2400"), one = Color("#b3261e")},
 ]
+## Emote packs (server/EMOTES.md): six animated stickers each. Starter is free and always owned. The art and the
+## emotes' display names come from assets/emotes/emotes.json (EmoteArt); these rows are the economy's source.
+const EMOTE_PACKS := [
+	{id = "starter", name = "Starter Set", price = 0, emotes = ["happy", "laugh", "cool", "angry", "love", "party"]},
+	{id = "pawns", name = "Pawn Pals", price = 2500, emotes = ["champ", "sleepy", "sob", "gasp", "confused", "hi"]},
+	{id = "friends", name = "Friends Set", price = 4000, emotes = ["cry", "wow", "facepalm", "cheer", "think", "tease"]},
+	{id = "game", name = "Game Set", price = 3500, emotes = ["dice", "crown", "highfive", "flag", "sad", "peek"]},
+]
+const FREE_EMOTES := "starter"
 const FREE_DICE := "classic"
 const FREE_ROOMS := ["night", "cafe"]
 ## Each room's card swatch (ROOM_LIST `g`: linear-gradient(160deg, from, to)).
@@ -51,6 +60,12 @@ static func room(id: String) -> Dictionary:
 static func rooms() -> Array:
 	return Rooms.LIST
 
+static func emote_pack(id: String) -> Dictionary:
+	for e: Dictionary in EMOTE_PACKS:
+		if e.id == id:
+			return e
+	return {}
+
 
 # ---------- the player's things ----------
 
@@ -72,6 +87,19 @@ static func owns_dice(id: String) -> bool:
 	if dice(id).is_empty():
 		return false
 	return id == FREE_DICE or _list(profile(), "dice_owned").has(id)
+
+static func owns_emotes(id: String) -> bool:
+	if emote_pack(id).is_empty():
+		return false
+	return id == FREE_EMOTES or _list(profile(), "emote_sets").has(id)
+
+static func emotes_in_use() -> String:
+	var e := str(profile().get("emote_set", ""))
+	return e if owns_emotes(e) else FREE_EMOTES
+
+## Owned emote packs in catalogue order (Starter first).
+static func owned_emote_packs() -> Array:
+	return EMOTE_PACKS.filter(func(e: Dictionary) -> bool: return owns_emotes(e.id))
 
 static func room_in_use() -> String:
 	var r := str(profile().get("room", ""))
@@ -136,6 +164,35 @@ static func buy_dice(id: String, equip := true) -> String:
 		if equip:
 			p.dice = id)
 	return "" if ok else SAVE_FAILED
+
+## Buys an emote pack and equips it. "" when bought, else the reason (nothing changed then).
+static func buy_emotes(id: String, equip := true) -> String:
+	var e := emote_pack(id)
+	if e.is_empty():
+		return "That emote pack isn’t in the shop."
+	if owns_emotes(id):
+		return "You already own %s." % e.name
+	var price := int(e.price)
+	if coins() < price:
+		return need_text(price - coins())
+	var ok := _commit(func(p: Dictionary) -> void:
+		p.coins = int(p.get("coins", 0)) - price
+		var owned := _list(p, "emote_sets")
+		if not owned.has(FREE_EMOTES):
+			owned.insert(0, FREE_EMOTES)
+		owned.append(id)
+		p.emote_sets = owned
+		if equip:
+			p.emote_set = id)
+	return "" if ok else SAVE_FAILED
+
+## Equips an owned emote pack. False when it isn't owned (or the save failed); true when it is in use now.
+static func equip_emotes(id: String) -> bool:
+	if not owns_emotes(id):
+		return false
+	if str(profile().get("emote_set", "")) == id:
+		return true
+	return _commit(func(p: Dictionary) -> void: p.emote_set = id)
 
 ## Puts an owned room in use. False when it isn't owned (or the save failed); true when it is in use now.
 static func equip_room(id: String) -> bool:

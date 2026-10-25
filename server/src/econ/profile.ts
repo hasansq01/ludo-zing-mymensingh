@@ -9,6 +9,7 @@ import {
   DEFAULT_SCENE,
   DEFAULTS,
   FREE_DICE,
+  FREE_EMOTES,
   FREE_ROOMS,
   STAT_KEYS,
   achievement,
@@ -43,6 +44,9 @@ export interface Profile {
   room: string;
   dice_owned: unknown[];
   dice: string;
+  /** Owned emote packs (Starter always) and the equipped pack. */
+  emote_sets: unknown[];
+  emote_set: string;
   /** Owned Snakes & Ladders scenes; the game adds the field on the first scene purchase (Jungle is implied). */
   scenes?: unknown;
   scene?: unknown;
@@ -94,14 +98,22 @@ export function isPlayerId(v: unknown): v is string {
  * One difference: Godot stops with a script error on int(null) / int([]) for coins, xp, last_free and stats; the
  * port uses the default there.
  */
+/** Save.as_int: a number (floats truncate), or a string holding a whole number; anything else the default. */
+function asInt(d: Dict, key: string, dflt: number): number {
+  const v = d[key];
+  if (typeof v === "number") return Number.isFinite(v) ? Math.trunc(v) : dflt;
+  if (typeof v === "string" && /^\s*[+-]?\d+\s*$/.test(v)) return Number(v.trim());
+  return dflt;
+}
+
 export function normalizeProfile(raw: unknown, newId: () => string = newPlayerId): Profile {
   const p: Dict = isDict(raw) ? clone(raw) : {};
   if (typeof p.name !== "string" || stripEdges(p.name) === "") p.name = DEFAULTS.name;
   if (!("id" in p)) p.id = newId();
-  p.coins = getInt(p, "coins", DEFAULTS.coins);
-  p.xp = Math.max(0, getInt(p, "xp", 0));
+  p.coins = Math.max(0, asInt(p, "coins", DEFAULTS.coins));
+  p.xp = Math.max(0, asInt(p, "xp", 0));
   const st: Dict = isDict(p.stats) ? p.stats : {};
-  for (const k of STAT_KEYS) st[k] = getInt(st, k, 0);
+  for (const k of STAT_KEYS) st[k] = Math.max(0, asInt(st, k, 0));
   p.stats = st;
   const rooms = isArray(p.rooms) ? p.rooms : [];
   for (const free of FREE_ROOMS) if (!rooms.includes(free)) rooms.push(free);
@@ -111,9 +123,13 @@ export function normalizeProfile(raw: unknown, newId: () => string = newPlayerId
   if (!dice.includes(FREE_DICE)) dice.unshift(FREE_DICE);
   p.dice_owned = dice;
   if (typeof p.dice !== "string" || !dice.includes(p.dice)) p.dice = FREE_DICE;
+  const emo = isArray(p.emote_sets) ? p.emote_sets : [];
+  if (!emo.includes(FREE_EMOTES)) emo.unshift(FREE_EMOTES);
+  p.emote_sets = emo;
+  if (typeof p.emote_set !== "string" || !emo.includes(p.emote_set)) p.emote_set = FREE_EMOTES;
   if (!isDict(p.daily)) p.daily = {};
   if (typeof p.last_spin !== "string") p.last_spin = "";
-  p.last_free = getInt(p, "last_free", 0);
+  p.last_free = Math.max(0, asInt(p, "last_free", 0));
   if (typeof p.avatar !== "string" || p.avatar === "") p.avatar = DEFAULT_AVATAR;
   if (!isArray(p.av_owned)) p.av_owned = [];
   if (typeof p.frame !== "string" || p.frame === "") p.frame = DEFAULT_FRAME;
@@ -183,6 +199,12 @@ export function ownsRoom(p: Dict, id: string): boolean {
 export function ownsDice(p: Dict, id: string): boolean {
   if (!item("dice", id)) return false;
   return id === FREE_DICE || list(p, "dice_owned").includes(id);
+}
+
+/** Catalog.owns_emotes. */
+export function ownsEmotes(p: Dict, id: string): boolean {
+  if (!item("emotes", id)) return false;
+  return id === FREE_EMOTES || list(p, "emote_sets").includes(id);
 }
 
 /** SLScenes.owned_ids: Jungle first, then the saved scenes that exist (once each). */
@@ -266,6 +288,10 @@ export function equipped(kind: string, p: Dict): string {
     case "dice": {
       const id = str(p.dice);
       return ownsDice(p, id) ? id : FREE_DICE;
+    }
+    case "emotes": {
+      const id = str(p.emote_set);
+      return ownsEmotes(p, id) ? id : FREE_EMOTES;
     }
     case "scene": {
       const id = str(p.scene, DEFAULT_SCENE);

@@ -65,6 +65,13 @@ func _ensure() -> void:
 	p.dice_owned = dice
 	if not p.get("dice") is String or not dice.has(p.dice):
 		p.dice = "classic"
+	# emote packs (Catalog.EMOTE_PACKS): owned ids (Starter always, first), the equipped pack
+	var emo: Array = p.get("emote_sets", []) if p.get("emote_sets") is Array else []
+	if not emo.has("starter"):
+		emo.insert(0, "starter")
+	p.emote_sets = emo
+	if not p.get("emote_set") is String or not emo.has(p.emote_set):
+		p.emote_set = "starter"
 	# rewards: daily calendar state, last spin day, last free-coins claim (unix seconds)
 	if not p.get("daily") is Dictionary:
 		p.daily = {}

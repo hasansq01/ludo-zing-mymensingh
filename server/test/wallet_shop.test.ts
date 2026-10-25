@@ -34,6 +34,21 @@ describe("shop", () => {
     expect(await rows("SELECT * FROM ledger WHERE account_id = ? AND reason = 'buy'", a.id)).toEqual([]);
   });
 
+  it("buys and equips an emote pack through the wallet", async () => {
+    const a = await guest();
+    const r = await ok("shop/buy", { session: a.session, body: { kind: "emotes", id: "pawns" } });
+    expect(r).toMatchObject({ ok: true, price: 2500, item: { kind: "emotes", id: "pawns" } });
+    expect(r.profile).toMatchObject({ coins: 2500, emote_sets: ["starter", "pawns"], emote_set: "pawns" });
+    const led = await rows("SELECT ref, delta_coins FROM ledger WHERE account_id = ? AND reason = 'buy'", a.id);
+    expect(led).toEqual([{ ref: "emotes:pawns", delta_coins: -2500 }]);
+    expect((await v1("shop/buy", { session: a.session, body: { kind: "emotes", id: "pawns" } })).body).toEqual({ error: "owned" });
+    expect(await v1("shop/buy", { session: a.session, body: { kind: "emotes", id: "friends" } })).toMatchObject({ status: 409, body: { error: "coins", short: 1500 } });
+    expect(await v1("shop/equip", { session: a.session, body: { kind: "emotes", id: "friends" } })).toMatchObject({ status: 409, body: { error: "locked" } });
+    const e = await ok("shop/equip", { session: a.session, body: { kind: "emotes", id: "starter" } });
+    expect(e.profile.emote_set).toBe("starter");
+    expect((await ok("me", { session: a.session })).profile).toMatchObject({ emote_set: "starter", emote_sets: ["starter", "pawns"] });
+  });
+
   it("buys a character and a scene", async () => {
     const a = await guest();
     await setAccount(a.id, { coins: 40_000 });

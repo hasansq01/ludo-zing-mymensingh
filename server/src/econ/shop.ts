@@ -1,7 +1,7 @@
 // Buying and equipping (Catalog.buy_room / buy_dice, SLScenes.buy_scene, Collection.buy_char, the equip functions).
 // The checks run in the game's order; nothing changes on an error. Purchases equip the item, as the Shop does
 // (rooms, dice and scenes by default, characters with equip_it = true).
-import { FREE_DICE, item } from "./catalog";
+import { FREE_DICE, FREE_EMOTES, item } from "./catalog";
 import { clone, getInt, list, str } from "./gd";
 import {
   type Delta,
@@ -9,6 +9,7 @@ import {
   coinsOf,
   isUnlocked,
   ownsDice,
+  ownsEmotes,
   ownsRoom,
   ownsScene,
   sceneIds,
@@ -31,10 +32,11 @@ export function buy(profile: Profile, kind: string, id: string): BuyResult {
   switch (kind) {
     case "room":
     case "dice":
+    case "emotes":
     case "scene": {
       const it = item(kind, id);
       if (!it) return { ok: false, error: "unknown" };
-      const owned = kind === "room" ? ownsRoom(profile, id) : kind === "dice" ? ownsDice(profile, id) : ownsScene(profile, id);
+      const owned = kind === "room" ? ownsRoom(profile, id) : kind === "dice" ? ownsDice(profile, id) : kind === "emotes" ? ownsEmotes(profile, id) : ownsScene(profile, id);
       if (owned) return { ok: false, error: "owned" };
       return pay(profile, kind, id, it.price, (p) => {
         if (kind === "room") {
@@ -42,6 +44,12 @@ export function buy(profile: Profile, kind: string, id: string): BuyResult {
           rooms.push(id);
           p.rooms = rooms;
           p.room = id;
+        } else if (kind === "emotes") {
+          const sets = list(p, "emote_sets");
+          if (!sets.includes(FREE_EMOTES)) sets.unshift(FREE_EMOTES);
+          sets.push(id);
+          p.emote_sets = sets;
+          p.emote_set = id;
         } else if (kind === "dice") {
           const dice = list(p, "dice_owned");
           if (!dice.includes(FREE_DICE)) dice.unshift(FREE_DICE);
@@ -92,7 +100,7 @@ function pay(profile: Profile, kind: string, id: string, price: number, add: (p:
 
 // ---------- equipping ----------
 
-export type EquipKind = "room" | "dice" | "scene" | "avatar" | "char" | "frame" | "plate" | "badge";
+export type EquipKind = "room" | "dice" | "emotes" | "scene" | "avatar" | "char" | "frame" | "plate" | "badge";
 
 export type EquipResult = { ok: true; profile: Profile; changed: boolean } | { ok: false; error: "unknown" | "locked" };
 
@@ -106,12 +114,14 @@ export function equip(profile: Profile, kind: string, id: string): EquipResult {
   const p = profile;
   switch (kind) {
     case "room":
-    case "dice": {
+    case "dice":
+    case "emotes": {
       if (!item(kind, id)) return { ok: false, error: "unknown" };
-      if (!(kind === "room" ? ownsRoom(p, id) : ownsDice(p, id))) return { ok: false, error: "locked" };
-      if (str(p[kind]) === id) return { ok: true, profile: p, changed: false };
+      if (!(kind === "room" ? ownsRoom(p, id) : kind === "dice" ? ownsDice(p, id) : ownsEmotes(p, id))) return { ok: false, error: "locked" };
+      const field = kind === "emotes" ? "emote_set" : kind;
+      if (str(p[field]) === id) return { ok: true, profile: p, changed: false };
       const q = clone(p);
-      q[kind] = id;
+      q[field] = id;
       return { ok: true, profile: q, changed: true };
     }
     case "scene": {

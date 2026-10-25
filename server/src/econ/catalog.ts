@@ -3,8 +3,8 @@
 // Server-only rules that have no GDScript counterpart (online rewards, claim limits, import caps) live in rules.ts.
 import data from "./catalog.json";
 
-export type ItemKind = "dice" | "room" | "scene" | "char" | "avatar" | "frame" | "plate" | "badge";
-export const ITEM_KINDS: readonly ItemKind[] = ["dice", "room", "scene", "char", "avatar", "frame", "plate", "badge"];
+export type ItemKind = "dice" | "emotes" | "room" | "scene" | "char" | "avatar" | "frame" | "plate" | "badge";
+export const ITEM_KINDS: readonly ItemKind[] = ["dice", "emotes", "room", "scene", "char", "avatar", "frame", "plate", "badge"];
 
 export interface Unlock {
   level?: number;
@@ -56,6 +56,8 @@ export interface CatalogData {
     room: string;
     dice_owned: string[];
     dice: string;
+    emote_sets: string[];
+    emote_set: string;
     scenes: string[];
     scene: string;
     avatar: string;
@@ -121,6 +123,7 @@ export const DEFAULTS = CATALOG.defaults;
 export const STAT_KEYS = CATALOG.defaults.stats;
 export const FREE_ROOMS = CATALOG.defaults.rooms;
 export const FREE_DICE = CATALOG.defaults.dice;
+export const FREE_EMOTES = CATALOG.defaults.emote_set;
 export const DEFAULT_ROOM = CATALOG.defaults.room;
 export const DEFAULT_SCENE = CATALOG.defaults.scene;
 export const DEFAULT_AVATAR = CATALOG.defaults.avatar;

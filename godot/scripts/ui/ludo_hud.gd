@@ -18,6 +18,10 @@ extends Control
 ## "Reconnecting…" pill under the top tiles.
 ## Play on: a side that has finished while the game goes on shows its place badge and is dimmed (update(), from the
 ## state); show_finish() is the "You finished 1st!" card (Keep watching / Home: finish_home_pressed) for your side.
+## Emotes (EmotePicker + EmoteLayer, over the pops): the chat-bubble button just above your avatar (the bottom-left
+## tile; moved up clear of a prompt or the finish card above the tile row), its panel along the left edge of the board
+## between the tile rows, and the reactions beside each player's dice (emote_seat). set_emotes(on) shows the button
+## (LudoMatch: when someone at this table may send); the match sends the picks (emote_picker.picked).
 
 signal dice_pressed
 signal pause_pressed
@@ -59,11 +63,16 @@ var banner: PanelContainer               # online: "Reconnecting…"
 var away_box: PanelContainer             # online: "You were away…" + I’m back
 var away_button: Button
 var finish_card: FinishCard              # play on: "You finished 1st!" while the others play on
+var emotes: EmoteLayer                   # the reactions beside the dice
+var emote_picker: EmotePicker            # the chat-bubble button and its panel
+var emote_on := false                    # the button shows (someone here may send)
 var tutorial := false:
 	set(v):
 		tutorial = v
 		if v and top:
 			top.clear()
+		if emote_picker:
+			_place_emotes()
 
 
 ## A PlayerTile whose dice slot only shows while it is that player's turn: every tile has the same fixed size
@@ -229,6 +238,13 @@ func _ready() -> void:
 	_pop_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_pop_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_pop_layer)
+	emotes = EmoteLayer.new()
+	emotes.name = "Emotes"
+	add_child(emotes)
+	emote_picker = EmotePicker.new()
+	add_child(emote_picker)
+	emotes.seat_fn = emote_seat
+	emotes.avoid_fn = emote_picker.button_rect
 	_help = UIKit.hbox(UIKit.SPACE.xxs)
 	_help.name = "Help"
 	_help.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -338,6 +354,7 @@ func show_away(on: bool) -> void:
 	if away_box.visible:
 		_place_bottom(away_box)
 		UIKit.pop_in(away_box)
+	_place_emotes()
 
 ## The reconnect pill under the top tiles ("" hides it).
 func set_banner(text: String) -> void:
@@ -361,6 +378,9 @@ func setup(s: Dictionary) -> void:
 	top.clear()
 	pair_box.visible = false
 	finish_card.visible = false
+	emotes.clear()                           # no reactions or computer cooldowns carried over
+	emote_picker.close()
+	emote_picker.refresh()                   # the equipped pack (it may have changed since the last game)
 	for c in 4:
 		var t: Tile = tiles[c]
 		t.visible = LudoRules.active(s, c)
@@ -444,6 +464,7 @@ func _layout() -> void:
 		_place_bottom(finish_card)
 	if banner and banner.visible:
 		_place_banner()
+	_place_emotes()
 
 ## The free band between the top and bottom tile rows (UI pixels, full width): the board is framed in it.
 func board_band() -> Rect2:
@@ -540,9 +561,11 @@ func show_finish(place: int, team := false, home := true) -> void:
 		return
 	finish_card.present(place, team, home)
 	_place_bottom(finish_card)
+	_place_emotes()
 
 func hide_finish() -> void:
 	finish_card.visible = false
+	_place_emotes()
 
 ## The team chip under a tile in Teams (2 v 2), led by the two teammates' colour dots: "With Yellow" on your tile,
 ## "With you" on your teammate's, "Rivals" on the other team's (no you: "With <teammate's colour>" on every tile).
@@ -592,6 +615,7 @@ func hide_for_result() -> void:
 	banner.visible = false
 	finish_card.visible = false
 	set_timer(-1, 0.0, 1.0)
+	set_emotes(false)
 
 ## A short pop text that rises and fades at a screen point (UI pixels): "+1 roll", "Home!". Pops sit on their own
 ## layer under the tutorial's coach marks (never over its caption). board = true: a pop on the board (a capture,
@@ -652,6 +676,7 @@ func ask_pair() -> bool:
 	top.cancel_message()                     # and no stale event stays over a question aimed at you
 	pair_box.visible = true
 	_place_pair_box()
+	_place_emotes()
 	UIKit.pop_in(pair_box)
 	Sound.sfx("select")
 	var yes: bool = await pair_answered
@@ -661,12 +686,14 @@ func ask_pair() -> bool:
 func cancel_pair() -> void:
 	if pair_box.visible:
 		pair_box.visible = false
+		_place_emotes()
 		pair_answered.emit(false)
 
 func _answer(yes: bool) -> void:
 	if not pair_box.visible:
 		return
 	pair_box.visible = false
+	_place_emotes()
 	pair_answered.emit(yes)
 
 func _place_pair_box() -> void:
@@ -681,6 +708,75 @@ func _place_bottom(box: Control) -> void:
 		if t.visible and _corner[c] in ["bl", "br"]:
 			ytop = minf(ytop, t.position.y - (PlayerTile.ACTIVE_SCALE - 1.0) * t.tile_height())
 	box.position = Vector2(round((size.x - box.size.x) / 2.0), ytop - box.size.y - UIKit.SPACE.sm)
+
+# ---------- emotes ----------
+
+## Shows or hides the emote button (hidden during the tutorial and after the game).
+func set_emotes(on: bool) -> void:
+	emote_on = on
+	_place_emotes()
+
+## A rect of tile t's own coordinates where it is at its turn size (the tiles grow ACTIVE_SCALE round pivot_offset):
+## emotes are placed against the largest the tile gets, so they never move with the turn.
+func _grown(t: Tile, local: Rect2) -> Rect2:
+	var k := PlayerTile.ACTIVE_SCALE
+	var pv := t.pivot_offset
+	return Rect2(t.position + pv + (local.position - pv) * k, local.size * k)
+
+## Where colour c's reaction goes (EmoteLayer.seat_fn): its tile, its dice slot and which side is inner.
+func emote_seat(c: int) -> Dictionary:
+	if c < 0 or c > 3 or not tiles[c].visible or _corner[c] == "":
+		return {}
+	var t: Tile = tiles[c]
+	var d := {card = _grown(t, Rect2(Vector2.ZERO, Vector2(PlayerTile.CARD_W, t.tile_height()))),
+		slot = _grown(t, t.dice_slot_local()), inner = "right" if t.side != "right" else "left",
+		low = _corner[c] in ["bl", "br"]}
+	if d.low:                                # a prompt over the tile row stays readable: the bubble goes above it
+		for box: Control in [pair_box, away_box, finish_card]:
+			if box and box.visible:
+				d.ceiling = minf(float(d.get("ceiling", INF)), box.position.y - UIKit.SPACE.xs)
+	return d
+
+## The tile the emote button sits over: the bottom-left one (your seat), else the bottom-right; -1 when none.
+func _emote_tile() -> int:
+	for want in ["bl", "br"]:
+		for c in 4:
+			if tiles[c].visible and _corner[c] == want:
+				return c
+	return -1
+
+## The button just above your avatar (clear of the tile at its turn size), moved up above a prompt or the finish
+## card when one is over it; the panel in the band between the tile rows (and above the button).
+func _place_emotes() -> void:
+	if emote_picker == null or size.x <= 0:
+		return
+	var tc := _emote_tile()
+	var show_it := emote_on and not tutorial and not _over and tc >= 0
+	var at := Vector2(-100, -100)
+	if tc >= 0:
+		var t: Tile = tiles[tc]
+		var ava := _grown(t, Rect2(t._ava_pos(), Vector2(PlayerTile.AVA, PlayerTile.AVA)))
+		at = Vector2(ava.get_center().x, ava.position.y - 6.0 - EmotePicker.SZ / 2.0)
+		for box: Control in [pair_box, away_box, finish_card]:
+			if box and box.visible:
+				var r := Rect2(box.position, box.size).grow(6)
+				if r.intersects(Rect2(at - Vector2.ONE * EmotePicker.SZ / 2.0, Vector2.ONE * EmotePicker.SZ)):
+					at.y = minf(at.y, r.position.y - EmotePicker.SZ / 2.0)
+	emote_picker.place_button(at, show_it)
+	var t0 := top.bottom()
+	var t1 := size.y - safe_bottom
+	for c in 4:
+		var t: Tile = tiles[c]
+		if not t.visible:
+			continue
+		var r := _grown(t, Rect2(Vector2.ZERO, Vector2(PlayerTile.CARD_W, t.tile_height())))
+		if _corner[c] in ["tl", "tr"]:
+			t0 = maxf(t0, r.end.y)
+		else:
+			t1 = minf(t1, r.position.y)
+	if show_it:
+		t1 = minf(t1, at.y - EmotePicker.SZ / 2.0)
+	emote_picker.place_panel(t0 + UIKit.SPACE.sm, t1 - UIKit.SPACE.sm)
 
 func _on_tile_input(e: InputEvent, c: int) -> void:
 	var hit := false

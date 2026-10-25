@@ -42,6 +42,8 @@ static func build() -> Dictionary:
 	var items := []
 	for d: Dictionary in Catalog.DICE:
 		items.append(_item("dice", d, int(d.price) > 0, d.id == Catalog.FREE_DICE, d.id == Catalog.FREE_DICE))
+	for e: Dictionary in Catalog.EMOTE_PACKS:
+		items.append(_item("emotes", e, int(e.price) > 0, e.id == Catalog.FREE_EMOTES, e.id == Catalog.FREE_EMOTES))
 	for r: Dictionary in Rooms.LIST:
 		items.append(_item("room", r, int(r.price) > 0, Catalog.FREE_ROOMS.has(r.id), r.id == Rooms.DEFAULT))
 	for s: Dictionary in SLScenes.LIST:
@@ -101,7 +103,7 @@ static func _defaults() -> Dictionary:
 	var stats: Array = p.stats.keys()
 	return {
 		name = p.name, coins = int(p.coins), xp = int(p.xp), stats = stats,
-		rooms = p.rooms, room = p.room, dice_owned = p.dice_owned, dice = p.dice,
+		rooms = p.rooms, room = p.room, emote_sets = p.emote_sets, emote_set = p.emote_set, dice_owned = p.dice_owned, dice = p.dice,
 		scenes = [SLScenes.DEFAULT], scene = SLScenes.DEFAULT,
 		avatar = p.avatar, frame = p.frame, plate = p.plate, badge = p.badge,
 		bot_levels = SaveScript.BOT_LEVELS,

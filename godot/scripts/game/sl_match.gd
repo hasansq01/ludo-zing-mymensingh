@@ -28,6 +28,12 @@ extends Node
 ## (a pop over the pawn, "You finished 1st!" / "Rafi finished 2nd!", the place badge on the tile, which dims); the
 ## pawn stays on 100 and the turn order skips them. Your own finish online: the FinishCard (Keep watching / Home =
 ## leave the room; the server grants your place at the end). The result at the end shows the full standings.
+##
+## Emotes (server/EMOTES.md; EmotePicker + EmoteLayer, as in Ludo): the chat-bubble button sits at the bottom left,
+## level with the dice; its panel along the left edge of the board, between the tile row and the button; reactions
+## pop just under the sender's tile. Sender: you vs the computer, the player to move in Pass & Play, your seat
+## online ({t: "emote", id} out, net_emote in). Offline the computers react now and then to a snake, a ladder, a
+## finish and the end (throttled).
 
 signal finished(result: Dictionary)
 signal pause_pressed
@@ -79,6 +85,9 @@ var away_button: Button
 var finish_card: FinishCard               # play on: "You finished 1st!" while the others play on
 var _my_place := 0                        # play on: the place you finished in while the game went on (0: not yet)
 var _my_away := false                     # online: a bot was playing your seat when you finished
+var emotes: EmoteLayer                    # the reactions under the tiles
+var emote_picker: EmotePicker             # the chat-bubble button and its panel
+var _emote_on := false
 
 func _init(app_: Node, world_: TableWorld, board_: SLBoard) -> void:
 	app = app_
@@ -167,6 +176,17 @@ func _build_online() -> void:
 	finish_card.home_pressed.connect(_finish_home)
 	finish_card.visibility_changed.connect(_layout)
 	hud.add_child(finish_card)
+	emotes = EmoteLayer.new()
+	emotes.name = "Emotes"
+	hud.add_child(emotes)
+	emote_picker = EmotePicker.new()
+	hud.add_child(emote_picker)
+	emotes.seat_fn = emote_seat
+	emotes.avoid_fn = emote_picker.button_rect
+	emotes.is_cpu_fn = func(c: int) -> bool: return not online and bool(_player_of(c).get("cpu", false))
+	emotes.is_human_fn = func(c: int) -> bool: return not _player_of(c).is_empty() and not bool(_player_of(c).cpu)
+	emote_picker.picked.connect(_emote_send)
+	emote_picker.guard = func() -> bool: return app != null and (bool(app.get("paused")) or (app.has_method("_top_sheet") and app._top_sheet() != null))
 
 func _layout() -> void:
 	if hud == null:
@@ -206,6 +226,13 @@ func _layout() -> void:
 	if finish_card and finish_card.visible:
 		finish_card.size = finish_card.get_combined_minimum_size()
 		finish_card.position = Vector2(round((w - finish_card.size.x) / 2.0), dy - finish_card.size.y - UIKit.SPACE.md)
+	if emote_picker:                          # the emote button at the bottom left, level with the dice
+		var at := Vector2(g + EmotePicker.SZ / 2.0 + 2.0, dy + DICE_PX / 2.0)
+		emote_picker.place_button(at, _emote_on)
+		var t1 := minf(dy, at.y - EmotePicker.SZ / 2.0) - UIKit.SPACE.sm
+		if away_box and away_box.visible:
+			t1 = minf(t1, away_box.position.y - UIKit.SPACE.sm)
+		emote_picker.place_panel(tile_y + SLTile.H * 1.06 + UIKit.SPACE.lg, t1)
 	if scenes:                                # the board fills the width between the tiles and the dice
 		var btop := tile_y + SLTile.H + 14.0
 		var bbottom := dy - 18.0
@@ -381,6 +408,11 @@ func _open() -> void:
 	top.clear()
 	_build_tiles()
 	_refresh_tiles()
+	if emotes:
+		emotes.clear()
+		emote_picker.close()
+		emote_picker.refresh()
+	_emote_sync()
 	_layout()
 	await get_tree().process_frame
 	_layout()
@@ -396,6 +428,9 @@ func stop() -> void:
 	_id += 1
 	_offline()
 	G = {}
+	_emote_sync()
+	if emotes:
+		emotes.clear()
 	_waiting = false
 	_ff = false
 	_busy = false
@@ -418,6 +453,7 @@ func _begin() -> void:
 	board.set_current(G.turn)
 	top.set_turn(int(p.c))
 	_refresh_tiles()
+	_emote_sync()
 	if online:                                # the server rolls for bots and keeps the timer: only show the turn
 		_net_badges()
 		var mine := ns.my_turn()
@@ -546,6 +582,8 @@ func _walk(id: int, p: Dictionary, pi: int, e: Dictionary, v: int) -> void:
 		if _human(p):
 			Haptics.success()
 		_pop("Up to %d!" % e.to, board.pawn_top(pi), Palette.GOLD_HI, 30)
+		if not online and emotes:
+			emotes.react_ladder(int(p.c))
 		await board.climb(pi, e.via, e.to, _spd())
 	elif e.snake:
 		if p.you:
@@ -556,6 +594,8 @@ func _walk(id: int, p: Dictionary, pi: int, e: Dictionary, v: int) -> void:
 		if _human(p):
 			Haptics.medium()
 		_pop("Down to %d" % e.to, board.pawn_top(pi), Palette.CORAL, 30)
+		if not online and emotes:
+			emotes.react_snake(int(p.c))
 		await board.slide(pi, e.via, e.to, _spd())
 	if not live(id):
 		return
@@ -579,6 +619,8 @@ func _finished_one(p: Dictionary, pi: int, place: int, ending: bool) -> void:
 	top.say("%s finished %s! The others play on." % [_who(p), nth], 2.4, "event")
 	_pop("%s finished %s!" % ["You" if p.you else str(p.name), nth], board.pawn_top(pi), Palette.GOLD_HI if place == 1 else Palette.HONEY, 30)
 	Sound.sfx("win", {soft = _soft(p)})
+	if not online and emotes:
+		emotes.react_finish(int(p.c))
 	if bool(p.you):
 		Haptics.success()
 		Celebrate.run(hud, "burst", 0.45)
@@ -603,6 +645,9 @@ func _win(w: Dictionary) -> void:
 	dice.set_turn(dice.tint, false)
 	board.set_current(-1)
 	_refresh_tiles()
+	_emote_sync()
+	if emotes:
+		emotes.react_win([int(p.c)], G.players.map(func(x): return int(x.c)))
 	top.set_idle("")
 	if _homes() <= 1:                         # (play on: the later finishes already popped)
 		top.say("You reached 100!" if p.you else "%s reached 100!" % _who(p), 2.0, "event")
@@ -659,6 +704,65 @@ func result_data(reward := 0) -> Dictionary:
 	return {game = "sl", title = title, sub = sub, standings = rows, human_won = won,
 		reward = reward,
 		vs_cpu = G.mode == "cpu", color = int(w.get("c", 0))}
+
+
+# =====================================================================================================================
+# Emotes
+# =====================================================================================================================
+
+## The player of colour c ({} when not at this table).
+func _player_of(c: int) -> Dictionary:
+	for p in G.get("players", []):
+		if int(p.c) == c:
+			return p
+	return {}
+
+## Who sends from this phone: your seat online; vs the computer you; Pass & Play the player to move. -1: nobody.
+func emote_sender() -> int:
+	return emote_sender_of(G, (ns.me if ns != null else -1) if online else -2)
+
+## emote_sender() for a rules state: me = your colour online (-1: watching), -2 offline.
+static func emote_sender_of(g: Dictionary, me := -2) -> int:
+	if g.is_empty() or g.get("phase", "") == "over":
+		return -1
+	if me != -2:
+		return me if me >= 0 and (g.players as Array).any(func(p): return int(p.c) == me) else -1
+	var hs := (g.players as Array).filter(func(p): return not bool(p.cpu))
+	if hs.size() == 1:
+		return int(hs[0].c)
+	var cur: Dictionary = g.players[int(g.turn)]
+	if not bool(cur.cpu):
+		return int(cur.c)
+	return int(hs[0].c) if not hs.is_empty() else -1
+
+func _emote_sync() -> void:
+	var on := not autoplay and emote_sender() >= 0
+	if on == _emote_on and (emote_picker == null or emote_picker.button.visible == on):
+		return
+	_emote_on = on
+	if emote_picker and hud:
+		_layout()
+
+## Where colour c's reaction goes: just under its tile in the top row.
+func emote_seat(c: int) -> Dictionary:
+	if chips == null:
+		return {}
+	for k in mini(G.get("players", []).size(), chips.get_child_count()):
+		if int(G.players[k].c) == c:
+			var t: SLTile = chips.get_child(k)
+			var r := Rect2(chips.position + t.position, t.size)
+			r = r.grow_individual(0, 0, 0, SLTile.H * 0.03 + 6.0)   # it grows on its turn; the pointer under it
+			return {card = r, slot = r, inner = "center", low = false, pitch = t.size.x + TILE_GAP}
+	return {}
+
+## A pick: shown under the sender's tile at once (online the server relays it to the others).
+func _emote_send(id: String) -> void:
+	var c := emote_sender()
+	if c < 0:
+		return
+	if online:
+		_net_send({t = "emote", id = id})
+	emotes.show_emote(c, id)
 
 
 # =====================================================================================================================
@@ -861,6 +965,14 @@ func net_error(msg: Dictionary) -> void:
 func net_status(st: String) -> void:
 	if online:
 		_set_banner("Reconnecting…" if st in ["reconnecting", "connecting"] else "")
+
+## {t: "emote", c, id}: another seat's reaction (a friend, a quick-match player).
+func net_emote(msg: Dictionary) -> void:
+	if not online or G.is_empty() or emotes == null:
+		return
+	var got := EmoteLayer.incoming(msg, ns.me, func(c: int) -> bool: return not _player_of(c).is_empty())
+	if not got.is_empty():
+		emotes.show_emote(int(got[0]), str(got[1]))
 
 ## "I’m back": your seat is yours again (the server answers with a `mode human` act).
 func _net_back() -> void:

@@ -63,6 +63,11 @@ const DUCK_RELEASE := 0.8    # s to come back up
 const NO_DUCK := ["tap", "tick", "step", "select"]
 const MASTER_LP_HZ := 7000.0
 const SFX_BUS := "SFX"
+## Emote sounds (assets/audio/emotes/<id>.ogg, made by tools/make_emote_sfx.py at the calm tap / step level): at most
+## EMOTE_VOICES at once, each with a little random pitch; loaded on first use.
+const EMOTE_DIR := "emotes/"
+const EMOTE_VOICES := 3
+const EMOTE_PITCH := 0.03
 const MUSIC_BUS := "Music"
 
 var enabled := true
@@ -81,6 +86,8 @@ var _land_token := 0                   # bumps to cancel a scheduled landing
 var _land_pending := false             # a scheduled landing is still waiting
 var _land_soft := false                # ... and whether it is a soft one
 var _auto_land_at := -100000           # ticks msec of the last scheduled landing that played
+var _emote_streams: Dictionary = {}    # emote id -> AudioStream, or null when it has no sound (lazy)
+var _emote_pool: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
 var _music_wanted := false
 var _music_on := false
@@ -163,12 +170,41 @@ func sfx(name: String, arg: Variant = null) -> void:
 	_play(name, o, soft, now)
 
 
+## Plays an emote's short sound (see server/EMOTES.md for the ids) on the effects bus: skipped when sound is off, the
+## app is in the background or the sliders are at 0; +/-3 % random pitch; at most EMOTE_VOICES at once (extra ones
+## are dropped). Unknown ids are ignored quietly.
+func emote(id: String) -> void:
+	if not enabled or _app_paused or effects_volume <= 0 or master_volume <= 0:
+		return
+	var stream := _emote_stream(id)
+	if stream == null:
+		return
+	var p: AudioStreamPlayer = null
+	for q in _emote_pool:
+		if not q.playing:
+			p = q
+			break
+	if p == null:
+		if _emote_pool.size() >= EMOTE_VOICES:
+			return
+		p = AudioStreamPlayer.new()
+		p.bus = SFX_BUS
+		add_child(p)
+		_emote_pool.append(p)
+	p.stream = stream
+	p.pitch_scale = 1.0 + _rng.randf_range(-EMOTE_PITCH, EMOTE_PITCH)
+	p.volume_db = 0.0
+	p.play()
+
+
 ## Sound on / off (the Settings switch). Off silences effects and music at once; music comes back if it was wanted.
 func set_enabled(on: bool) -> void:
 	enabled = on
 	if not on:
 		_cancel_land()
 		for p in _pool:
+			p.stop()
+		for p in _emote_pool:
 			p.stop()
 	_apply_levels()
 
@@ -256,6 +292,14 @@ static func _load_takes(n: String) -> Array:
 			break
 		out.append(s)
 	return out
+
+
+func _emote_stream(id: String) -> AudioStream:
+	if not _emote_streams.has(id):
+		var ok := id.length() > 0 and id.length() < 24 and id == id.to_lower() and id.is_valid_filename() \
+				and not id.contains(".")
+		_emote_streams[id] = _find(EMOTE_DIR + id) if ok else null
+	return _emote_streams[id]
 
 
 static func _load_music() -> AudioStream:

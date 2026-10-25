@@ -21,7 +21,7 @@ import * as SL from "./rules/sl";
 import { slStateHash } from "./rules/sl_hash";
 import * as D from "./db";
 import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineOutcome } from "./accounts_shim";
-import { ghostDelay, ghostPairYes, ghostPick, makeGhosts } from "./ghosts";
+import { GHOST_EMOTE, ghostDelay, ghostEmote, ghostPack, ghostPairYes, ghostPick, makeGhosts, packOfEmote, type EmoteKind } from "./ghosts";
 import type { Matchmaker } from "./matchmaker";
 
 export interface Env {
@@ -118,6 +118,10 @@ interface Member {
   level?: number;
   /** Quick rooms: a seat the server plays (never sent to clients). */
   ghost?: boolean;
+  /** Ghosts only: the one paid emote pack this ghost "owns" besides starter (never sent). */
+  emotePack?: string;
+  /** Ghosts only: epoch ms of the last emote this ghost sent or has planned (8 s gap). */
+  emoteAt?: number;
 }
 
 interface Seat {
@@ -162,6 +166,8 @@ interface Match {
    */
   ranked?: number[];
   away?: number[];
+  /** Ghost emotes planned (alarm-driven, stored so they survive hibernation); never touches state, n or the hash. */
+  gemotes?: Array<{ at: number; c: number; id: string }>;
 }
 
 interface TurnTimers {
@@ -228,6 +234,8 @@ export interface TestHooks {
   timeScale?: number;
   /** Replaces LIMITS.ratePerSec (test clients play far faster than people tap). */
   ratePerSec?: number;
+  /** Replaces the ghosts' 25% chance of reacting to an event (1 = always, 0 = never). */
+  emoteChance?: number;
 }
 
 /** What the Matchmaker hands a new quick room. */
@@ -254,7 +262,7 @@ interface Identity {
 
 interface GameOps {
   hash(s: AnyState): string;
-  apply(s: AnyState, a: Action): void;
+  apply(s: AnyState, a: Action): unknown[];
   /** The colour whose turn it is. */
   turnColor(s: AnyState): number;
   /** Colour c is played by a (labelled) bot. */
@@ -273,7 +281,7 @@ interface GameOps {
 
 const LUDO: GameOps = {
   hash: (s) => R.stateHash(s as LudoState),
-  apply: (s, a) => void R.applyAction(s as LudoState, a as R.Action),
+  apply: (s, a) => R.applyAction(s as LudoState, a as R.Action),
   turnColor: (s) => (s as LudoState).turn,
   isCpu: (s, c) => (s as LudoState).players[c] === "cpu",
   phase: (s) => (s as LudoState).phase,
@@ -305,7 +313,7 @@ function slFinishedColors(g: SlState): number[] {
 
 const SNAKES: GameOps = {
   hash: (s) => slStateHash(s as SlState),
-  apply: (s, a) => void SL.applySlAction(s as SlState, a as SL.SlAction),
+  apply: (s, a) => SL.applySlAction(s as SlState, a as SL.SlAction),
   turnColor: (s) => SL.turnColor(s as SlState),
   isCpu: (s, c) => (s as SlState).players.some((p) => p.c === c && p.cpu),
   phase: (s) => (s as SlState).phase,
@@ -413,6 +421,11 @@ export class Room extends DurableObject<Env> {
   private eventWindow = { start: 0, count: 0 };
   private reported = new WeakSet<object>();
   private granting = false;
+  // emotes (in memory: a miss after eviction only means one extra D1 read / a looser window)
+  private emoSets = new Map<number, string[]>();
+  private emoSent = new Map<number, number[]>();
+  private emoLocked = new Map<string, number>();
+  private emoWindow = new WeakMap<WebSocket, { start: number; count: number }>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -481,7 +494,7 @@ export class Room extends DurableObject<Env> {
         account: h.account_id,
         level: Math.max(1, Math.trunc(h.level) || 1),
       })),
-      ...ghosts.map((gh) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, graceAt: 0, account: null, level: gh.level, ghost: true })),
+      ...ghosts.map((gh) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g) })),
     ];
     for (let k = entries.length - 1; k > 0; k--) {
       const j = cryptoInt(k + 1);
@@ -703,6 +716,7 @@ export class Room extends DurableObject<Env> {
       return this.error(ws, "bad_message", "expected an object with a string t");
     }
     if (msg.t === "ping") return this.send(ws, { t: "pong", now: Date.now() });
+    if (msg.t === "emote") this.refundEmote(ws);
 
     const att = this.att(ws);
     if (att.mid === -2) return;
@@ -758,6 +772,9 @@ export class Room extends DurableObject<Env> {
       case "sync_req":
         this.sendSnapshot(ws);
         break;
+      case "emote":
+        await this.emote(ws, mem, msg);
+        return; // emotes never touch the match: nothing to commit or settle
       case "leave":
         this.leave(ws, mem);
         break;
@@ -833,6 +850,7 @@ export class Room extends DurableObject<Env> {
     }
     const m = r.match;
     if (r.status === "playing" && m && m.due && m.due <= now) this.step();
+    this.flushGhostEmotes(now);
     if (r.grants?.some((g) => g.next <= now)) this.ctx.waitUntil(this.runGrants());
     this.commit();
     await this.settle();
@@ -889,6 +907,7 @@ export class Room extends DurableObject<Env> {
       r.touched = now;
       this.playerSeen(mem, true);
     }
+    this.emoSets.delete(mem.id); // the account's packs are read again (a reconnect, or another account taking the seat)
     ws.serializeAttachment({ mid: mem.id } satisfies Att);
     r.emptySince = 0;
     this.send(ws, { t: "welcome", token: mem.token, id: mem.id, code: r.code, host: r.host });
@@ -1291,11 +1310,12 @@ export class Room extends DurableObject<Env> {
     const r = this.room!;
     const m = r.match!;
     const s = m.state;
-    this.ops.apply(s, a);
+    const ev = this.ops.apply(s, a);
     const n = m.n++;
     r.touched = Date.now();
     this.noteRanked(m);
     this.broadcast({ t: "act", n, a, h: this.ops.hash(s) });
+    if (r.quick) this.ghostReact(m, ev);
   }
 
   /** Records the sides ranked by the last action, and which of their seats were away then (their grant: "left"). */
@@ -1528,6 +1548,145 @@ export class Room extends DurableObject<Env> {
     return this.sockets().length > 0;
   }
 
+  // ---------- emotes (EMOTES.md; never part of the match) ----------
+
+  /**
+   * Emotes have their own limiter, so a spammed picker must not eat the 20 msg/s budget that rolls and moves need:
+   * the first 5 emote messages per second are refunded to the general limit, the rest count as ordinary messages.
+   */
+  private refundEmote(ws: WebSocket): void {
+    const now = Date.now();
+    let e = this.emoWindow.get(ws);
+    if (!e || now - e.start >= 1000) {
+      e = { start: now, count: 0 };
+      this.emoWindow.set(ws, e);
+    }
+    e.count++;
+    const w = this.rate.get(ws);
+    if (e.count <= 5 && w && w.count > 0) w.count--;
+  }
+
+  /** `{t:"emote", id}` from a member: validate, rate limit (1 / 2 s, 6 / 30 s), ownership, relay to the others. */
+  private async emote(ws: WebSocket, mem: Member, msg: Record<string, unknown>): Promise<void> {
+    const r = this.room!;
+    const id = msg.id;
+    const pack = packOfEmote(id);
+    if (!pack) return this.error(ws, "bad_message", "unknown emote");
+    const now = Date.now();
+    const sent = (this.emoSent.get(mem.id) ?? []).filter((t) => now - t < this.ms(30_000));
+    if ((sent.length && now - sent[sent.length - 1] < this.ms(2000)) || sent.length >= 6) {
+      this.emoSent.set(mem.id, sent);
+      return this.error(ws, "emote_rate", "too many emotes");
+    }
+    if (pack !== "starter") {
+      const key = `${mem.id}:${pack}`;
+      if ((this.emoLocked.get(key) ?? 0) > now) return this.error(ws, "emote_locked", "you do not own that emote pack");
+      let sets = this.emoSets.get(mem.id);
+      if (!sets?.includes(pack)) {
+        sets = await this.readEmoteSets(mem);
+        if (ws.readyState !== 1 || !this.room) return;
+        if (sets.includes(pack)) this.emoSets.set(mem.id, sets);
+      }
+      if (!sets.includes(pack)) {
+        this.emoLocked.set(key, Date.now() + this.ms(2000));
+        if (this.emoLocked.size > 256) this.emoLocked.delete(this.emoLocked.keys().next().value!);
+        return this.error(ws, "emote_locked", "you do not own that emote pack");
+      }
+    }
+    const at = Date.now();
+    sent.push(at);
+    this.emoSent.set(mem.id, sent);
+    const m = r.match;
+    const seat = m && r.status !== "lobby" ? m.seats.find((st) => st.id === mem.id && !st.left) : undefined;
+    this.broadcast(seat ? { t: "emote", c: seat.color, id } : { t: "emote", c: -1, member: mem.id, id }, ws);
+    if (r.quick && m && r.status === "playing" && seat) {
+      this.ghostReply(m);
+      this.commit(); // persists the plan and points the alarm at it
+    }
+  }
+
+  /** The packs the member's account owns (fails to starter only); never throws. */
+  private async readEmoteSets(mem: Member): Promise<string[]> {
+    if (!mem.account || !this.env.DB) return ["starter"];
+    try {
+      return await withTimeout(D.readEmoteSets(this.env.DB, mem.account), TELEMETRY.readTimeout);
+    } catch (e) {
+      console.error("emote ownership read failed (denying):", e);
+      return ["starter"];
+    }
+  }
+
+  /** Ghost reactions to the events of one action (their capture, being captured, a 6, finishing). */
+  private ghostReact(m: Match, ev: unknown[]): void {
+    const hits: Array<{ c: number; kind: EmoteKind }> = [];
+    const colourOf = (turn: number): number => (m.state as SlState).players?.[turn]?.c ?? -1;
+    for (const e of ev as Array<Record<string, unknown>>) {
+      switch (e.type) {
+        case "rolled":
+          if (e.v === 6) hits.push({ c: typeof e.c === "number" ? e.c : colourOf(e.turn as number), kind: "six" });
+          break;
+        case "capture":
+          hits.push({ c: e.c as number, kind: "capture" });
+          for (const v of (e.victims as number[][]) ?? []) hits.push({ c: v[0], kind: "captured" });
+          break;
+        case "finished":
+          hits.push({ c: typeof e.c === "number" ? e.c : colourOf(e.turn as number), kind: "finish" });
+          break;
+        case "move":
+          if (e.snake === true) hits.push({ c: colourOf(e.turn as number), kind: "captured" });
+          break;
+      }
+    }
+    const seen = new Set<string>();
+    for (const h of hits) {
+      const key = `${h.c}:${h.kind}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        this.planGhostEmote(m, h.c, h.kind);
+      }
+    }
+  }
+
+  /** A human emoted: at most one ghost may answer. */
+  private ghostReply(m: Match): void {
+    const gs = m.seats.filter((st) => st.ghost && !st.left);
+    for (let k = gs.length - 1; k > 0; k--) {
+      const j = Math.floor(Math.random() * (k + 1));
+      [gs[k], gs[j]] = [gs[j], gs[k]];
+    }
+    for (const st of gs) if (this.planGhostEmote(m, st.color, "reply")) return;
+  }
+
+  /** Plans (chance, 0.8-2.5 s delay, one per 8 s per ghost) an emote of the ghost on colour c; true when planned. */
+  private planGhostEmote(m: Match, c: number, kind: EmoteKind): boolean {
+    const st = m.seats.find((x) => x.color === c && x.ghost && !x.left);
+    const mem = st && this.room!.members.find((x) => x.id === st.id);
+    if (!st || !mem?.ghost) return false;
+    const chance = this.env.TEST_MODE === "1" ? (this.hooks.emoteChance ?? GHOST_EMOTE.chance) : GHOST_EMOTE.chance;
+    if (Math.random() >= chance) return false;
+    const now = Date.now();
+    if (now < (mem.emoteAt ?? 0) + this.ms(GHOST_EMOTE.gap)) return false;
+    const [lo, hi] = GHOST_EMOTE.delay;
+    const at = now + this.ms(lo + Math.random() * (hi - lo));
+    const id = ghostEmote(kind, mem.emotePack ?? "", { randf: Math.random });
+    mem.emoteAt = at;
+    (m.gemotes ??= []).push({ at, c, id });
+    return true;
+  }
+
+  /** Sends the ghost emotes that are due (same shape as a person's); drops them when the room is back in the lobby. */
+  private flushGhostEmotes(now: number): void {
+    const r = this.room;
+    const m = r?.match;
+    if (!r || !m?.gemotes?.length) return;
+    const due = m.gemotes.filter((e) => e.at <= now);
+    if (!due.length && r.status !== "lobby") return;
+    m.gemotes = m.gemotes.filter((e) => e.at > now);
+    if (r.status === "lobby") m.gemotes = [];
+    if (!this.anyOnline()) return;
+    for (const e of due) if (r.status !== "lobby") this.broadcast({ t: "emote", c: e.c, id: e.id });
+  }
+
   /** 20 messages per second per socket; over that: one rate error per window, the rest dropped. */
   private allow(ws: WebSocket): boolean {
     const now = Date.now();
@@ -1561,6 +1720,7 @@ export class Room extends DurableObject<Env> {
     if (r.emptySince) due.push(r.emptySince + this.ms(TIMING.empty));
     if (r.status === "playing" && r.match?.due) due.push(r.match.due);
     for (const mem of r.members) if (mem.graceAt) due.push(mem.graceAt);
+    if (r.match?.gemotes?.length && r.status !== "lobby") for (const e of r.match.gemotes) due.push(e.at);
     if (r.quick && r.status === "lobby") due.push(r.quick.startBy);
     if (r.quick && r.status === "over" && r.quick.overAt) due.push(r.quick.overAt + this.ms(QUICK.overKeep));
     for (const g of r.grants ?? []) due.push(g.next);

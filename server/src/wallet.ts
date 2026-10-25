@@ -70,7 +70,7 @@ export async function shopBuy(req: Request, env: AccEnv, a: Authed, now: number)
   return r ?? gone();
 }
 
-/** POST /v1/shop/equip {kind, id} (room, dice, scene, avatar / char, frame, plate, badge) -> {ok, profile} | 404 | 409 locked. */
+/** POST /v1/shop/equip {kind, id} (room, dice, emotes, scene, avatar / char, frame, plate, badge) -> {ok, profile} | 404 | 409 locked. */
 export async function shopEquip(req: Request, env: AccEnv, a: Authed, now: number): Promise<Response> {
   const { kind, id } = itemArgs(await readBody(req));
   const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {

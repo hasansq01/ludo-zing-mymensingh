@@ -59,3 +59,20 @@ plain gain (no limiter): peaks at or below -6 dBFS, UI taps and steps -16 to -20
 | lose.ogg | synth nylon pluck + electric piano | gen_audio.gd | original |
 | error.wav | synth low felt marimba | gen_audio.gd | original |
 | music.ogg | synth lo-fi loop (electric piano, pad, sine bass; 32 bars, 66 BPM, 116 s) | gen_audio.gd | original |
+
+## Emote sounds (assets/audio/emotes/)
+
+The 24 emote sounds are built by `godot/tools/make_emote_sfx.py` (reuses the helpers of mix_audio.py). Calm voicing as
+above: soft attacks, low-passed at 5.5 kHz, a small dark room, no limiter; active RMS matched to the tap / step sounds
+(about -29 dBFS) and peaks at or below the step peak (-17 dBFS). 44.1 kHz mono Ogg Vorbis. Measured levels:
+`emotes/levels.json`. Tones, glides, whooshes and the clap are synthesized in numpy (original, no third-party rights).
+
+| File | Made from | Source | Licence |
+|---|---|---|---|
+| happy, party, crown, cheer, wow, champ, love, laugh, tease, peek, confused, think, sad, sob, cry, sleepy, angry (.ogg) | synth tones, bell / felt-marimba partials, blips, filtered-noise whooshes | make_emote_sfx.py | original |
+| cool.ogg | synth whoosh + tick_002.ogg click | make_emote_sfx.py; Kenney Interface Sounds | original + CC0 |
+| dice.ogg | dice-shake-2.ogg + die-throw-2.ogg, softened | Kenney Casino Audio | CC0 |
+| facepalm.ogg | impactPunch_medium_001.ogg (low-passed thud) + cloth1.ogg | Kenney Impact Sounds, RPG Audio | CC0 |
+| flag.ogg | cloth3.ogg with a 17 Hz flutter | Kenney RPG Audio | CC0 |
+| hi.ogg | synth pops + tick_002.ogg | make_emote_sfx.py; Kenney Interface Sounds | original + CC0 |
+| highfive.ogg | synth noise clap + thump + die-throw-1.ogg tap | make_emote_sfx.py; Kenney Casino Audio | original + CC0 |
