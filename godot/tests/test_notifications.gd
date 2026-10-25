@@ -298,6 +298,22 @@ func _opens_and_toasts() -> void:
 	check("opened: before Home it waits (the cid is counted at once)", app.calls.is_empty() and fake.push_opens.has("c3"))
 	app.screen = "home"
 	check("opened: Home up -> take_launch routes it", n.take_launch() and app.calls == ["close", "tab:free"], app.calls)
+	# the network fails when the tap brings the game back (the phone did that once): the open is kept, sent later
+	n.open_retry_sec = []
+	fake.online = false
+	r.plugin.tap({link = "leaderboard", cid = "c4", source = "push"})
+	check("opened offline: routed anyway, the open kept for later", Save.prefs.get("notif_opens", []) == ["c4"] and not fake.push_opens.has("c4"), Save.prefs.get("notif_opens"))
+	fake.online = true
+	n._notification(Node.NOTIFICATION_APPLICATION_RESUMED)
+	check("opened offline: sent on the next resume, then forgotten", fake.push_opens.count("c4") == 1 and (Save.prefs.get("notif_opens", []) as Array).is_empty(), [fake.push_opens, Save.prefs.get("notif_opens")])
+	n._notification(Node.NOTIFICATION_APPLICATION_RESUMED)
+	check("opened offline: ... and only once", fake.push_opens.count("c4") == 1)
+	# signed out: opens count only for an account, so they wait for the sign-in
+	acc._set_session("")
+	r.plugin.tap({link = "home", cid = "c5", source = "push"})
+	check("opened signed out: kept, nothing sent", Save.prefs.get("notif_opens", []) == ["c5"] and not fake.push_opens.has("c5"))
+	await acc.sign_in_guest()
+	check("opened signed out: sent once signed in", fake.push_opens.has("c5") and (Save.prefs.get("notif_opens", []) as Array).is_empty(), [fake.push_opens, Save.prefs.get("notif_opens")])
 	# foreground pushes
 	app.calls.clear()
 	r.plugin.push_received.emit({title = "Weekly result", body = "You finished #4 on last week's board!", link = "leaderboard", cid = "", kind = "weekly"})

@@ -19,6 +19,7 @@ extends Node
 signal permission_changed(state: String)
 
 const PROMOS := "promos"
+const OPENS_KEPT := 5                    # campaign opens kept until the server has them
 const ASK_GAP_SEC := 3 * 86400           # the soft prompt again after a "Not now": at least this long, ...
 const ASK_MAX := 3                       # ... and three times in all
 const ASK_TITLE := "Stay in the loop?"
@@ -39,6 +40,8 @@ var _reg_session := ""                   # ... and the session it was registered
 var _topic: Variant = null               # the promos topic as last set (null = not yet)
 var _push_started := false
 var _syncing := false
+var open_retry_sec: Array = [3.0, 10.0]  ## a kept campaign open is sent again after these waits (tests: [])
+var _flushing_opens := false
 var _again := false                      # a change came in while the server was being told: tell it again
 var _ask_wanted := false
 var last_toast: Control = null           ## the toast the last foreground push put up (null: none; tests)
@@ -83,6 +86,7 @@ func _ready() -> void:
 	var d: Variant = notifier.call("take_launch_data")
 	_launch = d if d is Dictionary else {}
 	_start_push()
+	_flush_opens()                                   # opens kept from an earlier run
 
 
 # ---------- clock, state ----------
@@ -134,6 +138,7 @@ func _notification(what: int) -> void:
 			_away(true)
 		NOTIFICATION_APPLICATION_RESUMED:
 			notifier.call("cancel_all")
+			_flush_opens()
 			_away(false)
 			_refresh_rewards()
 			permission_changed.emit(permission())
@@ -170,15 +175,57 @@ func _on_opened(data: Variant) -> void:
 ## A tapped notification (local or push): count the campaign open, then go where its link says.
 func _open(d: Dictionary) -> void:
 	var cid := str(d.get("cid", ""))
-	var acc := _account()
-	if cid != "" and acc != null:
-		acc.push_opened(cid)
+	if cid != "":
+		report_open(cid)
 	if str(app.get("screen")) in ["splash", "welcome"]:
 		_launch = d                                  # not yet: take_launch() routes it once Home is up
 		return
 	route(str(d.get("link", "home")))
 
 ## Opens a link on Home: daily / spin / free / shop[:kind:id] / leaderboard / room:CODE (anything else stays home).
+
+## A campaign push was opened: counted on the server (POST /v1/push/opened). The tap usually brings the game back
+## from the background, when the phone may not let it reach the network for a moment: the cid is kept (in
+## Save.prefs.notif_opens, a few at most) and sent again a few seconds later, on the next resume and the next launch,
+## until the server has it (or refuses it for good).
+func report_open(cid: String) -> void:
+	var q: Array = _pending_opens()
+	if not q.has(cid):
+		q.append(cid)
+	Save.prefs.notif_opens = q.slice(-OPENS_KEPT)
+	Save.save()
+	_flush_opens()
+
+func _pending_opens() -> Array:
+	var q: Variant = Save.prefs.get("notif_opens", [])
+	return (q as Array).duplicate() if q is Array else []
+
+## Sends the kept opens: each one again after open_retry_sec while the network fails (a few tries per call).
+func _flush_opens() -> void:
+	if _flushing_opens:
+		return
+	var acc := _account()
+	if acc == null or not acc.has_session() or _pending_opens().is_empty():
+		return                                       # (opens count only for an account: sent once signed in)
+	_flushing_opens = true
+	for wait: float in [0.0] + open_retry_sec:
+		if wait > 0.0:
+			await get_tree().create_timer(wait).timeout
+			if not is_inside_tree():
+				break
+		for cid: String in _pending_opens():
+			var r: Dictionary = await acc.push_opened(str(cid))
+			var done := bool(r.get("ok", false)) or (int(r.get("status", 0)) >= 400 and int(r.get("status", 0)) < 500)
+			print("Notifications: open of %s %s" % [cid, "reported" if r.get("ok", false) else ("dropped (%s)" % r.get("error", "")) if done else "not sent yet (%s)" % r.get("error", "")])
+			if done:
+				var q := _pending_opens()
+				q.erase(cid)
+				Save.prefs.notif_opens = q
+				Save.save()
+		if _pending_opens().is_empty():
+			break
+	_flushing_opens = false
+
 ## Not while a game is on screen. True when something opened.
 func route(link: String) -> bool:
 	if app == null or str(app.get("screen")) != "home":
@@ -310,6 +357,7 @@ func _start_push() -> void:
 
 func _on_signed_in() -> void:
 	_start_push()
+	_flush_opens()
 
 func _on_account_changed() -> void:
 	_start_push()

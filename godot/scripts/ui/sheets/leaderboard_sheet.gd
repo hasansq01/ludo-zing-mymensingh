@@ -11,6 +11,7 @@ extends Sheet
 ## Tests: set fetch_fn (board, period) -> {ok, top, me, min_matches | error} (a coroutine) and auto_load false.
 
 const ROW_H := 60.0
+const ME_NOTE_W := 96.0                 # the pinned bar's note: wraps inside at least this width
 const AVA_PX := 40.0
 const CACHE_SEC := 30.0
 const PULL_PX := 90.0
@@ -306,6 +307,7 @@ func _render_me(r: Dictionary) -> void:
 	me_label = UIKit.label(sub, UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
 	me_label.name = "YouNote"
 	me_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	me_label.custom_minimum_size.x = ME_NOTE_W   # (a wrapping label with no width yet asks for one glyph per line)
 	col.add_child(me_label)
 	_me_box.add_child(col)
 	if value != "":
@@ -315,6 +317,15 @@ func _render_me(r: Dictionary) -> void:
 		_me_box.add_child(vl)
 	UIKit.set_on(_me_bar, "row", true)
 	_me_bar.visible = true
+	_fit_me_bar.call_deferred()
+
+## The pinned bar back to its contents' height once the new row has its width: the body only ever grows a child, so
+## a taller moment during the rebuild would otherwise stay (the row pushed below the card on every refresh).
+func _fit_me_bar() -> void:
+	if not is_instance_valid(_me_bar):
+		return
+	_me_bar.reset_size()
+	body.queue_sort()
 
 
 # ---------- pull to refresh ----------

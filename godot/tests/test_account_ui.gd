@@ -157,6 +157,14 @@ func _leaderboard() -> void:
 	check("leaderboard: back to a kept board: no call, rows shown", calls.size() == n and s.rows_shown == 5)
 	await s.load_board(true)
 	check("leaderboard: refresh forces a call", calls.size() == n + 1)
+	# the pinned bar keeps its height across refreshes (it once stayed ~190 px after a refresh and pushed your row
+	# below the card): a tall moment during the rebuild is fitted back to the row
+	s._me_bar.size.y = 190.0
+	s._render_me(answer.v)
+	s._fit_me_bar()                        # (deferred after a render)
+	check("leaderboard: after a refresh the pinned bar fits its row again, no taller", s._me_bar.size.y <= s._me_bar.get_combined_minimum_size().y + 1.0,
+		[s._me_bar.size.y, s._me_bar.get_combined_minimum_size().y])
+	check("leaderboard: the pinned note wraps within a real width (never one glyph per line)", s.me_label.custom_minimum_size.x >= LeaderboardSheet.ME_NOTE_W)
 	check("leaderboard: wins values read as wins", LeaderboardSheet.value_text(42, "wins") == "42 wins" and LeaderboardSheet.value_text(1, "wins") == "1 win")
 	# not listed yet
 	answer.v = _board(3, {rank = 9, value = 30, listed = false})

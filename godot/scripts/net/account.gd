@@ -672,12 +672,12 @@ func push_delete(token: String, session_: String) -> Dictionary:
 	var st := int(r.get("status", 0))
 	return {ok = st >= 200 and st < 300, error = "" if st >= 200 and st < 300 else _error_code(st, {})}
 
-## POST /v1/push/opened {cid}: a campaign notification was opened (the session is optional). {ok, error}.
+## POST /v1/push/opened {cid}: a campaign notification was opened (the session is optional). {ok, error, status}.
 func push_opened(cid: String) -> Dictionary:
 	if cid == "" or not enabled:
-		return {ok = false, error = "offline"}
+		return {ok = false, error = "offline", status = 0}
 	var r: Dictionary = await request(HTTPClient.METHOD_POST, "/v1/push/opened", {cid = cid}, has_session())
-	return {ok = r.ok, error = r.error}
+	return {ok = r.ok, error = r.error, status = r.status}
 
 
 # =====================================================================================================================
