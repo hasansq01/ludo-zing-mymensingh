@@ -243,6 +243,16 @@ describe("hello and lobby", () => {
     expect(viaToken.id).toBe(b.id);
   });
 
+  it("nobody is shown to the others as \"You\" (each client calls its own player that)", async () => {
+    const code = await createRoom();
+    const a = await Client.join(code, { name: "Ana" });
+    const b = await Client.join(code, { name: " you " });
+    const l = await a.waitFor((m) => m.t === "lobby" && m.members.length === 2, 3000);
+    expect(l.members.map((m: { name: string }) => m.name)).toEqual(["Ana", "Player"]);
+    a.close();
+    b.close();
+  });
+
   it("a member offline for longer than the grace is dropped from the lobby", async () => {
     const { code, cs } = await lobbyOf(2, { timeScale: 0.01 });
     cs[1].close();

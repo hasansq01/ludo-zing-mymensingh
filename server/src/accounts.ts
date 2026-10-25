@@ -12,6 +12,7 @@ import {
   applyOnlineResult,
   cleanName,
   dayKey,
+  reservedName,
   equip,
   equipped,
   importProfile,
@@ -722,6 +723,7 @@ export async function patchMe(req: Request, env: AccEnv, a: Authed, now: number)
   let name: string | undefined;
   if (o.name !== undefined) {
     if (typeof o.name !== "string") throw new BadRequest("name: string");
+    if (reservedName(o.name)) return authedJson(a, { error: "reserved", field: "name" }, 409);
     name = cleanName(o.name.replace(/[\u0000-\u001f\u007f]/g, " "));
     if (!name) throw new BadRequest("name: 1-16 characters");
   }

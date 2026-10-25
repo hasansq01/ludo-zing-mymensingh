@@ -16,6 +16,7 @@
 // {k: "end"} act (the rules' endGame, which clients apply too) once no real person (a seated, not-left, non-ghost
 // member) is left unfinished while one is still there to see the result: quick matches never make people watch
 // ghosts. Each seat's grant outcome is fixed when its side is ranked (Match.ranked / Match.away).
+import { reservedName } from "./econ";
 import { DurableObject } from "cloudflare:workers";
 import * as R from "./rules_shim";
 import * as SL from "./rules/sl";
@@ -420,8 +421,9 @@ export function cleanName(x: unknown): string {
   // eslint-disable-next-line no-control-regex
   const t = x.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, "").trim();
   const cut = Array.from(t).slice(0, 16).join("").trim();
-  return cut || "Player";
+  return cut && !reservedName(cut) ? cut : "Player";
 }
+
 
 /** Catalog ids (avatar, frame): strings of at most 32 safe characters, else "". */
 export function cleanId(x: unknown): string {

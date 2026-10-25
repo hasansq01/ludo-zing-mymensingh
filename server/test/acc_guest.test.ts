@@ -143,4 +143,17 @@ describe("PATCH /v1/me", () => {
     }
     expect((await v1("me", { session: g.session, method: "DELETE" })).status).toBe(405);
   });
+
+  it("refuses the name \"You\" (what every client calls its own player)", async () => {
+    const g = await guest();
+    const s = { session: g.session, method: "PATCH" };
+    await ok("me", { ...s, body: { name: "Rafi" } });
+    for (const name of ["You", " you ", "YOU"]) {
+      const r = await v1("me", { ...s, body: { name } });
+      expect(r.status, name).toBe(409);
+      expect(r.body).toEqual({ error: "reserved", field: "name" });
+    }
+    expect((await ok("me", { session: g.session })).profile.name).toBe("Rafi");
+    expect((await ok("me", { ...s, body: { name: "Younus" } })).profile.name).toBe("Younus"); // only the word itself
+  });
 });

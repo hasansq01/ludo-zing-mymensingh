@@ -23,6 +23,11 @@ function num(v: unknown): number | undefined {
 }
 
 /** NetClient.wire_name: trimmed, inner runs of spaces collapsed, at most 16 characters. */
+/** "You" is what every client calls its own player (tiles, leaderboard rows): nobody may be named that. */
+export function reservedName(name: string): boolean {
+  return name.trim().toLowerCase() === "you";
+}
+
 export function cleanName(v: unknown): string {
   if (typeof v !== "string") return "";
   return stripEdges(v).split(" ").filter((s) => s !== "").join(" ").slice(0, IMPORT_CAPS.name_max);
@@ -56,7 +61,7 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   const p = clone(base);
 
   const name = cleanName(raw.name);
-  if (name !== "" && name !== "You") p.name = name;
+  if (name !== "" && !reservedName(name)) p.name = name;
   if (isPlayerId(raw.id)) p.id = raw.id;
 
   const capNum = (v: unknown, field: string, max: number, dflt: number): number => {
