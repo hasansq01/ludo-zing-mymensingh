@@ -198,6 +198,10 @@ Last reviewed: 2026-10-19.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Ninth deploy (2026-10-24): `feature/emotes` build (emote sets, Shop > Emotes, the left-side picker, the 24
+      animated stickers, the chat button above your avatar and reactions beside the dice) uploaded to Cloudflare Pages
+      (production); verified live at https://ludo-king-mymensingh.pages.dev (new code present, same size as the local
+      build, game loads with no console errors).
 - [x] Emote button + reaction placement, round 2 (2026-10-24, user's marked screenshot): the button sits just above
       your avatar (green mark) and is a cream speech bubble with a thin warm-brown outline and three dots (the game's
       card palette; no circle). Reactions pop in beside the sender's dice on the inner side, just above the card row
