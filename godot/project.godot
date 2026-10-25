@@ -41,6 +41,13 @@ enabled=PackedStringArray("res://addons/notifications/plugin.cfg", "res://addons
 pointing/emulate_touch_from_mouse=false
 pointing/emulate_mouse_from_touch=true
 
+[ludo_zing]
+
+push/project_id="ludo-zing-a1b7c"
+push/app_id="1:650464431641:android:90e6b5cebd13aed0c1a488"
+push/api_key="AIzaSyD1iquBS8PYJofWWjfjRnEsyXy1xKCELvg"
+push/sender_id="650464431641"
+
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.0901961, 0.0588235, 0.133333, 1)

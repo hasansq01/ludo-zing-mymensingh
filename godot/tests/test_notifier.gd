@@ -219,7 +219,8 @@ func _settings() -> void:
 		and ["project_id", "app_id", "api_key", "sender_id"].all(func(k): return s.has(k)), s)
 	check("settings: same keys as the export plugin registers", N.PUSH_SETTINGS.values() == Export.PUSH_SETTINGS,
 		N.PUSH_SETTINGS)
-	check("settings: no Firebase project configured in the repo yet (push off)", not N.push_configured(), s)
+	check("settings: the Ludo Zing Firebase project is configured (push on)", N.push_configured()
+		and s.project_id == "ludo-zing-a1b7c" and str(s.app_id).begins_with("1:%s:android:" % s.sender_id), s)
 	check("channels: the contract's four", N.CHANNELS == ["rewards", "reminders", "game", "offers"], N.CHANNELS)
 
 func _export() -> void:

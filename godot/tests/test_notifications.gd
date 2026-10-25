@@ -538,7 +538,7 @@ func _push() -> void:
 	check("push: a start failure allows another try", not n._push_started)
 	# the plugin's own push_configured is off without the settings
 	for k in old:
-		ProjectSettings.set_setting(Notifier.PUSH_SETTINGS[k], old[k])
+		ProjectSettings.set_setting(Notifier.PUSH_SETTINGS[k], "")
 	check("push: without the project settings it stays off", not Notifier.push_configured())
 	drop(r)
 	var r2 := rig(fake)
@@ -546,6 +546,8 @@ func _push() -> void:
 	await r2.acc.sign_in_guest()
 	check("push: off (no settings): Firebase is never started", r2.plugin.inits == 0)
 	drop(r2)
+	for k in old:
+		ProjectSettings.set_setting(Notifier.PUSH_SETTINGS[k], old[k])
 
 
 # ---------- the Settings sheet ----------
