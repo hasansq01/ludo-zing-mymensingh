@@ -113,7 +113,7 @@ describe("hello and lobby", () => {
     expect(await a.wait("error")).toMatchObject({ code: "bad_message" });
     a.send({ t: "hello", v: 1, pid: a.pid });
     expect(await a.wait("error")).toMatchObject({ code: "bad_message" });
-    a.send({ t: "ping" });
+    a.send({ t: "ping", v: 1 });
     const p = await a.wait("pong");
     expect(typeof p.now).toBe("number");
   });
@@ -122,7 +122,7 @@ describe("hello and lobby", () => {
     const { cs } = await lobbyOf(1, { ratePerSec: undefined });
     const a = cs[0];
     a.skip();
-    for (let k = 0; k < 30; k++) a.send({ t: "ping" });
+    for (let k = 0; k < 30; k++) a.send({ t: "ping", v: 1 });
     await a.wait("error");
     await new Promise((r) => setTimeout(r, 100));
     expect(a.all("error").filter((m) => m.code === "rate").length).toBe(1);

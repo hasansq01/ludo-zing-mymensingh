@@ -175,7 +175,9 @@ func _process(delta: float) -> void:
 		_ping_left -= delta
 		if _ping_left <= 0.0:
 			_ping_left = PING_SEC
-			_send({t = "ping"})
+			log_sent.append({t = "ping"})
+			if transport != null:
+				transport.send('{"t":"ping"}')
 
 ## One matchmaker message (the socket's frames come here; tests inject them directly).
 func handle(msg: Dictionary) -> void:

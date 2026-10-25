@@ -35,9 +35,40 @@ manifest `godot/assets/emotes/emotes.json` is the source of truth for names, fra
 - Server checks: the member's account owns the pack containing `id` (starter always), and a rate limit of 1 emote per
   2 s and 6 per 30 s per member; violations → `{t: "error", code: "emote_locked" | "emote_rate"}` (clients ignore
   quietly). Emotes never touch game state, `n` or the hash.
-- Quick-match ghosts react like people: occasionally (≈25%) after their own capture, being captured, a 6, finishing, or
-  a human's emote ("reply"), with 0.8–2.5 s delay, at most one per 8 s per ghost; each ghost "owns" starter plus one
-  random paid pack. Indistinguishable from a person's emote.
+- Quick-match ghosts react like people: see "Ghost behaviour" below. Indistinguishable from a person's emote.
+
+## Ghost behaviour (BOT-EMO; `src/ghosts.ts`, driven by `src/room.ts`)
+Policy is the pure, seeded `ghostEmoteReply(situation, persona, memory, trigger, rng, pack) -> {id, delayMs} | null`
+(it updates `memory`); the Room only builds the situation, stores `persona` and `emo` (memory, plain JSON) on the
+ghost's Member (so both survive eviction), and sends the planned emote through the match alarm (`gemotes`). Wire shape
+is `{t:"emote", c, id}` exactly like a person's; persona and memory are never sent (the admin snapshot shows the persona).
+- Triggers: own capture / being captured / a 6 / finishing; a person's emote (only one ghost answers); another ghost's
+  emote (about 5%, at most once per match per other ghost); an opening "hi" early in the match (once, chatty and
+  friendly only).
+- Replies come from a weighted pool per incoming emote or event (including a "no reply" weight), restricted to the
+  packs the ghost owns (starter + one paid; falls back to a generic pool inside the owned packs), never one of its last
+  3 emotes. Sad emotes (cry, sad, sob) get a cheeky or a friendly answer, by personality, cheeky after the ghost just
+  captured someone.
+- Situation: ahead in the race (progress lead > 8%) boosts cool/tease/crown/laugh/champ/party, behind boosts
+  cry/sad/facepalm/sob/flag; within 15 s after its own capture gloat emotes get x2; within 15 s after being captured
+  angry/cry/facepalm/sob get x2.5 and love/happy/hi x0.3.
+- Spam: heat rises by 1 per person's emote, cools 1 per 30 s, is forgotten after 60 s of quiet. Reply chance for the
+  1st / 2nd / 3rd / later = 60% / 28% / 11% / 0% (x persona factor). At the 4th it may say "ok, enough" (facepalm or
+  sleepy, if owned), then stays quiet for 45-90 s.
+- Conversations: with one person it replies 1-3 times (random), then ignores that person for 60-120 s; a conversation
+  idle for 40 s starts over.
+- Timing: 1.0-3.5 s; on its own turn +0.5-1.5 s, or (35%) +3-5.5 s (after its move). Obeys the humans' limits (1 per
+  2 s, 6 per 30 s) plus its own pace (persona gap 4-12 s).
+- Personas (hidden, chosen at seat time; the ghosts of one match differ):
+  | persona | answers a person | events | own gap | opens with hi | bias |
+  |---|---|---|---|---|---|
+  | chatty | x1.4 | x1.2-1.6 | 4 s | 45% | hi, happy, party, wow, cheer |
+  | quiet | x0.5 | x0.3-0.6 | 12 s | 0 | cool, happy, hi; less tease/angry |
+  | cheeky | x1.0 | capture x1.6 | 6 s | 0 | tease, cool, crown, laugh, champ |
+  | friendly | x1.2 | finish x1.3, capture x0.6 | 5 s | 10% | love, hi, happy, highfive, cheer |
+  | sore | x0.9 | captured x1.8, rest x0.6-0.8 | 6 s | 0 | angry, facepalm, cry, sob, sad, flag |
+- Test hook `emoteChance` (TEST_MODE only): 0 = silence; 1 = every random gate passes (reply chance, spam, conversation
+  end, "no reply"), while pools, no-repeat, owned packs and the rate limits still apply.
 
 ## Sounds (E-SFX)
 `Sound.emote(id)` plays that emote's short sound (soft, calm mix, respects the sound settings); files in

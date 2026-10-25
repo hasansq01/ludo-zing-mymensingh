@@ -3,7 +3,8 @@
 // storage value ("room"), written synchronously with the SQLite-backed KV API after every change; per-socket
 // identity lives in the socket attachment. A single alarm covers every timer (turn deadline / bot or ghost action,
 // disconnect grace, quick-room auto-start, grant retries, empty-room and stale-room cleanup): schedule() always sets
-// it to the earliest due event.
+// it to the earliest due event. Ghost / bot steps due soon after an alarm run in that same wake-up (chain()), with the
+// alarm kept armed as the backup.
 //
 // Two kinds of rooms: friend rooms (POST /v1/rooms, a lobby, a host, rematches) and quick rooms (created by the
 // Matchmaker, src/matchmaker.ts: every seat pre-registered, auto-start, no lobby, no rematch). Quick rooms may hold
@@ -21,7 +22,7 @@ import * as SL from "./rules/sl";
 import { slStateHash } from "./rules/sl_hash";
 import * as D from "./db";
 import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineOutcome } from "./accounts_shim";
-import { GHOST_EMOTE, ghostDelay, ghostEmote, ghostPack, ghostPairYes, ghostPick, makeGhosts, packOfEmote, type EmoteKind } from "./ghosts";
+import { ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, ghostPick, makeGhosts, newGhostMemory, packOfEmote, progressLead, type GhostMemory, type GhostSituation, type GhostTrigger, type Persona } from "./ghosts";
 import type { Matchmaker } from "./matchmaker";
 
 export interface Env {
@@ -61,6 +62,14 @@ export const TIMING = {
   empty: 10 * 60_000, // no connected member for this long -> the room is deleted
   stale: 2 * 60 * 60_000, // no action (or lobby change) for this long -> the room is deleted
 };
+
+/**
+ * Server-played steps in one wake-up (fewer Durable Object requests; see chain()). After an alarm, while the next step
+ * is a ghost's or a bot's and due within `step`, the alarm handler stays awake until then and runs the alarm logic
+ * again instead of returning and being woken by another alarm; at most `total` of such waiting per alarm (and
+ * `passes` passes), then the alarm takes over again. A ghost "thinking" (4-6 s) is beyond `step`: its alarm plays it.
+ */
+export const CHAIN = { step: 4_000, total: 8_000, passes: 12 };
 
 /** Quick rooms (ONLINE_V2.md §3). */
 export const QUICK = {
@@ -120,8 +129,10 @@ interface Member {
   ghost?: boolean;
   /** Ghosts only: the one paid emote pack this ghost "owns" besides starter (never sent). */
   emotePack?: string;
-  /** Ghosts only: epoch ms of the last emote this ghost sent or has planned (8 s gap). */
-  emoteAt?: number;
+  /** Ghosts only: the hidden emote personality (chosen at seat time, never sent). */
+  persona?: Persona;
+  /** Ghosts only: what the ghost remembers about the chat (spam heat, conversations, recent emotes); never sent. */
+  emo?: GhostMemory;
 }
 
 interface Seat {
@@ -236,6 +247,18 @@ export interface TestHooks {
   ratePerSec?: number;
   /** Replaces the ghosts' 25% chance of reacting to an event (1 = always, 0 = never). */
   emoteChance?: number;
+  /** false: every ghost / bot step waits for an alarm of its own (no chain(); the old behaviour, for measurements). */
+  chain?: boolean;
+}
+
+/**
+ * Test-only counters (TEST_MODE, in memory): alarm() invocations, the alarm passes chain() ran in-request, and the
+ * longest in-request wait of one alarm (ms).
+ */
+export interface TestStats {
+  alarms: number;
+  chained: number;
+  longest: number;
 }
 
 /** What the Matchmaker hands a new quick room. */
@@ -407,6 +430,7 @@ function isInt(x: unknown, lo: number, hi: number): x is number {
 export class Room extends DurableObject<Env> {
   private room: RoomData | null;
   private hooks: TestHooks = {};
+  private stats: TestStats = { alarms: 0, chained: 0, longest: 0 };
   private rate = new WeakMap<WebSocket, { start: number; count: number; warned: boolean }>();
   /** Per-socket message queue: a message waits for the previous one's async part (ban check, timers read). */
   private queue = new WeakMap<WebSocket, Promise<void>>();
@@ -429,6 +453,7 @@ export class Room extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}')); // keep-alives never wake the DO
     this.room = ctx.storage.kv.get<RoomData>("room") ?? null;
     if (env.TEST_MODE === "1") this.hooks = ctx.storage.kv.get<TestHooks>("hooks") ?? {};
   }
@@ -483,6 +508,7 @@ export class Room extends DurableObject<Env> {
     const humans = spec.humans.slice(0, size);
     const g = new R.Mulberry32(randomSeed());
     const ghosts = makeGhosts(size - humans.length, humans, g);
+    const personas = ghostPersonas(ghosts.length, g);
     const entries: Array<Omit<Member, "id">> = [
       ...humans.map((h) => ({
         pid: h.pid,
@@ -494,7 +520,7 @@ export class Room extends DurableObject<Env> {
         account: h.account_id,
         level: Math.max(1, Math.trunc(h.level) || 1),
       })),
-      ...ghosts.map((gh) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g) })),
+      ...ghosts.map((gh, k) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g), persona: personas[k], emo: newGhostMemory() })),
     ];
     for (let k = entries.length - 1; k > 0; k--) {
       const j = cryptoInt(k + 1);
@@ -542,6 +568,12 @@ export class Room extends DurableObject<Env> {
     this.commit(); // re-plan the alarm with the new time scale
   }
 
+  /** Tests only: the alarm counters (TestStats). */
+  async testStats(): Promise<TestStats> {
+    if (this.env.TEST_MODE !== "1") throw new Error("test hooks are disabled");
+    return { ...this.stats };
+  }
+
   // ----- RPC from the admin API (src/admin.ts; no public route reaches these) -----
 
   /** The live room for the console; null when the room doesn't exist. The console is the only place ghosts show. */
@@ -572,6 +604,7 @@ export class Room extends DurableObject<Env> {
         account: mm.account ?? undefined,
         level: mm.level,
         ghost: mm.ghost ? true : undefined,
+        persona: mm.ghost ? mm.persona : undefined,
       })),
       settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask },
       match: m
@@ -715,7 +748,7 @@ export class Room extends DurableObject<Env> {
     if (!msg || typeof msg !== "object" || Array.isArray(msg) || typeof msg.t !== "string") {
       return this.error(ws, "bad_message", "expected an object with a string t");
     }
-    if (msg.t === "ping") return this.send(ws, { t: "pong", now: Date.now() });
+    if (msg.t === "ping") /* other ping shapes (the exact one is auto-answered) */ return this.send(ws, { t: "pong", now: Date.now() });
     if (msg.t === "emote") this.refundEmote(ws);
 
     const att = this.att(ws);
@@ -812,7 +845,9 @@ export class Room extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     try {
+      this.stats.alarms++;
       await this.onAlarm();
+      await this.chain();
     } catch (e) {
       this.crashed("alarm", e);
       throw e;
@@ -854,6 +889,40 @@ export class Room extends DurableObject<Env> {
     if (r.grants?.some((g) => g.next <= now)) this.ctx.waitUntil(this.runGrants());
     this.commit();
     await this.settle();
+  }
+
+  /**
+   * After an alarm pass: while the next step is server-played (a ghost, or a bot) and due soon (CHAIN), wait for it
+   * in this request and run the alarm pass again, instead of a second alarm (a ghost's roll and its move in one
+   * wake-up; a 6 or the next ghost's turn chained too). Nothing visible changes: planStep() drew the delay exactly as
+   * before and announced the turn; the pass plays the step as the alarm would (same rules, same persisted RNG), at the
+   * same time. Ghost emotes and other timers due on the way are handled by the passes (the wake-up is the alarm's
+   * time, the earliest of them). Safety: commit() keeps the alarm armed at the planned time throughout, so after an
+   * eviction mid-wait the alarm plays the step as before, and once the waited pass played it the alarm finds nothing
+   * due. The wait is dropped (the alarm takes over) when anything moved meanwhile: the room or match object, the
+   * status, the action count n (a mode change, {k: "end"}, ...) or the step's planned time (re-planned).
+   */
+  private async chain(): Promise<void> {
+    if (this.env.TEST_MODE === "1" && this.hooks.chain === false) return;
+    const start = Date.now();
+    for (let pass = 0; pass < CHAIN.passes; pass++) {
+      const r = this.room;
+      const m = r?.match;
+      if (!r || r.status !== "playing" || !m || !m.due) return;
+      const O = this.ops;
+      const c = O.turnColor(m.state);
+      if (!O.isCpu(m.state, c) && !this.seatOfColor(c)?.ghost) return; // a person's deadline: the alarm's
+      const now = Date.now();
+      const toStep = m.due - now;
+      if (toStep > this.ms(CHAIN.step) || now + toStep - start > this.ms(CHAIN.total)) return;
+      const { n, due } = m;
+      const wake = r.alarmAt > 0 ? Math.min(r.alarmAt, due) : due;
+      await new Promise((res) => setTimeout(res, Math.max(1, wake - now)));
+      if (this.room !== r || r.status !== "playing" || r.match !== m || m.n !== n || m.due !== due) return;
+      this.stats.chained++;
+      this.stats.longest = Math.max(this.stats.longest, Date.now() - start);
+      await this.onAlarm();
+    }
   }
 
   // ---------- connection handling ----------
@@ -1600,7 +1669,7 @@ export class Room extends DurableObject<Env> {
     const seat = m && r.status !== "lobby" ? m.seats.find((st) => st.id === mem.id && !st.left) : undefined;
     this.broadcast(seat ? { t: "emote", c: seat.color, id } : { t: "emote", c: -1, member: mem.id, id }, ws);
     if (r.quick && m && r.status === "playing" && seat) {
-      this.ghostReply(m);
+      this.ghostReply(m, id as string, seat.color);
       this.commit(); // persists the plan and points the alarm at it
     }
   }
@@ -1616,9 +1685,9 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  /** Ghost reactions to the events of one action (their capture, being captured, a 6, finishing). */
+  /** Ghost reactions to the events of one action (their capture, being captured, a 6, finishing; the opening hi). */
   private ghostReact(m: Match, ev: unknown[]): void {
-    const hits: Array<{ c: number; kind: EmoteKind }> = [];
+    const hits: Array<{ c: number; kind: "capture" | "captured" | "six" | "finish" }> = [];
     const colourOf = (turn: number): number => (m.state as SlState).players?.[turn]?.c ?? -1;
     for (const e of ev as Array<Record<string, unknown>>) {
       switch (e.type) {
@@ -1642,35 +1711,49 @@ export class Room extends DurableObject<Env> {
       const key = `${h.c}:${h.kind}`;
       if (!seen.has(key)) {
         seen.add(key);
-        this.planGhostEmote(m, h.c, h.kind);
+        this.planGhostEmote(m, h.c, { kind: h.kind });
       }
     }
+    // early in the match a chatty ghost may open with a hi (decided once per ghost)
+    if (m.n <= 3) for (const st of m.seats) if (st.ghost && !st.left) this.planGhostEmote(m, st.color, { kind: "open" });
   }
 
   /** A human emoted: at most one ghost may answer. */
-  private ghostReply(m: Match): void {
+  private ghostReply(m: Match, id: string, from: number): void {
     const gs = m.seats.filter((st) => st.ghost && !st.left);
     for (let k = gs.length - 1; k > 0; k--) {
       const j = Math.floor(Math.random() * (k + 1));
       [gs[k], gs[j]] = [gs[j], gs[k]];
     }
-    for (const st of gs) if (this.planGhostEmote(m, st.color, "reply")) return;
+    for (const st of gs) if (this.planGhostEmote(m, st.color, { kind: "emote", id, from, human: true })) return;
   }
 
-  /** Plans (chance, 0.8-2.5 s delay, one per 8 s per ghost) an emote of the ghost on colour c; true when planned. */
-  private planGhostEmote(m: Match, c: number, kind: EmoteKind): boolean {
+  /** A ghost's emote went out: another ghost may (rarely, once per pair) react to it. */
+  private ghostsHear(m: Match, from: number, id: string): void {
+    const gs = m.seats.filter((st) => st.ghost && !st.left && st.color !== from);
+    for (const st of gs) if (this.planGhostEmote(m, st.color, { kind: "emote", id, from, human: false })) return;
+  }
+
+  /**
+   * Asks the ghost on colour c what to do about `trigger` (pure policy in ghosts.ts), and plans its emote (alarm-driven,
+   * stored so it survives hibernation); true when one was planned.
+   */
+  private planGhostEmote(m: Match, c: number, trigger: GhostTrigger): boolean {
+    const r = this.room!;
     const st = m.seats.find((x) => x.color === c && x.ghost && !x.left);
-    const mem = st && this.room!.members.find((x) => x.id === st.id);
+    const mem = st && r.members.find((x) => x.id === st.id);
     if (!st || !mem?.ghost) return false;
-    const chance = this.env.TEST_MODE === "1" ? (this.hooks.emoteChance ?? GHOST_EMOTE.chance) : GHOST_EMOTE.chance;
-    if (Math.random() >= chance) return false;
     const now = Date.now();
-    if (now < (mem.emoteAt ?? 0) + this.ms(GHOST_EMOTE.gap)) return false;
-    const [lo, hi] = GHOST_EMOTE.delay;
-    const at = now + this.ms(lo + Math.random() * (hi - lo));
-    const id = ghostEmote(kind, mem.emotePack ?? "", { randf: Math.random });
-    mem.emoteAt = at;
-    (m.gemotes ??= []).push({ at, c, id });
+    const sit: GhostSituation = {
+      now,
+      scale: this.ms(1),
+      lead: progressLead(m.state, c, m.seats.filter((x) => !x.left).map((x) => x.color)),
+      ownTurn: r.status === "playing" && opsFor(m.game).turnColor(m.state) === c,
+      chance: this.env.TEST_MODE === "1" ? this.hooks.emoteChance : undefined,
+    };
+    const out = ghostEmoteReply(sit, mem.persona ?? "friendly", (mem.emo ??= newGhostMemory()), trigger, { randf: Math.random }, mem.emotePack ?? "");
+    if (!out) return false;
+    (m.gemotes ??= []).push({ at: now + out.delayMs, c, id: out.id });
     return true;
   }
 
@@ -1684,7 +1767,11 @@ export class Room extends DurableObject<Env> {
     m.gemotes = m.gemotes.filter((e) => e.at > now);
     if (r.status === "lobby") m.gemotes = [];
     if (!this.anyOnline()) return;
-    for (const e of due) if (r.status !== "lobby") this.broadcast({ t: "emote", c: e.c, id: e.id });
+    for (const e of due) {
+      if (r.status === "lobby") continue;
+      this.broadcast({ t: "emote", c: e.c, id: e.id });
+      this.ghostsHear(m, e.c, e.id);
+    }
   }
 
   /** 20 messages per second per socket; over that: one rate error per window, the rest dropped. */
@@ -2091,6 +2178,8 @@ export interface AdminSnapshot {
     account?: string;
     level?: number;
     ghost?: boolean;
+    /** Ghosts only: the hidden emote personality (admin console only). */
+    persona?: string;
   }>;
   settings: { teams: boolean; pair_ask: boolean };
   match: {

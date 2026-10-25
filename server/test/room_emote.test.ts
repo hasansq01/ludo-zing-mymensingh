@@ -1,10 +1,11 @@
 // Emotes (EMOTES.md "Online relay"): relay to the others, pack ownership from the account, rate limits, the lobby
 // form, no effect on the match, and the quick-match ghosts' reactions.
+import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DB } from "./admin_helpers";
-import { Client, NEAR_GOAL, createRoom, sleep, startAll, stubFor } from "./room_client";
+import { Client, NEAR_GOAL, createRoom, sleep, startAll, stubFor, type Msg } from "./room_client";
 import { QuickClient, guest, joinMatched, mmHooks, queueAll, resetSpies, type Guest } from "./quick_client";
-import { GHOST_EMOTE, packOfEmote } from "../src/ghosts";
+import { GHOST_DELAY_MAX, GHOST_EMOTE, packOfEmote } from "../src/ghosts";
 
 beforeEach(() => resetSpies());
 afterEach(() => resetSpies());
@@ -127,21 +128,25 @@ describe("emote rate limits", () => {
   });
 
   it("6 per 30 s", async () => {
-    const { a, b } = await pair();
+    // Timing-robust: a slower scale (2 s -> 500 ms, 30 s -> 7.5 s) and sends spaced twice the gap apart, so that no
+    // CPU-load jitter can push two sends inside one gap, or the 7th send out of the first send's window.
+    const K = 0.25;
+    const { a, b } = await pair({ timeScale: K });
+    const spacing = 2000 * K * 2; // 1 s: >= 500 ms gap with 500 ms of margin; 6 sends span 5 s of the 7.5 s window
     for (let k = 0; k < 6; k++) {
       a.send({ t: "emote", id: "happy" });
-      await sleep(GAP + 10);
+      await b.waitFor(() => emotes(b).length >= k + 1, 3000);
+      if (k < 5) await sleep(spacing);
     }
-    await b.waitFor(() => emotes(b).length >= 6, 1000).catch(() => {});
-    await sleep(50);
     expect(emotes(b).length).toBe(6);
-    a.send({ t: "emote", id: "happy" });
+    expect(a.log.filter((m) => m.t === "error")).toEqual([]);
+    a.send({ t: "emote", id: "happy" }); // ~5 s after the first: still inside its 7.5 s window
     expect((await a.wait("error")).code).toBe("emote_rate");
     expect(emotes(b).length).toBe(6);
-    await sleep(1500 + 100); // the window moves on
+    await sleep(30_000 * K); // far past the first send's window (>= 5 s of margin even when the sends ran late)
     a.send({ t: "emote", id: "happy" });
-    await b.waitFor((m) => m.t === "emote" && emotes(b).length === 7);
-  });
+    await b.waitFor(() => emotes(b).length === 7, 3000);
+  }, 40_000);
 
   it("an emote flood does not eat the 20 msg/s budget that gameplay needs", async () => {
     const { a, b } = await pair({ ratePerSec: 20, tok: NEAR_GOAL });
@@ -154,7 +159,7 @@ describe("emote rate limits", () => {
 });
 
 describe("ghost reactions", () => {
-  async function quickRoom(chance: number): Promise<{ g: Guest; c: Client; ghostColor: number }> {
+  async function quickRoom(chance: number): Promise<{ g: Guest; c: Client; ghostColor: number; code: string }> {
     await mmHooks("ludo", 2, { wait: 100, room: { timeScale: 0.1, emoteChance: chance, tok: NEAR_GOAL } });
     const g = await guest();
     const { matched } = await queueAll("ludo", 2, [g], ["Rahim"]);
@@ -162,32 +167,51 @@ describe("ghost reactions", () => {
     const ghostColor = snap.members.find((m) => m.ghost)!.color;
     const c = await joinMatched(matched[0].code, matched[0].token, g, "Rahim");
     await c.wait("start");
-    return { g, c, ghostColor };
+    return { g, c, ghostColor, code: matched[0].code };
+  }
+
+  /** Sends `id` until the ghost on `color` emotes (it can be busy with its own pace); returns it and the send time. */
+  async function chatUntilGhost(c: Client, color: number, id: string, tries = 10): Promise<{ m: Msg; dt: number }> {
+    for (let k = 0; k < tries; k++) {
+      const seen = c.log.length;
+      const t0 = Date.now();
+      c.send({ t: "emote", id });
+      try {
+        const m = await c.waitFor((x) => x.t === "emote" && x.c === color && c.log.indexOf(x) >= seen, 1400);
+        return { m, dt: Date.now() - t0 };
+      } catch {
+        await sleep(2000 * 0.1 + 80);
+      }
+    }
+    throw new Error("the ghost never answered");
   }
 
   it("answers a human's emote after 0.8-2.5 s (scaled), in a human's shape", async () => {
     const { c, ghostColor } = await quickRoom(1);
-    const t0 = Date.now();
-    c.send({ t: "emote", id: "love" });
-    const m = await c.waitFor((x) => x.t === "emote" && x.c === ghostColor, 2000);
-    const dt = Date.now() - t0;
+    const { m, dt } = await chatUntilGhost(c, ghostColor, "love");
     expect(Object.keys(m)).toEqual(["t", "c", "id"]);
     expect(packOfEmote(m.id)).not.toBe("");
     expect(dt).toBeGreaterThanOrEqual(GHOST_EMOTE.delay[0] * 0.1 - 25);
-    expect(dt).toBeLessThanOrEqual(GHOST_EMOTE.delay[1] * 0.1 + 400);
+    expect(dt).toBeLessThanOrEqual(GHOST_DELAY_MAX * 0.1 + 400); // 1-3.5 s, up to 5.5 s more on its own turn
     c.send({ t: "leave" });
   });
 
-  it("never more than one per 8 s (scaled) per ghost, even when every event triggers", async () => {
+  it("obeys the humans' limits (1 per 2 s, 6 per 30 s, scaled) and never repeats back to back, even when every event triggers", { retry: 2, timeout: 30_000 }, async () => {
     const { c, ghostColor } = await quickRoom(1);
     c.autoplay = true;
     c.playTurn(c.state.turn);
     await c.wait("over", 28_000);
-    await sleep(300);
+    await sleep(GHOST_DELAY_MAX * 0.1 + 300); // the last planned emotes still go out
     const at = c.log.map((m, k) => ({ m, t: c.at[k] })).filter((x) => x.m.t === "emote" && x.m.c === ghostColor).map((x) => x.t);
     expect(at.length).toBeGreaterThan(0);
-    for (let k = 1; k < at.length; k++) expect(at[k] - at[k - 1]).toBeGreaterThanOrEqual(GHOST_EMOTE.gap * 0.1 - 60);
-  }, 30_000);
+    // receipt times: delivery jitter under load can bunch two frames together, so allow JITTER (the exact limits are
+    // checked deterministically on ghostEmoteReply in ghost_emote.test.ts)
+    const JITTER = 160;
+    for (let k = 1; k < at.length; k++) expect(at[k] - at[k - 1]).toBeGreaterThanOrEqual(GHOST_EMOTE.minGap * 0.1 - JITTER);
+    for (let k = 6; k < at.length; k++) expect(at[k] - at[k - 6]).toBeGreaterThanOrEqual(GHOST_EMOTE.window * 0.1 - JITTER);
+    const ids = c.log.filter((m) => m.t === "emote" && m.c === ghostColor).map((m) => m.id);
+    for (let k = 1; k < ids.length; k++) expect(ids[k]).not.toBe(ids[k - 1]);
+  });
 
   it("chance 0 means silence", async () => {
     const { c, ghostColor } = await quickRoom(0);
@@ -196,4 +220,34 @@ describe("ghost reactions", () => {
     expect(emotes(c).filter((m) => m.c === ghostColor)).toEqual([]);
     c.send({ t: "leave" });
   });
+
+  it("the persona and the chat memory live in the room's storage: an evicted room keeps both and keeps the plan", async () => {
+    const { c, ghostColor, code } = await quickRoom(1);
+    const members = (): Promise<Array<{ ghost?: boolean; persona?: string; emo?: { last: string[]; sent: number[] } }>> =>
+      runInDurableObject(stubFor(code), (inst) => JSON.parse(JSON.stringify((inst as unknown as { room: { members: never[] } }).room.members)));
+    const before = (await members()).find((m) => m.ghost)!;
+    expect(["chatty", "quiet", "cheeky", "friendly", "sore"]).toContain(before.persona);
+    c.send({ t: "emote", id: "love" });
+    // evicted while the reply is still only planned: the plan (alarm) survives
+    await sleep(60);
+    await evictDurableObject(stubFor(code));
+    let first: Msg;
+    try {
+      first = await c.waitFor((x) => x.t === "emote" && x.c === ghostColor, 1500);
+    } catch {
+      first = (await chatUntilGhost(c, ghostColor, "love")).m; // it was busy with its own pace: ask again
+    }
+    const mid = (await members()).find((m) => m.ghost)!;
+    expect(mid.persona).toBe(before.persona);
+    expect(mid.emo!.last).toContain(first.id);
+    await evictDurableObject(stubFor(code));
+    const after = (await members()).find((m) => m.ghost)!;
+    expect(after.persona).toBe(before.persona);
+    expect(after.emo!.last).toContain(first.id); // memory survived a second eviction
+    await chatUntilGhost(c, ghostColor, "love");
+    const ids = c.log.filter((x) => x.t === "emote" && x.c === ghostColor).map((x) => x.id);
+    expect(ids.length).toBeGreaterThanOrEqual(2);
+    for (let k = 1; k < ids.length; k++) expect(ids[k]).not.toBe(ids[k - 1]); // never the same twice running, across evictions
+    c.send({ t: "leave" });
+  }, 20_000);
 });

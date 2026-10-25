@@ -93,6 +93,8 @@ class SimClient {
     this.listeners = [];
     this.history = [];
     this.finishes = []; // play on: {c, place, n} for every side that finished, in order
+    // step timing per colour (Ludo): turn announcement -> roll, roll -> move (ms); the quick summary shows the ghosts'
+    this.timing = { turnAt: 0, turnPhase: "", roll: null, rolls: [], moves: [] };
   }
 
   get color() {
@@ -167,6 +169,7 @@ class SimClient {
           this.send({ t: "sync_req" });
           break;
         }
+        this.time(m.a);
         const ev = this.game === "sl" ? R.applySlAction(this.state, m.a) : R.applyAction(this.state, m.a);
         this.n = m.n + 1;
         this.stats.acts++;
@@ -186,6 +189,8 @@ class SimClient {
         break;
       }
       case "turn":
+        this.timing.turnAt = Date.now();
+        this.timing.turnPhase = this.state?.phase ?? "";
         this.maybePlay(m.c);
         break;
       case "over":
@@ -196,6 +201,18 @@ class SimClient {
         if (m.code !== "stale") log(`${this.name}: error ${m.code} ${m.msg}`);
         break;
     }
+  }
+
+  /** Records the gap of a roll (since its turn) or a move (since the same colour's roll). */
+  time(a) {
+    const T = this.timing;
+    const now = Date.now();
+    if (a.k === "roll" && T.turnPhase === "roll" && T.turnAt) {
+      T.rolls.push({ c: a.c, ms: now - T.turnAt });
+      if (now - T.turnAt > 6000 && process.env.SIM_SLOW) log(`${this.name}: slow roll c${a.c} ${now - T.turnAt} ms at n ${this.n}`);
+    }
+    if (a.k === "move" && T.roll && T.roll.c === a.c) T.moves.push({ c: a.c, ms: now - T.roll.at });
+    T.roll = a.k === "roll" ? { c: a.c, at: now } : null;
   }
 
   hash() {
@@ -366,6 +383,17 @@ async function quickMain() {
     console.log(`room ${code} (${st.game}): ${st.seats.map((s) => `${COLORS[s.color]}=${s.name} L${s.level}`).join(", ")}`);
     console.log(`  ours ${rs.map((r) => `Sim${r.k + 1}`).join(", ")}; other seats ${others.length} (ghosts, unless other people queued): ${others.map((s) => s.name).join(", ") || "-"}`);
     console.log(`  waits ${rs.map((r) => `${(r.q.waitMs / 1000).toFixed(1)} s`).join(", ")}`);
+    const others_ = new Set(others.map((s) => s.color));
+    const T = rs[0].c.timing;
+    const stat = (xs) => {
+      const v = xs.filter((x) => others_.has(x.c)).map((x) => x.ms);
+      return v.length ? `n ${v.length}, min ${Math.min(...v)}, mean ${Math.round(v.reduce((a, b) => a + b, 0) / v.length)}, max ${Math.max(...v)} ms` : "n 0";
+    };
+    if (st.game !== "sl") {
+      const mv = T.moves.filter((x) => others_.has(x.c));
+      const thinks = mv.filter((x) => x.ms > 3750).length;
+      console.log(`  other seats' timing: turn->roll ${stat(T.rolls)}; roll->move ${stat(T.moves)}; over 3.75 s ${thinks} (${mv.length ? ((100 * thinks) / mv.length).toFixed(1) : 0}%)`);
+    } else console.log(`  other seats' timing: turn->roll ${stat(T.rolls)}`);
     console.log(`  winner ${winSeat ? `${COLORS[winSeat.color]} ${winSeat.name}${ours.has(winSeat.id) ? " (one of ours)" : ""}` : "-"}`);
     const hashes = new Set(rs.map((r) => r.c.hash()));
     if (hashes.size !== 1) bad = true;

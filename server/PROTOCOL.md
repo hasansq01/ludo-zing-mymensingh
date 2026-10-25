@@ -50,7 +50,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 | `sync_req` | – | your hash didn't match, or after a reconnect hiccup |
 | `leave` | – | leave the room (lobby: frees the seat; in a match: a bot takes the seat for good) |
 | `emote` | `id` | any time (see "Emotes") |
-| `ping` | – | keep-alive every 20 s |
+| `ping` | – | keep-alive every 20 s; send exactly `{"t":"ping"}` (see "Keep-alive") |
 
 `n` is the index of the action this request would become (the client's `n` = number of actions applied so far).
 A request with a stale `n` is ignored with `error {code: "stale"}` (protects against double taps and races).
@@ -69,7 +69,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | `over` | `finished: [colours in final order], winner` (colour, or −1); sent once, at the end of the game (see "Play on after the first finish") |
 | `error` | `code, msg` |
 | `emote` | `c, id` (+ `member` when `c` = -1; see "Emotes") |
-| `pong` | `now` |
+| `pong` | `now` (only from other ping shapes; the exact `{"t":"ping"}` gets `{"t":"pong"}`, see "Keep-alive") |
 
 `seats`: `[{color, id, name, avatar, frame, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
 LudoRules state (JSON) with `players[c]` = `"human"` (a member), `"cpu"` (a bot) or `"off"`, and `names[c]` = the
@@ -138,10 +138,11 @@ no hash, no timer; they are not stored in the action log.
   quietly. An unknown `id` (or a missing one) is `error {code: "bad_message"}`.
 - The general 20 msg/s limit still applies, but the first 5 emote messages per second per socket are not counted
   against it, so a spammed picker cannot starve rolls and moves.
-- Quick-match ghosts emote like people (same `{t: "emote", c, id}`): after their own capture, being captured (S&L: a
-  snake), a 6, finishing, or a human's emote, each with about 25% chance, 0.8-2.5 s later, at most one per 8 s per
-  ghost, from starter plus one random paid pack. They are indistinguishable from a person's emote. Ghost emotes are
-  alarm-driven and stored with the match (they survive hibernation).
+- Quick-match ghosts emote like people (same `{t: "emote", c, id}`, nothing else on the wire): after their own
+  capture, being captured (S&L: a snake), a 6, finishing, a person's emote, or (rarely) another ghost's, with a
+  per-ghost personality and memory, 1.0-3.5 s later (longer on their own turn), obeying the same 1 per 2 s / 6 per
+  30 s limits, from starter plus one random paid pack. They are indistinguishable from a person's emote. Ghost
+  emotes are alarm-driven and stored with the match (they survive hibernation). Details: EMOTES.md "Ghost behaviour".
 
 ## State hash
 
@@ -321,7 +322,11 @@ Clarifications of the tables above; nothing here changes a message the client se
   matches rows: `ghosts`, `human_won`, `players[].ghost`). Server internals: `src/ghosts.ts`, `src/room.ts`.
 - **Accounts on hello**: the legacy pid ban, the session's account (banned → `banned`) and the pid's account are
   checked before `welcome` (cached 60 s); the account's level is read from its profile. Lookups fail open.
-- **Rate limit**: a fixed 1 s window per socket, `ping` included; the first message over 20 gets `error rate`, the
+- **Keep-alive**: the exact text `{"t":"ping"}` is answered by the runtime's WebSocket auto-response with exactly
+  `{"t":"pong"}` (no `now`) without waking the Durable Object, and it does not count toward the rate limit. Clients
+  take the round trip from ping to pong and the server clock from `turn.now` (corrected by half the last round trip).
+  A ping with any other shape (extra fields, spacing) still reaches the DO and gets `{t: "pong", now}`.
+- **Rate limit**: a fixed 1 s window per socket, `ping` (other than the auto-answered one) included; the first message over 20 gets `error rate`, the
   rest of that window is dropped silently.
 - **Storage / timers**: one storage value per room (members, settings, match state, `n`, deadlines, strikes, bot
   RNG) and one Durable Object alarm set to the earliest of: turn deadline / bot action, disconnect graces, empty-room

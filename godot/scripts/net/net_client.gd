@@ -18,7 +18,7 @@ extends Node
 ## A dropped socket reconnects by itself with backoff (BACKOFF) while you are in a room; status says where it is:
 ## "idle" (no room), "connecting" (first join), "open" (welcomed), "reconnecting". A first join that never connects
 ## gives up after JOIN_TRIES with error {code = "no_connection"}; a room that is gone (404) stops the retries with
-## error {code = "not_found"}. Pings every PING_SEC; pong.now gives the round trip (rtt_ms) and the server clock
+## error {code = "not_found"}. Pings every PING_SEC; pong gives the round trip (rtt_ms), turn.now the server clock
 ## (server_now()). A silent socket (no frame for SILENCE_SEC) counts as dropped.
 ##
 ## Server URL: the --net=ws://host:port command line argument (debug builds), else Save.prefs.net_url, else
@@ -42,6 +42,7 @@ signal emote(msg: Dictionary)            ## another member's emote {c, id} (lobb
 const PROD_URL := "wss://ludo-zing-rooms.flipfold.workers.dev"
 const VERSION := 1
 const PING_SEC := 20.0
+const PING_TEXT := '{"t":"ping"}'            ## byte for byte: the server's auto-response matches this string
 const SILENCE_SEC := 50.0                ## no frame at all for this long (two pings unanswered): reconnect
 const CONNECT_SEC := 8.0                 ## a socket that hasn't opened by then is dropped and retried
 const BACKOFF := [0.5, 1.0, 2.0, 4.0, 8.0, 15.0]
@@ -338,7 +339,13 @@ func is_open() -> bool:
 func is_host() -> bool:
 	return member_id != "" and member_id == host_id
 
-## The server's clock now (unix ms), from the last pong.
+## The server clock a `turn` carries ("now"), as the offset: it was stamped about half a round trip ago.
+func _take_server_now(msg: Dictionary) -> void:
+	if msg.has("now"):
+		var local := Time.get_unix_time_from_system() * 1000.0
+		clock_offset_ms = float(msg.now) + maxf(rtt_ms, 0) / 2.0 - local
+
+## The server's clock now (unix ms), from the last turn (or an older server's pong).
 func server_now() -> float:
 	return Time.get_unix_time_from_system() * 1000.0 + clock_offset_ms
 
@@ -432,7 +439,11 @@ func _process(delta: float) -> void:
 func ping() -> void:
 	_ping_left = PING_SEC
 	_ping_at = Time.get_unix_time_from_system() * 1000.0
-	send_msg({t = "ping"})
+	log_sent.append({t = "ping"})
+	if log_sent.size() > 64:
+		log_sent.pop_front()
+	if transport != null and _hello_sent:
+		transport.send(PING_TEXT)             # the exact text: the server answers it without waking the room
 
 ## The socket is gone: retry with backoff while we want the room.
 func _on_closed() -> void:
@@ -504,6 +515,7 @@ func handle(msg: Dictionary) -> void:
 		"sync":
 			sync.emit(msg)
 		"turn":
+			_take_server_now(msg)
 			turn.emit(msg)
 		"presence":
 			presence.emit(msg)
@@ -515,7 +527,8 @@ func handle(msg: Dictionary) -> void:
 			var now := Time.get_unix_time_from_system() * 1000.0
 			if _ping_at > 0.0:
 				rtt_ms = int(now - _ping_at)
-				clock_offset_ms = float(msg.get("now", now)) - (_ping_at + rtt_ms / 2.0)
+				if msg.has("now"):                # older servers; the auto-response pong carries no clock
+					clock_offset_ms = float(msg.now) - (_ping_at + rtt_ms / 2.0)
 				_ping_at = 0.0
 		"error":
 			var c := str(msg.get("code", ""))

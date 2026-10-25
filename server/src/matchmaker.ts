@@ -97,6 +97,7 @@ export class Matchmaker extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}')); // keep-alives never wake the DO
     this.meta = ctx.storage.kv.get<Meta>("meta") ?? null;
     if (env.TEST_MODE === "1") this.hooks = ctx.storage.kv.get<MmHooks>("hooks") ?? {};
   }

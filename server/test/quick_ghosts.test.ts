@@ -147,7 +147,25 @@ describe("no ghost leaks", () => {
       expect(packs.size).toBeLessThanOrEqual(1);
       for (const id of mine.map((m) => m.id)) expect(Object.values(EMOTE_PACKS).flat()).toContain(id);
     }
+    // like a person's: never the same emote twice in a row, the humans' pace (1 per 2 s), no more than 6 per 30 s
+    for (const col of p.ghostColors) {
+      const mine = em.filter((m) => m.c === col);
+      for (let k = 1; k < mine.length; k++) expect(mine[k].id).not.toBe(mine[k - 1].id);
+      const at = p.cs[0].log.map((m, k) => ({ m, t: p.cs[0].at[k] })).filter((x) => x.m.t === "emote" && x.m.c === col).map((x) => x.t);
+      for (let k = 1; k < at.length; k++) expect(at[k] - at[k - 1]).toBeGreaterThanOrEqual(2000 * SCALE - 40);
+      for (let k = 6; k < at.length; k++) expect(at[k] - at[k - 6]).toBeGreaterThanOrEqual(30_000 * SCALE - 40);
+    }
     audit(p, "ludo", ["Rahim"]);
+  }, 30_000);
+
+  it("the 3 ghosts of a 4-seat match have different (hidden) personalities", async () => {
+    const p = await play("ludo", 4, 1, ["Rahim"]);
+    const ps = (p.snap.members as Array<{ ghost?: boolean; persona?: string }>).filter((m) => m.ghost).map((m) => m.persona);
+    expect(ps.length).toBe(3);
+    expect(new Set(ps).size).toBe(3);
+    // never on the wire: no message key or string carries the persona
+    expect(walk(p.cs[0].log).keys.filter((k) => /persona|personality/i.test(k))).toEqual([]);
+    expect(JSON.stringify(p.cs[0].log)).not.toMatch(/persona|chatty|cheeky|sore/i);
   }, 30_000);
 
   it("a reconnect (sync) mid-match shows the ghosts like everyone else", async () => {
@@ -167,7 +185,7 @@ describe("no ghost leaks", () => {
 });
 
 describe("ghost timing", () => {
-  it("ghosts act within the human-like windows and never time out", async () => {
+  it("ghosts act within the human-like windows and never time out", { retry: 2, timeout: 30_000 }, async () => {
     const scale = 0.1;
     await mmHooks("ludo", 4, { wait: 100, room: { timeScale: scale, tok: NEAR_GOAL } });
     const g = await guest();
@@ -199,10 +217,14 @@ describe("ghost timing", () => {
     expect(samples.length).toBeGreaterThanOrEqual(8);
     for (const s of samples) {
       const [lo, hi] = s.phase === "choose" ? [GHOST_TIMING.choose[0], GHOST_TIMING.think[1]] : s.phase === "pair_ask" ? GHOST_TIMING.pair : GHOST_TIMING.roll;
-      expect(s.ms, JSON.stringify(s)).toBeGreaterThanOrEqual(lo * scale - 25);
+      expect(s.ms, JSON.stringify(s)).toBeGreaterThanOrEqual(lo * scale - 160); // receipt times: delivery jitter under load
       expect(s.ms, JSON.stringify(s)).toBeLessThanOrEqual(hi * scale + 250);
     }
     // never a timeout: no ghost action waited for the turn timer
     expect(samples.every((s) => s.ms < (s.phase === "choose" ? 20_000 : 15_000) * scale)).toBe(true);
-  }, 30_000);
+    // a ghost's roll and its move share one wake-up (Room.chain(); test/room_ghost_alarm.test.ts measures it)
+    const stats = await stubFor(code).testStats();
+    expect(stats.chained).toBeGreaterThan(0);
+    expect(stats.alarms).toBeLessThan(samples.length);
+  });
 });

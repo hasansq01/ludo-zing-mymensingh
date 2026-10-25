@@ -212,7 +212,7 @@ describe("queue: refusals", () => {
     const q = await QuickClient.open("ludo", 2);
     q.send({ t: "cancel" });
     expect(await q.wait("error")).toMatchObject({ code: "bad_message" });
-    q.send({ t: "ping" });
+    q.send({ t: "ping", v: 1 });
     expect((await q.wait("pong")).now).toBeGreaterThan(0);
     q.close();
   });
