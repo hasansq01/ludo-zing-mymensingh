@@ -43,6 +43,7 @@ const SUITES := [
 	"res://tests/test_emote_sfx.gd",
 	"res://tests/test_emotes_hud.gd",
 	"res://tests/test_notif_plan.gd",
+	"res://tests/test_back_online.gd",
 	"res://tests/test_notifications.gd",
 ]
 

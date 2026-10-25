@@ -43,6 +43,7 @@ signal finished(result: Dictionary)
 ##   place, finished, progress}], human_won, reward, teams, color (the winner), winners, xp_before, xp_after}
 
 const CPU_ROLL_WAIT := 0.35
+const BACK_WINDOW_MS := 30_000            # app_resumed(): how long a bot on your seat is still "you were away"
 const CPU_MOVE_WAIT := 0.25
 const AUTO_MOVE_WAIT := 0.15
 const AFTER_TURN := 0.3
@@ -90,6 +91,7 @@ var _net_ready := false                   # the board is up: queued acts may pla
 var _net_turn := {}                       # the server's last `turn` {c, end (ticks ms), total}: shown once the acts before it played
 var _my_place := 0                        # play on: the place your side finished in while the game went on (0: not yet)
 var _my_away := false                     # online: a bot was playing your seat when your side finished
+var _back_until := 0                      # online: back in the app until then (ticks ms): a bot on your seat is sent away
 
 ## Old callers (device tests): true when tap points are printed. Use TapLog.enabled().
 static func tap_log() -> bool:
@@ -1243,6 +1245,14 @@ func _net_back() -> void:
 	if online:
 		_net_send({t = "back"})
 
+## The app came back to the front during an online match: the player is here, so the seat is theirs again without
+## an "I’m back" tap (now, and when the bot that took it over while the phone was away shows up in the next acts).
+func app_resumed() -> void:
+	if not online:
+		return
+	_back_until = Time.get_ticks_msec() + BACK_WINDOW_MS
+	_net_back()                              # (the server ignores it while the seat is still yours)
+
 ## Offline / bot badges on the tiles, and the away prompt when a bot plays for you.
 func _net_badges() -> void:
 	if not online or not hud.has_method("set_badges"):
@@ -1257,7 +1267,12 @@ func _net_badges() -> void:
 		elif c != ns.me and not st.is_empty() and not bool(st.get("online", true)):   # (you are here)
 			b[c] = "offline"
 	hud.set_badges(b)
-	hud.show_away(ns.me >= 0 and S.players[ns.me] == "cpu" and S.phase != "over")
+	var botted: bool = ns.me >= 0 and S.players[ns.me] == "cpu" and S.phase != "over"
+	if botted and Time.get_ticks_msec() < _back_until:
+		_back_until = 0                      # just back in the app: take the seat back (once)
+		_net_back()
+		botted = false
+	hud.show_away(botted)
 
 ## The event line while someone else plays: "Ana’s turn", "Ana is choosing…", a bot "Ana (bot) is thinking…".
 func _net_wait_line(c: int) -> String:

@@ -65,6 +65,7 @@ export const TIMING = {
   botStepMin: 900, // a bot's move / pair answer after its roll (~1 s, so clients can animate the dice)
   botStepMax: 1100,
   grace: 20_000, // disconnect grace: match -> the seat becomes a bot; lobby -> the member is dropped
+  lobbyAway: 300_000, // lobby grace when the app said it went to the background (sharing the invite, a call)
   empty: 10 * 60_000, // no connected member for this long -> the room is deleted
   stale: 2 * 60 * 60_000, // no action (or lobby change) for this long -> the room is deleted
 };
@@ -1031,6 +1032,7 @@ export class Room extends DurableObject<Env> {
     if (!r) return;
     const att = this.att(ws);
     if (att.mid < 0) return;
+    const wentAway = att.away === true; // the app said it went to the background, then the phone closed the socket
     try {
       ws.serializeAttachment({ mid: -2 } satisfies Att);
     } catch {
@@ -1043,7 +1045,7 @@ export class Room extends DurableObject<Env> {
         mem.graceAt = now + this.ms(TIMING.grace);
         this.broadcast({ t: "presence", id: mem.id, online: false }, ws);
       } else if (!r.quick) {
-        mem.graceAt = now + this.ms(TIMING.grace);
+        mem.graceAt = now + this.ms(wentAway ? TIMING.lobbyAway : TIMING.grace);
         this.broadcast(this.lobbyMsg(), ws);
       }
     }

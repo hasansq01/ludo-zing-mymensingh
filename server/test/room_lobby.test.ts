@@ -251,6 +251,18 @@ describe("hello and lobby", () => {
     expect((await roomInfo(code)).body.members).toBe(1);
   });
 
+  it("a member whose app went to the background keeps the lobby seat longer (sharing the invite)", async () => {
+    const { code, cs } = await lobbyOf(2, { timeScale: 0.01 }); // grace 200 ms, lobbyAway 3 s
+    cs[1].send({ t: "away", on: true });
+    cs[1].send({ t: "ping", sync: true }); // (a pong after it on the same socket: the room has handled the away)
+    await cs[1].waitFor((m) => m.t === "pong");
+    cs[1].close();
+    await new Promise((r) => setTimeout(r, 1000)); // 5 plain graces later
+    expect((await roomInfo(code)).body.members).toBe(2);
+    const l = await cs[0].waitFor((m) => m.t === "lobby" && m.members.length === 1, 6000);
+    expect(l.members[0].id).toBe(cs[0].id);
+  });
+
   it("an empty room is deleted after the empty-room timeout", async () => {
     const { code, cs } = await lobbyOf(1, { timeScale: 0.0005 }); // 10 min -> 300 ms
     cs[0].close();

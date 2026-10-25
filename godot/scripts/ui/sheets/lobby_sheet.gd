@@ -304,8 +304,10 @@ func _refresh() -> void:
 	_quiet = true
 	for b: Button in game_picker.get_children():
 		b.set_pressed_no_signal(str(b.get_meta("value")) == game)
-		b.disabled = not host
-	game_picker.modulate.a = 1.0 if host else 0.75
+		# not the host: the same picker showing the host's choice, just not tappable (a disabled Button would draw the
+		# theme's grey disabled box over both halves, which reads as broken)
+		b.mouse_filter = Control.MOUSE_FILTER_STOP if host else Control.MOUSE_FILTER_IGNORE
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if host else Control.CURSOR_ARROW
 	var ludo := game == "ludo"
 	for r: Control in [_rules_cap, _teams_row, _pair_row]:
 		r.visible = ludo

@@ -40,6 +40,7 @@ signal pause_pressed
 signal settings_pressed
 
 const CPU_ROLL_WAIT := 0.35              # a computer's turn starts, then it rolls
+const BACK_WINDOW_MS := 30_000            # app_resumed(): how long a bot on your seat is still "you were away"
 const CPU_AFTER_WAIT := 0.25             # after a computer's move, before the next turn
 const HUMAN_AFTER_WAIT := 0.3            # after your move
 const HOLD_WAIT := 0.9                   # a roll that can't move (three 6s, need a 1, overshoot): read it
@@ -88,6 +89,7 @@ var _my_away := false                     # online: a bot was playing your seat 
 var emotes: EmoteLayer                    # the reactions under the tiles
 var emote_picker: EmotePicker             # the chat-bubble button and its panel
 var _emote_on := false
+var _back_until := 0                      # online: back in the app until then (ticks ms): a bot on your seat is sent away
 
 func _init(app_: Node, world_: TableWorld, board_: SLBoard) -> void:
 	app = app_
@@ -979,6 +981,14 @@ func _net_back() -> void:
 	if online:
 		_net_send({t = "back"})
 
+## The app came back to the front during an online match: the player is here, so the seat is theirs again without
+## an "I’m back" tap (now, and when the bot that took it over while the phone was away shows up in the next acts).
+func app_resumed() -> void:
+	if not online:
+		return
+	_back_until = Time.get_ticks_msec() + BACK_WINDOW_MS
+	_net_back()                              # (the server ignores it while the seat is still yours)
+
 ## The Offline / Bot tags on the tiles, and the away prompt when a bot plays for you.
 func _net_badges() -> void:
 	if not online or G.is_empty():
@@ -993,7 +1003,12 @@ func _net_badges() -> void:
 			b = "offline"
 		(chips.get_child(k) as SLTile).set_badge(b)
 	var mine := ns.mine()
-	_show_away(not mine.is_empty() and bool(mine.cpu) and G.phase != "over")
+	var botted: bool = not mine.is_empty() and bool(mine.cpu) and G.phase != "over"
+	if botted and Time.get_ticks_msec() < _back_until:
+		_back_until = 0                      # just back in the app: take the seat back (once)
+		_net_back()
+		botted = false
+	_show_away(botted)
 
 ## The event line while you wait: "Your turn", "Rafi’s turn", "Rafi is away. A bot is playing…".
 func _net_wait_line(p: Dictionary) -> String:

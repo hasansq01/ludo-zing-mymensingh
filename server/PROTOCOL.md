@@ -308,7 +308,8 @@ Clarifications of the tables above; nothing here changes a message the client se
 - Timeouts act with `auto_move_token`, else the **easy** AI; bots play the **normal** AI.
 - **`lobby`** also carries `status` (`"lobby" | "playing" | "over"`); a member's `color` is the colour they would
   get if the host started now. It is also sent during a match when the host changes (the host left).
-- **Lobby disconnects**: the member stays (`online: false`) for the 20 s grace, then is dropped (`lobby` sent); a
+- **Lobby disconnects**: the member stays (`online: false`) for the 20 s grace (5 min when its last socket had said
+  `{t: "away", on: true}`: the app went to the background, e.g. to share the invite), then is dropped (`lobby` sent); a
   later hello joins as a new member at the end of the order.
 - **`over`** also carries `standings: [{color, place, finished, progress}]` (`LudoRules.standings`), and is
   followed by `lobby` (`status: "over"`). The room is then back under lobby rules: people may join (up to 4) or

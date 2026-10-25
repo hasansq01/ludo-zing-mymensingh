@@ -1217,9 +1217,11 @@ func _notification(what: int) -> void:
 			_flush_match()
 			Save.flush()
 			Sound.set_app_paused(true)
-			if screen in ["ludo", "sl"]:
-				open_pause()
+			if screen in ["ludo", "sl"] and not _online_match():
+				open_pause()                        # (online the game goes on: coming back goes straight to the board)
 		NOTIFICATION_APPLICATION_RESUMED:
 			Sound.set_app_paused(false)
+			if _online_match():
+				(ludo if screen == "ludo" else sl).app_resumed()   # back in the app: the seat is yours again
 		NOTIFICATION_APPLICATION_FOCUS_OUT:      # a call, the notification shade, the app switcher: keep the match
 			_flush_match()

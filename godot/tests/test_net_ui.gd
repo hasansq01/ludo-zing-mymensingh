@@ -68,6 +68,13 @@ func _lobby() -> void:
 	s.update(_lobby_msg(3, "m2"), false)
 	check("lobby: guests wait for the host", s.start_button.disabled and s.start_button.text == "Waiting for host…")
 	check("lobby: guests can't change the rules", s.pair_switch.disabled and s.teams_switch.disabled)
+	var halves: Array = s.game_picker.get_children()
+	check("lobby: guests see the game picker as it is (not the grey disabled look), just not tappable",
+		halves.all(func(b): return not b.disabled and b.mouse_filter == Control.MOUSE_FILTER_IGNORE) and s.game_picker.modulate.a == 1.0)
+	var picked: Array = []
+	s.game_changed.connect(func(g): picked.append(g))
+	(halves[1] as Button).pressed.emit()
+	check("lobby: …and a pick by a guest changes nothing", picked.is_empty() and s.game == "ludo", [picked, s.game])
 	sent.clear()
 	s.pair_switch.button_pressed = not s.pair_switch.button_pressed
 	check("lobby: …and nothing is sent", sent.is_empty())
@@ -76,6 +83,7 @@ func _lobby() -> void:
 	s.start_button.pressed.emit()
 	check("lobby: a disabled Start emits nothing", started.is_empty())
 	s.update(_lobby_msg(2), true)
+	check("lobby: the host's game picker is tappable again", s.game_picker.get_children().all(func(b): return b.mouse_filter == Control.MOUSE_FILTER_STOP))
 	s.set_status("reconnecting")
 	check("lobby: reconnecting holds Start and shows the pill", s.status_pill.visible and s.start_button.disabled)
 	s.set_status("open")
