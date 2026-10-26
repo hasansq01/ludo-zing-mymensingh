@@ -63,7 +63,8 @@ describe("economy report", () => {
     const today = econDayStartMs(Date.now());
     const g = await guest(); // its start ledger row counts too, so take the baseline after creating it
     await setAccount(g.id, { gems: 7 });
-    const bg = (await get("economy?days=7")).totals; // plus whatever other tests put in the window
+    const b7 = await get("economy?days=7");
+    const bg = b7.totals; // plus whatever other tests put in the window (some write at the fixed clock T0, 2026-10-21)
     const bt = (await get("economy?days=1")).totals;
     const d1 = today - DAY; // yesterday (BD)
     const old = today - 40 * DAY;
@@ -113,7 +114,7 @@ describe("economy report", () => {
     const [yest, tod] = e.per_day.slice(-2);
     expect(yest).toMatchObject({ coins_created: 900, coins_spent: 1000, gems_created: 5, gems_spent: 0, fees: 40 });
     expect(tod).toMatchObject({ coins_created: bt.coins_created + 450, coins_spent: bt.coins_spent + 500, gems_created: bt.gems_created, gems_spent: bt.gems_spent + 5, fees: 100 });
-    expect(e.per_day[0]).toMatchObject({ coins_created: 0, fees: 0 });
+    expect(e.per_day[0]).toMatchObject({ coins_created: b7.per_day[0].coins_created, fees: b7.per_day[0].fees });
     expect(e.to).toBe(tod.day);
     expect(e.totals).toMatchObject({ coins_created: bg.coins_created + 1350, coins_spent: bg.coins_spent + 1500, gems_created: bg.gems_created + 5, gems_spent: bg.gems_spent + 5, fees: 140 });
     expect(e.totals.by_reason).toEqual(
