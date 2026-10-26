@@ -1,7 +1,7 @@
 # Tasks — Ludo Zing Mymensingh
 
 See `PROJECT_CONTEXT.md` for details. Update this list whenever work starts, finishes or is dropped.
-Last reviewed: 2026-10-19.
+Last reviewed: 2026-10-27.
 
 ## Completed
 - [x] 3D WebGL Ludo core: board, tokens, dice, turns, captures, exact finish, three-6s rule.
@@ -95,20 +95,28 @@ Last reviewed: 2026-10-19.
   - [x] Step 3: online friend rooms for Ludo on Cloudflare Workers + Durable Objects (`server/`, live; tested with
         unit/parity/room tests, simulated 2–4 player games incl. drop/rejoin on production, and the Android release
         APK on the emulator against production).
-  - [ ] Step 4: quick match, accounts (Google sign-in) and server-side coins; Snakes & Ladders online.
+  - [x] Step 4 (`6c10e19`): quick match, accounts and server coins, leaderboards, Snakes & Ladders online.
   - [x] Play on after the first finish (owner 2026-10-25): Ludo (Individual + Teams) and Snakes & Ladders go on until
-        the places are decided (ends when < 2 sides are left or no person is left unfinished; the rest ranked by
-        progress); GDScript rules + TS port with regenerated parity traces; the Room ends ghost-only / leaver-only
-        tails with `{k: "end"}`; grants and offline claims by placing; finish pops, place badges, "You finished" card.
-  - [ ] Emotes in the Godot game (next, after play-on; owner 2026-10-25): port the 24 animated stickers from
-        `origin/feature/emotes` (web index.html) into 4 packs of 6 (Starter free + equipped; Pawn Pals 2,500, Friends
-        4,000, Game 3,500 coins, bought via the server wallet), each emote paired with its own sound, a picker in Ludo and
-        S&L matches, online relay (server validates ownership + rate limit; quick-match ghosts react like people), CPU
-        reactions offline, Shop/Inventory Emotes tab with previews.
-  - [ ] Notifications (after Step 4): local reminders (daily/free/spin ready, come-back nudges), FCM push for game
-        events (your turn, friend joined, rematch), and promo sends from the admin console. Design:
-        `server/ONLINE_V2.md` section 8.
-  - [ ] Step 5: Play Store release.
+        the places are decided; grants and offline claims by placing.
+  - [x] Emotes (`48a8171`, `f735a1e`): 24 animated stickers in 4 packs, sounds, shop, online relay, bot emotes.
+  - [x] Notifications (`8bc8e37`, `0933daf`): local reminders, FCM push alerts, admin campaigns.
+  - [x] New home screen, layout D (`02da34a`); admin Usage page (`afcbe28`).
+  - [ ] **Economy v1** (owner's goal, 2026-10-26; contract `server/ECONOMY_V1.md`):
+    - [x] Server (`3b77d00`, deployed, migration 0005 on remote D1): gems, coin tables 100 / 500 / 2,000 / 10,000 /
+          50,000 + practice, entries held and settled, re-rolls, AdMob SSV and Play purchase checks, refunds cron,
+          weekly gem prizes, admin gems grant / remove and Economy page. 1015/1015 server tests (2026-10-27).
+    - [x] Game (`7815ec2`, `1400d44`): gem wallet + store, coin-table picker, broke popup, re-roll button and held note,
+          rewarded videos (AdMob + UMP consent), Play Billing plugin, 2,500 starting coins. 2455/2455 Godot tests.
+    - [x] AdMob: app + rewarded unit, SSV URL verified, European regulations consent message published (2026-10-27).
+    - [x] Phone (v4): re-roll used (free and 5 gems).
+    - [ ] **User:** update the phone to v5 (published to internal testing 2026-10-27), watch a rewarded video, play a
+          coin match to the end.
+    - [ ] **User:** set up the Google Payments merchant account; then create the 4 gem products (gems_80 / 220 / 500 /
+          1200), add license testers (TeamDD) and make a test purchase.
+    - [ ] **User:** `npx wrangler login` with the Flipfold Cloudflare account (the CLI is on shihabsdev's account, which
+          can't see the D1 database), so the ad / payout / purchase rows can be checked.
+  - [ ] Step 5: Play Store release. Internal testing is live (Oclasp org account, testers TeamDD, v5 0.2.0); store
+        listing, content rating, data safety and policy pages are done. Production after Economy v1 is verified.
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
       be updated (screenshot differs 5.35%, only in the bar region x 12-377, y 9-64; all layout checks and locked
       numbers pass).
