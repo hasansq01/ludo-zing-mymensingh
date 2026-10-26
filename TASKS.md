@@ -83,6 +83,10 @@ Last reviewed: 2026-10-19.
 - [x] Second deploy (2026-10-19, on the user's request): everything above marked "second deploy", including the restyled top
       bar that is not yet approved for the home screenshot baseline. Verified live: all 6 files match the build byte for byte,
       fonts load, no console errors; welcome, home top bar, Settings and Profile checked at 390x844.
+- [x] Snakes & Ladders 3D board: the in-board snakes and ladders are now flat 2D cartoon art printed into the board's face
+      texture (`paintLadders` / `paintSnakes`), replacing the 3D tube snakes and rod ladders. Same squares, paths, colours
+      and rules; scenery, table, framing snakes, camera and UI unchanged. Checked in the 3D and Top camera views (2026-10-26).
+      Not committed or deployed yet.
 
 ## In progress
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can

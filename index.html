@@ -5826,7 +5826,7 @@ const SL = (() => {
    Jungle.render; nothing renders otherwise). Built the first time it opens. Smooth rounded foliage (Lambert), glossy
    snakes / board / pawns (Standard), no real-time shadows. The sign and the framing trees / snakes are placed relative
    to the screen edges (`anchor`), so the composition holds on any screen shape. The table's board is a framed 3D
-   board built from the real SL.LADDERS / SL.SNAKES data (painted tiles, 3D ladders and snakes); static meshes are
+   board built from the real SL.LADDERS / SL.SNAKES data (tiles, flat ladders and snakes, one texture); static meshes are
    merged per material (the table separately, since it turns). */
 const Jungle = (() => {
   let J = null, cam = null, table = null, sign = null, built = false, building = null, vw = 0, vh = 0, last = 0, t = 0;
@@ -6009,12 +6009,8 @@ const Jungle = (() => {
   }
 
   // ---- the game board on the table: a rounded cream frame (like the Ludo board), a honey lip, the tile face and
-  // real 3D ladders and snakes lying on it. Everything is built in the table's space (it turns with the table).
+  // flat cartoon ladders and snakes printed on it. Everything is built in the table's space (it turns with the table).
   const BOARD = 5.3, FACE = 4.8, CELL = FACE / 10, BOARD_H = .3, SURF = BOARD_H + .066;
-  function square(n) {   // centre of square n on the face (x, z); square 1 bottom-left, rows zig-zag upwards
-    const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0;
-    return [-FACE / 2 + (k + .5) * CELL, FACE / 2 - (r + .5) * CELL];
-  }
   // B: the scene's board style (see SCENES): tile bands, grout, frame / lip, number ink, ladder colours, snake colours
   function boardFace(px, B) {   // rounded tiles in the scene's pastel bands, soft top light, readable numbers
     return tex(px, px, (g, w) => {
@@ -6029,6 +6025,7 @@ const Jungle = (() => {
         g.fillStyle = lg; g.fill();
       }
       { const [x, y] = [9 * c + c / 2, c / 2 + c * .08]; g.fillStyle = B.star; g.beginPath(); for (let a = 0; a < 10; a++) { const q = a % 2 ? c * .15 : c * .33, an = -Math.PI / 2 + a * Math.PI / 5; g.lineTo(x + Math.cos(an) * q, y + Math.sin(an) * q); } g.fill(); }
+      paintLadders(g, c, B); paintSnakes(g, c, B);
       g.font = `900 ${Math.round(c * .3)}px Nunito, sans-serif`; g.textBaseline = 'top'; g.lineJoin = 'round';
       for (let n = 1; n <= 100; n++) {
         const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0, x = k * c + c * .13, y = (9 - r) * c + c * .11;
@@ -6037,17 +6034,81 @@ const Jungle = (() => {
       }
     });
   }
-  function boardSnake(pts, R, col, parent) {   // pts: tail first, on the board plane
-    const rf = u => R * (.22 + .78 * Math.sin(Math.min(1, u * 1.3) * Math.PI / 2));
-    pts.forEach((p, i) => { p.y = SURF + rf(i / (pts.length - 1)) * .75; });
-    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
-    add(taperGeo(curve, 56, 10, rf), std(col, .35), 0, 0, 0, parent);
-    const end = curve.getPointAt(1), f = curve.getTangentAt(1), head = new THREE.Group();
-    head.position.copy(end); head.rotation.y = Math.atan2(f.x, f.z); parent.add(head);
-    add(SPH, std(col, .35), 0, R * .05, R * .55, head, { s: [R * 1.3, R * .85, R * 1.55] });
-    [-1, 1].forEach(s => {
-      add(SPH, std('#ffffff', .25), s * R * .55, R * .62, R * .9, head, { s: R * .4 });
-      add(SPH, std('#2a1d24', .2), s * R * .58, R * .7, R * 1.2, head, { s: R * .2 });
+  // ---- the snakes and ladders are printed flat on the tile face (flat cartoon art, no 3D geometry). They use the
+  // same centres and the same wavy body as the flat board (SL's snakePts), so a pawn sliding down in a match follows
+  // the drawn snake exactly. c: one square in texture pixels; rows go upwards from the bottom like the board.
+  const sq2d = (n, c) => { const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0; return [k * c + c / 2, (9 - r) * c + c / 2]; };
+  const shade = (hex, k) => {   // k < 0 darkens, k > 0 lightens
+    const n = parseInt(hex.slice(1), 16), f = v => Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k);
+    return `rgb(${f(n >> 16)},${f(n >> 8 & 255)},${f(n & 255)})`;
+  };
+  const seg = (g, a, b, x, y) => { g.beginPath(); g.moveTo(a, b); g.lineTo(x, y); g.stroke(); };
+  function paintLadders(g, c, B) {   // two rails and even rungs: an outline pass, then the colours, then a thin shine
+    Object.entries(SL.LADDERS).forEach(([f, t]) => {
+      const [x1, y1] = sq2d(+f, c), [x2, y2] = sq2d(t, c), dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+      const ux = dx / L, uy = dy / L, nx = -uy * c * .19, ny = ux * c * .19, ex = ux * c * .12, ey = uy * c * .12;
+      const rail = s => [x1 + nx * s - ex, y1 + ny * s - ey, x2 + nx * s + ex, y2 + ny * s + ey];
+      const n = Math.max(2, Math.round(L / (c * .42))), rungs = [];
+      for (let i = 1; i < n; i++) { const x = x1 + dx * i / n, y = y1 + dy * i / n; rungs.push([x - nx, y - ny, x + nx, y + ny]); }
+      const RW = c * .1, GW = c * .075, OW = c * .045;
+      g.lineCap = 'round'; g.strokeStyle = shade(B.rail, -.5);
+      g.lineWidth = GW + OW; rungs.forEach(r => seg(g, ...r));
+      g.lineWidth = RW + OW; [1, -1].forEach(s => seg(g, ...rail(s)));
+      g.strokeStyle = B.rung; g.lineWidth = GW; rungs.forEach(r => seg(g, ...r));
+      [1, -1].forEach(s => {
+        const [a, b, x, y] = rail(s);
+        g.lineCap = 'round'; g.strokeStyle = B.stripe ? B.stripe[1] : B.rail; g.lineWidth = RW; seg(g, a, b, x, y);
+        if (B.stripe) {   // candy-cane rails
+          const k = Math.max(2, Math.round(Math.hypot(x - a, y - b) / (c * .2)));
+          g.lineCap = 'butt'; g.strokeStyle = B.stripe[0];
+          for (let i = 0; i < k; i += 2) seg(g, a + (x - a) * i / k, b + (y - b) * i / k, a + (x - a) * (i + 1) / k, b + (y - b) * (i + 1) / k);
+        }
+        g.lineCap = 'round'; g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = c * .022;
+        seg(g, a - nx * .14 + ux * c * .04, b - ny * .14 + uy * c * .04, x - nx * .14 - ux * c * .04, y - ny * .14 - uy * c * .04);
+      });
+    });
+  }
+  function paintSnakes(g, c, B) {   // a smooth tapered body with soft back spots, then a round head with big eyes
+    const cols = B.snakes || SL.SNAKE_COL;
+    Object.entries(SL.SNAKES).forEach(([h, t], i) => {
+      const col = cols[i % cols.length], ink = shade(col, -.5);
+      const [x1, y1] = sq2d(+h, c), [x2, y2] = sq2d(t, c), dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+      const nx = -dy / len, ny = dx / len, waves = Math.max(1.5, len / (c * 2.2)), amp = c * .32, P = [], N = 40;
+      for (let s = 0; s <= N; s++) { const u = s / N, w = Math.sin(u * Math.PI * waves + i) * amp * Math.sin(u * Math.PI); P.push([x1 + dx * u + nx * w, y1 + dy * u + ny * w]); }
+      const hw = j => c * (.15 - .115 * Math.pow(j / N, 1.15)), left = [], right = [];
+      P.forEach((p, j) => {
+        const a = P[Math.max(0, j - 1)], b = P[Math.min(N, j + 1)], tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty), w = hw(j);
+        left.push([p[0] - ty / tl * w, p[1] + tx / tl * w]); right.push([p[0] + ty / tl * w, p[1] - tx / tl * w]);
+      });
+      const [ax, ay] = P[N - 1], [bx, by] = P[N], tl = Math.hypot(bx - ax, by - ay), tip = [bx + (bx - ax) / tl * c * .1, by + (by - ay) / tl * c * .1];
+      g.beginPath(); left.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y));
+      g.quadraticCurveTo(left[N][0] + (tip[0] - bx) * .9, left[N][1] + (tip[1] - by) * .9, ...tip);
+      g.quadraticCurveTo(right[N][0] + (tip[0] - bx) * .9, right[N][1] + (tip[1] - by) * .9, ...right[N]);
+      for (let j = N; j >= 0; j--) g.lineTo(...right[j]);
+      g.closePath();
+      g.lineJoin = 'round'; g.strokeStyle = ink; g.lineWidth = c * .05; g.stroke(); g.fillStyle = col; g.fill();
+      g.fillStyle = shade(col, -.18);   // back spots
+      for (let j = 5; j < N - 3; j += 4) { const [p, q] = [P[j - 1], P[j + 1]]; g.beginPath(); g.ellipse(P[j][0], P[j][1], hw(j) * .62, hw(j) * .4, Math.atan2(q[1] - p[1], q[0] - p[0]), 0, Math.PI * 2); g.fill(); }
+      g.strokeStyle = 'rgba(255,255,255,.38)'; g.lineWidth = c * .028; g.lineCap = 'round';   // a soft shine along one side
+      g.beginPath(); for (let j = 3; j < N - 6; j++) { const x = (P[j][0] * 2 + left[j][0]) / 3, y = (P[j][1] * 2 + left[j][1]) / 3; j > 3 ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+      // the head, pointing away from the body, on the head square
+      const ang = Math.atan2(P[0][1] - P[3][1], P[0][0] - P[3][0]), cs = Math.cos(ang), sn = Math.sin(ang);
+      const at = (f, s) => [P[0][0] + cs * c * f - sn * c * s, P[0][1] + sn * c * f + cs * c * s];
+      const [hx, hy] = at(.05, 0);
+      g.fillStyle = col; g.strokeStyle = ink; g.lineWidth = c * .05;
+      g.beginPath(); g.ellipse(hx, hy, c * .27, c * .22, ang, 0, Math.PI * 2); g.stroke(); g.fill();
+      g.strokeStyle = '#e5484d'; g.lineWidth = c * .03; g.lineCap = 'round';   // forked tongue
+      const [t0x, t0y] = at(.28, 0), [t1x, t1y] = at(.4, 0);
+      seg(g, t0x, t0y, t1x, t1y); seg(g, t1x, t1y, ...at(.46, -.05)); seg(g, t1x, t1y, ...at(.46, .05));
+      [-1, 1].forEach(s => {
+        g.fillStyle = 'rgba(255,140,160,.55)'; g.beginPath(); g.ellipse(...at(.1, s * .15), c * .045, c * .03, ang, 0, Math.PI * 2); g.fill();   // cheeks
+        const [ex, ey] = at(-.02, s * .11);
+        g.fillStyle = '#fff'; g.strokeStyle = ink; g.lineWidth = c * .022; g.beginPath(); g.arc(ex, ey, c * .085, 0, Math.PI * 2); g.fill(); g.stroke();
+        const [px, py] = at(.0, s * .11); g.fillStyle = '#2a1d24'; g.beginPath(); g.arc(px + cs * c * .02, py + sn * c * .02, c * .042, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#fff'; g.beginPath(); g.arc(px + cs * c * .03 - sn * c * .015, py + sn * c * .03 + cs * c * .015, c * .014, 0, Math.PI * 2); g.fill();
+      });
+      g.strokeStyle = ink; g.lineWidth = c * .02;   // a little smile across the snout
+      g.beginPath(); g.arc(...at(.08, 0), c * .1, ang - .7, ang + .7); g.stroke();
     });
   }
   // a rail made of short alternating pieces (candy-cane ladders); merges like any other static mesh
@@ -6058,26 +6119,9 @@ const Jungle = (() => {
   function buildBoard(parent, B) {
     add(rbox(BOARD, BOARD, BOARD_H, .14), std(B.frame, B.frameR, B.frameM), 0, BOARD_H / 2, 0, parent, { rx: -Math.PI / 2 });
     add(rbox(FACE + .22, FACE + .22, .08, .035), std(B.lip, .35, B.lipM), 0, BOARD_H + .02, 0, parent, { rx: -Math.PI / 2 });
-    const face = boardFace(1024, B); face.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    // the tiles, ladders and snakes are one flat texture on the face (2048 px, so the line art stays crisp up close)
+    const face = boardFace(Math.min(2048, renderer.capabilities.maxTextureSize), B); face.anisotropy = renderer.capabilities.getMaxAnisotropy();
     add(new THREE.PlaneGeometry(FACE, FACE), new THREE.MeshStandardMaterial({ map: face, roughness: .5 }), 0, SURF, 0, parent, { rx: -Math.PI / 2 });
-    const rail = std(B.rail, .5, B.railM), rung = std(B.rung, .5);
-    Object.entries(SL.LADDERS).forEach(([f, t]) => {
-      const [x1, z1] = square(+f), [x2, z2] = square(t), dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz);
-      const ux = dx / L, uz = dz / L, nx = -uz * CELL * .19, nz = ux * CELL * .19, ex = ux * CELL * .12, ez = uz * CELL * .12;
-      [1, -1].forEach(s => {
-        const a = V3(x1 + nx * s - ex, SURF + .03, z1 + nz * s - ez), b = V3(x2 + nx * s + ex, SURF + .03, z2 + nz * s + ez);
-        B.stripe ? stripedRod(a, b, .03, B.stripe, parent) : rod(a, b, .028, rail, parent);
-      });
-      const k = Math.max(2, Math.round(L / (CELL * .42)));
-      for (let i = 1; i < k; i++) { const x = x1 + dx * i / k, z = z1 + dz * i / k; rod(V3(x - nx * 1.08, SURF + .022, z - nz * 1.08), V3(x + nx * 1.08, SURF + .022, z + nz * 1.08), .02, rung, parent); }
-    });
-    const cols = B.snakes || SL.SNAKE_COL;
-    Object.entries(SL.SNAKES).forEach(([h, t], i) => {
-      const [x1, z1] = square(+h), [x2, z2] = square(t), dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz), nx = -dz / L, nz = dx / L;
-      const waves = Math.max(1.5, L / (CELL * 2.2)), amp = CELL * .3, pts = [];
-      for (let s = 0; s <= 24; s++) { const u = s / 24, w = Math.sin(u * Math.PI * waves + i) * amp * Math.sin(u * Math.PI); pts.push(V3(x1 + dx * u + nx * w, 0, z1 + dz * u + nz * w)); }
-      boardSnake(pts.reverse(), CELL * .15, cols[i % cols.length], parent);
-    });
   }
   function pawn(parent, x, z, col) {   // a glossy Ludo-style pawn
     const m = std(col, .3), g = new THREE.Group(); g.position.set(x, 0, z); parent.add(g);
@@ -6552,7 +6596,7 @@ const Jungle = (() => {
      around) or 'top' (straight down, the whole board flat and readable, square 1 bottom-left). The board is fitted into
      the #slBoard box of the page (the same box the flat board used), so the player strip, message and dice stay where
      they were. Pawns are driven by the game itself: SL keeps animating each player's xy / lift on its board grid, and
-     here those are mapped onto the 3D board (same layout as square()), so rules, turns and animations are untouched. */
+     here those are mapped onto the 3D board (same layout as the face texture), so rules, turns and animations are untouched. */
   let mode = 'landing', view = '3d', landingCam = null, playCache = null, camCur = null, pawnsFor = 0, pawnSet = [], turnRing = null, decorPawns = [], coilTree = null;
   const fitCam = new THREE.PerspectiveCamera(46, 1, .5, 200), pv = V3();
   function boardBox() {   // the #slBoard box in stage pixels

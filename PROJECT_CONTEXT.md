@@ -345,8 +345,10 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   while the landing is visible (setup/game/home draw nothing of it); built lazily on first open (`Jungle.start`).
   Contents (polished 2026-10-20): sky gradient + fog, grass and a soft-edged sandy clearing, round wooden table turning
   ~1 rev / 30 s with a framed 3D board (`buildBoard`: rounded cream frame like the Ludo board, honey lip, painted face
-  with rounded pastel tiles and numbers (`boardFace`), 3D ladders and glossy tapered snakes built from SL.LADDERS /
-  SL.SNAKES / SL.SNAKE_COL) and two glossy Ludo-style pawns (no dice); background of smooth rounded trees, two far
+  with rounded pastel tiles and numbers (`boardFace`); since 2026-10-26 the ladders and snakes are flat 2D cartoon art
+  painted into that same 2048 px face texture (`paintLadders` / `paintSnakes`, from SL.LADDERS / SL.SNAKES /
+  SL.SNAKE_COL and the scene's `rail` / `rung` / `stripe` / `snakes` colours), no 3D geometry; the snake bodies use
+  the same wave as SL's `snakePts`, so pawns slide along the drawn snake) and two glossy Ludo-style pawns (no dice); background of smooth rounded trees, two far
   palms (leaf geometry `leafGeo`), tidy bushes and ferns; a hanging wooden sign "SNAKES & LADDERS" (canvas text,
   Lilita One) with ropes, vines and a little snake; two framing snakes (left tree coil, purple hanging right). Snakes
   share one model (`snake`: tapered body `taperGeo` with painted back pattern and pale belly, `snakeHead` with big
