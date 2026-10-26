@@ -44,6 +44,8 @@ const SINGLETON := "AdMob"
 const UNIT_SETTING := "ludo_zing/ads/rewarded_unit"
 ## Optional: a UMP test device hashed id (logcat prints it), to force the consent form in dev. Empty = none.
 const TEST_DEVICE_SETTING := "ludo_zing/ads/test_device"
+## Phones that get test ads from the real units (comma-separated hashed ids from the SDK's log line).
+const TEST_ADS_SETTING := "ludo_zing/ads/test_ad_devices"
 const UNAVAILABLE := "unavailable"
 ## Seconds before the next automatic load, by number of failures in a row (the last one repeats).
 const BACKOFF := [5.0, 15.0, 60.0]
@@ -68,6 +70,9 @@ func _init(singleton: Object = null, deferred := true) -> void:
 	if singleton == null and Engine.has_singleton(SINGLETON):
 		singleton = Engine.get_singleton(SINGLETON)
 	_pg = singleton
+	var test_ads := str(ProjectSettings.get_setting(TEST_ADS_SETTING, "")).strip_edges()
+	if _pg != null and test_ads != "" and _pg.has_method("set_test_devices"):
+		_pg.call("set_test_devices", test_ads)
 	if _pg == null:
 		return
 	_connect("consent_done", _on_consent)

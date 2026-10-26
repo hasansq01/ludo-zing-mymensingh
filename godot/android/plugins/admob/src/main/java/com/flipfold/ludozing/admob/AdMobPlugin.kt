@@ -6,6 +6,7 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.RequestConfiguration
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions
@@ -76,6 +77,18 @@ class AdMobPlugin(godot: Godot) : GodotPlugin(godot) {
             }
             startSdk()
         }
+    }
+
+    /**
+     * Devices that get test ads from the real ad units (comma-separated hashed ids, as the SDK logs them: "Use
+     * RequestConfiguration.Builder().setTestDeviceIds(...)"). Before the AdMob account is approved, and for our own
+     * phones afterwards. Call before initialize / load_rewarded; "" clears the list.
+     */
+    @UsedByGodot
+    fun set_test_devices(ids: String) {
+        val list = ids.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        MobileAds.setRequestConfiguration(RequestConfiguration.Builder().setTestDeviceIds(list).build())
+        Log.i(TAG, "test devices: ${list.size}")
     }
 
     private fun startSdk() {
