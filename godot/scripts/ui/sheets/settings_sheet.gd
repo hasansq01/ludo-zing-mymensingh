@@ -12,7 +12,7 @@ extends Sheet
 ##                  News & offers (Save.prefs notif, notif_rewards, notif_reminders, notif_game, notif_offers); a note
 ##                  under the master says what a tap will do while the phone doesn't allow them
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
-##   Help           How to play, Credits (+ Privacy policy / Support once their pages exist: URLS)
+##   Help           How to play, Credits, Privacy policy, Delete my account, Support (URLS)
 ##   Reset progress (confirm first), then the version line and the Support ID (the player ID; nothing else uses it
 ##   offline, so it lives here instead of on the Profile).
 ## Every change is written to Save.prefs at once (Save.save() debounces the file write), sound changes reach the
@@ -25,7 +25,11 @@ signal prefs_changed
 
 const VERSION_LINE := "Ludo Zing Mymensingh · v%s · Flipfold Studio"
 ## Web pages for the Help rows. A row shows only when its URL is set (no dead "Coming soon" rows).
-const URLS := {privacy = "", support = ""}
+const URLS := {
+	privacy = "https://ludo-zing-rooms.flipfold.workers.dev/privacy",
+	delete = "https://ludo-zing-rooms.flipfold.workers.dev/delete-account",
+	support = "mailto:Hello@oclasp.com?subject=Ludo%20Zing",
+}
 const ROW_H := 56.0
 const SEG_W := 132.0
 const SEG_W_SHORT := 112.0              ## two short choices (3D / Top): the long row labels keep one line
@@ -138,7 +142,7 @@ func _build() -> void:
 	hp.add_child(_link_line("How to play", _open_howto))
 	hp.add_child(_divider())
 	hp.add_child(_link_line("Credits", _open_credits))
-	for k: Array in [["privacy", "Privacy policy"], ["support", "Support"]]:
+	for k: Array in [["privacy", "Privacy policy"], ["delete", "Delete my account"], ["support", "Support"]]:
 		var url := str(URLS.get(k[0], ""))
 		if url != "":
 			hp.add_child(_divider())
