@@ -25,7 +25,7 @@ interface Played {
 
 /** A full quick match with these humans (autoplay), returning everything every client received. */
 async function play(game: string, size: number, humans: number, names: string[]): Promise<Played> {
-  await mmHooks(game, size, { wait: 150, room: { timeScale: SCALE, emoteChance: 1, ...(game === "ludo" ? { tok: NEAR_GOAL } : { slPos: [80, 80, 80, 80] }) } });
+  await mmHooks(game, size, { wait: 150, room: { timeScale: SCALE, emoteChance: 1, rerollChance: 1, ...(game === "ludo" ? { tok: NEAR_GOAL } : { slPos: [80, 80, 80, 80] }) } });
   const gs: Guest[] = [];
   for (let k = 0; k < humans; k++) gs.push(await guest());
   const { qs, matched } = await queueAll(game, size, gs, names);
@@ -64,7 +64,10 @@ function audit(p: Played, game: string, humanNames: string[]): void {
   for (const c of p.cs) {
     for (let k = 0; k < c.log.length; k++) {
       const m = c.log[k];
-      expect(["welcome", "start", "sync", "act", "turn", "presence", "over", "error", "pong", "emote"]).toContain(m.t);
+      expect(["welcome", "start", "sync", "act", "turn", "presence", "over", "error", "pong", "emote", "hold", "rerolled"]).toContain(m.t);
+      // re-rolls (ECONOMY_V1.md §4): a ghost's look exactly like a person's free one
+      if (m.t === "hold") expect(Object.keys(m).sort()).toEqual(["c", "t", "until"]);
+      if (m.t === "rerolled") expect(Object.keys(m).sort()).toEqual(["c", "paid", "t"]);
       if (m.t === "welcome") expect(m.host).toBe(-1);
       if (m.t === "start" || m.t === "sync") {
         expect(m.game).toBe(game);
@@ -99,8 +102,12 @@ function audit(p: Played, game: string, humanNames: string[]): void {
       }
       if (m.t === "turn") {
         expect(Object.keys(m).sort()).toEqual(["c", "deadline", "now", "t"]);
-        // a ghost's turn carries a person's deadline (the configured turn timer), like everyone's
-        expect(Object.values(TIMERS)).toContain(m.deadline - m.now);
+        // a ghost's turn carries a person's deadline (the configured turn timer), like everyone's; after a hold
+        // (a re-roll offer) it starts when the hold ends
+        const held = c.log.slice(0, k).reverse().find((x) => x.t === "hold" || x.t === "act");
+        // (a hold shifts the next player's clock; the roller's own next turn, after an S&L 6, isn't shifted)
+        if (held?.t === "hold" && held.until > m.now && held.c !== m.c) expect(Object.values(TIMERS).some((t) => Math.abs(m.deadline - held.until - t) <= 2)).toBe(true);
+        else expect(Object.values(TIMERS)).toContain(m.deadline - m.now);
       }
       if (m.t === "emote") {
         // exactly a person's shape (key order included), a colour in the match, one of the 24 ids
@@ -110,7 +117,8 @@ function audit(p: Played, game: string, humanNames: string[]): void {
       }
       if (m.t === "presence") expect(p.ghostIds.has(m.id)).toBe(false);
       if (m.t === "over") {
-        expect(Object.keys(m).sort()).toEqual(["finished", "standings", "t", "winner"]);
+        expect(Object.keys(m).sort()).toEqual(["finished", "match_id", "standings", "t", "table", "winner"]);
+        expect(Object.keys(m.table).sort()).toEqual(["entry", "payouts", "tier"]);
         const ks = m.standings.map((s: Msg) => Object.keys(s).sort().join(","));
         expect(new Set(ks).size).toBe(1);
       }

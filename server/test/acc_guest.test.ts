@@ -9,7 +9,7 @@ describe("guest accounts", () => {
     const a = await guest({ pid });
     expect(a.body.created).toBe(true);
     expect(a.body.account).toMatchObject({ id: a.id, guest: true, imported: false });
-    expect(a.profile).toMatchObject({ coins: 5000, xp: 0, name: "You", room: "night", dice: "classic" });
+    expect(a.profile).toMatchObject({ coins: 2500, xp: 0, name: "You", room: "night", dice: "classic" });
     expect(a.profile.id).toMatch(/^LZM-/);
     const b = await guest({ pid });
     expect(b.body.created).toBe(false);
@@ -17,7 +17,7 @@ describe("guest accounts", () => {
     expect(b.profile.id).toBe(a.profile.id);
     expect(await rows("SELECT * FROM devices WHERE pid = ?", pid)).toHaveLength(1);
     const led = await rows("SELECT reason, delta_coins, balance_after FROM ledger WHERE account_id = ?", a.id);
-    expect(led).toEqual([{ reason: "start", delta_coins: 5000, balance_after: 5000 }]);
+    expect(led).toEqual([{ reason: "start", delta_coins: 2500, balance_after: 2500 }]);
     expect(await accountForPid(ENV, pid)).toEqual({ account_id: a.id, banned: false });
     expect(await accountForPid(ENV, newPid())).toBeNull();
   });
@@ -82,8 +82,8 @@ describe("the one-time import", () => {
       g.id,
     );
     expect(led).toEqual([
-      { reason: "start", delta_coins: 5000, delta_xp: 0 },
-      { reason: "import", delta_coins: 45_000, delta_xp: 12_345 },
+      { reason: "start", delta_coins: 2500, delta_xp: 0 },
+      { reason: "import", delta_coins: 47_500, delta_xp: 12_345 },
     ]);
     expect(await ledgerSum(g.id)).toBe(50_000);
     expect(await row("SELECT value FROM scores WHERE account_id = ? AND board = 'xp' AND period = 'all'", g.id)).toEqual({ value: 12_345 });
@@ -114,7 +114,7 @@ describe("the one-time import", () => {
     await ok("shop/buy", { session: h.session, body: { kind: "dice", id: "crema" } });
     const late = await guest({ pid: pid2, import: { coins: 40_000 } });
     expect(late.body.import).toEqual({ ok: false, error: "already" });
-    expect(late.profile.coins).toBe(4000);
+    expect(late.profile.coins).toBe(1500);
     expect(g.id).not.toBe(h.id);
   });
 
@@ -122,7 +122,7 @@ describe("the one-time import", () => {
     const g = await guest({ import: "lots of coins" });
     expect(g.body.import).toEqual({ ok: false, error: "invalid" });
     expect(g.body.account.imported).toBe(false);
-    expect(g.profile.coins).toBe(5000);
+    expect(g.profile.coins).toBe(2500);
   });
 });
 

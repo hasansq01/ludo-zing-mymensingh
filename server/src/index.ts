@@ -6,6 +6,9 @@ import * as A from "./accounts";
 import { CSP, handleAdmin } from "./admin";
 import { cron } from "./cron";
 import * as D from "./db";
+import * as Ads from "./ads";
+import * as E from "./economy";
+import * as Iap from "./iap";
 import { handleLeaderboard } from "./leaderboard";
 import * as P from "./push";
 import { handleQuick } from "./quick";
@@ -63,6 +66,10 @@ const POST_AUTHED: Record<string, (req: Request, env: Env, a: A.Authed, now: num
   "rewards/spin": (_req, env, a, now) => W.rewardSpin(env, a, now),
   "rewards/free": (_req, env, a, now) => W.rewardFree(env, a, now),
   "achievements/claim": W.achievementClaim,
+  "gems/exchange": E.gemsExchange,
+  "ads/start": Ads.adsStart,
+  "iap/verify": Iap.iapVerify,
+  "rewards/broke": (_req, env, a, now) => E.rewardBroke(env, a, now),
   claims: W.postClaim,
   "push/token": P.postToken,
 };
@@ -90,6 +97,18 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
       }
       case "push/opened":
         return m === "POST" ? await P.postOpened(req, env, now) : json({ error: "method" }, 405);
+      case "ads/ssv":
+        return await Ads.adsSsv(req, env, now); // AdMob's callback: no session, signature-checked
+      case "ads/today":
+      case "ads/status":
+      case "iap/products": {
+        if (m !== "GET") return json({ error: "method" }, 405);
+        const a = await A.authenticate(req, env, now);
+        if (a instanceof Response) return a;
+        if (path === "ads/today") return await Ads.adsToday(env, a, now);
+        if (path === "ads/status") return await Ads.adsStatus(env, a, new URL(req.url), now);
+        return Iap.iapProducts(a);
+      }
       case "push/token": {
         if (m !== "DELETE") break; // POST: below
         const a = await A.authenticate(req, env, now);
@@ -97,11 +116,13 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
         return await P.deleteToken(req, env, a);
       }
       case "me":
+      case "tables":
       case "rewards": {
         if (m !== "GET" && !(path === "me" && m === "PATCH")) return json({ error: "method" }, 405);
         const a = await A.authenticate(req, env, now);
         if (a instanceof Response) return a;
         if (path === "rewards") return await W.rewardsState(a, A.rowToProfile(a.row), now);
+        if (path === "tables") return await E.tablesState(env, a, A.rowToProfile(a.row), now);
         return m === "GET" ? await A.getMe(a) : await A.patchMe(req, env, a, now);
       }
     }

@@ -7,7 +7,10 @@ import * as D from "./db";
 import {
   DEFAULT_AVATAR,
   DEFAULT_FRAME,
+  ECON_V1,
   ONLINE_REWARDS,
+  addCoins,
+  tablePayouts,
   type Profile,
   applyOnlineResult,
   cleanName,
@@ -20,6 +23,7 @@ import {
   newProfile,
   normalizeProfile,
 } from "./econ";
+import { entryOpen, entrySettleStmt } from "./economy";
 import { type GoogleEnv, type GooglePlayer, googleConfigured, playerFromAuthCode } from "./google";
 import { type Guard, scoreStmts } from "./leaderboard";
 import type { Env } from "./room";
@@ -44,6 +48,9 @@ export interface AccountRow {
   plate: string | null;
   badge: string | null;
   coins: number;
+  /** Economy v1 (migration 0005): premium currency and free re-rolls held. */
+  gems: number;
+  rerolls: number;
   xp: number;
   online_wins: number;
   stats: string | null;
@@ -91,6 +98,8 @@ export function rowToProfile(r: AccountRow): Profile {
     name: r.name,
     id: r.public_id,
     coins: r.coins,
+    gems: r.gems,
+    rerolls: r.rerolls,
     xp: r.xp,
     stats: obj(r.stats),
     rooms: owned.rooms,
@@ -129,6 +138,8 @@ export function profileColumns(p: Profile): Record<string, string | number | nul
     plate: p.plate,
     badge: p.badge,
     coins: Math.trunc(p.coins),
+    gems: Math.trunc(p.gems ?? 0),
+    rerolls: Math.trunc(p.rerolls ?? 0),
     xp: Math.trunc(p.xp),
     stats: JSON.stringify(p.stats),
     owned: JSON.stringify(owned),
@@ -203,6 +214,8 @@ export function isUnique(e: unknown): boolean {
 export interface LedgerEntry {
   coins: number;
   xp: number;
+  /** Gems of this change (Economy v1); missing = 0. */
+  gems?: number;
   reason: string;
   ref?: string | null;
 }
@@ -221,6 +234,8 @@ export interface Write {
   set?: Record<string, string | number | null>;
   /** Statements to run in the same batch, guarded so they apply only when this write did. */
   extra?: (g: Guard) => D1PreparedStatement[];
+  /** No level-up gems for this write (the one-time import: XP from the device isn't earned here). */
+  noLevelGems?: boolean;
 }
 
 export interface Step<T> {
@@ -238,14 +253,21 @@ export function guardedInsert(db: D1Database, g: Guard, table: string, cols: str
     .bind(...vals, ...g.params);
 }
 
-export function ledgerStmt(db: D1Database, g: Guard, accountId: string, l: LedgerEntry, balance: number, now: number): D1PreparedStatement {
+export function ledgerStmt(db: D1Database, g: Guard, accountId: string, l: LedgerEntry, balance: number, now: number, gemsAfter: number | null = null): D1PreparedStatement {
   return guardedInsert(
     db,
     g,
     "ledger",
-    ["account_id", "at", "delta_coins", "delta_xp", "reason", "ref", "balance_after"],
-    [accountId, now, Math.trunc(l.coins), Math.trunc(l.xp), l.reason, l.ref ?? null, balance],
+    ["account_id", "at", "delta_coins", "delta_xp", "delta_gems", "reason", "ref", "balance_after", "gems_after"],
+    [accountId, now, Math.trunc(l.coins), Math.trunc(l.xp), Math.trunc(l.gems ?? 0), l.reason, l.ref ?? null, balance, gemsAfter],
   );
+}
+
+/** Gems for reaching a new level (ECONOMY_V1.md §0): ECON_V1.level_gems per level gained. */
+export function levelGems(xpBefore: number, xpAfter: number): { gems: number; level: number } {
+  const a = levelInfo(Math.max(0, xpBefore)).level;
+  const b = levelInfo(Math.max(0, xpAfter)).level;
+  return { gems: b > a ? (b - a) * ECON_V1.level_gems : 0, level: b };
 }
 
 /**
@@ -270,6 +292,9 @@ export async function mutate<T>(
     const step = await fn(row, rowToProfile(row));
     const w = step.write;
     if (!w) return step.result;
+    // a write that raises the level adds the level-up gems (its own ledger row below)
+    const lv = w.profile && !w.noLevelGems ? levelGems(row.xp, Math.trunc(w.profile.xp)) : { gems: 0, level: 0 };
+    if (lv.gems > 0) w.profile = { ...w.profile!, gems: Math.trunc(w.profile!.gems ?? 0) + lv.gems };
     const rev = newRev();
     const g: Guard = { sql: "EXISTS (SELECT 1 FROM accounts WHERE id = ? AND rev = ?)", params: [accountId, rev] };
     const cols: Record<string, string | number | null> = { ...(w.profile ? profileColumns(w.profile) : {}), ...(w.set ?? {}) };
@@ -283,15 +308,33 @@ export async function mutate<T>(
     ];
     const coins = w.profile ? Math.trunc(w.profile.coins) : row.coins;
     const xp = w.profile ? Math.trunc(w.profile.xp) : row.xp;
-    if (w.ledger && (w.ledger.coins !== 0 || w.ledger.xp !== 0)) stmts.push(ledgerStmt(db, g, accountId, w.ledger, coins, now));
+    const gems = w.profile ? Math.trunc(w.profile.gems ?? 0) : row.gems;
+    if (w.ledger && (w.ledger.coins !== 0 || w.ledger.xp !== 0 || (w.ledger.gems ?? 0) !== 0)) {
+      stmts.push(ledgerStmt(db, g, accountId, w.ledger, coins, now, gems - lv.gems));
+    }
+    if (lv.gems > 0) stmts.push(ledgerStmt(db, g, accountId, { coins: 0, xp: 0, gems: lv.gems, reason: "level", ref: String(lv.level) }, coins, now, gems));
     const xpWeek = w.xpWeek ?? (w.ledger && w.ledger.xp > 0 ? w.ledger.xp : 0);
     stmts.push(...scoreStmts(db, g, accountId, { xp: xp !== row.xp ? xp : undefined, xpWeek, wins: w.wins }, now));
     if (w.extra) stmts.push(...w.extra(g));
     const res = await db.batch(stmts);
-    if (res[0].meta.changes > 0) return step.result;
+    if (res[0].meta.changes > 0) return lv.gems > 0 ? ((await withLevelGems(step.result, w.profile!)) as T) : step.result;
     await new Promise((r) => setTimeout(r, 2 + Math.random() * 10 * (attempt + 1)));
   }
   throw new Busy(`account ${accountId} busy`);
+}
+
+/**
+ * A step's answer was built from its profile before mutate added the level-up gems: a JSON Response carrying that
+ * profile gets the final gems (anything else is returned as it is).
+ */
+async function withLevelGems<T>(result: T, final: Profile): Promise<T> {
+  if (!(result instanceof Response)) return result;
+  if (!(result.headers.get("Content-Type") ?? "").includes("application/json")) return result;
+  const body = (await result.clone().json().catch(() => null)) as Record<string, unknown> | null;
+  const prof = body?.profile as Record<string, unknown> | undefined;
+  if (!prof || typeof prof !== "object") return result;
+  prof.gems = Math.trunc(final.gems ?? 0);
+  return new Response(JSON.stringify(body), { status: result.status, headers: result.headers }) as T;
 }
 
 // ---------- sessions ----------
@@ -418,20 +461,29 @@ export async function getPublicProfile(env: AccEnv, accountId: string): Promise<
  * leaderboards (XP; wins: online wins) and completed_matches (win / finish). Idempotent: calling it again for the same match grants nothing new. Unknown, merged and banned
  * accounts are skipped. Every account is tried; if any write failed it throws afterwards (safe to retry).
  */
-export async function grantOnlineMatch(
-  env: AccEnv,
-  m: { match_id: string; game: "ludo" | "sl"; results: { account_id: string; outcome: "win" | "finish" | "left" }[] },
-): Promise<void> {
+export async function grantOnlineMatch(env: AccEnv, m: MatchGrant): Promise<void> {
   const table = ONLINE_REWARDS[m.game];
   if (!table || typeof m.match_id !== "string" || !m.match_id) throw new Error("grantOnlineMatch: bad match");
   const now = Date.now();
   const errors: unknown[] = [];
   const seen = new Set<string>();
+  if (m.table && m.table.entry > 0) {
+    // the Economy page's row for this coin-table match (once)
+    const t = m.table;
+    const { pot, pool, pay } = tablePayouts(t.entry, t.size, t.size);
+    const paidHumans = m.results.reduce((n, r) => n + (r.place !== undefined && r.place >= 0 && r.entry_id ? (pay[r.place] ?? 0) : 0), 0);
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO table_matches (match_id, at, game, size, tier, entry, humans, ghosts, pot, fee, paid_humans, winner_ghost)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(m.match_id, now, m.game, t.size, t.tier, t.entry, t.humans, t.ghosts, pot, pot - pool, paidHumans, t.winner_ghost ? 1 : 0)
+      .run();
+  }
   for (const r of m.results) {
     if (seen.has(r.account_id) || !ACCOUNT_RE.test(r.account_id) || !(r.outcome in table)) continue;
     seen.add(r.account_id);
     try {
-      await grantOne(env, m.match_id, m.game, r.account_id, r.outcome, now);
+      await grantOne(env, m, r, now);
     } catch (e) {
       console.error(`grantOnlineMatch ${m.match_id} ${r.account_id} failed:`, e);
       errors.push(e);
@@ -440,26 +492,66 @@ export async function grantOnlineMatch(
   if (errors.length) throw new AggregateError(errors, `grantOnlineMatch ${m.match_id}: ${errors.length} failed`);
 }
 
-async function grantOne(env: AccEnv, matchId: string, game: "ludo" | "sl", accountId: string, outcome: "win" | "finish" | "left", now: number) {
+/** The grant of one online match (Room -> accounts_shim -> grantOnlineMatch). */
+export interface MatchGrant {
+  match_id: string;
+  game: "ludo" | "sl";
+  results: MatchGrantResult[];
+  /** Quick match: the coin table (entry 0 = practice). Missing: a friend room (ONLINE_REWARDS coins). */
+  table?: { tier: string; entry: number; size: number; humans: number; ghosts: number; winner_ghost?: boolean };
+}
+
+export interface MatchGrantResult {
+  account_id: string;
+  outcome: "win" | "finish" | "left";
+  /** Coin tables: the paid place (0 = 1st) among the seats that didn't leave; -1 = left (forfeit). */
+  place?: number;
+  /** Coin tables: this person's entry (ECONOMY_V1.md §3). */
+  entry_id?: string;
+}
+
+/**
+ * One account's grant: XP (and online stats) by outcome as before; coins: friend rooms ONLINE_REWARDS, practice
+ * ECON_V1.practice, coin tables the payout of `place` (ledger `payout`) with the entry settled (or forfeit) in the
+ * same batch. Once per match (match_grants).
+ */
+async function grantOne(env: AccEnv, m: MatchGrant, r: MatchGrantResult, now: number) {
   const db = env.DB;
+  const matchId = m.match_id;
+  const game = m.game;
+  const accountId = r.account_id;
+  const outcome = r.outcome;
   const done = await db.prepare("SELECT 1 AS x FROM match_grants WHERE match_id = ? AND account_id = ?").bind(matchId, accountId).first();
   if (done) return;
-  const { coins, xp } = ONLINE_REWARDS[game][outcome];
-  const grantRow = (g: Guard) => [
-    guardedInsert(db, g, "match_grants", ["match_id", "account_id", "at", "game", "outcome", "coins", "xp"], [matchId, accountId, now, game, outcome, coins, xp]),
-  ];
+  const t = m.table;
+  const paid = !!t && t.entry > 0;
+  let coins: number = ONLINE_REWARDS[game][outcome].coins;
+  if (t && !paid) coins = outcome === "left" ? 0 : (ECON_V1.practice[game]?.[outcome] ?? 0);
+  if (paid) coins = r.place !== undefined && r.place >= 0 ? (tablePayouts(t.entry, t.size, t.size).pay[r.place] ?? 0) : 0;
+  const xp = ONLINE_REWARDS[game][outcome].xp;
   try {
-    await mutate(env, accountId, now, (row, p) => {
+    await mutate(env, accountId, now, async (row, p) => {
       if (row.merged_into || row.banned) return { result: undefined };
-      const g = applyOnlineResult(p, game, outcome);
+      // a coin table pays only against an open entry (settled once, whatever retries do)
+      const entry = paid && r.entry_id ? await entryOpen(db, r.entry_id) : null;
+      const payout = paid ? (entry && entry.account_id === accountId ? coins : 0) : coins;
+      const g0 = applyOnlineResult(p, game, outcome);
+      const prof = structuredClone(g0.profile);
+      // applyOnlineResult paid ONLINE_REWARDS coins: replace them with this match's coins
+      prof.coins = Math.trunc(p.coins);
+      prof.stats = structuredClone(p.stats);
+      if (payout > 0) addCoins(prof, payout);
       return {
         result: undefined,
         write: {
-          profile: g.profile,
-          ledger: { coins, xp, reason: "match", ref: matchId },
+          profile: prof,
+          ledger: { coins: payout, xp, reason: paid ? "payout" : "match", ref: matchId },
           wins: outcome === "win" ? 1 : 0,
           matches: outcome === "left" ? 0 : 1,
-          extra: grantRow,
+          extra: (g) => [
+            guardedInsert(db, g, "match_grants", ["match_id", "account_id", "at", "game", "outcome", "coins", "xp"], [matchId, accountId, now, game, outcome, payout, xp]),
+            ...(entry ? [entrySettleStmt(db, g, entry.id, matchId, r.place ?? -1, payout, now)] : []),
+          ],
         },
       };
     });
@@ -660,6 +752,7 @@ export async function authGuest(req: Request, env: AccEnv, now: number): Promise
               set: { imported: 1 },
               ledger: { coins: res.delta.coins, xp: res.delta.xp, reason: "import" },
               xpWeek: 0,
+              noLevelGems: true,
             },
           };
         }) ?? undefined;

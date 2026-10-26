@@ -52,6 +52,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 | `emote` | `id` | any time (see "Emotes") |
 | `ping` | – | keep-alive every 20 s; send exactly `{"t":"ping"}` (see "Keep-alive") |
 | `away` | `on: bool` | the app went to the background (`true`) / came back (`false`); for push notifications only (see "Away and event pushes") |
+| `reroll` | `n` | within a `reroll_offer`'s window: pay and roll again (see "Re-roll") |
 
 `n` is the index of the action this request would become (the client's `n` = number of actions applied so far).
 A request with a stale `n` is ignored with `error {code: "stale"}` (protects against double taps and races).
@@ -259,9 +260,39 @@ What changes for `"sl"`:
   them had already finished (play on): then the match ends with `{k: "end"}` and the finished keep their place.
 - Everything else in the match (turns, timers, presence, reconnects, `leave`) is as in friend rooms.
 
+## Re-roll (Economy v1, ECONOMY_V1.md §4)
+
+After a **bad roll** (Ludo: the roll ended your turn without a move, i.e. you needed a 6 or were stuck on a non-6;
+S&L: you ended on a snake), a player who hasn't re-rolled in this match and can pay (a free re-roll, or 5 gems) gets
+an offer, and the turn is held for 3 s:
+
+| dir | t | fields |
+|---|---|---|
+| ← (the roller only) | `reroll_offer` | `n` (the action count now), `until`, `now` (server ms), `free` (free re-rolls held), `gems`, `cost` (5) |
+| ← (everyone) | `hold` | `c` (the roller's colour), `until`: the next player can't act before (their `turn.deadline` is shifted by the hold) |
+| → | `reroll` | `n` |
+| ← (everyone) | `rerolled` | `c`, `paid` (`free` \| `gems`) |
+| ← (everyone) | `sync` | the state before the bad roll (`n` back to that roll's index) |
+| ← (everyone) | `act` | the new roll (a fresh server roll, not a guaranteed 6), then play goes on as usual |
+
+Errors: `hold` (`until`: someone else's roll during the hold; retry then), `reroll_used`, `reroll_closed` (no offer,
+window over, the state moved on, a stale `n`), `gems` (can't pay). Once per player per match. Ghosts (quick match)
+sometimes take theirs (same messages, `paid: "free"`). A re-roll never touches the hash rules: clients just apply
+the `sync` and the `act`.
+
+## Coin tables (Economy v1, ECONOMY_V1.md §3)
+
+`GET /v1/quick/ws?game=&players=&table=<id>`: `practice` (default, free), `t100`, `t500`, `t2k`, `t10k`, `t50k`
+(levels 1, 1, 3, 6, 10, 15). One queue per game, size and table. At `hello` the entry is taken; errors before the
+close: `coins` (+`short`), `locked` (+`level`). Leaving the queue gives it back; leaving the match forfeits it; a
+match that never starts (no-show) or is closed early refunds it. `over` carries `match_id` and, in quick matches,
+`table: {tier, entry, payouts: {"<colour>": coins}}` (2 players: the winner gets 2 × entry − 10%; 4 players: 1st 75%,
+2nd 25% of 4 × entry − 10%; seats that left are skipped).
+
 ## Online rewards
 
-At `over` (friend rooms and quick rooms) the server grants each seat's account once per match (match id
+Friend rooms as below; quick matches: XP as below, coins from the coin table (or 50 / 10 at the practice table, see
+"Coin tables"). At `over` (friend rooms and quick rooms) the server grants each seat's account once per match (match id
 `<code>-<start ms>`): **win** (your side finished first), **finish** (your side finished later, or was ranked by
 progress at the end), **left** (you were away, i.e. had left or a bot was playing your seat, when your side was
 ranked: 0; finishing and then leaving keeps win / finish). Amounts: ONLINE_V2.md "Economy decisions". The client refreshes its

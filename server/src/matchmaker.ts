@@ -14,6 +14,8 @@
 import { DurableObject } from "cloudflare:workers";
 import * as D from "./db";
 import { accounts, quickStat, type GameKind } from "./accounts_shim";
+import { coinTable } from "./econ";
+import { holdEntry, refundEntry, seatEntries } from "./economy";
 import {
   CLOSE,
   PID_RE,
@@ -62,11 +64,15 @@ interface MmAtt {
   wait?: number;
   /** The position last sent (1-based), to send `queued` only on changes. */
   pos?: number;
+  /** Coin tables: the entry held for this queue entry (ECONOMY_V1.md §3); refunded unless it reaches a room. */
+  ent?: string;
 }
 
 interface Meta {
   game: GameKind;
   size: number;
+  /** The coin table (ECONOMY_V1.md §3); missing in queues created before Economy v1: practice. */
+  table?: string;
   /** Epoch ms since the queue has been empty (0 while someone waits). */
   emptySince: number;
   seq: number;
@@ -133,13 +139,14 @@ export class Matchmaker extends DurableObject<Env> {
     const url = new URL(req.url);
     const game = url.searchParams.get("game") ?? "ludo";
     const size = Number(url.searchParams.get("players") ?? "2");
-    if (!isGame(game) || !(QUICK_SIZES as readonly number[]).includes(size)) {
+    const table = url.searchParams.get("table") ?? "practice";
+    if (!isGame(game) || !(QUICK_SIZES as readonly number[]).includes(size) || !coinTable(table)) {
       return Response.json({ error: "bad_request" }, { status: 400 });
     }
     if (!this.meta) {
-      this.meta = { game, size, emptySince: Date.now(), seq: 0, alarmAt: 0 };
+      this.meta = { game, size, table, emptySince: Date.now(), seq: 0, alarmAt: 0 };
       this.save();
-    } else if (this.meta.game !== game || this.meta.size !== size) {
+    } else if (this.meta.game !== game || this.meta.size !== size || (this.meta.table ?? "practice") !== table) {
       return Response.json({ error: "bad_request" }, { status: 400 });
     }
     if (this.ctx.getWebSockets().length >= MM.maxSockets) return Response.json({ error: "busy" }, { status: 503 });
@@ -285,6 +292,7 @@ export class Matchmaker extends DurableObject<Env> {
     let since = now;
     let seq = -1;
     let wait = -1;
+    let ent: string | undefined;
     for (const other of this.ctx.getWebSockets()) {
       if (other === ws) continue;
       const oa = this.att(other);
@@ -294,9 +302,40 @@ export class Matchmaker extends DurableObject<Env> {
       since = oa.since ?? now;
       seq = oa.seq ?? -1;
       wait = oa.wait ?? -1;
+      ent = oa.ent; // the newer connection takes over the entry already paid
+      delete oa.ent;
+      other.serializeAttachment(oa);
       this.finishSocket(other, { t: "error", code: "replaced", msg: "you queued again on another connection" }, CLOSE.replaced, "replaced");
     }
     const meta = this.meta!;
+    const t = coinTable(meta.table ?? "practice");
+    if (t && t.entry > 0 && !ent) {
+      // a coin table: the entry is taken now and given back if this person leaves the queue
+      let h: Awaited<ReturnType<typeof holdEntry>>;
+      try {
+        h = await holdEntry(env as never, { account_id: account, game: meta.game, size: meta.size, tier: t.id });
+      } catch (e) {
+        console.error("holdEntry failed:", e);
+        return this.fatal(ws, "busy", "could not take the entry: try again");
+      }
+      if (!h.ok) {
+        if (h.error === "coins") {
+          this.send(ws, { t: "error", code: "coins", msg: "not enough coins for this table", short: h.short });
+          return this.closeWith(ws, CLOSE.fatal, "coins");
+        }
+        if (h.error === "locked") {
+          this.send(ws, { t: "error", code: "locked", msg: `this table opens at level ${h.level}`, level: h.level });
+          return this.closeWith(ws, CLOSE.fatal, "locked");
+        }
+        return this.fatal(ws, "session", "your account can't play this table");
+      }
+      ent = h.entry_id;
+      if (ws.readyState !== 1) {
+        // gone while paying: give it back
+        this.ctx.waitUntil(refundEntry(env as never, ent, "gone").then(() => undefined));
+        return;
+      }
+    }
     const fresh = seq < 0;
     if (fresh) {
       seq = meta.seq++;
@@ -317,6 +356,7 @@ export class Matchmaker extends DurableObject<Env> {
       seq,
       wait,
     };
+    if (ent) entry.ent = ent;
     ws.serializeAttachment(entry);
     meta.emptySince = 0;
     this.save();
@@ -385,9 +425,11 @@ export class Matchmaker extends DurableObject<Env> {
       e.att.st = "matching";
       e.ws.serializeAttachment(e.att);
     }
+    const t = coinTable(meta.table ?? "practice")!;
     const spec: QuickSpec = {
       game: meta.game,
       size: meta.size,
+      table: { tier: t.id, entry: t.entry },
       humans: entries.map((e) => ({
         account_id: e.att.acc!,
         pid: e.att.pid!,
@@ -395,6 +437,7 @@ export class Matchmaker extends DurableObject<Env> {
         avatar: e.att.avatar ?? "",
         frame: e.att.frame ?? "",
         level: e.att.level ?? 1,
+        entry_id: e.att.ent,
       })),
     };
     if (this.env.TEST_MODE === "1" && this.hooks.room) spec.hooks = this.hooks.room;
@@ -421,10 +464,14 @@ export class Matchmaker extends DurableObject<Env> {
     }
     const now = Date.now();
     let waited = 0;
+    const ents: string[] = [];
     for (const e of entries) {
       waited += now - e.att.since!;
+      if (e.att.ent) ents.push(e.att.ent);
+      delete e.att.ent; // the room owns the entry now (it refunds it if the match never happens)
       this.matchedSocket(e.ws, { t: "matched", code, token: res.tokens[e.att.acc!] ?? "" });
     }
+    if (ents.length) this.ctx.waitUntil(seatEntries(this.env as never, ents, code).catch((e) => console.error("seatEntries failed:", e)));
     this.ctx.waitUntil(
       quickStat(this.env, { game: meta.game, size: meta.size, matched: entries.length, ghost_filled: ghosts, wait_ms: waited }),
     );
@@ -434,6 +481,7 @@ export class Matchmaker extends DurableObject<Env> {
     const att = this.att(ws);
     if (!att || att.st === "done") return;
     const wasQueued = att.st === "queued";
+    this.release(att);
     att.st = "done";
     try {
       ws.serializeAttachment(att);
@@ -528,8 +576,17 @@ export class Matchmaker extends DurableObject<Env> {
     }
   }
 
+  /** Gives back the coin-table entry of a queue entry that won't reach a room (cancel, close, replaced, error). */
+  private release(att: MmAtt): void {
+    if (!att.ent) return;
+    const id = att.ent;
+    delete att.ent;
+    this.ctx.waitUntil(refundEntry(this.env as never, id, "queue").then(() => undefined, (e) => console.error("refundEntry failed:", e)));
+  }
+
   private closeWith(ws: WebSocket, code: number, reason: string): void {
     const att = this.att(ws) ?? { st: "done" as Stage, opened: 0 };
+    this.release(att);
     att.st = "done";
     try {
       ws.serializeAttachment(att);

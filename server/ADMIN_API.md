@@ -139,7 +139,7 @@ Errors: `{error: "<code>", msg?}`: 400 `bad_request` (bad input, bad limit / cur
 ## v2: accounts, economy, leaderboards, quick match (ONLINE_V2.md §6)
 
 Same rules as v1: session cookie, `X-Admin: 1` on writes (else `403 csrf`), every write audited in `admin_log`
-(new actions: `account.coins`, `account.ban`, `account.unban`, `account.note`), list endpoints take
+(new actions: `account.coins`, `account.gems`, `account.ban`, `account.unban`, `account.note`), list endpoints take
 `limit` / `cursor` and return `{items, next}`, errors as above.
 
 ### D1 schema v2 (migrations/0002_accounts.sql, 0003_policy.sql)
@@ -198,8 +198,9 @@ account. Sum of an account's `ledger.delta_coins` = its coins.
 | method | path | result |
 |---|---|---|
 | GET | `/admin/api/accounts?q=&banned=0\|1&linked=0\|1` | account rows, `last_seen` desc. `q`: name substring, account id prefix, device pid prefix, exact Google player id or `LZM-` id. Rows: the columns with the JSON ones parsed, plus `level` and `linked` (no `rev`) |
-| GET | `/admin/api/accounts/:id` | `{now, account, devices: [row], ledger: [row] (last 50), claims: [row with payload parsed] (last 50), grants: [match_grants row] (last 20), matches: [match] (last 20, by its pids or players[].account_id)}` |
+| GET | `/admin/api/accounts/:id` | (account rows also carry `gems` and `rerolls`, the free re-rolls held) `{now, account, devices: [row], ledger: [row] (last 50), claims: [row with payload parsed] (last 50), grants: [match_grants row] (last 20), matches: [match] (last 20, by its pids or players[].account_id)}` |
 | POST | `/admin/api/accounts/:id/coins` `{delta, reason}` | delta: non-zero integer, \|delta\| ≤ 1,000,000; reason 3–200 chars. Ledger row reason `admin`, `ref` = the reason (not counted as coins earned) → `{ok: true, coins, account}`; `409 {error: "coins", coins}` if the balance would go below 0 |
+| POST | `/admin/api/accounts/:id/gems` `{delta, reason}` | As `/coins`, for gems (Economy v1): delta non-zero integer, \|delta\| ≤ 1,000,000; reason 3–200 chars. Ledger row reason `admin` (`delta_coins` 0, `delta_gems`, `gems_after`, `ref` = the reason); audit action `account.gems` → `{ok: true, gems, account}`; `409 {error: "gems", gems}` if the balance would go below 0 |
 | POST | `/admin/api/accounts/:id/ban` `{reason}` (3–200) / `.../unban` | → `{ok: true, kicked: n, account}` (unban: `{ok: true, account, still_banned_pids: [pid]}`); kicks its devices from the room of their latest join (best effort); bans / lifts device pid bans per "Ban sources" |
 | PATCH | `/admin/api/accounts/:id` `{note}` (≤ 500, null / "" clears) | → `{ok: true, account}` |
 | GET | `/admin/api/leaderboards?board=xp\|wins&period=all\|week&week=YYYY-Www&limit=` | `{board, period, week (null for all), total, top: [{rank, account_id, name, avatar, frame, level, value, updated_at}]}`; `week` picks a past week (period=week only; weeks older than 26 are pruned); limit 1–200 (default 50). The same population as the public board: banned / merged accounts and accounts with fewer than 3 `completed_matches` are left out (also of `total`) |
@@ -298,3 +299,29 @@ with **Account > Account Analytics > Read** on the account (`tools/cf.sh secret 
   ≥ 5 matches started today, else the last 7 days) from D1 `matches`; a rough guess, other traffic is in the cost.
 - Cloudflare refused / unreachable: `200` with the last good body and `stale: true, error_msg` if it is from today,
   else `502 {error: "cloudflare_failed", msg}`.
+
+## Economy (Economy v1)
+
+`GET /admin/api/economy?days=14` (session required; `days` 1-60, default 14, anything else clamped, non-numbers = 14).
+Per **Bangladesh economy day** (UTC+6, `econDay` in `src/wallet.ts`) over the last `days` days, today included. Sources:
+`ledger` (reason breakdown; created = positive deltas, spent = negative), `table_matches`, `entries` (only
+`playing` / `settled` / `forfeit`: refunded entries are not coins in), `rerolls` (people only; ghost re-rolls are not
+stored), `ad_rewards` (`status = granted`, by `granted_at`) and `purchases`. A few grouped queries on time ranges; the
+ledger has no index on `at`, so its start id is found by bisecting the id (ids grow with time).
+
+```
+{now, days, from, to ("YYYY-MM-DD", oldest / today),
+ per_day: [{day, coins_created, coins_spent, gems_created, gems_spent, fees}]   // every day, oldest first, zeros filled
+ ledger: [{day, reason, coins_created, coins_spent, gems_created, gems_spent}]  // sparse, by reason
+ tables: [{day, tier, matches, pot, fee, paid_humans, ghost_wins, ghost_win_rate, entries, coins_in, payouts}]  // sparse
+ rerolls: [{day, paid: "free"|"gems", n}], ads: [{day, kind, granted}],
+ purchases: [{day, count, gems, voided}],
+ totals: {coins_created, coins_spent, gems_created, gems_spent, fees,
+          by_reason: [{reason, coins_created, coins_spent, gems_created, gems_spent}],
+          tables: [{tier, matches, pot, fee, paid_humans, ghost_wins, ghost_win_rate, entries, coins_in, payouts}],
+          rerolls: {free, gems}, ads: {<kind>: granted}, purchases: {count, gems, voided}},
+ coins_in_circulation, gems_in_circulation}   // sums over accounts that are not merged
+```
+
+`fees` = the table fee (`table_matches.fee`, pot - pool). `ghost_win_rate` = `winner_ghost` / matches (null when no
+matches); a fair bot is near 1 / size. `purchases.gems` counts granted purchases only; `voided` is the number voided.

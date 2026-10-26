@@ -1,7 +1,7 @@
 // Buying and equipping (Catalog.buy_room / buy_dice, SLScenes.buy_scene, Collection.buy_char, the equip functions).
 // The checks run in the game's order; nothing changes on an error. Purchases equip the item, as the Shop does
 // (rooms, dice and scenes by default, characters with equip_it = true).
-import { FREE_DICE, FREE_EMOTES, item } from "./catalog";
+import { type CatalogItem, FREE_DICE, FREE_EMOTES, item } from "./catalog";
 import { clone, getInt, list, str } from "./gd";
 import {
   type Delta,
@@ -15,20 +15,21 @@ import {
   sceneIds,
 } from "./profile";
 
-export type BuyError = "unknown" | "owned" | "coins" | "locked";
+export type BuyError = "unknown" | "owned" | "coins" | "gems" | "locked";
 
 export type BuyResult =
   | { ok: true; profile: Profile; delta: Delta; price: number }
-  | { ok: false; error: BuyError; /** Coins still missing (error "coins"). */ short?: number };
+  | { ok: false; error: BuyError; /** Coins (error "coins") or gems (error "gems") still missing. */ short?: number };
 
 /**
  * POST /v1/shop/buy {kind, id}.
  *   unknown  no such item (or a kind the Shop doesn't sell)
  *   owned    already owned, or free for everyone (Arif, Nadia, the free rooms / dice / scene)
  *   coins    not enough coins
+ *   gems     not enough gems (currency "gems": the item's gem price is paid from profile.gems)
  *   locked   an unlock-only item (avatar, frame, plate, badge) that isn't unlocked yet; when it is, "owned"
  */
-export function buy(profile: Profile, kind: string, id: string): BuyResult {
+export function buy(profile: Profile, kind: string, id: string, currency: "coins" | "gems" = "coins"): BuyResult {
   switch (kind) {
     case "room":
     case "dice":
@@ -38,7 +39,7 @@ export function buy(profile: Profile, kind: string, id: string): BuyResult {
       if (!it) return { ok: false, error: "unknown" };
       const owned = kind === "room" ? ownsRoom(profile, id) : kind === "dice" ? ownsDice(profile, id) : kind === "emotes" ? ownsEmotes(profile, id) : ownsScene(profile, id);
       if (owned) return { ok: false, error: "owned" };
-      return pay(profile, kind, id, it.price, (p) => {
+      return pay(profile, kind, id, it, currency, (p) => {
         if (kind === "room") {
           const rooms = list(p, "rooms");
           rooms.push(id);
@@ -69,7 +70,7 @@ export function buy(profile: Profile, kind: string, id: string): BuyResult {
       if (!it) return { ok: false, error: "unknown" };
       if (it.price <= 0) return { ok: false, error: "owned" };
       if (isUnlocked("char", id, profile)) return { ok: false, error: "owned" };
-      return pay(profile, kind, id, it.price, (p) => {
+      return pay(profile, kind, id, it, currency, (p) => {
         const owned = list(p, "av_owned");
         owned.push(id);
         p.av_owned = owned;
@@ -88,7 +89,17 @@ export function buy(profile: Profile, kind: string, id: string): BuyResult {
   return { ok: false, error: "unknown" };
 }
 
-function pay(profile: Profile, kind: string, id: string, price: number, add: (p: Profile) => void): BuyResult {
+function pay(profile: Profile, kind: string, id: string, it: CatalogItem, currency: "coins" | "gems", add: (p: Profile) => void): BuyResult {
+  if (currency === "gems") {
+    const price = it.gems ?? Math.ceil(it.price / 100);
+    const have = Math.max(0, getInt(profile, "gems", 0));
+    if (have < price) return { ok: false, error: "gems", short: price - have };
+    const p = clone(profile);
+    p.gems = have - price;
+    add(p);
+    return { ok: true, profile: p, delta: { coins: 0, xp: 0, gems: -price, items: [{ kind, id }] }, price };
+  }
+  const price = it.price;
   const have = coinsOf(profile);
   if (have < price) return { ok: false, error: "coins", short: price - have };
   const p = clone(profile);

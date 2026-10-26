@@ -36,7 +36,8 @@ const T0 = Date.UTC(2026, 9, 24, 12, 0, 0) / 1000; // 2026-10-24 12:00 UTC
 const DAY = 86400;
 
 function fresh(over: Partial<Profile> = {}): Profile {
-  return { ...newProfile("LZM-TEST-0001"), ...over };
+  // 5,000 coins: an arbitrary working balance (a new account starts with 2,500)
+  return { ...newProfile("LZM-TEST-0001"), coins: 5000, ...over };
 }
 
 describe("profile defaults and level", () => {
@@ -44,7 +45,7 @@ describe("profile defaults and level", () => {
     const p = newProfile();
     expect(isPlayerId(p.id)).toBe(true);
     expect(p).toMatchObject({
-      name: "You", coins: 5000, xp: 0, rooms: ["night", "cafe"], room: "night", dice_owned: ["classic"], dice: "classic",
+      name: "You", coins: 2500, gems: 0, rerolls: 0, xp: 0, rooms: ["night", "cafe"], room: "night", dice_owned: ["classic"], dice: "classic",
       scenes: ["jungle"], scene: "jungle", avatar: "pawn-red", frame: "classic", plate: "plain", badge: "", claimed: [],
       av_owned: [], daily: {}, last_spin: "", last_free: 0,
     });
@@ -369,7 +370,7 @@ describe("import of the local profile", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect([r.profile.coins, r.profile.xp]).toEqual([IMPORT_CAPS.coins, IMPORT_CAPS.xp]);
-    expect(r.delta).toEqual({ coins: IMPORT_CAPS.coins - 5000, xp: IMPORT_CAPS.xp });
+    expect(r.delta).toEqual({ coins: IMPORT_CAPS.coins - 2500, xp: IMPORT_CAPS.xp });
     expect(r.notes).toEqual(["coins: 999999 -> 50000", "xp: 5000000 -> 200000"]);
     const neg = importProfile({ coins: -50, xp: "lots" }, base, today, T0);
     expect(neg.ok && [neg.profile.coins, neg.profile.xp]).toEqual([0, 0]);

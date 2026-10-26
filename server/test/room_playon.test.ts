@@ -157,7 +157,9 @@ describe("quick match: only ghosts left unfinished", () => {
     expect(over.finished.length).toBe(4);
     expect(over.standings.filter((e: Msg) => e.finished).map((e: Msg) => e.color)).toEqual([h]);
     await eventually(async () => grants.length === 1, 5000, "grant");
-    expect(grants[0].results).toEqual([{ account_id: g.account, outcome: "win" }]);
+    // quick matches carry the place (ECONOMY_V1.md §3; this practice table pays by outcome)
+    expect(grants[0].results).toEqual([{ account_id: g.account, outcome: "win", place: 0 }]);
+    expect(grants[0].table).toMatchObject({ tier: "practice", entry: 0, size: 4, humans: 1, ghosts: 3, winner_ghost: false });
   });
 });
 

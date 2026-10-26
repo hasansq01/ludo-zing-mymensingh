@@ -12,7 +12,7 @@ describe("daily reward", () => {
     const a = await guest();
     const d1 = await ok("rewards/daily", { session: a.session, body: {}, now: T0 });
     expect(d1).toMatchObject({ ok: true, coins: 100, day: 1, cycle: 0, next_at: NEXT_BD_DAY });
-    expect(d1.profile.coins).toBe(5100);
+    expect(d1.profile.coins).toBe(2600);
     expect(d1.profile.daily).toMatchObject({ streak: 1, last: "2026-10-21" });
 
     const again = await v1("rewards/daily", { session: a.session, body: {}, now: NEXT_BD_DAY - 60 });
@@ -31,7 +31,7 @@ describe("daily reward", () => {
     const led = await rows<{ delta_coins: number; ref: string }>("SELECT delta_coins, ref FROM ledger WHERE account_id = ? AND reason = 'daily' ORDER BY id", a.id);
     expect(led.map((l) => l.delta_coins)).toEqual([100, 150, 200]); // the dice day changes no coins: no ledger row
     expect(led[0].ref).toBe("2026-10-21:c0:d1");
-    expect(await ledgerSum(a.id)).toBe(5450);
+    expect(await ledgerSum(a.id)).toBe(2950);
   });
 
   it("GET /v1/rewards shows the calendar, the wheel and free coins", async () => {
@@ -56,7 +56,7 @@ describe("daily reward", () => {
     const rs = await Promise.all([0, 1, 2].map(() => v1("rewards/daily", { session: a.session, body: {}, now: T0 })));
     expect(rs.filter((r) => r.status === 200)).toHaveLength(1);
     expect(rs.filter((r) => r.status === 409)).toHaveLength(2);
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(5100);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2600);
   });
 });
 
@@ -65,11 +65,11 @@ describe("daily spin", () => {
     const a = await guest();
     const s = await ok("rewards/spin", { session: a.session, body: {}, now: T0 });
     expect(PRIZES[s.index]).toBe(s.prize);
-    expect(s.profile.coins).toBe(5000 + s.prize);
+    expect(s.profile.coins).toBe(2500 + s.prize);
     expect(s.next_at).toBe(NEXT_BD_DAY);
     expect(await v1("rewards/spin", { session: a.session, body: {}, now: T0 + 3600 })).toMatchObject({ status: 409, body: { error: "spun", next_at: NEXT_BD_DAY } });
     const t = await ok("rewards/spin", { session: a.session, body: {}, now: NEXT_BD_DAY });
-    expect(t.profile.coins).toBe(5000 + s.prize + t.prize);
+    expect(t.profile.coins).toBe(2500 + s.prize + t.prize);
     const led = await rows("SELECT delta_coins FROM ledger WHERE account_id = ? AND reason = 'spin'", a.id);
     expect(led).toEqual([{ delta_coins: s.prize }, { delta_coins: t.prize }]);
   });
@@ -79,7 +79,7 @@ describe("daily spin", () => {
     const rs = await Promise.all([0, 1, 2, 3].map(() => v1("rewards/spin", { session: a.session, body: {}, now: T0 })));
     expect(rs.filter((r) => r.status === 200)).toHaveLength(1);
     const won = rs.find((r) => r.status === 200)!.body.prize;
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(5000 + won);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2500 + won);
   });
 });
 
@@ -90,10 +90,10 @@ describe("free coins", () => {
     expect(f).toMatchObject({ ok: true, coins: 300, next_at: T0 + 14400 });
     expect(await v1("rewards/free", { session: a.session, body: {}, now: T0 + 14399 })).toMatchObject({ status: 409, body: { error: "cooldown", next_at: T0 + 14400 } });
     const g = await ok("rewards/free", { session: a.session, body: {}, now: T0 + 14400 });
-    expect(g.profile.coins).toBe(5600);
+    expect(g.profile.coins).toBe(3100);
     expect(await rows("SELECT delta_coins, balance_after FROM ledger WHERE account_id = ? AND reason = 'free' ORDER BY id", a.id)).toEqual([
-      { delta_coins: 300, balance_after: 5300 },
-      { delta_coins: 300, balance_after: 5600 },
+      { delta_coins: 300, balance_after: 2800 },
+      { delta_coins: 300, balance_after: 3100 },
     ]);
   });
 });
@@ -110,7 +110,7 @@ describe("achievements", () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ ok: true, coins: 200, progress: { done: true, claimed: true } });
     expect(r.body.profile.claimed).toEqual(["first"]);
-    expect(r.body.profile.coins).toBe(5000 + 200 + 200);
+    expect(r.body.profile.coins).toBe(2500 + 200 + 200);
     expect(await claim("first")).toMatchObject({ status: 409, body: { error: "claimed" } });
     expect(await rows("SELECT delta_coins, ref FROM ledger WHERE account_id = ? AND reason = 'achievement'", a.id)).toEqual([{ delta_coins: 200, ref: "first" }]);
   });

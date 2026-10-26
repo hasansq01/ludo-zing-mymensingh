@@ -49,7 +49,7 @@ describe("claims", () => {
     const c = ludoClaim("win", { pairs: 2, xp: 99999 });
     const r = await ok("claims", { session: a.session, body: c, now: T0 });
     expect(r).toMatchObject({ ok: true, id: c.id, limited: false, granted: true, coins: 200, xp: 100 });
-    expect(r.profile).toMatchObject({ coins: 5200, xp: 100 });
+    expect(r.profile).toMatchObject({ coins: 2700, xp: 100 });
     expect(r.profile.stats).toMatchObject({ played: 1, wins: 1, streak: 1, bestStreak: 1, pairsFormed: 2, coinsEarned: 200 });
     expect(await rows("SELECT reason, ref, delta_coins, delta_xp FROM ledger WHERE account_id = ? AND reason = 'claim'", a.id)).toEqual([
       { reason: "claim", ref: c.id, delta_coins: 200, delta_xp: 100 },
@@ -81,8 +81,8 @@ describe("claims", () => {
     const rs = await Promise.all([0, 1, 2, 3].map(() => v1("claims", { session: a.session, body: c, now: T0 })));
     for (const r of rs) expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(rs.filter((r) => r.body.duplicate)).toHaveLength(3);
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(5200);
-    expect(await ledgerSum(a.id)).toBe(5200);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2700);
+    expect(await ledgerSum(a.id)).toBe(2700);
   });
 
   it("too short and malformed claims", async () => {
@@ -106,7 +106,7 @@ describe("claims", () => {
     for (const id of [undefined, "short", "x".repeat(65), "bad id!!"]) {
       expect((await v1("claims", { session: a.session, body: { ...ludoClaim("win"), id } })).status).toBe(400);
     }
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(5000);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2500);
   });
 
   it("S&L: a win vs Computer pays 100 only when its rolls replay to 100; a loss pays 10; no XP", async () => {
@@ -133,7 +133,7 @@ describe("claim limits", () => {
     await seedClaims(a.id, [{ at: DAY_START_MS + 1000, coins: 5820, xp: 2940, granted: 1 }]);
     const p1 = await ok("claims", { session: a.session, body: ludoClaim("win"), now: T0 });
     expect(p1).toMatchObject({ granted: true, limited: true, reason: "daily_coins", coins: 180, xp: 60, would: { coins: 200, xp: 100 } });
-    expect(p1.profile).toMatchObject({ coins: 5180, xp: 60 });
+    expect(p1.profile).toMatchObject({ coins: 2680, xp: 60 });
     expect(p1.profile.stats).toMatchObject({ wins: 1, coinsEarned: 180 });
     const p2 = await ok("claims", { session: a.session, body: ludoClaim("win"), now: T0 + 1 });
     expect(p2).toMatchObject({ granted: false, limited: true, reason: "daily_coins", coins: 0, xp: 0 });
@@ -141,7 +141,7 @@ describe("claim limits", () => {
     // the next Bangladesh day the caps start again
     const p3 = await ok("claims", { session: a.session, body: ludoClaim("win"), now: T0 + 12 * 3600 });
     expect(p3).toMatchObject({ granted: true, limited: false, coins: 200, xp: 100 });
-    expect(await ledgerSum(a.id)).toBe(5000 + 180 + 200);
+    expect(await ledgerSum(a.id)).toBe(2500 + 180 + 200);
   });
 
   it("XP alone hits the cap: a Pass & Play claim pays the XP remainder", async () => {
@@ -179,7 +179,7 @@ describe("claim limits", () => {
     const bodies: Json[] = rs.map((r) => r.body);
     expect(bodies.filter((b) => b.granted)).toHaveLength(1);
     expect(bodies.filter((b) => b.reason === "hourly")).toHaveLength(3);
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(5200);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2700);
   });
 
   it("claims are refused for a banned account and without a session", async () => {

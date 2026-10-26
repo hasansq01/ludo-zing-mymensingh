@@ -57,11 +57,12 @@ export default function accountPage(root, [id], ctx) {
           h("span", { class: "pid" }, h("span", { class: "mono" }, a.id), copyBtn(a.id, "Copy account id")),
           a.public_id ? h("span", null, "Public id ", h("span", { class: "mono" }, a.public_id)) : null,
           a.avatar ? h("span", null, "Avatar ", h("span", { class: "mono" }, a.avatar)) : null)),
-      h("div", { class: "hero-actions" }, adjustButton(a)));
+      h("div", { class: "hero-actions" }, adjustButton(a), adjustButton(a, "gems")));
 
-    const tiles = h("div", { class: "tiles tiles-5" },
+    const tiles = h("div", { class: "tiles tiles-6" },
       tile({ label: "Level", value: Number(a.level) || 0, foot: h("span", { class: "tile-sub" }, fmtInt(a.xp) + " XP") }),
       tile({ label: "Coins", value: Number(a.coins) || 0, ic: "coin", tone: "tile-accent" }),
+      tile({ label: "Gems", value: Number(a.gems) || 0, ic: "gem", foot: h("span", { class: "tile-sub" }, fmtInt(a.rerolls || 0) + " free re-roll" + (Number(a.rerolls) === 1 ? "" : "s")) }),
       tile({ label: "Online wins", value: Number(a.online_wins) || 0 }),
       tile({ label: "Completed matches", value: Number(a.completed_matches) || 0, foot: h("span", { class: "tile-sub" }, "Leaderboards need 3") }),
       tile({ label: "Devices", value: devices.length }));
@@ -70,13 +71,15 @@ export default function accountPage(root, [id], ctx) {
       ? simpleTable([
         { label: "When", render: (r) => timeEl(r.at) },
         { label: "Coins", align: "right", render: (r) => delta(r.delta_coins) },
+        { label: "Gems", align: "right", render: (r) => delta(r.delta_gems || 0) },
         { label: "XP", align: "right", render: (r) => delta(r.delta_xp) },
         { label: "Reason", render: (r) => h("span", { class: "tag" }, r.reason || "–") },
         { label: "Ref", cls: "ref", render: (r) => (r.ref ? h("span", { class: "mono trunc", title: r.ref }, r.ref) : h("span", { class: "muted" }, "–")) },
         { label: "Balance after", align: "right", render: (r) => fmtInt(r.balance_after) },
+        { label: "Gems after", align: "right", render: (r) => (r.gems_after === null || r.gems_after === undefined ? "–" : fmtInt(r.gems_after)) },
       ], ledger, { caption: "Ledger" })
       : emptyState("No ledger rows", "Every coin / XP change of the account is recorded here.", "table"),
-    { cls: "card-flush", sub: "Last 50, newest first. The coins column sums to the balance." });
+    { cls: "card-flush", sub: "Last 50, newest first. The coins and gems columns sum to the balances." });
 
     const claimsCard = card("Claims", claims.length
       ? simpleTable([
@@ -141,13 +144,15 @@ export default function accountPage(root, [id], ctx) {
     tickTimes(body);
   }
 
-  // ---------- coins ----------
+  // ---------- coins and gems ----------
 
-  function adjustButton(a) {
-    const btn = h("button", { class: "btn btn-sm", type: "button" }, icon("coin", { size: 14 }), "Adjust coins");
+  function adjustButton(a, kind = "coins") {
+    const gems = kind === "gems";
+    const noun = gems ? "gems" : "coins";
+    const btn = h("button", { class: "btn btn-sm", type: "button" }, icon(gems ? "gem" : "coin", { size: 14 }), "Adjust " + noun);
     btn.addEventListener("click", async () => {
-      const balance = Number(a.coins) || 0;
-      const input = h("input", { type: "number", class: "input mono", id: "adj-delta", step: "1", min: String(-ADJUST_MAX), max: String(ADJUST_MAX), placeholder: "e.g. 500 or -200", inputmode: "numeric", "aria-describedby": "adj-help" });
+      const balance = Number(gems ? a.gems : a.coins) || 0;
+      const input = h("input", { type: "number", class: "input mono", id: "adj-delta", step: "1", min: String(-ADJUST_MAX), max: String(ADJUST_MAX), placeholder: gems ? "e.g. 50 or -10" : "e.g. 500 or -200", inputmode: "numeric", "aria-describedby": "adj-help" });
       const reason = h("textarea", { class: "input textarea", rows: 3, maxlength: REASON_MAX, id: "adj-reason", placeholder: "e.g. Refund for a lost purchase (3–200 characters)", required: true });
       const count = h("span", { class: "counter" }, `0 / ${REASON_MAX}`);
       const sure = h("input", { type: "checkbox", id: "adj-sure" });
@@ -169,10 +174,10 @@ export default function accountPage(root, [id], ctx) {
       reason.addEventListener("input", paint);
       paint();
       const ok = await openDialog({
-        title: "Adjust coins of " + (a.name || "player"),
+        title: "Adjust " + noun + " of " + (a.name || "player"),
         confirmLabel: "Apply adjustment",
         body: [
-          h("p", null, "Adds a ledger row (reason ", h("code", null, "admin"), ") and an audit entry. This is a correction, not coins earned."),
+          h("p", null, "Adds a ledger row (reason ", h("code", null, "admin"), ") and an audit entry. This is a correction, not " + noun + " earned."),
           h("label", { class: "label", for: "adj-delta" }, "Change ", h("span", { class: "muted" }, "(+ adds, − removes, up to " + fmtInt(ADJUST_MAX) + ")")),
           input,
           h("p", { class: "help muted", id: "adj-help" }, "Whole number, not 0."),
@@ -188,9 +193,9 @@ export default function accountPage(root, [id], ctx) {
           if (r < 3 || r > REASON_MAX) return "reason";
           return sure.checked ? "" : "confirm";
         },
-        onConfirm: () => api.post("/accounts/" + enc(a.id) + "/coins", { delta: parse(), reason: reason.value.trim() }),
+        onConfirm: () => api.post("/accounts/" + enc(a.id) + "/" + noun, { delta: parse(), reason: reason.value.trim() }),
       });
-      if (ok) { toast("Coins adjusted", "ok"); notice = null; load(); }
+      if (ok) { toast((gems ? "Gems" : "Coins") + " adjusted", "ok"); notice = null; load(); }
     });
     return btn;
   }

@@ -23,6 +23,8 @@ import * as SL from "./rules/sl";
 import { slStateHash } from "./rules/sl_hash";
 import * as D from "./db";
 import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineOutcome } from "./accounts_shim";
+import { forfeitEntry, refundEntry, refundReroll, rerollBalance, spendReroll } from "./economy";
+import { ECON_V1, tablePayouts } from "./econ/rules";
 import { ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, ghostPick, makeGhosts, newGhostMemory, packOfEmote, progressLead, type GhostMemory, type GhostSituation, type GhostTrigger, type Persona } from "./ghosts";
 import type { Matchmaker } from "./matchmaker";
 import { EVENT_TTL_S, pushAccount, pushConfigured, type PushKind } from "./push";
@@ -146,6 +148,10 @@ interface Member {
   emo?: GhostMemory;
   /** Event pushes sent to this member (epoch ms per kind) and the turn of the last turn push; never sent. */
   pushed?: { turn?: number; joined?: number; rematch?: number; turnKey?: string };
+  /** Quick rooms at a coin table: this person's entry (ECONOMY_V1.md §3); never sent. */
+  entry?: string;
+  /** Re-roll means (free re-rolls, gems), read at match start and after each use; missing: unknown (no offer). */
+  rr?: { free: number; gems: number };
 }
 
 interface Seat {
@@ -162,6 +168,8 @@ interface Seat {
   level?: number;
   /** Never sent to clients (see the file comment). */
   ghost?: boolean;
+  /** Coin tables: the member's entry id (never sent). */
+  entry?: string;
 }
 
 interface Match {
@@ -192,6 +200,26 @@ interface Match {
   away?: number[];
   /** Ghost emotes planned (alarm-driven, stored so they survive hibernation); never touches state, n or the hash. */
   gemotes?: Array<{ at: number; c: number; id: string }>;
+  /** The open re-roll offer after a bad roll (ECONOMY_V1.md §4). Cleared by the next action. */
+  rr?: RerollOffer;
+  /** Colours that used their re-roll in this match. */
+  rrUsed?: number[];
+}
+
+interface RerollOffer {
+  /** The colour that rolled. */
+  c: number;
+  /** The action index of the bad roll (the state goes back to it) and m.n after it (the offer is for that state). */
+  bn: number;
+  n: number;
+  /** The state before the bad roll. */
+  before: AnyState;
+  /** Epoch ms: the offer closes; the next player can't act before. */
+  until: number;
+  /** A ghost decided to re-roll at this time. */
+  ghostAt?: number;
+  /** A person's payment is in flight (the hold lasts until it's answered). */
+  paying?: boolean;
 }
 
 interface TurnTimers {
@@ -209,6 +237,8 @@ interface Settings {
 
 interface QuickInfo {
   size: number;
+  /** The coin table (ECONOMY_V1.md §3); missing: practice (rooms made before Economy v1 too). */
+  table?: { tier: string; entry: number };
   /** Epoch ms: start then even if not every human is connected. */
   startBy: number;
   timers?: TurnTimers;
@@ -262,6 +292,8 @@ export interface TestHooks {
   emoteChance?: number;
   /** false: every ghost / bot step waits for an alarm of its own (no chain(); the old behaviour, for measurements). */
   chain?: boolean;
+  /** Replaces ECON_V1.ghost_reroll_chance (1 = a ghost always re-rolls a bad roll, 0 = never). */
+  rerollChance?: number;
 }
 
 /**
@@ -278,7 +310,9 @@ export interface TestStats {
 export interface QuickSpec {
   game: GameKind;
   size: number;
-  humans: Array<{ account_id: string; pid: string; name: string; avatar: string; frame: string; level: number }>;
+  /** The coin table (ECONOMY_V1.md §3); missing: practice. */
+  table?: { tier: string; entry: number };
+  humans: Array<{ account_id: string; pid: string; name: string; avatar: string; frame: string; level: number; entry_id?: string }>;
   /** Tests only (TEST_MODE). */
   hooks?: TestHooks;
 }
@@ -437,6 +471,18 @@ export function isSessionShape(x: unknown): x is string {
   return typeof x === "string" && x.length > 0 && x.length <= 512;
 }
 
+/**
+ * A roll that a re-roll can undo (ECONOMY_V1.md §4): Ludo, the roll ended the turn without a move (need a 6, or stuck
+ * on a non-6); Snakes & Ladders, it ended on a snake.
+ */
+export function badRoll(game: GameKind, ev: Array<{ type: string; v?: number; snake?: boolean }>): boolean {
+  if (game === "sl") return ev.some((e) => e.type === "move" && e.snake === true);
+  if (ev.some((e) => e.type === "three_sixes")) return false;
+  if (ev.some((e) => e.type === "need_six")) return true;
+  const rolled = ev.find((e) => e.type === "rolled");
+  return ev.some((e) => e.type === "stuck") && rolled?.v !== 6;
+}
+
 function isInt(x: unknown, lo: number, hi: number): x is number {
   return typeof x === "number" && Number.isInteger(x) && x >= lo && x <= hi;
 }
@@ -535,6 +581,7 @@ export class Room extends DurableObject<Env> {
         graceAt: 0,
         account: h.account_id,
         level: Math.max(1, Math.trunc(h.level) || 1),
+        ...(h.entry_id ? { entry: h.entry_id } : {}),
       })),
       ...ghosts.map((gh, k) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g), persona: personas[k], emo: newGhostMemory() })),
     ];
@@ -556,7 +603,7 @@ export class Room extends DurableObject<Env> {
       touched: now,
       emptySince: now,
       alarmAt: 0,
-      quick: { size, startBy: now + this.ms(QUICK.autoStart), timers, overAt: 0 },
+      quick: { size, startBy: now + this.ms(QUICK.autoStart), timers, overAt: 0, table: spec.table ?? { tier: "practice", entry: 0 } },
     };
     this.commit();
     const tokens: Record<string, string> = {};
@@ -820,6 +867,9 @@ export class Room extends DurableObject<Env> {
       case "back":
         this.back(mem);
         break;
+      case "reroll":
+        await this.reroll(ws, mem, msg);
+        break;
       case "sync_req":
         this.sendSnapshot(ws);
         break;
@@ -906,7 +956,9 @@ export class Room extends DurableObject<Env> {
       else if (mem.graceAt <= now) this.graceOver(mem);
     }
     const m = r.match;
-    if (r.status === "playing" && m && m.due && m.due <= now) this.step();
+    if (r.status === "playing" && m?.rr?.ghostAt && m.rr.ghostAt <= now && m.n === m.rr.n) this.doReroll(m, m.rr, "free");
+    if (r.status === "playing" && m?.rr?.paying && m.due && m.due <= now) m.due = now + 300; // wait for the payment
+    else if (r.status === "playing" && m && m.due && m.due <= now) this.step();
     this.flushGhostEmotes(now);
     if (r.grants?.some((g) => g.next <= now)) this.ctx.waitUntil(this.runGrants());
     this.commit();
@@ -1092,6 +1144,11 @@ export class Room extends DurableObject<Env> {
     const r = this.room!;
     const m = r.match;
     const hostWas = r.host;
+    if (r.quick && r.status === "lobby" && mem.entry) {
+      // left a coin-table room before its match started: the entry goes back
+      const id = mem.entry;
+      this.ctx.waitUntil(refundEntry(this.env as never, id, "left_lobby").then(() => undefined, (e) => console.error("entry refund failed:", e)));
+    }
     this.removeMember(mem);
     for (const sock of this.socketsOf(mem.id)) {
       if (code) this.send(sock, { t: "error", code, msg: msg ?? code });
@@ -1200,6 +1257,7 @@ export class Room extends DurableObject<Env> {
       };
       if (mm.level !== undefined) st.level = mm.level;
       if (mm.ghost) st.ghost = true;
+      if (mm.entry) st.entry = mm.entry;
       return st;
     });
     let s: AnyState;
@@ -1261,6 +1319,7 @@ export class Room extends DurableObject<Env> {
     };
     this.db("match start", [D.insertMatch(this.env.DB, row)]);
     this.broadcast({ t: "start", n: 0, game, seats: this.seatsOut(), state: s, h: this.ops.hash(s) });
+    this.ctx.waitUntil(this.loadRerollMeans());
     // members offline at the start keep their grace; it now turns their seat into a bot
     this.planStep();
   }
@@ -1278,6 +1337,8 @@ export class Room extends DurableObject<Env> {
     const seat = m.seats.find((st) => st.id === mem.id && !st.left);
     if (!seat || seat.color !== O.turnColor(s)) return this.error(ws, "not_your_turn", "it is not your turn");
     const c = seat.color;
+    const hold = this.holding(m);
+    if (hold && hold.c !== c) return this.error(ws, "hold", "wait: the last player may roll again", { until: hold.until });
     let a: Action;
     if ((m.game ?? "ludo") === "sl") {
       if (msg.t !== "roll") return this.error(ws, "bad_action", "snakes & ladders only has roll");
@@ -1405,12 +1466,129 @@ export class Room extends DurableObject<Env> {
     const r = this.room!;
     const m = r.match!;
     const s = m.state;
+    delete m.rr; // any action closes an open re-roll offer
+    const before = a.k === "roll" && this.rerollEligible(m, a.c) ? structuredClone(s) : null;
     const ev = this.ops.apply(s, a);
     const n = m.n++;
     r.touched = Date.now();
     this.noteRanked(m);
     this.broadcast({ t: "act", n, a, h: this.ops.hash(s) });
+    if (before && s.phase !== "over" && badRoll(m.game ?? "ludo", ev as Array<{ type: string; v?: number; snake?: boolean }>)) this.offerReroll(m, (a as { c: number }).c, n, before);
     if (r.quick) this.ghostReact(m, ev);
+  }
+
+  // ---------- re-rolls (ECONOMY_V1.md §4) ----------
+
+  /** Can colour c's seat get a re-roll offer if this roll goes badly? */
+  private rerollEligible(m: Match, c: number): boolean {
+    if (m.rrUsed?.includes(c)) return false;
+    if (this.ops.isCpu(m.state, c)) return false;
+    const st = m.seats.find((x) => x.color === c);
+    if (!st || st.left) return false;
+    if (st.ghost) return true;
+    if (!st.account) return false;
+    const mem = this.room!.members.find((x) => x.id === st.id);
+    const rr = mem?.rr;
+    return !!rr && (rr.free > 0 || rr.gems >= ECON_V1.reroll_gems);
+  }
+
+  /** Opens the offer: holds the turn ECON_V1.reroll_window_ms; a ghost may decide to take it. */
+  private offerReroll(m: Match, c: number, bn: number, before: AnyState): void {
+    const now = Date.now();
+    const until = now + this.ms(ECON_V1.reroll_window_ms);
+    const offer: RerollOffer = { c, bn, n: m.n, before, until };
+    const st = m.seats.find((x) => x.color === c)!;
+    if (st.ghost) {
+      // (tests: off unless a test asks, so scripted dice stay in order)
+      const chance = this.env.TEST_MODE === "1" ? (this.hooks.rerollChance ?? 0) : ECON_V1.ghost_reroll_chance;
+      if (Math.random() >= chance) return; // most bad rolls a ghost just takes (no hold either: nothing to wait for)
+      offer.ghostAt = now + this.ms(1200 + Math.random() * 1000);
+      m.rr = offer;
+      this.broadcast({ t: "hold", c, until });
+      return;
+    }
+    m.rr = offer;
+    const mem = this.room!.members.find((x) => x.id === st.id);
+    if (mem) for (const ws of this.socketsOf(mem.id)) this.send(ws, { t: "reroll_offer", n: m.n, until, now, free: mem.rr?.free ?? 0, gems: mem.rr?.gems ?? 0, cost: ECON_V1.reroll_gems });
+    this.broadcast({ t: "hold", c, until });
+  }
+
+  /** The open offer, if it still holds the turn (paying keeps it open past `until`). */
+  private holding(m: Match, now = Date.now()): RerollOffer | null {
+    const o = m.rr;
+    return o && (o.paying || now < o.until) ? o : null;
+  }
+
+  /** {t: "reroll", n}: the player pays and rolls again. */
+  private async reroll(ws: WebSocket, mem: Member, msg: Record<string, unknown>): Promise<void> {
+    const r = this.room!;
+    const m = r.match;
+    if (r.status !== "playing" || !m) return this.error(ws, "reroll_closed", "no match in progress");
+    const seat = m.seats.find((st) => st.id === mem.id && !st.left);
+    const o = m.rr;
+    if (!seat || !o || o.c !== seat.color || o.ghostAt !== undefined) return this.error(ws, "reroll_closed", "no re-roll offer for you");
+    if (m.rrUsed?.includes(seat.color)) return this.error(ws, "reroll_used", "you already rolled again this match");
+    if (msg.n !== m.n || o.n !== m.n) return this.error(ws, "reroll_closed", "the game moved on");
+    if (o.paying) return; // a double tap
+    if (Date.now() > o.until + 500) return this.error(ws, "reroll_closed", "too late");
+    if (!mem.account) return this.error(ws, "reroll_closed", "sign in to roll again");
+    const matchId = `${r.code}-${m.startedAt ?? 0}`;
+    o.paying = true;
+    this.commit();
+    let pay: Awaited<ReturnType<typeof spendReroll>>;
+    try {
+      pay = await withTimeout(spendReroll(this.env as never, mem.account, matchId), 8_000);
+    } catch (e) {
+      console.error("spendReroll failed:", e);
+      pay = { ok: false, error: "unknown" };
+    }
+    const r2 = this.room;
+    const still = r2 === r && r.status === "playing" && r.match === m && m.rr === o && m.n === o.n;
+    o.paying = false;
+    if (!still) {
+      if (pay.ok) this.ctx.waitUntil(refundReroll(this.env as never, mem.account, matchId).catch((e) => console.error("refundReroll failed:", e)));
+      return this.error(ws, "reroll_closed", "the game moved on");
+    }
+    if (!pay.ok) {
+      delete m.rr; // the hold ends: the next player goes on
+      this.planStep();
+      if (pay.error === "reroll_used") (m.rrUsed ??= []).push(seat.color);
+      return this.error(ws, pay.error === "unknown" ? "reroll_closed" : pay.error, pay.error === "gems" ? `a re-roll costs ${ECON_V1.reroll_gems} gems` : "can't roll again now");
+    }
+    mem.rr = { free: pay.free, gems: pay.gems };
+    this.doReroll(m, o, pay.paid);
+  }
+
+  /** Puts the state back to before the bad roll and rolls again (a fresh server roll). */
+  private doReroll(m: Match, o: RerollOffer, paid: "free" | "gems"): void {
+    const r = this.room!;
+    delete m.rr;
+    (m.rrUsed ??= []).push(o.c);
+    m.state = o.before;
+    m.n = o.bn;
+    const O = this.ops;
+    this.broadcast({ t: "rerolled", c: o.c, paid });
+    this.broadcast({ t: "sync", n: m.n, game: m.game ?? "ludo", seats: this.seatsOut(), state: m.state, h: O.hash(m.state) });
+    this.act({ k: "roll", c: o.c, v: this.dice() } as Action);
+    r.touched = Date.now();
+    this.afterActs();
+  }
+
+  /** Re-roll means for the people in a match (read once at the start; best effort). */
+  private async loadRerollMeans(): Promise<void> {
+    const r = this.room;
+    const m = r?.match;
+    if (!r || !m) return;
+    for (const mem of r.members) {
+      if (mem.ghost || !mem.account || mem.rr) continue;
+      try {
+        const b = await withTimeout(rerollBalance(this.env as never, mem.account), 5_000);
+        if (b && this.room === r) mem.rr = b;
+      } catch (e) {
+        console.error("rerollBalance failed:", e);
+      }
+    }
+    if (this.room === r) this.commit();
   }
 
   /** Records the sides ranked by the last action, and which of their seats were away then (their grant: "left"). */
@@ -1484,13 +1662,45 @@ export class Room extends DurableObject<Env> {
       m.due = now + humanMs;
       m.shown = m.due;
     }
+    // a re-roll offer holds the turn: the next player's clock starts when it closes
+    const hold = this.holding(m, now);
+    if (hold && hold.c !== c) {
+      const shift = Math.max(0, hold.until - now);
+      m.due += shift;
+      m.shown = (m.shown || m.due) + shift;
+    }
     this.broadcast({ t: "turn", c, deadline: Math.round(m.shown), now });
     if (phase === "roll" && !O.isCpu(s, c) && !r.quick) this.pushTurn(m, c);
   }
 
   private overMsg(m: Match): Record<string, unknown> {
     const O = opsFor(m.game);
-    return { t: "over", finished: O.finished(m.state), winner: O.winner(m.state), standings: O.standings(m.state) };
+    const r = this.room!;
+    const msg: Record<string, unknown> = { t: "over", finished: O.finished(m.state), winner: O.winner(m.state), standings: O.standings(m.state), match_id: `${r.code}-${m.startedAt ?? 0}` };
+    const t = r.quick?.table;
+    if (r.quick && t) {
+      // the coin table's result (ECONOMY_V1.md §3): coins paid per colour (seats that left get none)
+      const paid = this.paidOrder(m);
+      const { pay } = tablePayouts(t.entry, r.quick.size, paid.length);
+      const payouts: Record<string, number> = {};
+      for (const st of m.seats) payouts[String(st.color)] = 0;
+      if (t.entry > 0) paid.forEach((st, k) => (payouts[String(st.color)] = pay[k] ?? 0));
+      msg.table = { tier: t.tier, entry: t.entry, payouts };
+    }
+    return msg;
+  }
+
+  /** Quick matches: the seats in final order without the ones that left (the coin table's paid places). */
+  private paidOrder(m: Match): Seat[] {
+    const O = opsFor(m.game);
+    const order = [...O.finished(m.state)];
+    for (const st of m.seats) if (!order.includes(st.color)) order.push(st.color);
+    const out: Seat[] = [];
+    for (const c of order) {
+      const st = m.seats.find((x) => x.color === c);
+      if (st && !st.left) out.push(st);
+    }
+    return out;
   }
 
   private finish(): void {
@@ -1601,8 +1811,8 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  private error(ws: WebSocket, code: string, msg: string): void {
-    this.send(ws, { t: "error", code, msg });
+  private error(ws: WebSocket, code: string, msg: string, extra?: Record<string, unknown>): void {
+    this.send(ws, { t: "error", code, msg, ...extra });
   }
 
   /** An error that ends the connection. */
@@ -1883,6 +2093,7 @@ export class Room extends DurableObject<Env> {
     const due: number[] = [r.touched + this.ms(TIMING.stale)];
     if (r.emptySince) due.push(r.emptySince + this.ms(TIMING.empty));
     if (r.status === "playing" && r.match?.due) due.push(r.match.due);
+    if (r.status === "playing" && r.match?.rr?.ghostAt) due.push(r.match.rr.ghostAt);
     for (const mem of r.members) if (mem.graceAt) due.push(mem.graceAt);
     if (r.match?.gemotes?.length && r.status !== "lobby") for (const e of r.match.gemotes) due.push(e.at);
     if (r.quick && r.status === "lobby") due.push(r.quick.startBy);
@@ -1934,6 +2145,7 @@ export class Room extends DurableObject<Env> {
       }
     }
     const pending = r?.grants?.length ? r.grants : null;
+    if (r) this.closeEntries(r, reason);
     this.room = null;
     this.hooks = {};
     await this.ctx.storage.deleteAlarm();
@@ -1941,6 +2153,29 @@ export class Room extends DurableObject<Env> {
     if (pending) for (const g of pending) this.ctx.waitUntil(this.grantOnce(g.g).catch(() => undefined)); // last try
     // the room is gone anyway: give its last D1 writes a moment instead of leaving them to waitUntil alone
     await Promise.race([this.dbChain, new Promise((res) => setTimeout(res, 3000))]);
+  }
+
+  /**
+   * A coin-table room closing before `over` (no-show, everyone left, stale, an admin close): entries of seats that
+   * left are forfeit when every person left (the match was abandoned), every other open entry is refunded. Entries
+   * already settled by the match grant are left alone (refund / forfeit only touch open entries).
+   */
+  private closeEntries(r: RoomData, reason: string): void {
+    if (!r.quick?.table?.entry || r.status === "over") return;
+    const matchId = r.match ? `${r.code}-${r.match.startedAt ?? 0}` : r.code;
+    const seen = new Set<string>();
+    const env = this.env as never;
+    for (const st of r.match?.seats ?? []) {
+      if (!st.entry || seen.has(st.entry)) continue;
+      seen.add(st.entry);
+      const id = st.entry;
+      this.ctx.waitUntil((reason === "abandoned" && st.left ? forfeitEntry(env, id, matchId) : refundEntry(env, id, reason).then(() => undefined)).catch((e) => console.error("entry close failed:", e)));
+    }
+    for (const mem of r.members) {
+      if (!mem.entry || seen.has(mem.entry)) continue;
+      seen.add(mem.entry);
+      this.ctx.waitUntil(refundEntry(env, mem.entry, reason).then(() => undefined, (e) => console.error("entry refund failed:", e)));
+    }
   }
 
   // ---------- online rewards (accounts.grantOnlineMatch) ----------
@@ -2107,11 +2342,26 @@ export class Room extends DurableObject<Env> {
     }
     this.db("match over", stmts);
 
+    // quick match: the coin table's places (ECONOMY_V1.md §3): the final order without the seats that left
+    const q = r.quick;
+    const paidOrder: Seat[] = q ? this.paidOrder(m) : [];
     const results = m.seats
       .filter((st) => !st.ghost && st.account)
-      .map((st) => ({ account_id: st.account as string, outcome: this.outcome(m, st, won) }));
+      .map((st) => {
+        const res: OnlineMatchGrant["results"][number] = { account_id: st.account as string, outcome: this.outcome(m, st, won) };
+        if (q) {
+          res.place = st.left ? -1 : paidOrder.indexOf(st);
+          if (st.entry) res.entry_id = st.entry;
+        }
+        return res;
+      });
     if (results.length) {
       const g: OnlineMatchGrant = { match_id: `${r.code}-${m.startedAt ?? 0}`, game: m.game ?? "ludo", results };
+      if (q) {
+        const t = q.table ?? { tier: "practice", entry: 0 };
+        const ghosts = m.seats.filter((st) => st.ghost).length;
+        g.table = { tier: t.tier, entry: t.entry, size: q.size, humans: m.seats.length - ghosts, ghosts, winner_ghost: !!paidOrder[0]?.ghost };
+      }
       (r.grants ??= []).push({ g, tries: 0, next: now });
       this.ctx.waitUntil(this.runGrants());
     }

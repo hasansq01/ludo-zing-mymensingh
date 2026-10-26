@@ -11,7 +11,7 @@ describe("sessions", () => {
     expect(g.session).toMatch(/^acc_[a-z2-7]{16}\.\d+\.[A-Za-z0-9_-]+$/);
     const me = await ok("me", { session: g.session, now: T0 });
     expect(me.account.id).toBe(g.id);
-    expect(me.profile.coins).toBe(5000);
+    expect(me.profile.coins).toBe(2500);
 
     expect((await v1("me", { now: T0 })).status).toBe(401);
     expect((await v1("me", { session: "garbage", now: T0 })).status).toBe(401);

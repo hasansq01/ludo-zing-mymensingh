@@ -37,7 +37,10 @@ export interface PublicProfile {
 export interface OnlineMatchGrant {
   match_id: string;
   game: GameKind;
-  results: Array<{ account_id: string; outcome: OnlineOutcome }>;
+  /** place / entry_id: quick matches (ECONOMY_V1.md §3; place -1 = left, forfeit). */
+  results: Array<{ account_id: string; outcome: OnlineOutcome; place?: number; entry_id?: string }>;
+  /** Quick matches: the coin table (entry 0 = practice). */
+  table?: { tier: string; entry: number; size: number; humans: number; ghosts: number; winner_ghost?: boolean };
 }
 
 export interface AccountsApi {

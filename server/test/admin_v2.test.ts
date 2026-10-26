@@ -43,7 +43,7 @@ describe("accounts", () => {
     await setAccount(made[2].id, { google_player_id: `gp-${tag}`, google_name: "G" });
     const all = await get(`accounts?q=${tag}`);
     expect(all.items.map((x: { id: string }) => x.id)).toEqual(made.map((g) => g.id).reverse());
-    expect(all.items[0]).toMatchObject({ coins: 5000, level: 1, linked: false, stats: { wins: 0 } });
+    expect(all.items[0]).toMatchObject({ coins: 2500, level: 1, linked: false, stats: { wins: 0 } });
     expect(all.items[0]).not.toHaveProperty("rev");
     expect((await get(`accounts?q=${tag}&banned=1`)).items.map((x: { id: string }) => x.id)).toEqual([made[1].id]);
     expect((await get(`accounts?q=${tag}&linked=1`)).items.map((x: { id: string }) => x.id)).toEqual([made[2].id]);
@@ -68,9 +68,9 @@ describe("accounts", () => {
     await grantOnlineMatch(ENV, { match_id: `adm-${g.id}`, game: "ludo", results: [{ account_id: g.id, outcome: "finish" }] });
     await D.insertMatch(DB, { code: "ADMV2X", started_at: Date.now(), players: [{ pid: g.pid, name: "x", color: 0, bot: false }], teams: false, pair_ask: false }).run();
     const d = await get(`accounts/${g.id}`);
-    expect(d.account).toMatchObject({ id: g.id, coins: 5220, xp: 140, linked: false });
+    expect(d.account).toMatchObject({ id: g.id, coins: 2720, xp: 140, linked: false });
     expect(d.devices.map((x: { pid: string }) => x.pid)).toEqual([g.pid]);
-    expect(d.ledger.map((l: { reason: string }) => l.reason)).toEqual(["match", "claim", "start"]);
+    expect(d.ledger.map((l: { reason: string }) => l.reason)).toEqual(["match", "level", "claim", "start"]);
     expect(d.claims[0]).toMatchObject({ coins: 200, xp: 100, granted: 1, limited: 0, payload: { game: "ludo", result: "win" } });
     expect(d.grants[0]).toMatchObject({ outcome: "finish", coins: 20 });
     expect(d.matches[0]).toMatchObject({ code: "ADMV2X" });
@@ -81,21 +81,21 @@ describe("accounts", () => {
   it("adjusts coins with a reason: ledger row 'admin', audited; can't go below 0", async () => {
     const g = await guest();
     const r = await post(`accounts/${g.id}/coins`, { delta: 750, reason: "lost purchase refund" });
-    expect(r).toMatchObject({ ok: true, coins: 5750, account: { coins: 5750 } });
-    expect((await ok("me", { session: g.session })).profile).toMatchObject({ coins: 5750, stats: { coinsEarned: 0 } });
+    expect(r).toMatchObject({ ok: true, coins: 3250, account: { coins: 3250 } });
+    expect((await ok("me", { session: g.session })).profile).toMatchObject({ coins: 3250, stats: { coinsEarned: 0 } });
     await post(`accounts/${g.id}/coins`, { delta: -750, reason: "oops" });
     const over = await call(`accounts/${g.id}/coins`, { cookie, body: { delta: -6000, reason: "too much" } });
     expect(over.status).toBe(409);
     expect(((await over.json()) as { error: string }).error).toBe("coins");
     expect(await rows("SELECT delta_coins, ref, balance_after FROM ledger WHERE account_id = ? AND reason = 'admin' ORDER BY id", g.id)).toEqual([
-      { delta_coins: 750, ref: "lost purchase refund", balance_after: 5750 },
-      { delta_coins: -750, ref: "oops", balance_after: 5000 },
+      { delta_coins: 750, ref: "lost purchase refund", balance_after: 3250 },
+      { delta_coins: -750, ref: "oops", balance_after: 2500 },
     ]);
-    expect(await ledgerSum(g.id)).toBe(5000);
+    expect(await ledgerSum(g.id)).toBe(2500);
     const log = await rows<{ detail: string }>("SELECT detail FROM admin_log WHERE action = 'account.coins' AND target = ? ORDER BY id", g.id);
     expect(log.map((l) => JSON.parse(l.detail))).toEqual([
-      { delta: 750, reason: "lost purchase refund", balance: 5750 },
-      { delta: -750, reason: "oops", balance: 5000 },
+      { delta: 750, reason: "lost purchase refund", balance: 3250 },
+      { delta: -750, reason: "oops", balance: 2500 },
     ]);
     for (const bad of [{ delta: 0, reason: "abc" }, { delta: 1.5, reason: "abc" }, { delta: "5", reason: "abc" }, { delta: 2_000_000, reason: "abc" }, { delta: 5 }, { delta: 5, reason: "ab" }]) {
       await post(`accounts/${g.id}/coins`, bad, 400);
@@ -248,7 +248,7 @@ describe("leaderboards, quick match, overview", () => {
     const after = (await get("overview")).accounts;
     expect(after.total).toBe(before.total + 1);
     expect(after.linked).toBe(before.linked + 1);
-    expect(after.coins_in_circulation).toBe(before.coins_in_circulation + 5000);
+    expect(after.coins_in_circulation).toBe(before.coins_in_circulation + 2500);
     expect(after.claims_limited_today).toBe(before.claims_limited_today + 1);
     expect(after.new_today).toBe(before.new_today + 1);
   });

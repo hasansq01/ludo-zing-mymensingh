@@ -17,6 +17,8 @@ export interface CatalogItem {
   name: string;
   /** Coins; 0 for free and unlock-only items. */
   price: number;
+  /** Gem price, ceil(price / 100); only on items the Shop sells (buy: true). */
+  gems?: number;
   /** Sold for coins in the Shop (rooms, dice, scenes, characters with a price). */
   buy: boolean;
   /** Owned / usable by everyone from the start. */

@@ -34,14 +34,16 @@ server values of `rules.ts` never reach them. `test/econ_rules.test.ts` covers t
 
 | Rule | Value | Source |
 | --- | --- | --- |
-| Starting profile | 5,000 coins, 0 XP, rooms Moonlit Café + Corner Café, Classic dice, Jungle scene, Red Pawn, Wood frame, Plain plate, no badge, all stats 0 | `Save._ensure` |
+| Starting profile | 2,500 coins, 0 gems, 0 re-rolls, 0 XP, rooms Moonlit Café + Corner Café, Classic dice, Jungle scene, Red Pawn, Wood frame, Plain plate, no badge, all stats 0 | `Save._ensure` |
 | Level | Level n needs 100 + 50·(n−1) XP to reach n+1 | `Save.level_info` |
+| Gems and re-rolls | `gems` ≥ 0 and `rerolls` clamped 0..9, both normalized like `coins` (default 0). Existing saves keep their coins | `Save._ensure` |
+| Gem prices | Every item the Shop sells (price > 0) costs `ceil(price / 100)` gems (`gems` in `catalog.json`; free and unlock-only items have none) | `Catalog.gem_price` |
 | Rooms | Dream 3,000 · Studio 4,000 · Cloudside 5,000 (Moonlit, Corner free) | `Rooms.LIST` |
 | Dice | Crema 1,000 · Espresso 2,500 · Royal Gold 6,000 (Classic free) | `Catalog.DICE` |
 | S&L scenes | Frost 20,000 · Candy 22,000 · Desert / Cloud / Enchanted 25,000 (Jungle free) | `SLScenes.LIST` |
 | Characters | 18 at 10,000–12,000; Arif and Nadia free | `Collection.CHARS` |
 | Unlock-only | Lucky Dice avatar (First Victory), Robot (Winning Streak), Crown (level 5); frames Gold (level 5), Mint (Master of Pairs), Royal (Coin Collector); plates Espresso (Experienced Player), Ruby (Winning Streak); each badge needs its achievement | `Collection` |
-| Buy | Checks in order: exists → not owned (free items count as owned) → affordable. Pays the price once, adds the item and equips it, as the Shop does. Errors are `unknown`, `owned`, `coins` (+`short`), and `locked` for an unlock-only item not yet unlocked (`owned` once it is) | `Catalog.buy_*`, `SLScenes.buy_scene`, `Collection.buy_char` |
+| Buy | Checks in order: exists → not owned (free items count as owned) → affordable. Pays the price once, adds the item and equips it, as the Shop does. `buy(profile, kind, id, currency = "coins")`: with `"gems"` it pays the gem price from `gems` (coins and `coinsEarned` untouched, `delta.gems` negative). Errors are `unknown`, `owned`, `coins` / `gems` (+`short`), and `locked` for an unlock-only item not yet unlocked (`owned` once it is) | `Catalog.buy_*`, `SLScenes.buy_scene`, `Collection.buy_char` |
 | Equip | Owned rooms, dice and scenes; unlocked avatar, frame, plate and badge (`""` = no badge). Errors `unknown`, `locked` | `Catalog.equip_*`, `Collection.equip` |
 | Achievements | First Victory (1 win) 200 · Winning Streak (best streak 3) 300 · Experienced Player (25 vs-computer games) 500 · Master of Pairs (10 pairs) 300 · Multiplayer Champion (5 Pass & Play) 300 · Coin Collector (10,000 earned) 500. Each pays once and counts as earned. Errors `unknown`, `not_done`, `claimed` | `Collection.ACH`, `claim_ach` |
 | Daily reward | 3 cycles of 7 days (`catalog.rewards.daily_cycles`), one claim per day. The next day continues the run; a missed day restarts at Day 1 of the cycle; after Day 7 the next cycle starts (and wraps after the third). A dice tile already owned pays its `or` coins, and so does a character tile whose character is owned. Error `claimed` + `next_at` | `Rewards.daily_state`, `claim_daily` |

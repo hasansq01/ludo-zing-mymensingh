@@ -69,7 +69,7 @@ describe("Google linking", () => {
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body).toMatchObject({ linked: true, account: { id: a.id, guest: false, google_name: "Rafi G" } });
     expect(r.body.session).toBeTruthy();
-    expect(r.body.profile.coins).toBe(5000);
+    expect(r.body.profile.coins).toBe(2500);
     expect(seenBodies.at(-1)).toContain("client_id=web-client.apps.googleusercontent.com");
     expect(seenBodies.at(-1)).toContain("grant_type=authorization_code");
     const again = await g("auth/google", a.session, { server_auth_code: codeFor("gp-link-1") });
@@ -97,8 +97,8 @@ describe("Google linking", () => {
     const c = await g("auth/google", fresh.session, { server_auth_code: codeFor("gp-there") });
     expect(c.status).toBe(409);
     expect(c.body.error).toBe("conflict");
-    expect(c.body.conflict.here).toMatchObject({ name: "You", coins: 5000, level: 1, wins: 0 });
-    expect(c.body.conflict.there).toMatchObject({ coins: 4000, level: 1 });
+    expect(c.body.conflict.here).toMatchObject({ name: "You", coins: 2500, level: 1, wins: 0 });
+    expect(c.body.conflict.there).toMatchObject({ coins: 1500, level: 1 });
     expect(typeof c.body.ticket).toBe("string");
 
     // a ticket from another account's session is refused
@@ -109,7 +109,7 @@ describe("Google linking", () => {
     const r = await g("auth/google/resolve", fresh.session, { keep: "there", ticket: c.body.ticket, pid });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body).toMatchObject({ switched: true, account: { id: main.id } });
-    expect(r.body.profile.coins).toBe(4000);
+    expect(r.body.profile.coins).toBe(1500);
     expect(await verifySession(ENV, r.body.session)).toEqual({ account_id: main.id });
     // the device now opens the Google account; the guest account is left as it is
     expect((await guest({ pid })).id).toBe(main.id);
@@ -130,7 +130,7 @@ describe("Google linking", () => {
     const r = await g("auth/google/resolve", now.session, { keep: "here", server_auth_code: codeFor("gp-here"), pid });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body).toMatchObject({ linked: true, merged: old.id, account: { id: now.id, guest: false } });
-    expect(r.body.profile.coins).toBe(5300);
+    expect(r.body.profile.coins).toBe(2800);
     expect(await row("SELECT google_player_id, merged_into FROM accounts WHERE id = ?", old.id)).toEqual({ google_player_id: null, merged_into: now.id });
     expect((await row("SELECT google_player_id FROM accounts WHERE id = ?", now.id))!.google_player_id).toBe("gp-here");
     // the retired account's sessions stop working and its device opens the kept account
@@ -146,7 +146,7 @@ describe("Google linking", () => {
     expect((await g("auth/google", a.session, { server_auth_code: codeFor("gp-A") })).status).toBe(200);
     const c = await g("auth/google", a.session, { server_auth_code: codeFor("gp-B", "B"), pid });
     expect(c.status, JSON.stringify(c.body)).toBe(409);
-    expect(c.body).toMatchObject({ error: "other_google", conflict: { here: { name: "You", coins: 5000 }, there: null } });
+    expect(c.body).toMatchObject({ error: "other_google", conflict: { here: { name: "You", coins: 2500 }, there: null } });
     expect(typeof c.body.ticket).toBe("string");
     // nothing switched or created yet
     expect((await guest({ pid })).id).toBe(a.id);
@@ -183,11 +183,11 @@ describe("Google linking", () => {
     expect((await g("auth/google", a.session, { server_auth_code: codeFor("gp-A2") })).status).toBe(200);
     const c = await g("auth/google", a.session, { server_auth_code: codeFor("gp-B2") });
     expect(c.status).toBe(409);
-    expect(c.body).toMatchObject({ error: "other_google", conflict: { here: { coins: 5000 }, there: { coins: 4000 } } });
+    expect(c.body).toMatchObject({ error: "other_google", conflict: { here: { coins: 2500 }, there: { coins: 1500 } } });
     // keep "there" means the same as "switch" here
     const sw = await g("auth/google/resolve", a.session, { keep: "there", ticket: c.body.ticket, pid });
     expect(sw.body).toMatchObject({ switched: true, created: false, account: { id: b.id } });
-    expect(sw.body.profile.coins).toBe(4000);
+    expect(sw.body.profile.coins).toBe(1500);
     expect((await guest({ pid })).id).toBe(b.id);
     // a banned B can't be switched to
     await setAccount(b.id, { banned: 1, ban_reason: "cheating" });

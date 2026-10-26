@@ -374,7 +374,7 @@ for (let k = 0; k < 52; k++) {
   const acc = {
     id, created_at: created, last_seen: p.last_seen, google_player_id: linked ? "g" + ri(1e8, 9e8) + ri(1e8, 9e8) : null,
     google_name: linked ? p.name + " Google" : null, public_id: "LZM-" + randStr(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789") + "-" + randStr(4, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
-    name: p.name, avatar: p.avatar, frame: p.frame, plate: "", badge: "", coins: 0, xp: 0, online_wins: 0, completed_matches: 0,
+    name: p.name, avatar: p.avatar, frame: p.frame, plate: "", badge: "", coins: 0, gems: ri(0, 4) * 20, rerolls: ri(0, 3), xp: 0, online_wins: 0, completed_matches: 0,
     stats: { wins: ri(0, 20), games: ri(0, 60), coinsEarned: ri(5000, 90000) }, owned: { rooms: ["classic"], dice_owned: ["bone"], scenes: [], av_owned: [p.avatar || "pawn-red"] },
     equipped: { room: "classic", dice: "bone", scene: "" }, rewards: { daily: ri(0, 6), last_spin: created, last_free: created }, achievements: { claimed: [] },
     banned: 0, ban_reason: null, ban_source: null, note: null, merged_into: null, imported: k % 7 === 0 ? 1 : 0, version: ri(3, 140),
@@ -388,7 +388,7 @@ for (let k = 0; k < 52; k++) {
     devicesOf.get(id).push({ pid: q.pid, account_id: id, first_seen: q.first_seen, last_seen: q.last_seen });
   }
   // ledger: the first 5,000, then a mix; sum = coins
-  const rows = [{ id: ledgerId++, account_id: id, at: created, delta_coins: 5000, delta_xp: 0, reason: "start", ref: null, balance_after: 5000 }];
+  const rows = [{ id: ledgerId++, account_id: id, at: created, delta_coins: 5000, delta_xp: 0, delta_gems: 0, gems_after: null, reason: "start", ref: null, balance_after: 5000 }];
   let bal = 5000;
   let xp = 0;
   const n = ri(8, k % 4 === 0 ? 70 : 34);
@@ -399,7 +399,7 @@ for (let k = 0; k < 52; k++) {
     const dx = reason === "match" ? ri(20, 120) : reason === "achievement" ? ri(30, 90) : reason === "daily" ? 10 : 0;
     bal += dc; xp += dx;
     const at = created + Math.floor(((i + 1) / (n + 1)) * Math.max(3600e3, acc.last_seen - created));
-    rows.push({ id: ledgerId++, account_id: id, at, delta_coins: dc, delta_xp: dx, reason, ref: reason === "match" ? "m" + ri(1000, 9999) : reason === "buy" ? pick(["dice:gold", "room:night", "avatar:robot"]) : reason === "achievement" ? pick(["first_win", "ten_games", "streak_3"]) : null, balance_after: bal });
+    rows.push({ id: ledgerId++, account_id: id, at, delta_coins: dc, delta_xp: dx, delta_gems: 0, gems_after: null, reason, ref: reason === "match" ? "m" + ri(1000, 9999) : reason === "buy" ? pick(["dice:gold", "room:night", "avatar:robot"]) : reason === "achievement" ? pick(["first_win", "ten_games", "streak_3"]) : null, balance_after: bal });
   }
   acc.coins = bal; acc.xp = xp; acc.level = levelOf(xp);
   acc.online_wins = ri(0, 30); acc.completed_matches = k % 9 === 4 ? ri(0, 2) : ri(3, 80);
@@ -493,9 +493,10 @@ const isoWeek = (t) => {
   return y + "-W" + String(w).padStart(2, "0");
 };
 const accountOut = (a) => { const { _xpWeek, _winsWeek, ...r } = a; return { ...r, level: levelOf(a.xp), linked: a.google_player_id !== null }; };
-function addLedger(a, delta, reason, ref) {
+function addLedger(a, delta, reason, ref, gems = 0) {
   a.coins += delta;
-  const row = { id: ledgerId++, account_id: a.id, at: Date.now(), delta_coins: delta, delta_xp: 0, reason, ref, balance_after: a.coins };
+  a.gems += gems;
+  const row = { id: ledgerId++, account_id: a.id, at: Date.now(), delta_coins: delta, delta_xp: 0, delta_gems: gems, gems_after: gems ? a.gems : null, reason, ref, balance_after: a.coins };
   ledgerOf.get(a.id).push(row);
   a.version++;
 }
@@ -548,6 +549,66 @@ function snapshot(L) {
     settings: { ...L.settings },
     match: M ? { n: M.n, state: M.state, seats: M.seats, deadline: L.status === "playing" ? Math.round(M.deadline) : 0, started_at: M.started_at } : null,
     paused: L.status === "playing" && !anyOnline(L),
+  };
+}
+
+// GET /economy (src/admin.ts economy()): per Bangladesh day aggregates. Numbers are fake but add up (pot = fee + payouts).
+function economy(days) {
+  const bdDay = (t) => new Date(t + 6 * 3600e3).toISOString().slice(0, 10);
+  const dayList = Array.from({ length: days }, (_, i) => bdDay(Date.now() - (days - 1 - i) * DAY));
+  const TIERS = [["t100", 100, 40], ["t500", 500, 18], ["t2k", 2000, 9], ["t10k", 10000, 4], ["t50k", 50000, 1]];
+  const GHOST = { t100: 0.5, t500: 0.46, t2k: 0.52, t10k: 0.66, t50k: 0.3 }; // t10k and t50k are outside 40-60%
+  let sd = 7;
+  const r = () => ((sd = (sd * 48271) % 2147483647) / 2147483647);
+  const per_day = [], ledger = [], tables = [], rerolls = [], ads = [], purchases = [];
+  const byReason = new Map(), tierT = new Map();
+  const add = (m, k, o) => { const t = m.get(k) || {}; for (const [f, v] of Object.entries(o)) t[f] = (t[f] || 0) + v; m.set(k, t); };
+  for (const day of dayList) {
+    const pd = { day, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0, fees: 0 };
+    const led = (reason, cc, cs, gc, gs) => {
+      if (!(cc || cs || gc || gs)) return;
+      ledger.push({ day, reason, coins_created: cc, coins_spent: cs, gems_created: gc, gems_spent: gs });
+      add(byReason, reason, { coins_created: cc, coins_spent: cs, gems_created: gc, gems_spent: gs });
+      pd.coins_created += cc; pd.coins_spent += cs; pd.gems_created += gc; pd.gems_spent += gs;
+    };
+    let entries = 0, payouts = 0;
+    for (const [tier, entry, base] of TIERS) {
+      const n = Math.round(base * (0.6 + r() * 0.8));
+      const size = 2;
+      const gw = Math.round(n * Math.min(1, Math.max(0, GHOST[tier] + (r() - 0.5) * 0.1)));
+      const pot = n * entry * size, fee = Math.round(pot * 0.1);
+      const paid = (n - gw) * (entry * size - Math.round(entry * size * 0.1));
+      const ent = n * (1 + (r() < 0.5 ? 1 : 0) * 0), coinsIn = ent * entry;
+      tables.push({ day, tier, matches: n, pot, fee, paid_humans: paid, ghost_wins: gw, ghost_win_rate: gw / n, entries: ent, coins_in: coinsIn, payouts: paid });
+      add(tierT, tier, { matches: n, pot, fee, paid_humans: paid, ghost_wins: gw, entries: ent, coins_in: coinsIn, payouts: paid });
+      pd.fees += fee; entries += coinsIn; payouts += paid;
+    }
+    led("payout", payouts, 0, 0, 0); led("entry", 0, entries, 0, 0);
+    led("match", ri(20, 60) * 50, 0, 0, 0); led("daily", ri(10, 40) * 300, 0, 0, 0); led("broke", ri(2, 20) * 300, 0, 0, 0);
+    led("buy", 0, ri(10, 40) * 400, 0, ri(0, 3) * 10); led("level", 0, 0, ri(2, 8) * 5, 0);
+    led("iap", 0, 0, ri(0, 3) * 80, 0); led("reroll", 0, 0, 0, ri(2, 12) * 5); led("exchange", ri(0, 3) * 1000, 0, 0, ri(0, 3) * 10);
+    led("ad", ri(0, 4) * 500, 0, ri(0, 6) * 2, 0);
+    per_day.push(pd);
+    const fr = ri(2, 20), gm = ri(1, 12);
+    rerolls.push({ day, paid: "free", n: fr }, { day, paid: "gems", n: gm });
+    for (const [k, cap] of [["reroll", 30], ["refill", 12], ["double", 20], ["gems", 8]]) ads.push({ day, kind: k, granted: ri(0, cap) });
+    const pc = ri(0, 4);
+    purchases.push({ day, count: pc, gems: pc * 120, voided: pc && r() < 0.15 ? 1 : 0 });
+  }
+  const sum = (a, f) => a.reduce((t, x) => t + f(x), 0);
+  const adT = {};
+  for (const a of ads) adT[a.kind] = (adT[a.kind] || 0) + a.granted;
+  return {
+    now: Date.now(), days, from: dayList[0], to: dayList[days - 1], per_day, ledger, tables, rerolls, ads, purchases,
+    totals: {
+      coins_created: sum(per_day, (x) => x.coins_created), coins_spent: sum(per_day, (x) => x.coins_spent),
+      gems_created: sum(per_day, (x) => x.gems_created), gems_spent: sum(per_day, (x) => x.gems_spent), fees: sum(per_day, (x) => x.fees),
+      by_reason: [...byReason].map(([reason, t]) => ({ reason, ...t })).sort((a, b) => a.reason.localeCompare(b.reason)),
+      tables: [...tierT].map(([tier, t]) => ({ tier, ...t, ghost_win_rate: t.ghost_wins / t.matches })),
+      rerolls: { free: sum(rerolls.filter((x) => x.paid === "free"), (x) => x.n), gems: sum(rerolls.filter((x) => x.paid === "gems"), (x) => x.n) },
+      ads: adT, purchases: { count: sum(purchases, (x) => x.count), gems: sum(purchases, (x) => x.gems), voided: sum(purchases, (x) => x.voided) },
+    },
+    coins_in_circulation: accounts.reduce((t, a) => t + a.coins, 0), gems_in_circulation: accounts.reduce((t, a) => t + a.gems, 0),
   };
 }
 
@@ -646,6 +707,7 @@ function overview() {
       total: accounts.length, linked: accounts.filter((a) => a.google_player_id).length, guests: accounts.filter((a) => !a.google_player_id).length,
       banned: accounts.filter((a) => a.banned).length, new_today: accounts.filter((a) => a.created_at >= todayStart).length,
       coins_in_circulation: accounts.reduce((t, a) => t + a.coins, 0),
+      gems_in_circulation: accounts.reduce((t, a) => t + a.gems, 0),
       claims_limited_today: [...claimsOf.values()].flat().filter((c) => c.limited && c.at >= todayStart).length + 2,
     },
   };
@@ -703,6 +765,7 @@ async function api(req, res, url) {
   switch (sub[0]) {
     case "me": return send(res, 200, { ok: true });
     case "overview": return send(res, 200, overview());
+    case "economy": return send(res, 200, economy(Math.min(60, Math.max(1, Math.trunc(Number(q("days") || 14)) || 14))));
     case "usage": return USAGE_ERR ? fail(res, 502, "cloudflare_failed", "Cloudflare Analytics API: Authentication error") : send(res, 200, usage());
     case "rooms": {
       for (const L of live.values()) { L.room.members = L.members.length; L.room.online = L.members.filter((x) => x.online).length; }
@@ -854,6 +917,17 @@ async function api(req, res, url) {
         addLedger(acc, d, "admin", reason);
         addAudit(Date.now(), ip, "account.coins", acc.id, { delta: d, reason, balance: acc.coins });
         return send(res, 200, { ok: true, coins: acc.coins, account: accountOut(acc) });
+      }
+      if (sub[2] === "gems" && m === "POST") {
+        const body = await readBody(req);
+        const d = body?.delta;
+        const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+        if (typeof d !== "number" || !Number.isInteger(d) || d === 0 || Math.abs(d) > 1e6) return fail(res, 400, "bad_request", "delta: a non-zero integer, at most 1000000 either way");
+        if (reason.length < 3 || reason.length > 200) return fail(res, 400, "bad_request", "reason: 3-200 characters");
+        if (acc.gems + d < 0) return send(res, 409, { error: "gems", msg: `the balance would go below 0 (it is ${acc.gems})`, gems: acc.gems });
+        addLedger(acc, 0, "admin", reason, d);
+        addAudit(Date.now(), ip, "account.gems", acc.id, { delta: d, reason, balance: acc.gems });
+        return send(res, 200, { ok: true, gems: acc.gems, account: accountOut(acc) });
       }
       if ((sub[2] === "ban" || sub[2] === "unban") && m === "POST") {
         const body = await readBody(req);

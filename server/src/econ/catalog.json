@@ -20,7 +20,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 10
     },
     {
       "kind": "dice",
@@ -30,7 +31,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 25
     },
     {
       "kind": "dice",
@@ -40,7 +42,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 60
     },
     {
       "kind": "emotes",
@@ -60,7 +63,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 25
     },
     {
       "kind": "emotes",
@@ -70,7 +74,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 40
     },
     {
       "kind": "emotes",
@@ -80,7 +85,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 35
     },
     {
       "kind": "room",
@@ -110,7 +116,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 30
     },
     {
       "kind": "room",
@@ -120,7 +127,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 40
     },
     {
       "kind": "room",
@@ -130,7 +138,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 50
     },
     {
       "kind": "scene",
@@ -150,7 +159,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 200
     },
     {
       "kind": "scene",
@@ -160,7 +170,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 220
     },
     {
       "kind": "scene",
@@ -170,7 +181,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 250
     },
     {
       "kind": "scene",
@@ -180,7 +192,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 250
     },
     {
       "kind": "scene",
@@ -190,7 +203,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 250
     },
     {
       "kind": "char",
@@ -210,7 +224,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 100
     },
     {
       "kind": "char",
@@ -220,7 +235,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 105
     },
     {
       "kind": "char",
@@ -230,7 +246,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 110
     },
     {
       "kind": "char",
@@ -240,7 +257,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 118
     },
     {
       "kind": "char",
@@ -250,7 +268,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 103
     },
     {
       "kind": "char",
@@ -260,7 +279,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 120
     },
     {
       "kind": "char",
@@ -270,7 +290,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 113
     },
     {
       "kind": "char",
@@ -280,7 +301,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 108
     },
     {
       "kind": "char",
@@ -290,7 +312,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 115
     },
     {
       "kind": "char",
@@ -310,7 +333,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 100
     },
     {
       "kind": "char",
@@ -320,7 +344,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 105
     },
     {
       "kind": "char",
@@ -330,7 +355,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 110
     },
     {
       "kind": "char",
@@ -340,7 +366,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 118
     },
     {
       "kind": "char",
@@ -350,7 +377,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 103
     },
     {
       "kind": "char",
@@ -360,7 +388,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 120
     },
     {
       "kind": "char",
@@ -370,7 +399,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 113
     },
     {
       "kind": "char",
@@ -380,7 +410,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 108
     },
     {
       "kind": "char",
@@ -390,7 +421,8 @@
       "buy": true,
       "free": false,
       "default": false,
-      "unlock": null
+      "unlock": null,
+      "gems": 115
     },
     {
       "kind": "avatar",
@@ -687,7 +719,7 @@
   ],
   "defaults": {
     "name": "You",
-    "coins": 5000,
+    "coins": 2500,
     "xp": 0,
     "stats": [
       "played",

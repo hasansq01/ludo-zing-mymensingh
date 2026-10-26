@@ -1,6 +1,8 @@
 // The admin console's JSON API: /admin/api/* (ADMIN_API.md is the contract). Auth: one password (secret
 // ADMIN_PASSWORD) -> an HMAC-signed session cookie; X-Admin: 1 on every write (CSRF); every write is audited.
-import { ACCOUNT_RE, type AccountRow, type Step, adminAccountOut, getAccount, mutate } from "./accounts";
+import { ACCOUNT_RE, type AccountRow, type Step, adminAccountOut, getAccount, guardedInsert, mutate } from "./accounts";
+import { DAY_OFFSET_MIN } from "./econ/rules";
+import { econDayStartMs } from "./wallet";
 import * as D from "./db";
 import { BOARDS, PERIODS, type Board, type PeriodArg, countScores, periodKey, topScores } from "./leaderboard";
 import * as P from "./push";
@@ -247,6 +249,9 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
       case "events":
         if (b !== undefined) break;
         return m === "GET" ? await events(c) : fail(405, "method");
+      case "economy":
+        if (b !== undefined) break;
+        return m === "GET" ? await economy(c) : fail(405, "method");
       case "usage":
         if (b !== undefined) break;
         if (m !== "GET") return fail(405, "method");
@@ -271,6 +276,7 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
           return fail(405, "method");
         }
         if (d === "coins") return m === "POST" ? await accountCoins(c, b) : fail(405, "method");
+        if (d === "gems") return m === "POST" ? await accountGems(c, b) : fail(405, "method");
         if (d === "ban" || d === "unban") return m === "POST" ? await accountBan(c, b, d === "ban") : fail(405, "method");
         break;
       case "leaderboards":
@@ -628,6 +634,187 @@ async function accountCoins(c: Ctx, raw: string): Promise<Response> {
   if (!r.ok) return json({ error: "coins", msg: `the balance would go below 0 (it is ${r.coins})`, coins: r.coins }, 409);
   await audit(c, "account.coins", id, { delta, reason, balance: r.coins });
   return json({ ok: true, coins: r.coins, account: adminAccountOut((await getAccount(c.env.DB, id))!) });
+}
+
+/**
+ * POST /admin/api/accounts/:id/gems {delta, reason}: like /coins, for gems. The ledger row (reason "admin", ref = the
+ * reason, delta_gems / gems_after) is written through mutate's `set` + guarded `extra`, so it lands in the same batch
+ * as the balance change and only when it applied.
+ */
+async function accountGems(c: Ctx, raw: string): Promise<Response> {
+  const id = accountId(raw);
+  if (!id) return fail(404, "not_found");
+  const o = await body(c.req);
+  const delta = o.delta;
+  if (typeof delta !== "number" || !Number.isInteger(delta) || delta === 0 || Math.abs(delta) > ADJUST_MAX) {
+    throw new BadRequest(`delta: a non-zero integer, at most ${ADJUST_MAX} either way`);
+  }
+  const reason = optString(o, "reason", 200, 3)!;
+  const db = c.env.DB;
+  const r = await mutate(c.env, id, c.now, (row, _p): Step<{ ok: boolean; gems: number }> => {
+    const have = Math.trunc((row as AccountRow & { gems?: number }).gems ?? 0);
+    const gems = have + delta;
+    if (gems < 0) return { result: { ok: false, gems: have } };
+    return {
+      result: { ok: true, gems },
+      write: {
+        set: { gems },
+        extra: (g) => [
+          guardedInsert(
+            db, g, "ledger",
+            ["account_id", "at", "delta_coins", "delta_xp", "reason", "ref", "balance_after", "delta_gems", "gems_after"],
+            [id, c.now, 0, 0, "admin", reason, Math.trunc(row.coins), delta, gems],
+          ),
+        ],
+      },
+    };
+  });
+  if (!r) return fail(404, "not_found");
+  if (!r.ok) return json({ error: "gems", msg: `the balance would go below 0 (it is ${r.gems})`, gems: r.gems }, 409);
+  await audit(c, "account.gems", id, { delta, reason, balance: r.gems });
+  return json({ ok: true, gems: r.gems, account: adminAccountOut((await getAccount(db, id))!) });
+}
+
+// ---------- economy ----------
+
+const ECON_DAY_MS = 86_400_000;
+const ECON_OFFSET_MS = DAY_OFFSET_MIN * 60_000;
+const dayName = (n: number): string => new Date(n * ECON_DAY_MS).toISOString().slice(0, 10);
+
+/** First ledger id with at >= from (ledger has no index on `at`; ids grow with time, so bisect: ~log2(n) point reads). */
+async function ledgerStartId(db: D1Database, from: number): Promise<number> {
+  const top = await db.prepare("SELECT MAX(id) AS m FROM ledger").first<{ m: number | null }>();
+  let lo = 1;
+  let hi = (top?.m ?? 0) + 1; // answer in [lo, hi]; hi = "none"
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const r = await db.prepare("SELECT at FROM ledger WHERE id >= ? ORDER BY id LIMIT 1").bind(mid).first<{ at: number }>();
+    if (!r || r.at >= from) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
+/**
+ * GET /admin/api/economy?days=14 (1-60): per Bangladesh economy day over the last N days, from ledger, table_matches,
+ * entries, rerolls, ad_rewards and purchases (ADMIN_API.md "Economy"). A handful of grouped queries on time ranges.
+ */
+async function economy(c: Ctx): Promise<Response> {
+  const asked = Math.trunc(Number(param(c.url, "days") ?? "14"));
+  const days = Number.isNaN(asked) ? 14 : Math.min(60, Math.max(1, asked));
+  const todayStart = econDayStartMs(c.now);
+  const from = todayStart - (days - 1) * ECON_DAY_MS;
+  const to = todayStart + ECON_DAY_MS;
+  const todayN = Math.floor((todayStart + ECON_OFFSET_MS) / ECON_DAY_MS);
+  const firstN = todayN - (days - 1);
+  const db = c.env.DB;
+  const D = `((at + ${ECON_OFFSET_MS}) / ${ECON_DAY_MS})`;
+  const startId = await ledgerStartId(db, from);
+  const [led, tm, en, rr, ad, pu, circ] = await db.batch([
+    db.prepare(
+      `SELECT ${D} AS d, reason,
+         COALESCE(SUM(CASE WHEN delta_coins > 0 THEN delta_coins END), 0) AS coins_created,
+         COALESCE(SUM(CASE WHEN delta_coins < 0 THEN -delta_coins END), 0) AS coins_spent,
+         COALESCE(SUM(CASE WHEN delta_gems > 0 THEN delta_gems END), 0) AS gems_created,
+         COALESCE(SUM(CASE WHEN delta_gems < 0 THEN -delta_gems END), 0) AS gems_spent
+       FROM ledger WHERE id >= ? AND at >= ? AND at < ? GROUP BY d, reason`,
+    ).bind(startId, from, to),
+    db.prepare(
+      `SELECT ${D} AS d, tier, COUNT(*) AS matches, SUM(pot) AS pot, SUM(fee) AS fee, SUM(paid_humans) AS paid_humans,
+         SUM(winner_ghost) AS ghost_wins
+       FROM table_matches WHERE at >= ? AND at < ? GROUP BY d, tier`,
+    ).bind(from, to),
+    db.prepare(
+      `SELECT ${D} AS d, tier, COUNT(*) AS entries, SUM(amount) AS coins_in, SUM(payout) AS payouts
+       FROM entries WHERE status IN ('playing', 'settled', 'forfeit') AND at >= ? AND at < ? GROUP BY d, tier`,
+    ).bind(from, to),
+    db.prepare(
+      `SELECT ${D} AS d, paid, COUNT(*) AS n FROM rerolls WHERE at >= ? AND at < ? GROUP BY d, paid`,
+    ).bind(from, to),
+    db.prepare(
+      `SELECT ((granted_at + ${ECON_OFFSET_MS}) / ${ECON_DAY_MS}) AS d, kind, COUNT(*) AS n
+       FROM ad_rewards WHERE status = 'granted' AND granted_at >= ? AND granted_at < ? GROUP BY d, kind`,
+    ).bind(from, to),
+    db.prepare(
+      `SELECT ${D} AS d, COUNT(*) AS n, COALESCE(SUM(CASE WHEN status = 'granted' THEN gems END), 0) AS gems,
+         COALESCE(SUM(status = 'voided'), 0) AS voided
+       FROM purchases WHERE at >= ? AND at < ? GROUP BY d`,
+    ).bind(from, to),
+    db.prepare("SELECT COALESCE(SUM(coins), 0) AS coins, COALESCE(SUM(gems), 0) AS gems FROM accounts WHERE merged_into IS NULL"),
+  ]);
+  type R = Record<string, number | string>;
+  const num = (v: unknown): number => Math.trunc(Number(v) || 0);
+  const inRange = (r: R): boolean => num(r.d) >= firstN && num(r.d) <= todayN;
+  const dayList = Array.from({ length: days }, (_, i) => dayName(firstN + i));
+  const perDay = new Map(dayList.map((d) => [d, { day: d, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0, fees: 0 }]));
+  const byReason = new Map<string, { reason: string; coins_created: number; coins_spent: number; gems_created: number; gems_spent: number }>();
+  const ledger = (led.results as R[]).filter(inRange).map((r) => {
+    const o = { day: dayName(num(r.d)), reason: String(r.reason), coins_created: num(r.coins_created), coins_spent: num(r.coins_spent), gems_created: num(r.gems_created), gems_spent: num(r.gems_spent) };
+    const pd = perDay.get(o.day)!;
+    pd.coins_created += o.coins_created; pd.coins_spent += o.coins_spent; pd.gems_created += o.gems_created; pd.gems_spent += o.gems_spent;
+    const t = byReason.get(o.reason) ?? { reason: o.reason, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0 };
+    t.coins_created += o.coins_created; t.coins_spent += o.coins_spent; t.gems_created += o.gems_created; t.gems_spent += o.gems_spent;
+    byReason.set(o.reason, t);
+    return o;
+  });
+  const tierRow = (tier: string) => ({ tier, matches: 0, pot: 0, fee: 0, paid_humans: 0, ghost_wins: 0, ghost_win_rate: null as number | null, entries: 0, coins_in: 0, payouts: 0 });
+  type Tier = ReturnType<typeof tierRow>;
+  const rate = <T extends Tier>(t: T): T => { t.ghost_win_rate = t.matches > 0 ? t.ghost_wins / t.matches : null; return t; };
+  const tierTotals = new Map<string, Tier>();
+  const tables = new Map<string, Tier & { day: string }>();
+  const cell = (r: R): Tier & { day: string } => {
+    const day = dayName(num(r.d));
+    const k = day + "|" + r.tier;
+    if (!tables.has(k)) tables.set(k, { day, ...tierRow(String(r.tier)) });
+    return tables.get(k)!;
+  };
+  const total = (tier: string): Tier => {
+    if (!tierTotals.has(tier)) tierTotals.set(tier, tierRow(tier));
+    return tierTotals.get(tier)!;
+  };
+  for (const r of (tm.results as R[]).filter(inRange)) {
+    for (const t of [cell(r), total(String(r.tier))]) {
+      t.matches += num(r.matches); t.pot += num(r.pot); t.fee += num(r.fee); t.paid_humans += num(r.paid_humans); t.ghost_wins += num(r.ghost_wins);
+    }
+    perDay.get(dayName(num(r.d)))!.fees += num(r.fee);
+  }
+  for (const r of (en.results as R[]).filter(inRange)) {
+    for (const t of [cell(r), total(String(r.tier))]) { t.entries += num(r.entries); t.coins_in += num(r.coins_in); t.payouts += num(r.payouts); }
+  }
+  const rerollRows = (rr.results as R[]).filter(inRange).map((r) => ({ day: dayName(num(r.d)), paid: String(r.paid), n: num(r.n) }));
+  const adRows = (ad.results as R[]).filter(inRange).map((r) => ({ day: dayName(num(r.d)), kind: String(r.kind), granted: num(r.n) }));
+  const purRows = (pu.results as R[]).filter(inRange).map((r) => ({ day: dayName(num(r.d)), count: num(r.n), gems: num(r.gems), voided: num(r.voided) }));
+  const sumBy = <T,>(rows: T[], f: (r: T) => number) => rows.reduce((a, r) => a + f(r), 0);
+  const adTotals: Record<string, number> = {};
+  for (const r of adRows) adTotals[r.kind] = (adTotals[r.kind] ?? 0) + r.granted;
+  const pd = [...perDay.values()];
+  const cc = (circ.results as R[])[0] ?? {};
+  return json({
+    now: c.now,
+    days,
+    from: dayList[0],
+    to: dayList[days - 1],
+    per_day: pd,
+    ledger,
+    tables: [...tables.values()].map(rate).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.tier < b.tier ? -1 : 1)),
+    rerolls: rerollRows,
+    ads: adRows,
+    purchases: purRows,
+    totals: {
+      coins_created: sumBy(pd, (r) => r.coins_created),
+      coins_spent: sumBy(pd, (r) => r.coins_spent),
+      gems_created: sumBy(pd, (r) => r.gems_created),
+      gems_spent: sumBy(pd, (r) => r.gems_spent),
+      fees: sumBy(pd, (r) => r.fees),
+      by_reason: [...byReason.values()].sort((a, b) => a.reason.localeCompare(b.reason)),
+      tables: [...tierTotals.values()].map(rate).sort((a, b) => a.tier.localeCompare(b.tier)),
+      rerolls: { free: sumBy(rerollRows.filter((r) => r.paid === "free"), (r) => r.n), gems: sumBy(rerollRows.filter((r) => r.paid === "gems"), (r) => r.n) },
+      ads: adTotals,
+      purchases: { count: sumBy(purRows, (r) => r.count), gems: sumBy(purRows, (r) => r.gems), voided: sumBy(purRows, (r) => r.voided) },
+    },
+    coins_in_circulation: num(cc.coins),
+    gems_in_circulation: num(cc.gems),
+  });
 }
 
 /**

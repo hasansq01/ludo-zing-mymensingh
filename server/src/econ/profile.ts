@@ -37,6 +37,10 @@ export interface Profile {
   name: string;
   id: string;
   coins: number;
+  /** Premium currency, >= 0. */
+  gems: number;
+  /** Free re-rolls, 0..9. */
+  rerolls: number;
   xp: number;
   stats: Stats;
   /** Owned rooms (the free ones always). */
@@ -71,6 +75,8 @@ export interface Profile {
 export interface Delta {
   coins: number;
   xp: number;
+  /** Gems (negative when spent). */
+  gems?: number;
   /** Items added to the profile. */
   items?: { kind: string; id: string }[];
 }
@@ -111,6 +117,8 @@ export function normalizeProfile(raw: unknown, newId: () => string = newPlayerId
   if (typeof p.name !== "string" || stripEdges(p.name) === "") p.name = DEFAULTS.name;
   if (!("id" in p)) p.id = newId();
   p.coins = Math.max(0, asInt(p, "coins", DEFAULTS.coins));
+  p.gems = Math.max(0, asInt(p, "gems", 0));
+  p.rerolls = Math.min(9, Math.max(0, asInt(p, "rerolls", 0)));
   p.xp = Math.max(0, asInt(p, "xp", 0));
   const st: Dict = isDict(p.stats) ? p.stats : {};
   for (const k of STAT_KEYS) st[k] = Math.max(0, asInt(st, k, 0));

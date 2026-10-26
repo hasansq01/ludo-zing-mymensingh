@@ -8,12 +8,12 @@ describe("shop", () => {
     const a = await guest();
     const r = await ok("shop/buy", { session: a.session, body: { kind: "dice", id: "crema" }, now: T0 });
     expect(r).toMatchObject({ ok: true, price: 1000, item: { kind: "dice", id: "crema" } });
-    expect(r.profile).toMatchObject({ coins: 4000, dice: "crema" });
+    expect(r.profile).toMatchObject({ coins: 1500, dice: "crema" });
     expect(r.profile.dice_owned).toEqual(["classic", "crema"]);
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(4000);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(1500);
     const led = await rows("SELECT reason, ref, delta_coins, delta_xp, balance_after FROM ledger WHERE account_id = ? AND reason = 'buy'", a.id);
-    expect(led).toEqual([{ reason: "buy", ref: "dice:crema", delta_coins: -1000, delta_xp: 0, balance_after: 4000 }]);
-    expect(await ledgerSum(a.id)).toBe(4000);
+    expect(led).toEqual([{ reason: "buy", ref: "dice:crema", delta_coins: -1000, delta_xp: 0, balance_after: 1500 }]);
+    expect(await ledgerSum(a.id)).toBe(1500);
   });
 
   it("errors: owned, unknown, coins (+short), locked; nothing changes", async () => {
@@ -22,7 +22,7 @@ describe("shop", () => {
     expect((await buy("dice", "classic")).body).toEqual({ error: "owned" });
     expect(await buy("dice", "nope")).toMatchObject({ status: 404, body: { error: "unknown" } });
     expect(await buy("hat", "x")).toMatchObject({ status: 404, body: { error: "unknown" } });
-    expect(await buy("scene", "frost")).toMatchObject({ status: 409, body: { error: "coins", short: 15000 } });
+    expect(await buy("scene", "frost")).toMatchObject({ status: 409, body: { error: "coins", short: 17500 } });
     expect(await buy("frame", "gold")).toMatchObject({ status: 409, body: { error: "locked" } });
     expect(await buy("char", "ch-arif")).toMatchObject({ status: 409, body: { error: "owned" } }); // a free character
     for (const bad of [{}, { kind: "dice" }, { kind: 3, id: "x" }, { kind: "dice", id: "x".repeat(40) }]) {
@@ -30,7 +30,7 @@ describe("shop", () => {
     }
     expect((await v1("shop/buy", { body: { kind: "dice", id: "crema" } })).status).toBe(401);
     expect((await v1("shop/buy", { session: a.session, method: "GET" })).status).toBe(405);
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(5000);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2500);
     expect(await rows("SELECT * FROM ledger WHERE account_id = ? AND reason = 'buy'", a.id)).toEqual([]);
   });
 
@@ -38,11 +38,11 @@ describe("shop", () => {
     const a = await guest();
     const r = await ok("shop/buy", { session: a.session, body: { kind: "emotes", id: "pawns" } });
     expect(r).toMatchObject({ ok: true, price: 2500, item: { kind: "emotes", id: "pawns" } });
-    expect(r.profile).toMatchObject({ coins: 2500, emote_sets: ["starter", "pawns"], emote_set: "pawns" });
+    expect(r.profile).toMatchObject({ coins: 0, emote_sets: ["starter", "pawns"], emote_set: "pawns" });
     const led = await rows("SELECT ref, delta_coins FROM ledger WHERE account_id = ? AND reason = 'buy'", a.id);
     expect(led).toEqual([{ ref: "emotes:pawns", delta_coins: -2500 }]);
     expect((await v1("shop/buy", { session: a.session, body: { kind: "emotes", id: "pawns" } })).body).toEqual({ error: "owned" });
-    expect(await v1("shop/buy", { session: a.session, body: { kind: "emotes", id: "friends" } })).toMatchObject({ status: 409, body: { error: "coins", short: 1500 } });
+    expect(await v1("shop/buy", { session: a.session, body: { kind: "emotes", id: "friends" } })).toMatchObject({ status: 409, body: { error: "coins", short: 4000 } });
     expect(await v1("shop/equip", { session: a.session, body: { kind: "emotes", id: "friends" } })).toMatchObject({ status: 409, body: { error: "locked" } });
     const e = await ok("shop/equip", { session: a.session, body: { kind: "emotes", id: "starter" } });
     expect(e.profile.emote_set).toBe("starter");
@@ -61,6 +61,7 @@ describe("shop", () => {
 
   it("equips owned items only", async () => {
     const a = await guest();
+    await setAccount(a.id, { coins: 5000 });
     await ok("shop/buy", { session: a.session, body: { kind: "room", id: "dream" } });
     const e = await ok("shop/equip", { session: a.session, body: { kind: "room", id: "night" } });
     expect(e.profile.room).toBe("night");
@@ -76,6 +77,7 @@ describe("concurrency", () => {
   it("parallel purchases can't spend the same coins (5,000 coins, three rooms of 3,000 / 4,000 / 5,000)", async () => {
     for (let round = 0; round < 3; round++) {
       const a = await guest();
+      await setAccount(a.id, { coins: 5000 });
       const items = ["dream", "studio", "cloud"];
       const rs = await Promise.all(items.map((id) => v1("shop/buy", { session: a.session, body: { kind: "room", id } })));
       const okd = rs.filter((r) => r.status === 200);
@@ -85,7 +87,7 @@ describe("concurrency", () => {
       expect(me.profile.coins).toBe(5000 - okd[0].body.price);
       expect(me.profile.rooms.length).toBe(3);
       expect(await rows("SELECT * FROM ledger WHERE account_id = ? AND reason = 'buy'", a.id)).toHaveLength(1);
-      expect(await ledgerSum(a.id)).toBe(me.profile.coins);
+      expect((await ledgerSum(a.id)) + (5000 - 2500)).toBe(me.profile.coins); // the ledger holds the 2,500 start; the other 2,500 was seeded straight into the account
     }
   });
 
@@ -94,7 +96,7 @@ describe("concurrency", () => {
     const rs = await Promise.all([0, 1, 2, 3, 4].map(() => v1("shop/buy", { session: a.session, body: { kind: "dice", id: "crema" } })));
     expect(rs.filter((r) => r.status === 200)).toHaveLength(1);
     expect(rs.filter((r) => r.body.error === "owned")).toHaveLength(4);
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(4000);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(1500);
   });
 
   it("parallel purchases of different affordable items all apply (none lost)", async () => {

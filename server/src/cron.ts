@@ -5,6 +5,8 @@ import * as D from "./db";
 import { isoWeek } from "./econ";
 import { KEEP_WEEKS } from "./leaderboard";
 import { prunePush, weeklyPushes } from "./push";
+import { sweepEntries, weeklyPrizes } from "./economy";
+import { voidRefunded } from "./iap";
 import type { AdminSnapshot, Env } from "./room";
 
 /** A rooms row still "live" (lobby / playing / over) but not updated for this long is checked against its Room. */
@@ -18,6 +20,10 @@ export interface CronResult {
   swept: number;
   /** Weekly-result pushes queued (Monday, Bangladesh time; null: another day, push off, or the queueing failed). */
   weekly: number | null;
+  /** Economy v1: stuck coin-table entries refunded, refunded gem purchases voided, weekly gem prizes paid (Monday). */
+  entries?: number;
+  voided?: number;
+  prizes?: number | null;
 }
 
 /**
@@ -57,8 +63,11 @@ export async function cron(env: Env, now = Date.now()): Promise<CronResult> {
     return null;
   });
   const pushEvents = await prunePush(env.DB, now).catch(() => 0);
+  const entries = await sweepEntries(env as never, now).catch((e) => (console.error("entry sweep failed:", e), 0));
+  const voided = await voidRefunded(env as never, now).catch((e) => (console.error("voided purchases failed:", e), 0));
+  const prizes = await weeklyPrizes(env as never, now).catch((e) => (console.error("weekly prizes failed:", e), null));
   console.log(
-    `cron: pruned ${JSON.stringify(pruned)} + ${pushEvents} push_events, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes`,
+    `cron: pruned ${JSON.stringify(pruned)} + ${pushEvents} push_events, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
   );
-  return { pruned, reconciled, swept, weekly };
+  return { pruned, reconciled, swept, weekly, entries, voided, prizes };
 }

@@ -25,6 +25,7 @@ import {
   spin,
   FREE_AMOUNT,
   CATALOG,
+  ECON_V1,
 } from "./econ";
 import { type AccEnv, type Authed, type Step, BadRequest, authedJson, guardedInsert, isUnique, json, mutate, readBody } from "./accounts";
 
@@ -52,19 +53,25 @@ function gone(): Response {
 
 // ---------- shop ----------
 
-/** POST /v1/shop/buy {kind, id} -> {ok, profile, price, item} | 404 unknown | 409 owned / locked / coins (+short). */
+/**
+ * POST /v1/shop/buy {kind, id, currency?: "coins" | "gems"} -> {ok, profile, price, currency, item} | 404 unknown |
+ * 409 owned / locked / coins / gems (+short).
+ */
 export async function shopBuy(req: Request, env: AccEnv, a: Authed, now: number): Promise<Response> {
-  const { kind, id } = itemArgs(await readBody(req));
+  const body = await readBody(req);
+  const { kind, id } = itemArgs(body);
+  const currency = body.currency ?? "coins";
+  if (currency !== "coins" && currency !== "gems") throw new BadRequest('currency: "coins" | "gems"');
   const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {
-    const b = buy(p, kind, id);
+    const b = buy(p, kind, id, currency);
     if (!b.ok) {
       const body: Record<string, unknown> = { error: b.error };
       if (b.short !== undefined) body.short = b.short;
       return { result: authedJson(a, body, b.error === "unknown" ? 404 : 409) };
     }
     return {
-      result: authedJson(a, { ok: true, profile: b.profile, price: b.price, item: { kind, id } }),
-      write: { profile: b.profile, ledger: { coins: b.delta.coins, xp: 0, reason: "buy", ref: `${kind}:${id}` } },
+      result: authedJson(a, { ok: true, profile: b.profile, price: b.price, currency, item: { kind, id } }),
+      write: { profile: b.profile, ledger: { coins: b.delta.coins, xp: 0, gems: b.delta.gems ?? 0, reason: "buy", ref: `${kind}:${id}` } },
     };
   });
   return r ?? gone();
@@ -156,9 +163,12 @@ export async function achievementClaim(req: Request, env: AccEnv, a: Authed, now
   const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {
     const c = claimAch(p, id);
     if (!c.ok) return { result: authedJson(a, { error: c.error }, c.error === "unknown" ? 404 : 409) };
+    // Economy v1: every achievement also pays ECON_V1.achievement_gems (server-only, on top of the catalog coins)
+    const gems = ECON_V1.achievement_gems;
+    const profile = { ...c.profile, gems: c.profile.gems + gems };
     return {
-      result: authedJson(a, { ok: true, profile: c.profile, coins: c.coins, progress: achProgress(id, c.profile) }),
-      write: { profile: c.profile, ledger: { coins: c.coins, xp: 0, reason: "achievement", ref: id } },
+      result: authedJson(a, { ok: true, profile, coins: c.coins, gems, progress: achProgress(id, profile) }),
+      write: { profile, ledger: { coins: c.coins, xp: 0, gems, reason: "achievement", ref: id } },
     };
   });
   return r ?? gone();
