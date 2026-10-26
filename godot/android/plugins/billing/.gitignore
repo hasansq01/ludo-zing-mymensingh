@@ -1,0 +1,6 @@
+# Gradle build output and caches (the built AARs are copied to godot/addons/billing/bin/ by
+# tools/build-billing-plugin.sh and tracked there)
+/build/
+/.gradle/
+/.kotlin/
+/local.properties

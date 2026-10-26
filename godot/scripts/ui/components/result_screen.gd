@@ -26,10 +26,15 @@ extends Control
 ## Online (data.online = true, data.host = you host the room): rows carry the friends' own avatars (e.avatar,
 ## e.frame); Play again is the host's rematch (the screen stays until the server starts it: the app closes it),
 ## for everyone else a disabled "Waiting for host…" (set_host() when the host changes).
+## A coin-table match (data.table = {tier, entry, payout, match_id}, entry > 0; ECONOMY_V1.md 3): `reward` is the payout
+## (the Coins tile reads "Prize +180"); a payout of 0 says "Entry 100 lost"; a payout > 0 with a video available offers
+## "Double it with a video" (AdFlow "double", ref = match_id; the server grants the same payout again) and toasts the
+## extra coins. Tests and previews: data.ads (bool) replaces AdFlow.available(), flow (an AdFlow) a new AdFlow.
 
 signal play_again
 signal home
 signal closed
+signal doubled(extra: int)               ## the "double" video was granted (the extra coins)
 
 const CARD_W := 358.0
 const AVA_HERO := 92.0
@@ -43,6 +48,9 @@ var title_ribbon: Control
 var content: VBoxContainer
 var again_button: Button
 var home_button: Button
+var double_button: Button                ## coin table, prize > 0, a video can run: "Double it with a video"
+var table_note: Label                    ## coin table, no prize: "Entry 100 lost"
+var flow: AdFlow
 var coins: CoinAmount
 var xp_meter: Meter
 var level_badge: LevelBadge
@@ -306,6 +314,7 @@ func _build() -> void:
 		_rows.append(row)
 	_rewards = _rewards_row()
 	body.add_child(_rewards)
+	_build_table(body)
 	title_ribbon = RibbonTitle.new(title_text())
 	title_ribbon.name = "Ribbon"
 	add_child(title_ribbon)
@@ -324,6 +333,70 @@ func _build() -> void:
 	if is_online():
 		set_host(bool(data.get("host", false)))
 	resized.connect(_layout)
+
+# ---------------------------------------------------------------------------------------------------------------
+# Coin table
+# ---------------------------------------------------------------------------------------------------------------
+
+func table() -> Dictionary:
+	var t: Variant = data.get("table")
+	return t if t is Dictionary else {}
+
+## A paid coin table (not Practice, not a friends' room).
+func is_coin_table() -> bool:
+	return int(table().get("entry", 0)) > 0
+
+func table_payout() -> int:
+	return int(table().get("payout", 0))
+
+## A video can run here (data.ads overrides AdFlow.available(): tests, previews).
+func _ads_ok() -> bool:
+	return bool(data.ads) if data.has("ads") else AdFlow.available()
+
+## Under the rewards: "Entry 100 lost" without a prize, or the double button with one.
+func _build_table(parent: VBoxContainer) -> void:
+	if not is_coin_table():
+		return
+	if table_payout() <= 0:
+		var row := UIKit.hbox(UIKit.SPACE.xs)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(UIKit.icon("coin", 20))
+		table_note = UIKit.label(CoinTables.lost_text(int(table().entry)), UIKit.FS.body_l, Palette.MUTED, UIKit.font_body(900))
+		table_note.name = "TableNote"
+		table_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(table_note)
+		parent.add_child(row)
+		return
+	if not _ads_ok():
+		return
+	double_button = UIKit.btn("Double it with a video", "teal", "md")
+	double_button.name = "Double"
+	double_button.pressed.connect(_double)
+	parent.add_child(double_button)
+
+## The "double" video: AdFlow does the ad and the server grants the extra coins (never from this side's word).
+func _double() -> void:
+	if double_button == null or double_button.disabled or _closing:
+		return
+	double_button.disabled = true
+	double_button.text = "Watching…"
+	if flow == null:
+		flow = AdFlow.new()
+		add_child(flow)
+	var res: Dictionary = await AdWatch.run(flow, "double", str(table().get("match_id", "")))
+	if not is_instance_valid(self) or _closing:
+		return
+	var info: Dictionary = res.info
+	if bool(res.ok):
+		var extra := int(info.get("amount", table_payout()))
+		double_button.text = "Doubled!"
+		Toast.show(self, "+%s coins" % Fmt.coins_full(extra), null, 2.0, "coin")
+		doubled.emit(extra)
+		return
+	double_button.text = "Double it with a video"
+	double_button.disabled = false
+	Toast.show(self, str(info.get("text", AdFlow.NO_FILL_TEXT)), null, 2.2, "bad")
 
 ## A quiet line under the rewards when the server cut the payout of an offline match ("Daily limit reached"; see
 ## Account.claim_note). Safe to call late or twice; "" removes it.
@@ -494,7 +567,7 @@ func _rewards_row() -> Control:
 		var v := UIKit.vbox(2)
 		v.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cap := UIKit.eyebrow("Coins")
+		var cap := UIKit.eyebrow("Prize" if is_coin_table() else "Coins")
 		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(cap)
 		coins = CoinAmount.new(0, "lg", "plain", "+")

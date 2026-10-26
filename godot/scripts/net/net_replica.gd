@@ -34,6 +34,8 @@ const ONLINE_REWARDS := {
 	ludo = {win = [150, 100], finish = [20, 40]},
 	sl = {win = [100, 60], finish = [10, 25]},
 }
+## Quick match at the Practice table pays coins win 50 / finish 10 (ECONOMY_V1.md 3; XP as above).
+const PRACTICE_COINS := {win = 50, finish = 10}
 
 
 ## The replica for a game ("ludo" | "sl"; anything else is Ludo, the protocol's default).
@@ -47,6 +49,27 @@ static func online_reward(g: String, outcome: String) -> Dictionary:
 	var t: Dictionary = ONLINE_REWARDS.get(g, ONLINE_REWARDS.ludo)
 	var v: Array = t.get(outcome, [0, 0])
 	return {coins = int(v[0]), xp = int(v[1])}
+
+## The coin table of a quick match's `over` for your colour: {} for a friend room, else {tier, entry, payout (coins the
+## server paid you; 0 when you lost or watched), match_id}. A Practice table has entry 0.
+static func table_result(over: Dictionary, me: int) -> Dictionary:
+	var t: Variant = over.get("table")
+	if not t is Dictionary:
+		return {}
+	var pays: Variant = (t as Dictionary).get("payouts", {})
+	var pay := 0
+	if me >= 0 and pays is Dictionary:
+		pay = int(pays.get(str(me), pays.get(me, 0)))
+	return {tier = str(t.get("tier", "")), entry = int(t.get("entry", 0)), payout = maxi(0, pay), match_id = str(over.get("match_id", ""))}
+
+## Coins an online match grants outside a paid table: friends' rooms ONLINE_REWARDS, Practice PRACTICE_COINS. A coin
+## table pays its payout instead (table_result), never this.
+static func online_coins(g: String, outcome: String, table: Dictionary) -> int:
+	if not table.is_empty():
+		if int(table.get("entry", 0)) > 0:
+			return 0
+		return int(PRACTICE_COINS.get(outcome, 0))
+	return int(online_reward(g, outcome).coins)
 
 ## True when the server grants online rewards into this player's account (an Account runs): the result shows
 ## them and the profile is refreshed from the server; false: the XP is kept locally (no account), no coins.
@@ -91,7 +114,11 @@ func set_online(id: String, on: bool) -> int:
 			return int(st.get("color", -1))
 	return -1
 
+## A message from the server. A snapshot replaces the state, so the acts still waiting before it are dropped (a
+## re-roll's sync restores the state before the bad roll: its act must not play after it).
 func push(msg: Dictionary) -> void:
+	if str(msg.get("t", "")) == "sync":
+		q = q.filter(func(m): return str(m.get("t", "")) != "act")
 	q.append(msg)
 
 func pending() -> int:

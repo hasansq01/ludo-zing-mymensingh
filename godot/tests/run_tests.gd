@@ -37,16 +37,24 @@ const SUITES := [
 	"res://tests/test_net_ping.gd",
 	"res://tests/test_play_games.gd",
 	"res://tests/test_notifier.gd",
+	"res://tests/test_billing.gd",
+	"res://tests/test_ads.gd",
 	"res://tests/test_account.gd",
 	"res://tests/test_account_ui.gd",
+	"res://tests/test_econ_wallet.gd",
 	"res://tests/test_emote_art.gd",
 	"res://tests/test_emote_shop.gd",
 	"res://tests/test_emote_sfx.gd",
 	"res://tests/test_emotes_hud.gd",
 	"res://tests/test_notif_plan.gd",
 	"res://tests/test_back_online.gd",
+	"res://tests/test_coin_tables.gd",
+	"res://tests/test_reroll.gd",
 	"res://tests/test_notifications.gd",
 ]
+
+## Suites whose run() is a coroutine that the runner waits for (the others run to their first wait, as before).
+const ASYNC_SUITES := ["res://tests/test_reroll.gd"]
 
 func _initialize() -> void:
 	await process_frame                       # the info-bubble checks need a live scene tree
@@ -54,7 +62,10 @@ func _initialize() -> void:
 	var total := 0
 	for path in SUITES:
 		var suite = load(path).new()
-		suite.run()
+		if path in ASYNC_SUITES:
+			await suite.run()                  # (waits for frames: the live match tests)
+		else:
+			suite.run()
 		var bad: Array = suite.results.filter(func(r): return not r.ok)
 		total += suite.results.size()
 		failed += bad.size()

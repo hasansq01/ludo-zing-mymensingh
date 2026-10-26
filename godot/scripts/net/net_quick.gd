@@ -7,8 +7,8 @@ extends Node
 ##   var q := NetQuick.new(net); add_child(q)     # url, pid, profile and transport come from the NetClient
 ##   q.queued.connect(...); q.matched.connect(func(code, token): net.join(code, token, true))
 ##   q.failed.connect(func(code, msg): ...)       # maintenance | banned | session | replaced | busy | version |
-##                                                 # no_connection | bad_message
-##   q.search("sl", 2)
+##                                                 # no_connection | bad_message | coins | locked (q.fail_info: {short} | {level})
+##   q.search("sl", 2, "t100")                     # table: practice (default) | t100 | t500 | t2k | t10k | t50k
 ##   q.cancel()                                    # leaves the queue (also: closing the socket)
 ##
 ## The session: NetClient.session() (Account.session()). None yet: Account.ensure_session() first (a guest sign-in);
@@ -29,13 +29,15 @@ const CONNECT_TRIES := 3
 const BACKOFF := [0.6, 1.5, 3.0]
 const SIZES := [2, 4]
 const GAMES := ["ludo", "sl"]
-const FATAL := ["maintenance", "banned", "replaced", "busy", "version", "bad_message"]
+const FATAL := ["maintenance", "banned", "replaced", "busy", "version", "bad_message", "coins", "locked"]
 
 var net: NetClient
 var renew_fn := Callable()
 var status := "idle"
 var game := "ludo"
 var players := 2
+var table := "practice"                  ## the coin table of the search (CoinTables ids)
+var fail_info := {}                      ## the last failure's extras: coins {short}, locked {level}
 var position := 0
 var eta_s := 0
 var started_at := 0                      ## Time.get_ticks_msec() when the search began
@@ -57,9 +59,12 @@ func _init(net_: NetClient = null) -> void:
 	net = net_
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
-## The queue URL for a game and table size.
-static func queue_url(base: String, g: String, n: int) -> String:
-	return "%s/v1/quick/ws?game=%s&players=%d" % [base.trim_suffix("/"), g, n]
+## The queue URL for a game and table size (and the coin table: Practice is the server's default, left out).
+static func queue_url(base: String, g: String, n: int, table_ := "practice") -> String:
+	var u := "%s/v1/quick/ws?game=%s&players=%d" % [base.trim_suffix("/"), g, n]
+	if table_ != "practice" and CoinTables.valid(table_):
+		u += "&table=" + table_
+	return u
 
 static func valid(g: String, n: int) -> bool:
 	return g in GAMES and n in SIZES
@@ -71,11 +76,14 @@ func searching() -> bool:
 func elapsed() -> float:
 	return (Time.get_ticks_msec() - started_at) / 1000.0 if started_at > 0 else 0.0
 
-## Join the queue for game ("ludo" | "sl") and players (2 | 4).
-func search(g: String, n: int) -> void:
+## Join the queue for game ("ludo" | "sl"), players (2 | 4) and coin table (the entry is taken at hello and given
+## back when you leave the queue).
+func search(g: String, n: int, table_ := "practice") -> void:
 	close_socket()
 	game = g if g in GAMES else "ludo"
 	players = n if n in SIZES else 2
+	table = table_ if CoinTables.valid(table_) else "practice"
+	fail_info = {}
 	position = 0
 	eta_s = 0
 	_want = true
@@ -124,7 +132,7 @@ func _open() -> void:
 	if net and base == "":
 		net._defaults()
 		base = net.url_base
-	if transport.open(queue_url(base, game, players)) != OK:
+	if transport.open(queue_url(base, game, players, table)) != OK:
 		_on_closed()
 
 func _hello() -> void:
@@ -216,6 +224,10 @@ func handle(msg: Dictionary) -> void:
 				_open()
 				return
 			if code == "session" or code in FATAL:
+				fail_info = {}
+				for k in ["short", "level"]:
+					if msg.has(k):
+						fail_info[k] = int(msg[k])
 				_fail(code, why)
 
 ## A socket that closed before `matched`: try again a few times (backoff), then no_connection.

@@ -482,6 +482,8 @@ func _online(hub: NetFake.Hub, name := "Ana") -> Array:
 	var c := client(hub, name)
 	var o := Online.new(app, c)
 	o.reveal_fast = true
+	o.coins_fn = func() -> int: return 5000     # (not the real save's balance)
+	o.level_fn = func() -> int: return 3
 	app.add_child(o)
 	return [app, o]
 
@@ -503,7 +505,7 @@ func _online_flow() -> void:
 	s.find.emit(4)
 	opump(o)
 	check("online quick: searching, the table size remembered", o.state == "searching" and s.stage == "searching" and int(o.net.prefs.quick_players) == 4
-		and o.quick_cfg == {game = "ludo", players = 4} and hub.mm.queue("ludo", 4).size() == 1)
+		and o.quick_cfg == {game = "ludo", players = 4, table = "practice"} and hub.mm.queue("ludo", 4).size() == 1)
 	check("quick sheet: your seat and three searching seats, Cancel", s.slots.size() == 4 and (s.slots[0] as QuickSheet.Slot).filled
 		and not (s.slots[1] as QuickSheet.Slot).filled and s.cancel_button.visible and s.cancel_button.get_combined_minimum_size().y >= UIKit.TAP)
 	check("quick sheet: the time waited", s.sub_label.text.begins_with("0:0"), s.sub_label.text)

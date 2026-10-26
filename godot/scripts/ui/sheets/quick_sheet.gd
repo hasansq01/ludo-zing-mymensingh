@@ -1,29 +1,40 @@
 class_name QuickSheet
 extends Sheet
-## Quick match (Home's QUICK MATCH, the result's Play again): pick a table (2 or 4 players, the last choice is
-## preselected), then "Finding players…": a row of seats (yours first, the others searching: a soft pulse and a
+## Quick match (Home's QUICK MATCH, the result's Play again): pick a table (2 or 4 players and a coin table: Practice
+## or 100 / 500 / 2,000 / 10,000 / 50,000, the last choices are preselected), then "Finding players…": a row of seats (yours first, the others searching: a soft pulse and a
 ## sweeping ring), the time waited and Cancel. When the server has seated everyone, reveal(seats, me) fills the
 ## seats one by one (avatar, name, level; every player looks the same) and emits revealed; the caller then opens
 ## the match. The sheet only shows; Online does the network work:
 ##
 ##   var s := QuickSheet.new("ludo", 2)
-##   s.find.connect(func(players): ...)          # "Find players" (also Try again)
+##   s.find.connect(func(players): ...)          # "Find players" (also Try again); s.table is the coin table (CoinTables id)
 ##   s.cancel_pressed.connect(...)               # Cancel, the X, Back, a backdrop tap while searching
 ##   s.open(app.sheet_layer)
 ##   s.set_searching(); s.set_queued(position, eta_s); s.set_matched()
 ##   await s.reveal(seats, my_colour)            # then the match
 ##   s.set_error("Online play is down for maintenance.")   # back to the picker with the message
+##   s.set_tables(server_answer)                 # GET /v1/tables: its unlocked / affordable flags win over ours
+## Table rows (CoinTables.rows): the entry, "Win N" (the prize at this player count: 2 players the pool, 4 players 1st
+## place's 75 %), a lock with "Level N" when locked, greyed out when you can't pay it. A locked row says what unlocks it;
+## an unaffordable one says what it costs, or asks for the broke popup (`broke_requested`) when you have < 100 coins.
 ## stage: "pick" | "searching" | "matched" | "found" | "error".
 
 signal find(players: int)
 signal cancel_pressed
 signal revealed
+signal table_changed(id: String)
+signal broke_requested                  ## a table you can't pay was tapped while you have fewer than 100 coins
 
 const SLOT_GAP := 10.0
 const REVEAL_STEP := 0.28                ## s between two players popping into their seats
 
 var game := "ludo"
 var players := 2
+var table := "practice"                  ## the picked coin table (CoinTables id)
+var level := 1                           ## your level and coins: what unlocks / affords a table (set_wallet; Save by default)
+var coins := 0
+var rows: Array = []                     ## CoinTables.rows now
+var table_rows: Array = []               ## TableRow, in the same order
 var stage := "pick"
 var step_sec := REVEAL_STEP              ## 0: reveal at once (tests)
 var hold_sec := 0.55                     ## how long the full table shows before revealed
@@ -35,6 +46,8 @@ var sub_label: Label
 var note_label: Label
 var slots_row: HBoxContainer
 var slots: Array = []                    ## Slot
+var _server := {}                        ## the last GET /v1/tables answer
+var _table_box: VBoxContainer
 var _pick_box: Control
 var _search_box: Control
 var _started_ms := 0
@@ -42,9 +55,13 @@ var _eta := 0
 var _t := 0.0
 
 
-func _init(game_ := "ludo", players_ := 2) -> void:
+func _init(game_ := "ludo", players_ := 2, table_ := "practice") -> void:
 	game = game_ if game_ in ["ludo", "sl"] else "ludo"
 	players = players_ if players_ in [2, 4] else 2
+	table = table_ if CoinTables.valid(table_) else "practice"
+	if _has_save():
+		level = Save.level_info(int(Save.profile.get("xp", 0))).level
+		coins = int(Save.profile.get("coins", 0))
 	super("Quick match", UIKit.W.form, true, Sheet.LOOK_PM)
 	dismissable = true
 	back_action = func(): _cancel()
@@ -57,6 +74,7 @@ func _init(game_ := "ludo", players_ := 2) -> void:
 	note_label.visible = false
 	body.add_child(note_label)
 	body.move_child(note_label, _pick_box.get_index())
+	_refresh_rows()
 	_show("pick")
 	fit()
 	set_process(true)
@@ -68,13 +86,19 @@ func _build_pick() -> void:
 		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	_pick_box.add_child(intro)
 	_pick_box.add_child(UIKit.caption("Players"))
-	picker = UIKit.segmented([[2, "2 players"], [4, "4 players"]], players, func(v): players = int(v))
+	picker = UIKit.segmented([[2, "2 players"], [4, "4 players"]], players, func(v):
+		players = int(v)
+		_refresh_rows())
 	picker.name = "Players"
 	_pick_box.add_child(picker)
+	_pick_box.add_child(UIKit.caption("Table"))
+	_table_box = UIKit.vbox(UIKit.SPACE.xs + 2)
+	_table_box.name = "Tables"
+	_pick_box.add_child(_table_box)
 	find_button = UIKit.button_with("Find players", UIKit.icon("perk_friends", 30), "honey", "lg")
 	find_button.name = "Find"
 	find_button.pressed.connect(func():
-		if stage in ["pick", "error"]:
+		if stage in ["pick", "error"] and _table_ok(table):
 			find.emit(players))
 	_pick_box.add_child(find_button)
 	body.add_child(_pick_box)
@@ -112,6 +136,103 @@ func _show(s: String) -> void:
 		fl.text = "Try again" if s == "error" else "Find players"
 	if is_inside_tree():
 		fit_now()
+
+
+# ---------- tables ----------
+
+## Friendly copy for a queue error: the coin tables' `coins` / `locked` (info: {short} / {level}), else NetClient's.
+static func fail_text(code: String, info := {}) -> String:
+	match code:
+		"coins":
+			return "Not enough coins for that table. Pick a smaller one, or play Practice."
+		"locked":
+			var lv := int(info.get("level", 0))
+			return "That table unlocks at level %d." % lv if lv > 0 else "That table isn’t unlocked yet."
+	return NetClient.error_text(code)
+
+## Your level and coins (what unlocks and affords a table); the rows follow.
+func set_wallet(level_: int, coins_: int) -> void:
+	level = level_
+	coins = coins_
+	_refresh_rows()
+
+## GET /v1/tables' answer: its unlocked / affordable flags replace the local ones. A table that can't be played any
+## more is dropped for Practice.
+func set_tables(msg: Dictionary) -> void:
+	_server = msg
+	if msg.has("level"):
+		level = maxi(level, int(msg.level))
+	_refresh_rows()
+
+## Rebuilds the rows (prizes for the player count, locks, greyed-out) and keeps the pick when it can still be played.
+func _refresh_rows() -> void:
+	rows = CoinTables.rows(players, level, coins, _server)
+	var want := CoinTables.pick(table, rows)
+	if want != table:
+		table = want
+		table_changed.emit(table)
+	for r in table_rows:
+		(r as Control).queue_free()
+	table_rows = []
+	if _table_box == null:
+		return
+	for r: Dictionary in rows:
+		var tr := TableRow.new(r, players, r.id == table)
+		tr.picked.connect(_on_row.bind(str(r.id)))
+		_table_box.add_child(tr)
+		table_rows.append(tr)
+	if is_inside_tree() and stage in ["pick", "error"]:
+		fit_now()
+
+func _table_ok(id: String) -> bool:
+	for r: Dictionary in rows:
+		if r.id == id:
+			return bool(r.ok)
+	return false
+
+## The row of table id (tests).
+func row_of(id: String) -> TableRow:
+	for tr: TableRow in table_rows:
+		if str(tr.row.id) == id:
+			return tr
+	return null
+
+## A row was tapped: a playable table is picked; a locked one says what unlocks it; one you can't pay says what it
+## costs (and, when you are down to < 100 coins, asks for the broke popup).
+func _on_row(id: String) -> void:
+	if stage not in ["pick", "error"]:
+		return
+	for r: Dictionary in rows:
+		if r.id != id:
+			continue
+		if bool(r.locked):
+			set_note("Reach level %d to play that table." % int(r.level))
+		elif not bool(r.affordable):
+			if CoinTables.is_broke(coins):
+				broke_requested.emit()
+			else:
+				set_note("You need %s coins for that table." % Fmt.coins_full(int(r.entry)))
+		else:
+			select_table(id)
+		return
+
+## Pick a table (a playable one; anything else is ignored).
+func select_table(id: String) -> void:
+	if not _table_ok(id) or id == table:
+		return
+	table = id
+	note_label.visible = false
+	for tr: TableRow in table_rows:
+		tr.set_on(str(tr.row.id) == id)
+	table_changed.emit(id)
+
+## A line over the picker without leaving it (a table you can't play).
+func set_note(text: String) -> void:
+	note_label.text = text
+	note_label.visible = text != "" and stage in ["pick", "error"]
+	if is_inside_tree():
+		fit_now()
+
 
 # ---------- states ----------
 
@@ -300,3 +421,58 @@ class Slot extends VBoxContainer:
 		var fs := int(px * 0.42)
 		var w := f.get_string_size("?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		ring.draw_string(f, c + Vector2(-w / 2.0, fs * 0.36), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(Palette.MUTED, 0.55))
+
+
+## One coin table in the picker: the entry (coin and amount, "Practice" for the free one) and, at the right, the prize
+## ("Win 180"), "Free", or a lock with "Level 3". Selected: the gold ring; locked or unaffordable: greyed out.
+class TableRow extends PanelContainer:
+	signal picked
+
+	var row: Dictionary
+	var on := false
+	var title: Label
+	var prize_label: Label
+
+	func _init(row_: Dictionary, players_: int, on_: bool) -> void:
+		row = row_
+		on = on_
+		name = "Table_" + str(row.id)
+		custom_minimum_size = Vector2(0, UIKit.TAP + 6)
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		var h := UIKit.hbox(UIKit.SPACE.sm)
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.alignment = BoxContainer.ALIGNMENT_CENTER
+		var entry := int(row.entry)
+		if entry > 0:
+			h.add_child(UIKit.icon("coin", 26))
+		else:
+			h.add_child(UIKit.icon("pawn_icon", 26))
+		title = UIKit.label("Practice" if entry <= 0 else Fmt.coins_full(entry), UIKit.FS.h2,
+			Palette.INK, UIKit.font_display() if entry > 0 else UIKit.font_body(900))
+		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(title)
+		if bool(row.locked):
+			h.add_child(UIKit.icon("ic_lock", 18))
+			prize_label = UIKit.label("Level %d" % int(row.level), UIKit.FS.body, Palette.MUTED, UIKit.font_body(900))
+		elif entry <= 0:
+			prize_label = UIKit.label("Free", UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900))
+		else:
+			prize_label = UIKit.label("Win %s" % Fmt.coins_full(int(row.prize)), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
+		prize_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		prize_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(prize_label)
+		add_child(h)
+		set_on(on)
+		modulate.a = 1.0 if bool(row.ok) else 0.5
+
+	func set_on(v: bool) -> void:
+		on = v
+		add_theme_stylebox_override("panel", UIKit.surface("item", on, true))
+
+	func _gui_input(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT):
+			accept_event()
+			UIKit.sfx("tap")
+			picked.emit()

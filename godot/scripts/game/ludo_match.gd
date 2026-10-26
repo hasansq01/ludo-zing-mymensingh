@@ -25,6 +25,14 @@ extends Node
 ## No local AI or dice, no pause (the server keeps time), no MatchStore save; the HUD shows the server's turn timer,
 ## offline / bot badges, "Reconnecting…" and, when a bot took your seat, the "I’m back" prompt.
 ##
+## Re-roll (server/ECONOMY_V1.md section 4, RerollFlow): after your bad roll `reroll_offer` shows the HUD's "Roll again"
+## (3 s ring, "Free" or the gem price; a tap sends {t: "reroll", n}, then a spinner until `rerolled` or an error);
+## `hold {c, until}` keeps the next player's dice asleep until `until` ("Rahim may roll again…"; a roll the server
+## refused with `error hold` is sent again at `until`); `rerolled` toasts "<name> rolled again" for everyone. The `sync`
+## that follows (the state before the bad roll) replaces the board at once, even while the bad roll's dice or turn
+## animation is still running (net_push drops the acts waiting before it, ends the old animation and re-lays the
+## board); then the new roll's `act` animates as usual.
+##
 ## Play on (LudoRules header): when a side finishes and the game goes on, its place pops over the centre ("Red
 ## finished 1st!" / "You finished 1st!"), its tile shows the place badge and dims, its pawns stay home and the turn
 ## order skips it (the rules do; computers and timers only ever see the next unfinished side). Your own finish online:
@@ -92,6 +100,10 @@ var _net_turn := {}                       # the server's last `turn` {c, end (ti
 var _my_place := 0                        # play on: the place your side finished in while the game went on (0: not yet)
 var _my_away := false                     # online: a bot was playing your seat when your side finished
 var _back_until := 0                      # online: back in the app until then (ticks ms): a bot on your seat is sent away
+var rr := RerollFlow.new()                # online: the re-roll offer and hold
+var _rr_wait := false                     # online: a re-roll was paid: the dice sleep until the new roll's act
+var aborts := 0                           # online: animations ended by a mid-turn `sync` (tests, debugging)
+var _over_msg := {}                       # online: the server's `over` (match_id, the coin table's payouts)
 
 ## Old callers (device tests): true when tap points are printed. Use TapLog.enabled().
 static func tap_log() -> bool:
@@ -108,6 +120,8 @@ func _ready() -> void:
 	hud.dice_pressed.connect(_on_dice)
 	if hud.has_signal("away_pressed"):
 		hud.away_pressed.connect(_net_back)
+	if hud.has_signal("reroll_pressed"):
+		hud.reroll_pressed.connect(_net_reroll_tap)
 	if hud.has_signal("finish_home_pressed"):
 		hud.finish_home_pressed.connect(_finish_home)
 	if hud.get("emote_picker") != null:
@@ -122,6 +136,8 @@ func _on_dice() -> void:
 		return
 	if not LudoRules.is_human(S, S.turn) or (online and not ns.my_turn()):
 		return
+	if online and (rr.holds(ns.me) or _rr_wait):
+		return                               # the last player may still roll again: the dice wait for the hold
 	roll()
 
 ## Colour c is you (online: your seat; offline: the only human at the table).
@@ -1002,6 +1018,9 @@ func start_online(msg: Dictionary, net_: Object) -> void:
 	_net_info = {}
 	_net_pumping = false
 	_net_ready = false
+	_over_msg = {}
+	_rr_wait = false
+	rr.clear()
 	_net_hud()
 	await _open(ns.S, int(msg.get("n", 0)) == 0 and str(msg.get("t", "start")) == "start")
 
@@ -1013,6 +1032,8 @@ func _offline() -> void:
 	net = null
 	_net_pumping = false
 	_net_prompt = -1
+	rr.clear()
+	_rr_wait = false
 	if hud.has_method("set_online"):
 		hud.set_online(false)
 
@@ -1025,6 +1046,7 @@ func _net_hud() -> void:
 func _net_open(id: int) -> void:
 	_busy = false
 	_net_ready = true
+	_net_apply_hold()
 	hud.update(S, S.turn)
 	_net_badges()
 	match str(S.phase):
@@ -1047,7 +1069,26 @@ func net_push(msg: Dictionary) -> void:
 	if not online or ns == null:
 		return
 	ns.push(msg)
+	match str(msg.get("t", "")):
+		"over":
+			_over_msg = msg
+		"sync":
+			if _net_pumping:
+				_net_abort()                       # a snapshot mid-turn: end the animation now, the sync plays next
 	_net_kick()
+
+## A `sync` arrived while an act was animating: that animation is obsolete (the snapshot replaces the state). The
+## match's generation moves on (every running animation unwinds at its next live() check), the board's walks stop, a
+## tumbling die lands, and the pump is free to take the sync.
+func _net_abort() -> void:
+	aborts += 1
+	_id += 1
+	_net_pumping = false
+	_busy = false
+	board.cancel_all()
+	hud.dice.finish_roll()
+	hud.cancel_pair()
+	_net_prompt = -1
 
 ## Plays the queue, one message at a time, each to the end of its animation.
 func _net_kick() -> void:
@@ -1077,13 +1118,18 @@ func _net_kick() -> void:
 		_ff = 1.0
 		board.speed = _speed()
 		_net_show_turn()
+		_net_reroll_show()
 
 ## One server action through the offline animation path.
 func _net_act(id: int, m: Dictionary) -> void:
 	var a: Dictionary = m.get("a", {})
 	var c := int(a.get("c", S.turn))
+	if not rr.offer.is_empty() and int(m.get("n", 0)) >= int(rr.offer.n):
+		_net_reroll_close()                    # any action after the offer's roll closes it
 	match str(a.get("k", "")):
 		"roll":
+			_rr_wait = false                   # (the re-rolled roll is here)
+			_net_apply_hold()
 			_busy = true
 			hud.hold_dice = false
 			hud.dice.set_active(false)
@@ -1167,6 +1213,9 @@ func _net_end(m: Dictionary) -> void:
 func _net_request(t: String, fields := {}) -> void:
 	if not online or not ns.my_turn() or _net_sent == ns.n:
 		return
+	if t == "roll" and (rr.holds(ns.me) or _rr_wait):
+		_net_roll_later(maxf(rr.hold_left_ms(), 250.0))   # the last player may roll again: send ours when it ends
+		return
 	if _net_send(ns.request(t, fields)):
 		_net_sent = ns.n
 		if t == "roll":
@@ -1218,7 +1267,11 @@ func net_presence(msg: Dictionary) -> void:
 func net_error(msg: Dictionary) -> void:
 	if not online:
 		return
-	push_warning("[net] request refused: %s" % str(msg.get("code", "")))
+	var code := str(msg.get("code", ""))
+	if RerollFlow.is_error(code):
+		_net_reroll_error(code, msg)
+		return
+	push_warning("[net] request refused: %s" % code)
 	_net_sent = -1
 	hud.hold_dice = false
 	if not S.is_empty():
@@ -1244,6 +1297,107 @@ func net_emote(msg: Dictionary) -> void:
 func _net_back() -> void:
 	if online:
 		_net_send({t = "back"})
+
+# ---------- online: re-roll and hold (RerollFlow) ----------
+
+## reroll_offer {n, until, now, free, gems, cost}: your bad roll may be rolled again. The button shows once the bad
+## roll has played (the offer is for the state at n).
+func net_reroll_offer(msg: Dictionary) -> void:
+	if not online or ns == null:
+		return
+	rr.on_offer(msg)
+	if not _net_pumping:
+		_net_reroll_show()
+
+## The "Roll again" button, when an offer is open for the state shown and nothing is animating.
+func _net_reroll_show() -> void:
+	if not online or ns == null or S.is_empty() or not hud.has_method("show_reroll"):
+		return
+	if S.phase == "over" or _net_pumping or not rr.offer_open(ns.n):
+		return
+	if hud.reroll_button.visible:
+		return
+	hud.show_reroll(rr.offer_left_ms(), float(rr.offer.total), rr.is_free(), int(rr.offer.cost))
+
+## A tap on "Roll again": {t: "reroll", n}; the button spins until `rerolled` (or an error).
+func _net_reroll_tap() -> void:
+	if not online or ns == null or not rr.offer_open(ns.n):
+		return
+	if _net_send({t = "reroll", n = int(rr.offer.n)}):
+		rr.mark_sent()
+		hud.reroll_button.set_busy(true)
+
+## The offer is over (an action followed it, the re-roll was paid, an error): no button.
+func _net_reroll_close() -> void:
+	rr.clear_offer()
+	if hud.has_method("hide_reroll"):
+		hud.hide_reroll()
+
+## hold {c, until}: the next roll waits for colour c's re-roll. Your dice sleep if the roll is yours; everyone else
+## but c sees "<name> may roll again…".
+func net_hold(msg: Dictionary) -> void:
+	if not online or ns == null:
+		return
+	rr.on_hold(msg, _net_server_now())
+	_net_apply_hold()
+
+func _net_server_now() -> float:
+	return float(net.call("server_now")) if net != null and net.has_method("server_now") else -1.0
+
+## The dice and the note follow the hold: asleep while a hold on another colour's re-roll runs (or a paid re-roll waits
+## for its roll), awake again when it ends.
+func _net_apply_hold() -> void:
+	if not online or ns == null or not hud.has_method("set_hold"):
+		return
+	var holding := rr.holds(ns.me)
+	hud.roll_locked = holding or _rr_wait
+	hud.set_hold(LudoRules.pname(S, int(rr.hold.c)) if holding and not S.is_empty() and int(rr.hold.c) >= 0 else "")
+	hud.refresh_roll()
+	if holding:
+		var token: float = rr.hold.end
+		await get_tree().create_timer(rr.hold_left_ms() / 1000.0 + 0.03).timeout
+		if online and not rr.hold.is_empty() and float(rr.hold.end) == token:
+			rr.clear_hold()
+			_net_apply_hold()
+
+## Your roll goes out `ms` from now (the hold ends), when it is still yours to roll.
+func _net_roll_later(ms: float) -> void:
+	var at := ns.n
+	var id := _id
+	await get_tree().create_timer(ms / 1000.0 + 0.05).timeout
+	if live(id) and online and ns != null and ns.n == at and ns.my_turn() and S.phase == "roll" and _net_sent != ns.n and not _busy:
+		_net_request("roll")
+
+## rerolled {c, paid}: "<name> rolled again" for everyone; the sync and the new roll follow.
+func net_rerolled(msg: Dictionary) -> void:
+	if not online or ns == null or S.is_empty():
+		return
+	var c := int(msg.get("c", -1))
+	_net_reroll_close()
+	rr.clear_hold()
+	_rr_wait = true                            # the dice stay asleep until the new roll's act
+	_net_apply_hold()
+	var who := "You" if c == ns.me else LudoRules.pname(S, c)
+	Toast.show(hud, "%s rolled again" % who, null, 1.8, "info")
+	get_tree().create_timer(4.0).timeout.connect(func():
+		if _rr_wait:                           # failsafe: the roll never came
+			_rr_wait = false
+			if online and ns != null:
+				_net_apply_hold())
+
+## error hold / reroll_used / reroll_closed / gems.
+func _net_reroll_error(code: String, msg: Dictionary) -> void:
+	if code == "hold":
+		_net_sent = -1
+		hud.hold_dice = false
+		rr.on_hold({c = -2, until = msg.get("until", 0)}, _net_server_now())
+		_net_apply_hold()
+		_net_roll_later(maxf(rr.hold_left_ms(), 250.0))
+		return
+	var text := RerollFlow.error_text(code)
+	if text != "":
+		Toast.show(hud, text, null, 2.0, "bad")
+	_net_reroll_close()
 
 ## The app came back to the front during an online match: the player is here, so the seat is theirs again without
 ## an "I’m back" tap (now, and when the bot that took it over while the phone was away shows up in the next acts).
@@ -1304,12 +1458,18 @@ func _net_game_over() -> void:
 	# the server's outcome: fixed when your side was ranked (play on: finished earlier, then maybe left / watched)
 	var away: bool = _my_away if _my_place > 0 else (ns.me >= 0 and S.players[ns.me] == "cpu")
 	var outcome := "" if ns.me < 0 else ("left" if away else ("win" if won else "finish"))
+	if _over_msg.is_empty() and net != null and bool(net.get("quick")):
+		for _k in 120:                         # (the `over` carries the coin table's payouts: a moment at most)
+			if not _over_msg.is_empty() or not live(id):
+				break
+			await get_tree().process_frame
+	var table := NetReplica.table_result(_over_msg, ns.me)
 	var rw := NetReplica.online_reward("ludo", outcome)
 	var xp_before := int(Save.profile.get("xp", 0))
 	var xp_after := xp_before
 	var reward := 0
 	if NetReplica.server_rewards():
-		reward = int(rw.coins)
+		reward = int(table.payout) if int(table.get("entry", 0)) > 0 else NetReplica.online_coins("ludo", outcome, table)
 		xp_after = xp_before + int(rw.xp)
 	elif int(rw.xp) > 0:
 		Save.profile.xp = xp_before + int(rw.xp)
@@ -1331,4 +1491,4 @@ func _net_game_over() -> void:
 		return
 	finished.emit({game = "ludo", title = copy.title, sub = copy.sub, standings = standings, human_won = won,
 		reward = reward, teams = S.teams, color = S.winner, winners = winners, vs_cpu = false, online = true,
-		xp_before = xp_before, xp_after = xp_after})
+		xp_before = xp_before, xp_after = xp_after, table = table})

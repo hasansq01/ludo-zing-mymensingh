@@ -213,6 +213,10 @@ static func equip_dice(id: String) -> bool:
 
 # ---------- text ----------
 
+## Economy v1: every paid item can also be bought with gems, ceil(coins / 100). Free items (0 coins) have no gem price.
+static func gem_price(coins: int) -> int:
+	return 0 if coins <= 0 else (coins + 99) / 100
+
 static func need_text(short: int) -> String:
 	return "Not enough coins — you need %s more." % group(short)
 

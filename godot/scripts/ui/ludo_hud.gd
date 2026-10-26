@@ -30,6 +30,7 @@ signal pick_chosen(kind: String)         # legacy (the Single / Pair step is gon
 signal pair_answered(yes: bool)
 signal away_pressed                      # online: "I’m back" (a bot was playing your seat)
 signal finish_home_pressed               # the finish card's Home (online: leave the room)
+signal reroll_pressed                    # online: the "Roll again" button (ECONOMY_V1.md 4)
 
 const POS := ["bl", "tl", "tr", "br"]
 const DICE := 72.0                       # the die's control (its face is DICE_FILL of it, ≈ 62 px)
@@ -59,6 +60,9 @@ var online := false
 var me := -1                             # online: your colour
 var seats := {}                          # online: colour -> seat {id, name, avatar, frame, bot, online}
 var hold_dice := false                   # online: your roll request is out (the dice wait for the server's act)
+var roll_locked := false                 # online: the next player's roll waits for a re-roll hold (the dice sleep)
+var reroll_button: RerollButton          # online: "Roll again" with its 3 s ring, above your tile row
+var hold_note: HoldNote                  # online: "Rahim may roll again…" under the top tiles
 var banner: PanelContainer               # online: "Reconnecting…"
 var away_box: PanelContainer             # online: "You were away…" + I’m back
 var away_button: Button
@@ -230,6 +234,13 @@ func _ready() -> void:
 	add_child(dice)
 	_build_pair_box()
 	_build_online()
+	reroll_button = RerollButton.new()
+	reroll_button.pressed.connect(func(): reroll_pressed.emit())
+	reroll_button.visibility_changed.connect(_layout)
+	add_child(reroll_button)
+	hold_note = HoldNote.new()
+	hold_note.visibility_changed.connect(_layout)
+	add_child(hold_note)
 	finish_card = FinishCard.new()
 	finish_card.home_pressed.connect(func(): finish_home_pressed.emit())
 	add_child(finish_card)
@@ -326,6 +337,11 @@ func set_online(on: bool, me_ := -1, seats_: Array = []) -> void:
 			seats[int(st.get("color", -1))] = st
 	hold_dice = false
 	if not on:
+		if reroll_button:
+			hide_reroll()
+		if hold_note:
+			set_hold("")
+		roll_locked = false
 		set_banner("")
 		show_away(false)
 		set_badges(["", "", "", ""])
@@ -367,6 +383,58 @@ func _place_banner() -> void:
 	banner.size = banner.get_combined_minimum_size()
 	var band := board_band()
 	banner.position = Vector2(round((size.x - banner.size.x) / 2.0), band.position.y + UIKit.SPACE.xs)
+
+## "Roll again" over the bottom tile row (the offer's 3 s window); the emote button keeps clear of it.
+func show_reroll(left_ms: float, total_ms: float, free: bool, cost: int) -> void:
+	if _over:
+		return
+	reroll_button.show_offer(left_ms, total_ms, free, cost)
+	_layout()
+	UIKit.pop_in(reroll_button, 0.18)
+
+## "Roll again" level with the bottom tile row, centred between the tiles (at their turn size); when the screen is too
+## narrow for that, centred just above the row like the other prompts.
+func _place_reroll() -> void:
+	var b := reroll_button
+	b.size = b.get_combined_minimum_size()
+	var lo := 0.0
+	var hi := size.x
+	var row_y := INF
+	var row_h := 0.0
+	for c in 4:
+		var t: Tile = tiles[c]
+		if not t.visible or not _corner[c] in ["bl", "br"]:
+			continue
+		var r := _grown(t, Rect2(Vector2.ZERO, Vector2(PlayerTile.CARD_W, t.tile_height())))
+		if _corner[c] == "bl":
+			lo = maxf(lo, r.end.x + UIKit.SPACE.xs)
+		else:
+			hi = minf(hi, r.position.x - UIKit.SPACE.xs)
+		row_y = minf(row_y, t.position.y)
+		row_h = maxf(row_h, t.tile_height())
+	if row_y < INF and hi - lo >= b.size.x:
+		b.position = Vector2(round((lo + hi - b.size.x) / 2.0), round(row_y + (row_h - b.size.y) / 2.0))
+	else:
+		_place_bottom(b)
+
+func hide_reroll() -> void:
+	if reroll_button and reroll_button.visible:
+		reroll_button.hide_offer()
+		_layout()
+
+## The pill under the top tiles while another player may re-roll ("" hides it).
+func set_hold(who: String) -> void:
+	hold_note.set_who("" if _over else who)
+	if hold_note.visible:
+		_place_hold()
+
+func _place_hold() -> void:
+	hold_note.size = hold_note.get_combined_minimum_size()
+	var band := board_band()
+	var y := band.position.y + UIKit.SPACE.xs
+	if banner and banner.visible:
+		y += banner.size.y + UIKit.SPACE.xs
+	hold_note.position = Vector2(round((size.x - hold_note.size.x) / 2.0), y)
 
 ## Rebuild the tiles for a new game.
 func setup(s: Dictionary) -> void:
@@ -464,6 +532,10 @@ func _layout() -> void:
 		_place_bottom(finish_card)
 	if banner and banner.visible:
 		_place_banner()
+	if reroll_button and reroll_button.visible:
+		_place_reroll()
+	if hold_note and hold_note.visible:
+		_place_hold()
 	_place_emotes()
 
 ## The free band between the top and bottom tile rows (UI pixels, full width): the board is framed in it.
@@ -528,11 +600,7 @@ func update(s: Dictionary, turn: int) -> void:
 	dice.visible = turn >= 0 and not over
 	if turn >= 0:
 		dice.set_tint(Palette.PLAYER[turn])
-	var can_roll: bool = turn >= 0 and s.phase == "roll" and LudoRules.is_human(s, turn) and not over \
-		and (not online or (turn == me and not hold_dice))
-	if can_roll and not dice.active and not dice.rolling:
-		dice.show_ready()                    # a neutral pose while waiting: the last roll's face is not a spoiler
-	dice.set_active(can_roll)
+	_wake_dice(s, turn, over)
 	var you_pair := false
 	for q in s.pairs:
 		if NetLudo.you(s, q.c) or (not online and LudoRules.is_human(s, q.c) and not s.players.has("cpu")):
@@ -543,6 +611,20 @@ func update(s: Dictionary, turn: int) -> void:
 	_set_info(_pair_info, you_pair)
 	_sync_help()
 	_layout()
+
+## The dice wake (or sleep) for the shown turn: yours to roll, and not held by a re-roll or your own pending request.
+func _wake_dice(s: Dictionary, turn: int, over: bool) -> void:
+	var can_roll: bool = turn >= 0 and s.phase == "roll" and LudoRules.is_human(s, turn) and not over \
+		and (not online or (turn == me and not hold_dice and not roll_locked))
+	if can_roll and not dice.active and not dice.rolling:
+		dice.show_ready()                    # a neutral pose while waiting: the last roll's face is not a spoiler
+	dice.set_active(can_roll)
+
+## Re-evaluates only the dice (a re-roll hold started or ended) without touching the tiles' turn.
+func refresh_roll() -> void:
+	if _s.is_empty() or _s.get("phase", "") == "over":
+		return
+	_wake_dice(_s, _turn, false)
 
 ## Play on: the place colour c's side finished in (its pawns all home: Teams, both partners'), else 0. A side ranked
 ## by progress at the end is not "done" (no badge).
@@ -614,6 +696,8 @@ func hide_for_result() -> void:
 	away_box.visible = false
 	banner.visible = false
 	finish_card.visible = false
+	reroll_button.hide_offer()
+	hold_note.visible = false
 	set_timer(-1, 0.0, 1.0)
 	set_emotes(false)
 
@@ -732,7 +816,7 @@ func emote_seat(c: int) -> Dictionary:
 		slot = _grown(t, t.dice_slot_local()), inner = "right" if t.side != "right" else "left",
 		low = _corner[c] in ["bl", "br"]}
 	if d.low:                                # a prompt over the tile row stays readable: the bubble goes above it
-		for box: Control in [pair_box, away_box, finish_card]:
+		for box: Control in [pair_box, away_box, finish_card, reroll_button]:
 			if box and box.visible:
 				d.ceiling = minf(float(d.get("ceiling", INF)), box.position.y - UIKit.SPACE.xs)
 	return d
@@ -757,7 +841,7 @@ func _place_emotes() -> void:
 		var t: Tile = tiles[tc]
 		var ava := _grown(t, Rect2(t._ava_pos(), Vector2(PlayerTile.AVA, PlayerTile.AVA)))
 		at = Vector2(ava.get_center().x, ava.position.y - 6.0 - EmotePicker.SZ / 2.0)
-		for box: Control in [pair_box, away_box, finish_card]:
+		for box: Control in [pair_box, away_box, finish_card, reroll_button]:
 			if box and box.visible:
 				var r := Rect2(box.position, box.size).grow(6)
 				if r.intersects(Rect2(at - Vector2.ONE * EmotePicker.SZ / 2.0, Vector2.ONE * EmotePicker.SZ)):

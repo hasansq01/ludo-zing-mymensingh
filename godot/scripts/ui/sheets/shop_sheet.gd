@@ -16,6 +16,9 @@ extends Sheet
 ##   locked       lock + what unlocks it ("Reach level 5", "Win 3 games in a row"), the art faded
 ## Rooms and scenes: tapping the picture (the "View" chip) opens the live 3D PreviewSheet in place of the Shop.
 ## Owned filter: a "3 more in the shop · Show all" link row under the grid; a single owned item is centred.
+## Economy v1: every paid item can also be bought with gems (ceil(price / 100), Catalog.gem_price): a second line under
+## the state row, "or [gem] 30", tapping it buys with gems (confirm first). Too few gems: "Not enough gems", the
+## shortfall, and "Open Store". Gems only exist on the server: offline it says "Connect to the internet to buy".
 ## Buying always asks first (Sheet.confirm), then goes through Catalog / SLScenes / Collection (coins checked, never
 ## charged twice, rolled back when the save fails), puts the item in use and says "<Item> is yours!".
 ## Coins come from the Get coins sheet (EarnSheet below): Daily reward, Daily spin and Free coins with their live
@@ -30,6 +33,7 @@ signal dice_changed(id: String)
 signal scene_changed(id: String)         ## a Snakes & Ladders scene was bought / put in use (SLScenes)
 signal changed                           ## anything was bought or put in use (rooms, dice, scenes, avatars, frames ...)
 signal emotes_changed                    ## an emote pack was bought / put in use
+signal store_requested                   ## "Open Store" after "not enough gems": main opens the Store sheet
 signal shop_requested(tab: String)       ## Inventory: "Open shop" (main closes the inventory and opens the Shop there)
 
 const TABS := [
@@ -371,6 +375,12 @@ func _card(it: Dictionary) -> PanelContainer:
 	ll.add_theme_constant_override("line_spacing", -3)
 	lock_row.add_child(ll)
 	slot.add_child(lock_row)
+	# the gem option: reserved on every card that has a price, so the cards of a row stay one height
+	var gem_row: Button = null
+	if price > 0:
+		gem_row = _gem_option(Catalog.gem_price(price))
+		gem_row.pressed.connect(func(): _on_buy_gems(kind, id, it.name))
+		v.add_child(gem_row)
 	_cards.append(p)
 	_updaters.append(func():
 		var owned := _owned(kind, id)
@@ -383,6 +393,9 @@ func _card(it: Dictionary) -> PanelContainer:
 		use.visible = owned and not on
 		on_pill.visible = on
 		lock_row.visible = not owned and not for_sale
+		if gem_row:
+			gem_row.modulate.a = 1.0 if for_sale else 0.0         # (keeps its height; not tappable while hidden)
+			gem_row.disabled = not for_sale
 		(view.get_meta("art", view) as CanvasItem).modulate.a = 0.55 if lock_row.visible else 1.0
 		if for_sale:
 			var short := price - Catalog.coins()
@@ -390,6 +403,32 @@ func _card(it: Dictionary) -> PanelContainer:
 			if buy.get_meta("kit_kind", "") != ("gold" if short <= 0 else "off"):
 				UIKit.set_kind(buy, "gold" if short <= 0 else "off"))
 	return p
+
+## The "or [gem] 30" line of a card: one flat 34 px button (the whole line is the tap).
+func _gem_option(gems: int) -> Button:
+	var b := Button.new()
+	b.name = "GemBuy"
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size.y = 34
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.set_meta("gems", gems)
+	for k in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		b.add_theme_stylebox_override(k, StyleBoxEmpty.new())
+	var h := UIKit.hbox(UIKit.SPACE.xs + 2)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	b.add_child(h)
+	var or_l := UIKit.label("or", UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
+	or_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	h.add_child(or_l)
+	var amt := CoinAmount.gems(gems, "xs", "plain")
+	amt.name = "Amount"
+	amt.set_color(Palette.TEAL_INK)
+	h.add_child(amt)
+	UIKit.wire_press(b)
+	return b
 
 ## The art of an item, filling its ArtBox.
 func _art(kind: String, id: String) -> Control:
@@ -639,13 +678,15 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 ## The purchase itself: "" when bought, else the reason to show. With an Account (the game) the server sells and the
 ## local profile is replaced by its answer; offline there is no local granting ("Connect to the internet to buy").
 ## Without one (previews, tests) the local rules apply.
-func _purchase(kind: String, id: String) -> String:
+func _purchase(kind: String, id: String, currency := "coins") -> String:
 	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
-		var r: Dictionary = await Account.instance().buy(kind, id)
+		var r: Dictionary = await Account.instance().buy(kind, id, currency)
 		if r.get("ok", false):
 			return ""
 		if r.get("error", "") == "coins" and int(r.get("short", 0)) > 0:
 			return Catalog.need_text(int(r.short))
+		if r.get("error", "") == "gems" and int(r.get("short", 0)) > 0:
+			return gems_need_text(int(r.short))
 		return Account.error_text(str(r.get("error", "")), "buy")
 	match kind:
 		"room": return Catalog.buy_room(id)
@@ -654,6 +695,66 @@ func _purchase(kind: String, id: String) -> String:
 		"emotes": return Catalog.buy_emotes(id)
 		"char": return Collection.buy_char(id, true)
 	return "That isn’t for sale."
+
+## "Not enough gems — you need 12 more."
+static func gems_need_text(short: int) -> String:
+	return "Not enough gems — you need %s more." % Fmt.coins_full(short)
+
+## Buy with gems: not enough -> "Not enough gems" + Open Store; else confirm -> buy and put in use -> "<Item> is yours!".
+func _on_buy_gems(kind: String, id: String, name_: String) -> void:
+	if _busy or _closing:
+		return
+	var price := _price(kind, id)
+	var gems := Catalog.gem_price(price)
+	if gems <= 0:
+		return
+	var have := int(Save.profile.get("gems", 0))
+	var title := _title(kind, name_)
+	if not (Account.wallet_active() and is_same(Collection.profile(), Save.profile)):
+		Sound.sfx("error")
+		Haptics.error()
+		Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")      # gems live on the server
+		return
+	if gems > have:
+		Sound.sfx("error")
+		Haptics.error()
+		_busy = true
+		var open_store: bool = await Sheet.confirm(self, "Not enough gems", "You need %s more gems for %s. You have %s." % [Fmt.coins_full(gems - have), title, Fmt.coins_full(have)], "Open Store", "Not now")
+		_busy = false
+		if open_store and is_instance_valid(self) and not _closing:
+			store_requested.emit()
+		return
+	_busy = true
+	var online: bool = await Account.instance().ensure_session()
+	_busy = false
+	if not is_instance_valid(self) or _closing:
+		return
+	if not online:
+		Sound.sfx("error")
+		Haptics.error()
+		Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
+		return
+	_busy = true
+	var yes: bool = await Sheet.confirm(self, "Buy %s?" % title, "%s gems. You’ll have %s left." % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], "Buy")
+	_busy = false
+	if not yes or not is_instance_valid(self) or _closing:
+		return
+	_busy = true
+	var err: String = await _purchase(kind, id, "gems")
+	_busy = false
+	if not is_instance_valid(self) or _closing:
+		return
+	if err != "":
+		Sound.sfx("error")
+		Haptics.error()
+		Toast.show(self, err, card, 2.2, "bad")
+		refresh()
+		return
+	Sound.sfx("buy")
+	Haptics.success()
+	Toast.show(self, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], card, 1.8, "good")
+	_announce(kind, id)
+	refresh()
 
 ## Use: put an owned item in use. Through the server when there is an Account (the look is part of the profile it
 ## keeps); offline: "Connect to the internet to change your look".

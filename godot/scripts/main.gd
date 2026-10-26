@@ -32,6 +32,8 @@ var sl_hud: Control
 var online: Online                      # friend rooms (scripts/net/online.gd)
 var account: Account                    # the server account, wallet and claims (scripts/net/account.gd)
 var notifications: Notifications        # reminders, push and the permission question (scripts/net/notifications.gd)
+var ads: Ads                            # rewarded ads + the consent form (scripts/net/ads.gd; AdFlow shows them)
+var gem_store: GemStore                 # the gem packs: Play Billing + server verification (scripts/net/gem_store.gd)
 var screen := "splash"                  # splash | welcome | home | ludo | sl
 var paused := false
 var speed := 1.0
@@ -51,6 +53,7 @@ var _pairs_start := 0                   # stats.pairsFormed when it began (the c
 var _resumed := false                   # the match was continued from MatchStore (it began in an earlier session)
 var _free_busy := false                 # a Free coins claim is waiting for the server
 var _claim_id := ""                     # the claim of the match whose result is on screen
+var _app_focused := true                # false while a system dialog / the notification shade has the focus
 var _sl_seen := false                   # the S&L scene has been on screen (its shaders are compiled: no warm-up needed)
 
 
@@ -75,6 +78,13 @@ func _ready() -> void:
 	notifications = Notifications.new(self)
 	notifications.name = "Notifications"
 	add_child(notifications)
+	ads = Ads.new()
+	ads.name = "Ads"
+	add_child(ads)
+	gem_store = GemStore.new()
+	gem_store.name = "GemStore"
+	add_child(gem_store)
+	gem_store.granted.connect(_on_gems_granted)
 	baker = TexBaker.new()
 	baker.name = "Baker"
 	add_child(baker)
@@ -695,6 +705,8 @@ func _on_tab(tab: String) -> void:
 			var s := ShopSheet.new("scenes")
 			_wire_shop(s)
 			s.open(sheet_layer)
+		"store", "gems":
+			open_store()
 		"shop", "coins":
 			var s := ShopSheet.new("coins" if tab == "coins" else _home_shop_tab())
 			_wire_shop(s)
@@ -759,6 +771,8 @@ func _wire_shop(s: Sheet) -> void:
 		s.connect("scene_changed", func(_id: String):
 			if screen == "home" and home.game == "sl":
 				_home_backdrop())
+	if s.has_signal("store_requested"):
+		s.connect("store_requested", open_store)
 	s.closed.connect(home.refresh)
 
 ## Switch the café to a room theme (built on first use; the splash already built the equipped one).
@@ -1037,6 +1051,49 @@ func _on_finished(result: Dictionary, game: String) -> void:
 func _start_account() -> void:
 	if account.enabled:
 		account.start()
+		gem_store.launch_check()              # a payment an earlier run left unverified, and what Play still holds
+		_ads_consent()
+
+## The ads consent form (UMP) and the first rewarded ad, once Home is quiet: after the notifications question (its soft
+## prompt and the system dialog under it), never over a sheet or a game. Asked every launch: the form only shows where
+## it is needed (EEA / UK) and answers at once otherwise; that also tells us whether Settings offers "Privacy choices".
+func _ads_consent() -> void:
+	if not ads.available():
+		return
+	var since := -1
+	while is_inside_tree():
+		var quiet := screen == "home" and _splash == null and home.visible and _top_sheet() == null and _app_focused \
+			and not bool(notifications.get("_ask_wanted")) and not is_instance_valid(_result)
+		if not quiet:
+			since = -1
+		elif since < 0:
+			since = Time.get_ticks_msec()
+		elif Time.get_ticks_msec() - since >= 2500:
+			break
+		await get_tree().process_frame
+	if not is_inside_tree():
+		return
+	ads.consent_done.connect(func(can: bool, _privacy: bool):
+		if can:
+			ads.load_rewarded(), CONNECT_ONE_SHOT)
+	ads.request_consent()
+
+## "+80 gems" after a purchase is verified (the Store sheet shows its own toast).
+func _on_gems_granted(gems: int, _product: String) -> void:
+	if _top_sheet() is StoreSheet:
+		return
+	if screen == "home":
+		_home_toast("+%s gems" % Fmt.coins_full(gems), "gem")
+	home.refresh()
+
+## The Store: gem packs and swapping gems for coins.
+func open_store() -> void:
+	var top := _top_sheet()
+	if top is StoreSheet:
+		return
+	var s := StoreSheet.new(gem_store)
+	s.closed.connect(home.refresh)
+	s.open(sheet_layer)
 
 func _begin_match_clock() -> void:
 	_match_ms = Time.get_ticks_msec()
@@ -1207,5 +1264,8 @@ func _notification(what: int) -> void:
 			Sound.set_app_paused(false)
 			if _online_match():
 				(ludo if screen == "ludo" else sl).app_resumed()   # back in the app: the seat is yours again
+		NOTIFICATION_APPLICATION_FOCUS_IN:
+			_app_focused = true
 		NOTIFICATION_APPLICATION_FOCUS_OUT:      # a call, the notification shade, the app switcher: keep the match
+			_app_focused = false
 			_flush_match()

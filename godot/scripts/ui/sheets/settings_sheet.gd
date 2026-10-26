@@ -143,6 +143,13 @@ func _build() -> void:
 		if url != "":
 			hp.add_child(_divider())
 			hp.add_child(_link_line(k[1], func(): OS.shell_open(url)))
+	# Privacy choices (ads consent): only where the consent form says the player can change them
+	var ad := Ads.instance()
+	if ad != null and ad.privacy_options_required():
+		hp.add_child(_divider())
+		var pc := _link_line("Privacy choices", func(): ad.show_privacy_options())
+		pc.name = "PrivacyChoices"
+		hp.add_child(pc)
 
 	# --- Reset progress
 	var gap := Control.new()

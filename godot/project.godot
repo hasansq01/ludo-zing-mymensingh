@@ -34,7 +34,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/notifications/plugin.cfg", "res://addons/play_games/plugin.cfg")
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/billing/plugin.cfg", "res://addons/notifications/plugin.cfg", "res://addons/play_games/plugin.cfg")
 
 [input_devices]
 
@@ -47,6 +47,8 @@ push/project_id="ludo-zing-a1b7c"
 push/app_id="1:650464431641:android:90e6b5cebd13aed0c1a488"
 push/api_key="AIzaSyD1iquBS8PYJofWWjfjRnEsyXy1xKCELvg"
 push/sender_id="650464431641"
+ads/app_id="ca-app-pub-1525695956680184~8542680820"
+ads/rewarded_unit="ca-app-pub-1525695956680184/5856807738"
 
 [rendering]
 

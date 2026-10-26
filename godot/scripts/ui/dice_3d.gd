@@ -113,6 +113,7 @@ var mat: ShaderMaterial
 var value := 6
 var active := false
 var rolling := false
+var _roll_tw: Tween
 var _t := 0.0
 var _height := 0.0
 var _squash := 0.0
@@ -314,6 +315,7 @@ func roll(v: int, speed := 1.0) -> void:
 	var to: Vector3 = FACE_EULER[clampi(v, 1, 6)]
 	to += Vector3(TAU * (2 + randi() % 2), TAU * (1 + randi() % 2) * (1 if randf() < 0.5 else -1), TAU * (randi() % 2))
 	var tw := create_tween()
+	_roll_tw = tw
 	tw.tween_method(_roll_step.bind(from, to), 0.0, 1.0, dur)
 	await tw.finished
 	value = v
@@ -323,6 +325,12 @@ func roll(v: int, speed := 1.0) -> void:
 	_pop = 1.0
 	rolling = false
 	set_active(active)
+
+## A tumble still running ends now (a snapshot replaced the state under it): the die lands on its face at once and
+## roll()'s caller carries on.
+func finish_roll() -> void:
+	if rolling and _roll_tw and _roll_tw.is_valid():
+		_roll_tw.custom_step(100.0)
 
 ## Shows face v at once.
 func show_face(v: int) -> void:

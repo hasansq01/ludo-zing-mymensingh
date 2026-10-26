@@ -86,7 +86,7 @@ func run() -> void:
 	sv.reset_progress()
 	var p: Dictionary = sv.profile
 	pr = sv.prefs
-	check("reset: fresh profile (coins, XP, stats, name, rooms)", p.coins == 5000 and p.xp == 0 and p.stats.played == 0 and p.stats.wins == 0 and p.name == "You" and p.rooms == ["night", "cafe"], p)
+	check("reset: fresh profile (coins, XP, stats, name, rooms)", p.coins == 2500 and p.gems == 0 and p.rerolls == 0 and p.xp == 0 and p.stats.played == 0 and p.stats.wins == 0 and p.name == "You" and p.rooms == ["night", "cafe"], p)
 	check("reset: a new player ID", p.id is String and p.id.begins_with("LZM-") and p.id != "LZM-ABCD-EFGH")
 	check("reset: sound switch and volumes kept (20 x 10 / 30 folded)", pr.sound == false and pr.vol.master == 100 and pr.vol.music == 2 and pr.vol.sfx == 6, pr.vol)
 	check("reset: other prefs back to defaults (Relaxed, house rules on, Top cameras, normal bots, first-run flags off)", is_equal_approx(pr.speed, 1.0) and pr.pair_ask == true and pr.sl_need_one == true and pr.cam == "top"

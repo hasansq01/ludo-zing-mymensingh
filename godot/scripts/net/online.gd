@@ -5,7 +5,8 @@ extends Node
 ## routes the room's messages to the online match (LudoMatch or SLMatch, whichever `start.game` / `sync.game` says).
 ## main.gd creates one (`online`) and calls:
 ##   open_friends(game)      Home's "Play with friends" (game: the new room's game; the host may change it)
-##   open_quick(game)        Home's "Quick match": the table picker, then "Finding players…", then the match
+##   open_quick(game)        Home's "Quick match": the table picker (players and coin table; < 100 coins: the "Out of
+##                           coins" sheet first), then "Finding players…", then the match
 ##   try_resume()            after launch: a room kept in Save.prefs.net_room is taken back (lobby or match)
 ##   leave()                 Leave match / Home from the result / Leave in the lobby
 ##   rematch()               the result's Play again: the host's rematch (friend rooms), queue again (quick match)
@@ -20,12 +21,16 @@ extends Node
 ## played in order). Every seat that isn't a bot is a person here: nothing tells ghost seats apart.
 ## Errors become friendly toasts (NetClient.error_text) or the quick sheet's message. Request errors during a match
 ## (stale, not_your_turn, bad_action) go to the match quietly: they are races, not mistakes.
+## Coin tables (server/ECONOMY_V1.md 3): the queue takes `table=`; `error coins` / `locked` come back as the picker's
+## message (and the broke sheet when you are down to < 100 coins). Re-rolls (ECONOMY_V1.md 4): reroll_offer / hold /
+## rerolled go to the match (net_reroll_offer / net_hold / net_rerolled); the re-roll errors (hold, reroll_used,
+## reroll_closed, gems) to its net_error.
 ## Emotes (server/EMOTES.md): another member's {t: "emote", c, id} goes to the match's net_emote while it is up
 ## (dropped while it opens: a reaction is only worth showing now); emote_locked / emote_rate are ignored quietly.
 
 signal state_changed(state: String)
 
-const QUIET := ["stale", "not_your_turn", "bad_action", "rate"]
+const QUIET := ["stale", "not_your_turn", "bad_action", "rate", "hold", "reroll_used", "reroll_closed", "gems"]
 const QUIET_EMOTE := ["emote_locked", "emote_rate"]   ## a refused emote: nothing to say, nothing to retry
 const REFRESH_AFTER := [1.5, 6.0]          ## s after `over`: GET /v1/me (the server grants the rewards at over)
 
@@ -37,7 +42,11 @@ var friends: FriendsSheet
 var lobby_sheet: LobbySheet
 var quick_sheet: QuickSheet
 var game := "ludo"                         ## the game of the room we are in (or joining)
-var quick_cfg := {}                        ## {game, players} of the last quick search (Play again queues it again)
+var quick_cfg := {}                        ## {game, players, table} of the last quick search (Play again queues it again)
+var last_tables := {}                      ## the last GET /v1/tables answer (the picker's flags, the broke bonus)
+var broke_sheet: BrokeSheet
+var coins_fn := Callable()                 ## tests, dev: () -> int in place of Save.profile.coins (the broke check, the picker)
+var level_fn := Callable()                 ## tests, dev: () -> int in place of your level
 var reveal_fast := false                   ## tests: the players are revealed at once
 
 var _created := false                      # this client just made the room (applies the host's choices once)
@@ -68,6 +77,9 @@ func _ready() -> void:
 	net.turn.connect(func(m: Dictionary): _deliver("net_turn", m))
 	net.presence.connect(func(m: Dictionary): _deliver("net_presence", m))
 	net.emote.connect(_on_emote)
+	net.reroll_offer.connect(func(m: Dictionary): _deliver("net_reroll_offer", m))
+	net.hold.connect(func(m: Dictionary): _deliver("net_hold", m))
+	net.rerolled.connect(func(m: Dictionary): _deliver("net_rerolled", m))
 	net.error.connect(_on_error)
 	net.status_changed.connect(_on_status)
 	quick_q.queued.connect(_on_queued)
@@ -199,7 +211,8 @@ func _ask_leave_lobby() -> void:
 
 # ---------- quick match ----------
 
-## Home's "Quick match" for game ("ludo" | "sl"): the table picker (the last choice preselected).
+## Home's "Quick match" for game ("ludo" | "sl"): the table picker (the last choices preselected). With fewer than 100
+## coins (the cheapest table) the "Out of coins" sheet comes first: its way out (a top-up, or Practice) opens the picker.
 func open_quick(game_ := "") -> void:
 	var g := game_ if game_ in ["ludo", "sl"] else _home_game()
 	if state == "searching" and is_instance_valid(quick_sheet):
@@ -207,18 +220,55 @@ func open_quick(game_ := "") -> void:
 	if net.in_room() and state in ["lobby", "match"]:
 		toast("Leave this room first.", "info")
 		return
+	if CoinTables.is_broke(_coins()) and not is_instance_valid(broke_sheet):
+		_open_broke(g)
+		return
 	_open_quick_sheet(g)
+
+func _coins() -> int:
+	return int(coins_fn.call()) if coins_fn.is_valid() else int(Save.profile.get("coins", 0))
+
+func _level() -> int:
+	return int(level_fn.call()) if level_fn.is_valid() else Save.level_info(int(Save.profile.get("xp", 0))).level
+
+## "Out of coins": a top-up opens the picker, Practice opens it on the free table.
+func _open_broke(g: String) -> BrokeSheet:
+	var b := BrokeSheet.new(last_tables.get("broke_bonus", {}) if last_tables.get("broke_bonus") is Dictionary else {})
+	b.coins_fn = _coins
+	b.refresh()
+	broke_sheet = b
+	b.practice_pressed.connect(func():
+		net.prefs.quick_table = CoinTables.PRACTICE
+		if is_instance_valid(quick_sheet):
+			quick_sheet.set_wallet(_level(), _coins())
+			quick_sheet.select_table(CoinTables.PRACTICE)
+		else:
+			_open_quick_sheet(g))
+	b.topped_up.connect(func(_c: int):
+		if is_instance_valid(quick_sheet):
+			quick_sheet.set_wallet(_level(), _coins())
+		else:
+			_open_quick_sheet(g))
+	b.closed.connect(func():
+		if broke_sheet == b:
+			broke_sheet = null)
+	b.open(_layer())
+	return b
 
 func _open_quick_sheet(g: String) -> QuickSheet:
 	if is_instance_valid(quick_sheet):
 		quick_sheet.close()
 	var players := int(net.prefs.get("quick_players", 2))
-	quick_sheet = QuickSheet.new(g, players)
+	quick_sheet = QuickSheet.new(g, players, str(net.prefs.get("quick_table", CoinTables.PRACTICE)))
+	quick_sheet.set_wallet(_level(), _coins())
 	if reveal_fast:
 		quick_sheet.step_sec = 0.0
 		quick_sheet.hold_sec = 0.0
 	quick_sheet.find.connect(func(n: int): search(g, n))
 	quick_sheet.cancel_pressed.connect(cancel_quick)
+	quick_sheet.broke_requested.connect(func():
+		if not is_instance_valid(broke_sheet):
+			_open_broke(g))
 	var s := quick_sheet
 	quick_sheet.closed.connect(func():
 		if quick_sheet == s:
@@ -226,24 +276,44 @@ func _open_quick_sheet(g: String) -> QuickSheet:
 			if state == "searching" or (state == "joining" and net.quick):
 				cancel_quick())
 	quick_sheet.open(_layer())
+	_fetch_tables(quick_sheet)
 	return quick_sheet
 
-## Queue for a quick match (the sheet shows the search). players: 2 | 4 (remembered for next time).
-func search(g: String, players: int) -> void:
+## The server's flags for the picker (unlocked / affordable) and the broke bonus. Quietly nothing offline.
+func _fetch_tables(sheet: QuickSheet) -> void:
+	var acc := Account.instance()
+	if acc == null or not Account.wallet_active() or not acc.has_session():
+		return
+	var r: Dictionary = await acc.fetch_tables()
+	if not bool(r.get("ok", false)):
+		return
+	last_tables = r
+	if is_instance_valid(sheet):
+		sheet.set_tables(r)
+
+## Queue for a quick match (the sheet shows the search). players: 2 | 4 and the coin table (the sheet's pick, else
+## the remembered one, else Practice); both are remembered for next time.
+func search(g: String, players: int, table := "") -> void:
 	if not NetQuick.valid(g, players):
 		return
 	if net.in_room():
 		net.leave()                            # (Play again: the finished quick room)
-	quick_cfg = {game = g, players = players}
+	var t := table
+	if t == "":
+		t = quick_sheet.table if is_instance_valid(quick_sheet) else str(net.prefs.get("quick_table", CoinTables.PRACTICE))
+	if not CoinTables.valid(t):
+		t = CoinTables.PRACTICE
+	quick_cfg = {game = g, players = players, table = t}
 	game = g
-	if int(net.prefs.get("quick_players", 0)) != players:
+	if int(net.prefs.get("quick_players", 0)) != players or str(net.prefs.get("quick_table", "")) != t:
 		net.prefs.quick_players = players
+		net.prefs.quick_table = t
 		net._persist()
 	_stopped_in_bg = false
 	_set_state("searching")
 	if is_instance_valid(quick_sheet):
 		quick_sheet.set_searching(players)
-	quick_q.search(g, players)
+	quick_q.search(g, players, t)
 
 ## Stop searching (Cancel, the sheet closed, Back, the app went to the background). A table already found: the
 ## room is left before the match starts.
@@ -274,11 +344,15 @@ func _on_quick_failed(code: String, msg: String) -> void:
 	if state not in ["searching", "joining"]:
 		return
 	_set_state("idle")
-	var text := msg if msg != "" and code in ["banned", "maintenance"] else NetClient.error_text(code)
+	var text := msg if msg != "" and code in ["banned", "maintenance"] else QuickSheet.fail_text(code, quick_q.fail_info)
 	if is_instance_valid(quick_sheet):
+		if code in ["coins", "locked"]:
+			quick_sheet.set_wallet(_level(), _coins())       # the table that was refused greys out
 		quick_sheet.set_error(text)
 	else:
 		toast(text, "bad")
+	if code == "coins" and CoinTables.is_broke(_coins()) and not is_instance_valid(broke_sheet):
+		_open_broke(game)                      # out of coins: the way back
 	_host_changed()
 
 
@@ -299,16 +373,26 @@ func rematch() -> void:
 	if net.quick:
 		var cfg := quick_cfg
 		if cfg.is_empty():
-			cfg = {game = game, players = int(net.prefs.get("quick_players", 2))}
+			cfg = {game = game, players = int(net.prefs.get("quick_players", 2)), table = str(net.prefs.get("quick_table", CoinTables.PRACTICE))}
 		net.leave()
 		_set_state("idle")
 		if app and app.has_method("go_home"):
 			app.call("go_home")                # the search runs over Home (Cancel leaves you there)
+		var tbl := str(cfg.get("table", CoinTables.PRACTICE))
 		_open_quick_sheet(str(cfg.game))
-		search(str(cfg.game), int(cfg.players))
+		if not _table_playable(tbl, int(cfg.players)):
+			return                             # can't pay or unlock that table now: the picker, to choose again
+		search(str(cfg.game), int(cfg.players), tbl)
 		return
 	if net.is_host():
 		net.send_msg({t = "start"})
+
+## The table can be played now (level and coins, as the picker would say).
+func _table_playable(id: String, size: int) -> bool:
+	for r: Dictionary in CoinTables.rows(size, _level(), _coins(), last_tables):
+		if r.id == id:
+			return bool(r.ok)
+	return false
 
 ## After launch: take back the room kept in Save.prefs.net_room (quietly; a room that's gone is forgotten).
 func try_resume() -> bool:

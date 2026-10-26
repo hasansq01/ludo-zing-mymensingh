@@ -451,6 +451,10 @@ static func offline_text(action: String) -> String:
 	match action:
 		"buy":
 			return "Connect to the internet to buy."
+		"store":
+			return "Connect to the internet to use the Store."
+		"ads":
+			return "Connect to the internet to watch a video."
 		"equip":
 			return "Connect to the internet to change your look."
 		"name":
@@ -472,8 +476,22 @@ static func error_text(code: String, action := "claim") -> String:
 			return "Not enough coins."
 		"owned":
 			return "You already own that."
+		"gems":
+			return "Not enough gems."
 		"locked":
 			return "That’s still locked."
+		"cap":
+			return "No more videos today. Come back tomorrow."
+		"not_eligible":
+			return "That video isn’t available right now."
+		"not_broke":
+			return "This bonus is for when you’re running low on coins."
+		"pending":
+			return "Your payment is still going through. The gems arrive as soon as it does."
+		"invalid":
+			return "We couldn’t confirm that purchase."
+		"unavailable":
+			return "That isn’t available right now. Try again in a moment."
 		"reserved":
 			return "Pick another name: “You” is how the game shows you to yourself."
 		"claimed", "spun", "cooldown":
@@ -495,19 +513,65 @@ func _write(method: int, path: String, body: Variant, notify := true) -> Diction
 		await flush_claims()
 	var r: Dictionary = await request(method, path, body)
 	var out: Dictionary = r.data.duplicate()
+	var body_status: Variant = out.get("status")        # (GET /v1/ads/status answers its own status word)
 	out.ok = r.ok
 	out.status = r.status
 	out.error = r.error
+	if body_status is String:
+		out.state = body_status
 	if r.ok:
 		_take(r.data, notify)
 		out.erase("profile")
-	elif r.error in ["claimed", "spun", "cooldown", "owned", "locked", "not_done", "coins"]:
+	elif r.error in ["claimed", "spun", "cooldown", "owned", "locked", "not_done", "coins", "gems", "not_broke"]:
 		await refresh_me()                   # our copy was behind: sync it
 	return out
 
-## POST /v1/shop/buy. {ok, price, item} | {ok = false, error: coins | owned | locked | unknown | offline, short?}.
-func buy(kind: String, id: String, notify := true) -> Dictionary:
-	return await _write(HTTPClient.METHOD_POST, "/v1/shop/buy", {kind = kind, id = id}, notify)
+## POST /v1/shop/buy {kind, id, currency}. {ok, price, item} | {ok = false, error: coins | gems | owned | locked |
+## unknown | offline, short?}. `currency` is "coins" (default) or "gems".
+func buy(kind: String, id: String, currency := "coins", notify := true) -> Dictionary:
+	return await _write(HTTPClient.METHOD_POST, "/v1/shop/buy", {kind = kind, id = id, currency = currency}, notify)
+
+## GET /v1/tables -> {ok, tables: [{id, entry, level, unlocked, affordable}], fee_pct, broke, broke_bonus: {available,
+## next_at, amount}} | {ok = false, error}.
+func fetch_tables() -> Dictionary:
+	return await _write(HTTPClient.METHOD_GET, "/v1/tables", null)
+
+## POST /v1/gems/exchange {pack: 0 | 1 | 2} -> {ok, gems (spent), coins (got)} | 409 gems (+short).
+func exchange(pack: int) -> Dictionary:
+	return await _write(HTTPClient.METHOD_POST, "/v1/gems/exchange", {pack = pack})
+
+## POST /v1/rewards/broke -> {ok, coins, next_at} | 409 not_broke | 409 claimed (+next_at).
+func claim_broke() -> Dictionary:
+	return await _write(HTTPClient.METHOD_POST, "/v1/rewards/broke", {})
+
+## GET /v1/ads/today -> {ok, left: {reroll, refill, double, gems}, total_left}.
+func ads_today() -> Dictionary:
+	return await _write(HTTPClient.METHOD_GET, "/v1/ads/today", null)
+
+## POST /v1/ads/start {kind, ref?} -> {ok, nonce, user_id, custom_data, left} | 409 cap (+next_at) | 409 not_eligible.
+## (AdFlow.watch does the whole ad: start, show, poll.)
+func ads_start(kind: String, ref := "") -> Dictionary:
+	var body := {kind = kind}
+	if ref != "":
+		body.ref = ref
+	return await _write(HTTPClient.METHOD_POST, "/v1/ads/start", body)
+
+## GET /v1/ads/status?nonce= -> {ok, status: pending | granted | expired | rejected, kind, amount?, http (the HTTP
+## code)}. The profile of a "granted" answer is written into Save.profile.
+func ads_status(nonce: String) -> Dictionary:
+	var r: Dictionary = await _write(HTTPClient.METHOD_GET, "/v1/ads/status?nonce=" + nonce.uri_encode(), null)
+	r.http = r.status
+	r.status = str(r.get("state", ""))
+	return r
+
+## GET /v1/iap/products -> {ok, products: [{id, gems}]}.
+func iap_products() -> Dictionary:
+	return await _write(HTTPClient.METHOD_GET, "/v1/iap/products", null)
+
+## POST /v1/iap/verify {product_id, token} -> {ok, gems (granted), duplicate?} | 409 pending | 409 invalid |
+## 503 unavailable (Play is down: keep the purchase and retry).
+func iap_verify(product_id: String, token: String) -> Dictionary:
+	return await _write(HTTPClient.METHOD_POST, "/v1/iap/verify", {product_id = product_id, token = token})
 
 ## POST /v1/shop/equip.
 func equip(kind: String, id: String) -> Dictionary:
@@ -559,9 +623,12 @@ func fetch_rewards() -> Dictionary:
 				rewards_at[key] = at
 	return rewards_at
 
-## POST /v1/achievements/claim {id} -> {ok, coins, progress}.
+## POST /v1/achievements/claim {id} -> {ok, coins, gems, progress}.
 func claim_ach(id: String, notify := true) -> Dictionary:
-	return await _write(HTTPClient.METHOD_POST, "/v1/achievements/claim", {id = id}, notify)
+	var r: Dictionary = await _write(HTTPClient.METHOD_POST, "/v1/achievements/claim", {id = id}, notify)
+	if r.ok:
+		r.gems = _int(r.get("gems"), 0)
+	return r
 
 
 # =====================================================================================================================

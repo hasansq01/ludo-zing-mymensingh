@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- INTERNET / ACCESS_NETWORK_STATE / AD_ID come from the Ads SDK's own manifest.
+         The APPLICATION_ID meta-data is added by the export plugin (godot/addons/admob/export_plugin.gd) from the
+         project setting ludo_zing/ads/app_id: without it the Ads SDK crashes at start. -->
+    <application>
+        <!-- Godot v2 plugin registration: org.godotengine.plugin.v2.<singleton name> = init class -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.AdMob"
+            android:value="com.flipfold.ludozing.admob.AdMobPlugin" />
+    </application>
+
+</manifest>

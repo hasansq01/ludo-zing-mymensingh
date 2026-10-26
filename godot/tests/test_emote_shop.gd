@@ -192,7 +192,7 @@ func _wallet() -> void:
 	_root.add_child(shop)
 	var err: String = await shop._purchase("emotes", "pawns")
 	check("wallet: an emote pack is bought through the server", err == "" and Save.profile.coins == 2500 and Save.profile.emote_sets.has("pawns") and Save.profile.emote_set == "pawns" and f.count("/v1/shop/buy") == 1, [err, Save.profile])
-	check("wallet: the body says kind emotes", f.last("/v1/shop/buy").body == {kind = "emotes", id = "pawns"}, f.last("/v1/shop/buy"))
+	check("wallet: the body says kind emotes", f.last("/v1/shop/buy").body == {kind = "emotes", id = "pawns", currency = "coins"}, f.last("/v1/shop/buy"))
 	await shop._on_use("emotes", "starter")
 	check("wallet: Use equips through the server", Save.profile.emote_set == "starter" and f.last("/v1/shop/equip").body == {kind = "emotes", id = "starter"}, Save.profile)
 	f.profile.coins = 100

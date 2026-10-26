@@ -34,6 +34,7 @@ var look := "plain"
 var prefix := ""
 var full := false
 var tick := false                    ## play the "tick" sound while counting
+var icon_name := "coin"              ## the art: "coin" (assets/ui/coin.svg) or "gem" (assets/ui/gem.svg, shown in full: "1,200")
 
 var coin: TextureRect
 var text_label: Label
@@ -44,7 +45,10 @@ var _bg: StyleBoxFlat
 var _shade: StyleBoxFlat
 
 
-func _init(n := 0, size_ := "sm", look_ := "plain", prefix_ := "", full_ := false) -> void:
+func _init(n := 0, size_ := "sm", look_ := "plain", prefix_ := "", full_ := false, icon_ := "coin") -> void:
+	icon_name = icon_
+	if icon_name == "gem":
+		full_ = true                      # gem counts are small: never "1.2K"
 	size_name = size_ if SIZES.has(size_) else "sm"
 	look = look_ if look_ in LOOKS else "plain"
 	prefix = prefix_
@@ -57,7 +61,7 @@ func _init(n := 0, size_ := "sm", look_ := "plain", prefix_ := "", full_ := fals
 	alignment = BoxContainer.ALIGNMENT_CENTER
 	var p: Dictionary = SIZES[size_name]
 	var cs: float = p.coin
-	coin = UIKit.icon("coin", cs)
+	coin = UIKit.icon(icon_name, cs)
 	coin.name = "Coin"
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	add_child(coin)
@@ -70,6 +74,11 @@ func _init(n := 0, size_ := "sm", look_ := "plain", prefix_ := "", full_ := fals
 	add_child(text_label)
 	_style()
 	_render(n)
+
+
+## A gem amount: the gem icon + the number in full ("30", "1,200").
+static func gems(n := 0, size_ := "sm", look_ := "plain", prefix_ := "") -> CoinAmount:
+	return CoinAmount.new(n, size_, look_, prefix_, true, "gem")
 
 
 ## The text for an amount (Fmt short form, or full; with the prefix).

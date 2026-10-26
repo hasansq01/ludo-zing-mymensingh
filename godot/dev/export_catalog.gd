@@ -12,7 +12,7 @@ extends SceneTree
 ##   match        LudoRules / SnakesLaddersRules rewards, the XP Save.record_ludo gives, LudoMatch.NET_XP_*
 ##   level        the two numbers of Save.level_info (need = base + step * (level - 1))
 ## Item fields: {kind, id, name, price, buy (sold for coins), free (owned / usable by everyone from the start),
-## default (the fallback of its kind), unlock ({level} | {ach} | null)}.
+## default (the fallback of its kind), unlock ({level} | {ach} | null), gems (only items the Shop sells: Catalog.gem_price)}.
 ## econ_parity_dump.gd embeds build() in its fixture, so the server test notices a stale catalog.json.
 
 const SaveScript := preload("res://scripts/core/save.gd")
@@ -85,8 +85,12 @@ static func _item(kind: String, d: Dictionary, buy: bool, free: bool, is_default
 	var unlock = null
 	if u is Dictionary:
 		unlock = {level = int(u.level)} if u.has("level") else {ach = str(u.ach)}
-	return {kind = kind, id = str(d.id), name = str(d.name), price = int(d.get("price", 0)), buy = buy, free = free,
+	var price := int(d.get("price", 0))
+	var item := {kind = kind, id = str(d.id), name = str(d.name), price = price, buy = buy, free = free,
 		default = is_default, unlock = unlock}
+	if buy and price > 0:
+		item["gems"] = Catalog.gem_price(price)   # only the items the Shop sells; free and unlock-only items have no gems field
+	return item
 
 ## A fresh profile from Save._ensure (on a detached Save instance: nothing is read or written).
 static func _fresh() -> Dictionary:

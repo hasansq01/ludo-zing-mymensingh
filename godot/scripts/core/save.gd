@@ -46,7 +46,9 @@ func _ensure() -> void:
 		for k in 8:
 			s += abc[randi() % abc.length()]
 		p.id = "LZM-%s-%s" % [s.substr(0, 4), s.substr(4, 4)]
-	p.coins = maxi(0, as_int(p.get("coins"), 5000))      # null / text / negative in a damaged save: never a crash
+	p.coins = maxi(0, as_int(p.get("coins"), 2500))      # null / text / negative in a damaged save: never a crash
+	p.gems = maxi(0, as_int(p.get("gems"), 0))           # Economy v1: premium currency (the server's balance)
+	p.rerolls = clampi(as_int(p.get("rerolls"), 0), 0, 9)   # free re-rolls
 	p.xp = maxi(0, as_int(p.get("xp"), 0))
 	var st: Dictionary = p.get("stats", {}) if p.get("stats") is Dictionary else {}
 	for k in ["played", "wins", "losses", "streak", "bestStreak", "coinsEarned", "pairsFormed", "ppGames", "slPlayed", "slWins"]:

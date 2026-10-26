@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- com.android.vending.BILLING comes from the billing library's own manifest (merged in by Gradle). -->
+
+    <application>
+        <!-- Godot v2 plugin registration: org.godotengine.plugin.v2.<singleton name> = init class -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.BillingPlugin"
+            android:value="com.flipfold.ludozing.billing.BillingPlugin" />
+    </application>
+
+</manifest>

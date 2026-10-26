@@ -19,6 +19,8 @@ const FIXED_H := 680.0                ## one card height for both tabs (web .pm 
 const AVATAR_PX := 72.0
 const AVATAR_PX_NARROW := 60.0
 const MEDAL_PX := 52.0
+## Economy v1: every achievement also pays this many gems (the server decides; shown only with an account).
+const ACH_GEMS := 10
 const TAB_CLEAR_X := 24               ## right inset of the folder tabs (the corner close X overhangs there)
 ## Loaded at run time (not by class name), so the Profile still compiles while the Shop is being changed.
 const SHOP_SCRIPT := "res://scripts/ui/sheets/shop_sheet.gd"
@@ -450,8 +452,12 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	var bar := Meter.new("teal", 18, true)
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	foot.add_child(bar)
-	var reward := CoinAmount.new(int(a.reward), "sm", "plain")
+	var reward := HBoxContainer.new()                      # the coins (and, with an account, the gems) it pays
+	reward.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	reward.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reward.add_child(CoinAmount.new(int(a.reward), "sm", "plain"))
+	if Account.wallet_active():
+		reward.add_child(CoinAmount.gems(ACH_GEMS, "sm", "plain", "+"))
 	foot.add_child(reward)
 	var claimed := UIKit.hbox(UIKit.SPACE.xs)
 	claimed.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -460,8 +466,16 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	cl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	claimed.add_child(cl)
 	foot.add_child(claimed)
-	var amt := CoinAmount.new(int(a.reward), "xs", "plain")
-	amt.set_color(Palette.ON_HONEY)
+	var amt := HBoxContainer.new()
+	amt.add_theme_constant_override("separation", UIKit.SPACE.sm)
+	var amt_coins := CoinAmount.new(int(a.reward), "xs", "plain")
+	amt_coins.set_color(Palette.ON_HONEY)
+	amt.add_child(amt_coins)
+	if Account.wallet_active():
+		var amt_gems := CoinAmount.gems(ACH_GEMS, "xs", "plain", "+")
+		amt_gems.name = "Gems"
+		amt_gems.set_color(Palette.ON_HONEY)
+		amt.add_child(amt_gems)
 	var claim := UIKit.button_with("Claim", amt, "gold", "sm")
 	claim.name = "Claim"
 	claim.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -501,7 +515,7 @@ static func _reorder_claim(b: Button) -> void:
 
 ## The Claim button's width: its padding, "Claim", the gap and the coin amount (button_with's content row is
 ## anchored inside the button, so the button doesn't grow with it by itself).
-static func _claim_width(amt: CoinAmount) -> float:
+static func _claim_width(amt: Control) -> float:
 	var p: Dictionary = UIKit.BTN.sm
 	var tw := UIKit.font_display().get_string_size("Claim", HORIZONTAL_ALIGNMENT_LEFT, -1, int(p.fs)).x
 	return ceilf(2.0 * float(p.pad) + tw + UIKit.SPACE.sm + amt.get_combined_minimum_size().x)
@@ -537,6 +551,7 @@ func _claim(id: String) -> void:
 	if fly:
 		_flying += 1                                     # before the grant: its Save.changed must not jump the counter
 	var n := 0
+	var gems := 0
 	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
 		if btn:
 			btn.disabled = true
@@ -544,6 +559,7 @@ func _claim(id: String) -> void:
 		if not is_instance_valid(self) or _closing:
 			return
 		n = int(r.get("coins", 0)) if r.get("ok", false) else 0
+		gems = int(r.get("gems", 0)) if r.get("ok", false) else 0
 		if n <= 0:
 			if fly:
 				_flying -= 1
@@ -566,8 +582,10 @@ func _claim(id: String) -> void:
 			if _flying == 0 and is_instance_valid(_ava):
 				_refresh()
 		CoinFly.run(self, from, target, n, landed, Collection.coins())
+		if gems > 0:
+			Toast.show(self, "+%d gems" % gems, card, 1.8, "gem")
 	else:
-		Toast.show(self, "%s: %s coins" % [Collection.ach(id).name, Fmt.gain(n)], card, 1.8, "coin")
+		Toast.show(self, "%s: %s coins%s" % [Collection.ach(id).name, Fmt.gain(n), (" +%d gems" % gems) if gems > 0 else ""], card, 1.8, "coin")
 	_refresh()
 	profile_changed.emit()
 

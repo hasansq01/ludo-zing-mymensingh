@@ -38,6 +38,9 @@ signal presence(msg: Dictionary)
 signal over(msg: Dictionary)
 signal error(msg: Dictionary)
 signal emote(msg: Dictionary)            ## another member's emote {c, id} (lobby: c = -1, member); see server/EMOTES.md
+signal reroll_offer(msg: Dictionary)     ## your bad roll may be rolled again {n, until, now, free, gems, cost} (ECONOMY_V1.md 4)
+signal hold(msg: Dictionary)             ## the next roll waits for colour c's re-roll {c, until}
+signal rerolled(msg: Dictionary)         ## colour c rolled again {c, paid}; a `sync` and the new roll's `act` follow
 
 const PROD_URL := "wss://ludo-zing-rooms.flipfold.workers.dev"
 const VERSION := 1
@@ -528,6 +531,12 @@ func handle(msg: Dictionary) -> void:
 			over.emit(msg)
 		"emote":
 			emote.emit(msg)
+		"reroll_offer":
+			reroll_offer.emit(msg)
+		"hold":
+			hold.emit(msg)
+		"rerolled":
+			rerolled.emit(msg)
 		"pong":
 			var now := Time.get_unix_time_from_system() * 1000.0
 			if _ping_at > 0.0:

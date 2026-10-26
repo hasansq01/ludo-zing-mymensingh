@@ -22,6 +22,7 @@ extends Control
 ##   safe_top / safe_bottom  set by main; the layout keeps >= BOTTOM_MIN px above the bottom edge regardless
 ##   free_band() -> Vector2  (top, bottom) of the free area for the 3D table, in UI px
 ##   table_width_factor      the table may be this many screen widths wide when framed (bigger board)
+##   gem_amount              the gems under the coins in the same chip (tap: the Store, open_tab "store")
 ##   coin_amount             the CoinAmount in the top bar (CoinFly target); side_button(id) -> where the coins of
 ##                           reward `id` fly from when no Rewards sheet is open (the gift)
 ##   toast_anchor()          the control a Home toast sits above (never over the play buttons)
@@ -39,12 +40,13 @@ signal quick_match(game: String)
 signal play_friends(game: String)
 signal continue_match
 signal game_switched(game: String)
-signal open_tab(tab: String)             ## rewards | shop | leaderboard | inventory | profile | settings | coins
+signal open_tab(tab: String)             ## rewards | shop | leaderboard | inventory | profile | settings | coins | store
 
 const HI := "res://assets/ui/home/hi_%s.svg"
 const TROPHY := "res://assets/ui/ic_trophy.svg"
 const REWARD_IDS := ["spin", "daily", "free"]
 const BAR_H := 52.0                      # top bar height
+const WALLET_W := 104.0                  # the coins-over-gems chip (grows with the numbers)
 const NAV_H := 60.0
 const G := 16.0                          # screen gutter (UIKit.SCREEN_GUTTER)
 const BOTTOM_MIN := 20.0                 # gesture-nav phones report 0 in immersive mode: keep this clear anyway
@@ -75,11 +77,13 @@ var game := "ludo"
 
 var logo: BrandLogo
 var coin_amount: CoinAmount
+var gem_amount: CoinAmount               # the gems next to the coins (tap: the Store)
 var rewards_button: Button               # the gift (opens the Rewards sheet)
 var quick_button: Button                 # QUICK MATCH (the matchmaker)
 var friends_button: Button               # Friends (online rooms)
 
 var _top: HBoxContainer
+var _gems_button: Button
 var _chip: Button                        # the player chip (only the avatar when the bar is tight)
 var _chip_text: Control                  # its name + XP column
 var _name: Label
@@ -161,6 +165,15 @@ static func _flat_button(st: StyleBox, pr: StyleBox = null) -> Button:
 	return b
 
 
+## A transparent button for a row inside a chip: a soft shade while pressed.
+static func _row_button() -> Button:
+	var pr := UIKit.box(Color(0.29, 0.17, 0.24, 0.08), UIKit.R.sm)
+	UIKit.pad(pr, 0)
+	var b := _flat_button(StyleBoxEmpty.new(), pr)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return b
+
+
 ## The cream glass of the top bar chips: glass, a white rim, a soft shadow.
 static func _chip_style(r := 18, pressed := false) -> StyleBoxFlat:
 	var s := UIKit.box(Palette.GLASS_PRESSED if pressed else Palette.GLASS, r, UIKit.BW.line, Color.WHITE)
@@ -213,17 +226,27 @@ func _build_top_bar() -> void:
 	col.add_child(_name)
 	_xp = Meter.new("night", 12)                          # gold on a dark inset track, no numbers (the profile has them)
 	col.add_child(_xp)
-	# coins: the balance and a teal "+" (opens the Earn coins hub)
-	var coins := _flat_button(_chip_style(UIKit.R.pill), _chip_style(UIKit.R.pill, true))
-	coins.custom_minimum_size = Vector2(104, BAR_H)
+	# the wallet: one chip, coins over gems. Coins and a teal "+" open the Earn coins hub; the gems open the Store
+	var wallet := PanelContainer.new()
+	wallet.name = "Wallet"
+	var wst := _chip_style(UIKit.R.lg)
+	UIKit.pad(wst, 6, 0)
+	wallet.add_theme_stylebox_override("panel", wst)
+	wallet.custom_minimum_size = Vector2(WALLET_W, BAR_H)
+	_top.add_child(wallet)
+	var wv := UIKit.vbox(0)
+	wv.alignment = BoxContainer.ALIGNMENT_CENTER
+	wallet.add_child(wv)
+	var coins := _row_button()
+	coins.name = "Coins"
+	coins.custom_minimum_size.y = 26
 	coins.pressed.connect(func(): open_tab.emit("coins"))
-	_top.add_child(coins)
-	var cr := UIKit.hbox(6)
+	wv.add_child(coins)
+	var cr := UIKit.hbox(5)
 	_fill(cr)
-	cr.offset_left = 6; cr.offset_right = -6
 	cr.alignment = BoxContainer.ALIGNMENT_CENTER
 	coins.add_child(cr)
-	coin_amount = CoinAmount.new(int(Save.profile.get("coins", 0)), "lg", "plain")
+	coin_amount = CoinAmount.new(int(Save.profile.get("coins", 0)), "md", "plain")
 	coin_amount.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cr.add_child(coin_amount)
 	var plus := PanelContainer.new()
@@ -231,12 +254,25 @@ func _build_top_bar() -> void:
 	var ps := UIKit.box(Palette.TEAL, UIKit.R.pill, UIKit.BW.line, Color.WHITE)
 	UIKit.pad(ps, 0)
 	plus.add_theme_stylebox_override("panel", ps)
-	plus.custom_minimum_size = Vector2(26, 26)
+	plus.custom_minimum_size = Vector2(20, 20)
 	plus.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var pl := UIKit.label("+", 20, Color.WHITE, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	var pl := UIKit.label("+", 16, Color.WHITE, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
 	pl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	plus.add_child(pl)
 	cr.add_child(plus)
+	_gems_button = _row_button()
+	_gems_button.name = "Gems"
+	_gems_button.tooltip_text = "Store"
+	_gems_button.custom_minimum_size.y = 22
+	_gems_button.pressed.connect(func(): open_tab.emit("store"))
+	wv.add_child(_gems_button)
+	var gr := UIKit.hbox(0)
+	_fill(gr)
+	gr.alignment = BoxContainer.ALIGNMENT_CENTER
+	_gems_button.add_child(gr)
+	gem_amount = CoinAmount.gems(int(Save.profile.get("gems", 0)), "sm", "plain")
+	gem_amount.name = "GemAmount"
+	gr.add_child(gem_amount)
 	# the gift: Free spin / Daily reward / Free coins (the Rewards sheet), with the count of those ready now
 	rewards_button = UIKit.icon_button(HI % "gift", "glass", int(BAR_H), 38)
 	rewards_button.name = "Rewards"
@@ -600,12 +636,18 @@ func refresh() -> void:
 	_xp.set_value(float(li.into), float(li.need))
 	if not _coins_busy():
 		coin_amount.set_amount(int(p.get("coins", 0)))
+	_show_gems(int(p.get("gems", 0)))
 	var sel: Button = _switch_buttons.get(game)
 	if sel and not sel.button_pressed:
 		sel.set_pressed_no_signal(true)
 	_tint_switch()
 	_refresh_rewards()
 	_refresh_quick()
+
+
+## The gem balance in the top bar (under the coins).
+func _show_gems(n: int) -> void:
+	gem_amount.set_amount(n)
 
 
 ## Keep the counter on its current number for up to `sec` while a CoinFly is about to land on it (the fly counts

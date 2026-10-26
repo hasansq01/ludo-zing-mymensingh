@@ -1,0 +1,54 @@
+// Versions follow the Godot 4.7.2 Android build template (godot/android/build/config.gradle) so the AAR
+// links cleanly into the Gradle export: AGP 8.6.1, Kotlin 2.1.21, Java 17, compileSdk 36, minSdk 24.
+plugins {
+    id 'com.android.library' version '8.6.1'
+    id 'org.jetbrains.kotlin.android' version '2.1.21'
+}
+
+ext {
+    // Must match the editor / export templates (godot --version).
+    godotVersion = '4.7.2.stable'
+    // Play Billing Library (checked on Google Maven 2026-10-26: 9.1.0 is the newest, 8.3.0 the newest 8.x; minSdk 23).
+    // Keep in sync with BILLING_DEPENDENCY in godot/addons/billing/export_plugin.gd: that is what the app build links.
+    billingVersion = '8.3.0'
+}
+
+android {
+    namespace 'com.flipfold.ludozing.billing'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    // Release and debug AARs carry the same code; the Godot export picks the one matching the export mode.
+    libraryVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "Billing-${variant.name}.aar"
+        }
+    }
+}
+
+dependencies {
+    // Provided by the Godot app at runtime (godot-lib in the export template): compile against it only.
+    compileOnly "org.godotengine:godot:$godotVersion"
+    // Not bundled into the AAR: the export plugin adds it to the app build as a Maven dependency (its manifest
+    // brings the com.android.vending.BILLING permission).
+    compileOnly "com.android.billingclient:billing-ktx:$billingVersion"
+}

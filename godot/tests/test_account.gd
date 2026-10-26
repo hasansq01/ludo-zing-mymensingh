@@ -126,7 +126,7 @@ func _wallet() -> void:
 	var r: Dictionary = await a.buy("room", "neon")
 	check("wallet: buy ok", r.ok and r.price == 3000, r)
 	check("wallet: the profile was reconciled in place", is_same(live, a.profile_own) and a.profile_own.coins == 5000 and a.profile_own.rooms.has("neon") and a.profile_own.room == "neon", a.profile_own)
-	check("wallet: the buy body is {kind, id}", f.last("/v1/shop/buy").body == {kind = "room", id = "neon"})
+	check("wallet: the buy body is {kind, id, currency}", f.last("/v1/shop/buy").body == {kind = "room", id = "neon", currency = "coins"})
 	r = await a.buy("room", "nope")
 	check("wallet: unknown item", not r.ok and r.error == "unknown")
 	f.profile.coins = 100
@@ -342,13 +342,23 @@ func _save_repair() -> void:
 	s.profile = {coins = null, xp = null, last_free = null, stats = null, name = null}
 	s.prefs = {vol = {master = null, music = null, sfx = null}, speed = null}
 	s._ensure()
-	check("save: null coins / xp / last_free / stats no longer crash", s.profile.coins == 5000 and s.profile.xp == 0 and s.profile.last_free == 0 and s.profile.stats.played == 0, s.profile)
+	check("save: null coins / xp / last_free / stats no longer crash", s.profile.coins == 2500 and s.profile.xp == 0 and s.profile.last_free == 0 and s.profile.stats.played == 0, s.profile)
 	s.profile = {coins = -50, xp = -3, stats = {wins = null, played = "7", losses = -2}}
 	s._ensure()
 	check("save: negative coins are clamped, text numbers read", s.profile.coins == 0 and s.profile.xp == 0 and s.profile.stats.wins == 0 and s.profile.stats.played == 7 and s.profile.stats.losses == 0, s.profile)
 	s.profile = {coins = 12.0, xp = 99.0}
 	s._ensure()
 	check("save: JSON floats become ints", typeof(s.profile.coins) == TYPE_INT and s.profile.coins == 12)
+	s.profile = {}
+	s._ensure()
+	check("save: a fresh profile has 2500 coins, 0 gems, 0 rerolls", s.profile.coins == 2500 and s.profile.gems == 0 and s.profile.rerolls == 0, s.profile)
+	s.profile = {coins = 700, gems = -4, rerolls = 50}
+	s._ensure()
+	check("save: an existing save keeps its coins; gems >= 0, rerolls clamped to 9", s.profile.coins == 700 and s.profile.gems == 0 and s.profile.rerolls == 9, s.profile)
+	s.profile = {gems = "12", rerolls = -3}
+	s._ensure()
+	check("save: gems read from text, negative rerolls become 0", s.profile.gems == 12 and s.profile.rerolls == 0, s.profile)
+	check("catalog: gem_price is ceil(coins / 100), none for free", Catalog.gem_price(0) == 0 and Catalog.gem_price(1) == 1 and Catalog.gem_price(100) == 1 and Catalog.gem_price(101) == 2 and Catalog.gem_price(2500) == 25 and Catalog.gem_price(12000) == 120)
 	check("save: as_int on junk", s.as_int([]) == 0 and s.as_int({}, 4) == 4 and s.as_int(null, 9) == 9 and s.as_int("x", 2) == 2)
 	s.free()
 

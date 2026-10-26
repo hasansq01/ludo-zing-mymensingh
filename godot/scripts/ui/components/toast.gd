@@ -2,7 +2,7 @@ class_name Toast
 extends RefCounted
 ## The one toast of the interface (web .toast): a plum pill (Palette.TOAST, radius pill, shadow) with white
 ## Nunito 900 16 px text, centred, wrapping to at most the screen width - 32. Optional icon by kind:
-##   "info" no icon   "good" a teal disc with a white check   "bad" a red disc with "!"   "coin" the coin
+##   "info" no icon   "good" a teal disc with a white check   "bad" a red disc with "!"   "coin" the coin   "gem" the gem
 ## Placement: above the bottom safe area (safe bottom + 104 px, like the web), or - with `near` - just under that
 ## control (a sheet card), or over its bottom edge when there's no room below.
 ## One at a time: a new toast replaces the one showing. It pops in (150 ms), holds `sec`, fades out (250 ms) and
@@ -225,6 +225,8 @@ static func _icon(kind: String) -> Control:
 	match kind:
 		"coin":
 			return UIKit.icon("coin", ICON)
+		"gem":
+			return UIKit.icon("gem", ICON)
 		"good", "bad":
 			var c := Control.new()
 			c.custom_minimum_size = Vector2(ICON, ICON)
