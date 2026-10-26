@@ -3737,7 +3737,7 @@ const INFO = {
     'A new day starts at midnight on this device.'] },
   scenes: { t: 'Scenes', b: [
     'A scene is the 3D world around the Snakes & Ladders board. The board, snakes, ladders and rules are the same in every scene.',
-    'Jungle Clearing is free. The others cost the coins shown, paid once, and are yours to keep.',
+    'Jungle Clearing, Snake Trail and Enchanted Jungle are free. The others cost the coins shown, paid once, and are yours to keep.',
     'A scene you buy is put to use straight away. Switch between your scenes with <b>Use</b>.',
     'Not enough coins? Nothing is spent; the shop tells you how many more you need.'] },
 };
@@ -4952,11 +4952,12 @@ function renderRooms(el, shop) {
    so a failed save charges nothing; owned scenes are never sold twice. */
 const SL_SCENES = [
   { id: 'jungle',    name: 'Jungle Clearing',   price: 0,     desc: 'The classic sunny jungle.',                          g: 'linear-gradient(160deg,#c8ee9c,#6aa84a)' },
+  { id: 'trail',     name: 'Snake Trail',       price: 0,     desc: 'A winding snake-shaped trail in a sunny meadow.',    g: 'linear-gradient(160deg,#bfe6ff,#7cc84a)' },
+  { id: 'enchanted', name: 'Enchanted Jungle',  price: 0,    desc: 'Glowing mushrooms, fireflies, golden snakes.',       g: 'linear-gradient(160deg,#8f6bb8,#2b4a5c)' },   // free since 2026-10-26
   { id: 'frost',     name: 'Frosty Wonderland', price: 20000, desc: 'Snowy pines, a frozen pond, lanterns, falling snow.', g: 'linear-gradient(160deg,#eef8ff,#9fc4e6)' },
   { id: 'candy',     name: 'Candy Kingdom',     price: 22000, desc: 'Lollipops, gumdrops and candy-cane ladders.',        g: 'linear-gradient(160deg,#ffe3f1,#f59ccb)' },
   { id: 'desert',    name: 'Desert Temple',     price: 25000, desc: 'Sandstone ruins, palms, an oasis, golden trim.',     g: 'linear-gradient(160deg,#ffe4ad,#e9a35a)' },
   { id: 'cloud',     name: 'Cloud Kingdom',     price: 25000, desc: 'Floating islands, rainbows, a pearl-white table.',   g: 'linear-gradient(160deg,#e3f3ff,#9fcfff)' },
-  { id: 'enchanted', name: 'Enchanted Jungle',  price: 25000, desc: 'Glowing mushrooms, fireflies, golden snakes.',       g: 'linear-gradient(160deg,#8f6bb8,#2b4a5c)' },
 ];
 const sceneById = id => SL_SCENES.find(s => s.id === id);
 let sceneBusy = false;
@@ -5473,9 +5474,41 @@ $('tabInv').addEventListener('click', () => { invTab = 'rooms'; renderInv(); $('
    2-4 players: you vs the computer, or Pass & Play. Beating the computer pays SL_REWARD coins once, after your
    recorded rolls are replayed through the rules and really reach 100. */
 const SL_REWARD = 100;
+/* Snakes & Ladders board layouts: where square n sits, as [u, v] in 0..1 of the board (u to the right, v down). No
+   layout = the classic 10x10 grid. A scene's board can name one (board.layout); only positions change, the squares,
+   snakes, ladders and rules are the same data everywhere.
+   trail: one winding road of 8 wavy bands joined by round bends, so the path itself looks like a long snake. Built in
+   board units (0..10, y up); `at(s)` gives the point and direction at distance s along it, `total` its length. */
+const SL_LAYOUTS = {
+  trail: (() => {
+    const BANDS = 8, Y0 = .75, S = 8.5 / 7, XL = 1.25, XR = 8.75, A = .2, R = S / 2, pts = [];
+    const wav = x => A * Math.sin((x - XL) / (XR - XL) * Math.PI * 2);
+    for (let b = 0; b < BANDS; b++) {
+      const y = Y0 + b * S, right = b % 2 === 0;
+      for (let i = 0; i <= 60; i++) { const f = i / 60, x = right ? XL + (XR - XL) * f : XR - (XR - XL) * f; pts.push([x, y + wav(x)]); }
+      if (b < BANDS - 1) for (let i = 1; i < 24; i++) { const a = -Math.PI / 2 + (right ? 1 : -1) * Math.PI * i / 24; pts.push([(right ? XR : XL) + R * Math.cos(a), y + R + R * Math.sin(a)]); }
+    }
+    const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const total = cum[cum.length - 1], pitch = total / 100;
+    function at(s) {   // [x, y, dx, dy] at distance s (clamped to the path)
+      s = Math.max(0, Math.min(total, s)); let i = 1; while (i < cum.length - 1 && cum[i] < s) i++;
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], f = (s - cum[i - 1]) / (cum[i] - cum[i - 1] || 1), l = Math.hypot(x1 - x0, y1 - y0) || 1;
+      return [x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, (x1 - x0) / l, (y1 - y0) / l];
+    }
+    const cells = []; for (let n = 1; n <= 100; n++) { const [x, y] = at((n - .5) * pitch); cells[n] = [x / 10, (10 - y) / 10]; }
+    // its own short snakes and ladders: each joins tiles lying just above / below each other on neighbouring loops
+    const ladders = { 3: 21, 8: 16, 19: 30, 33: 42, 47: 54, 59: 68, 72: 80, 85: 92 };
+    const snakes = { 17: 6, 28: 22, 36: 14, 45: 31, 56: 44, 62: 40, 70: 57, 83: 69, 95: 82, 98: 79 };
+    return Object.assign(n => cells[n], { at, total, pitch, ladders, snakes });
+  })(),
+};
 const SL = (() => {
-  const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91 };   // 1 -> 38 and 80 -> 100 removed (2026-10-21)
-  const SNAKES = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+  // the classic set (every grid board); a layout can bring its own (the trail's are short, between neighbouring loops)
+  const CLASSIC = {
+    ladders: { 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91 },   // 1 -> 38 and 80 -> 100 removed (2026-10-21)
+    snakes: { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 },
+  };
+  let LADDERS = CLASSIC.ladders, SNAKES = CLASSIC.snakes;
   const SNAKE_COL = ['#2fa86b', '#8a4fe0', '#e5484d', '#f08c00', '#3b7be0', '#2fb39c', '#d9536a', '#6b8e23', '#c0483f', '#7c4dff'];
   const cv = $('slCanvas'), ctx = cv.getContext('2d'), ov = $('slOv');
   let G = null, gid = 0, paused = false, raf = 0, setup = { mode: 'cpu', n: 2, color: 0 };
@@ -5506,7 +5539,14 @@ const SL = (() => {
   // ---- board geometry ----
   let size = 0, dpr = 1, boardImg = null;
   const cellRC = n => { const r = Math.floor((n - 1) / 10), k = (n - 1) % 10; return [r, r % 2 ? 9 - k : k]; };   // row from the bottom, column
-  function centre(n) { const c = size / 10, [r, k] = cellRC(n); return [k * c + c / 2, (9 - r) * c + c / 2]; }
+  let layout = null;   // the equipped scene's board layout (SL_LAYOUTS), null for the grid
+  function centre(n) { if (layout) { const [u, v] = layout(n); return [u * size, v * size]; } const c = size / 10, [r, k] = cellRC(n); return [k * c + c / 2, (9 - r) * c + c / 2]; }
+  function setLayout(id) {   // called when the 3D scene is built (never mid-game): that board's squares, snakes, ladders
+    layout = SL_LAYOUTS[id] || null;
+    LADDERS = layout && layout.ladders || CLASSIC.ladders; SNAKES = layout && layout.snakes || CLASSIC.snakes;
+    if (size && cv.width) drawBoard();
+    if (G) G.players.forEach(p => { if (!p.anim) p.xy = tokenXY(p); });
+  }
   function snakePts(head, tail, i) {   // a wavy body from the head (top) to the tail
     const [x1, y1] = centre(head), [x2, y2] = centre(tail), c = size / 10, dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
     const nx = -dy / len, ny = dx / len, waves = Math.max(1.5, len / (c * 2.2)), amp = c * .32, pts = [];
@@ -5819,14 +5859,14 @@ const SL = (() => {
   });
   // the page going to the background pauses a game in progress (outside YouTube; YouTube uses its own pause signal)
   if (!IN_YT) document.addEventListener('visibilitychange', () => { if (document.hidden && G && G.phase !== 'over' && ov.hidden) { card('pause'); msg('Paused.'); } });
-  return { open, exit, back, chooseMode, get landing() { return landing; }, roll, newGame, land, replayReaches100, paintBoard, LADDERS, SNAKES, SNAKE_COL, geom: () => ({ size }), get G() { return G; }, get paused() { return paused; } };
+  return { open, exit, back, chooseMode, get landing() { return landing; }, roll, newGame, land, replayReaches100, paintBoard, setLayout, get LADDERS() { return LADDERS; }, get SNAKES() { return SNAKES; }, CLASSIC, SNAKE_COL, geom: () => ({ size }), get G() { return G; }, get paused() { return paused; } };
 })();
 /* ---------- Snakes & Ladders landing: a 3D jungle with a slowly turning game table ----------
    Its own THREE.Scene and camera, drawn by the shared renderer only while the landing is on screen (frameLoop calls
    Jungle.render; nothing renders otherwise). Built the first time it opens. Smooth rounded foliage (Lambert), glossy
    snakes / board / pawns (Standard), no real-time shadows. The sign and the framing trees / snakes are placed relative
    to the screen edges (`anchor`), so the composition holds on any screen shape. The table's board is a framed 3D
-   board built from the real SL.LADDERS / SL.SNAKES data (tiles, flat ladders and snakes, one texture); static meshes are
+   board built from the real snakes and ladders data (SL.CLASSIC, or the board layout's own set) (tiles, flat ladders and snakes, one texture); static meshes are
    merged per material (the table separately, since it turns). */
 const Jungle = (() => {
   let J = null, cam = null, table = null, sign = null, built = false, building = null, vw = 0, vh = 0, last = 0, t = 0;
@@ -6014,21 +6054,25 @@ const Jungle = (() => {
   // B: the scene's board style (see SCENES): tile bands, grout, frame / lip, number ink, ladder colours, snake colours
   function boardFace(px, B) {   // rounded tiles in the scene's pastel bands, soft top light, readable numbers
     return tex(px, px, (g, w) => {
-      const c = w / 10, bands = B.bands, cream = B.cream;
+      const c = w / 10, bands = B.bands, cream = B.cream, trail = B.layout === 'trail';
+      lay = SL_LAYOUTS[B.layout] || null;
       g.fillStyle = B.grout; g.fillRect(0, 0, w, w);
       const rr = (x, y, s, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + s, y, x + s, y + s, r); g.arcTo(x + s, y + s, x, y + s, r); g.arcTo(x, y + s, x, y, r); g.arcTo(x, y, x + s, y, r); g.closePath(); };
-      for (let n = 1; n <= 100; n++) {
+      if (trail) paintTrail(g, c, B);
+      else for (let n = 1; n <= 100; n++) {
         const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0, x = k * c + c * .045, y = (9 - r) * c + c * .045, s = c * .91;
-        g.fillStyle = n === 100 ? B.goal : (r + k) % 2 ? bands[r >> 1] : cream;
+        // B.tiles: a 3- or 4-colour pattern that shifts every row (premium boards); otherwise cream + the row's band
+        g.fillStyle = n === 100 ? B.goal : B.tiles ? B.tiles[(k + 2 * (r % 2)) % B.tiles.length] : (r + k) % 2 ? bands[r >> 1] : cream;
         rr(x, y, s, c * .16); g.fill();
         const lg = g.createLinearGradient(0, y, 0, y + s); lg.addColorStop(0, 'rgba(255,255,255,.4)'); lg.addColorStop(.5, 'rgba(255,255,255,0)'); lg.addColorStop(1, 'rgba(120,70,40,.1)');
         g.fillStyle = lg; g.fill();
+        if (B.marks && n !== 100) tileMark(g, B.marks, n, x + s * .79, y + s * .77, c);   // bottom-right corner, clear of the number
       }
-      { const [x, y] = [9 * c + c / 2, c / 2 + c * .08]; g.fillStyle = B.star; g.beginPath(); for (let a = 0; a < 10; a++) { const q = a % 2 ? c * .15 : c * .33, an = -Math.PI / 2 + a * Math.PI / 5; g.lineTo(x + Math.cos(an) * q, y + Math.sin(an) * q); } g.fill(); }
+      if (!trail) { const [x, y] = [9 * c + c / 2, c / 2 + c * .08]; g.fillStyle = B.star; g.beginPath(); for (let a = 0; a < 10; a++) { const q = a % 2 ? c * .15 : c * .33, an = -Math.PI / 2 + a * Math.PI / 5; g.lineTo(x + Math.cos(an) * q, y + Math.sin(an) * q); } g.fill(); }
       paintLadders(g, c, B); paintSnakes(g, c, B);
-      g.font = `900 ${Math.round(c * .3)}px Nunito, sans-serif`; g.textBaseline = 'top'; g.lineJoin = 'round';
-      for (let n = 1; n <= 100; n++) {
-        const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0, x = k * c + c * .13, y = (9 - r) * c + c * .11;
+      g.font = `900 ${Math.round(c * .3)}px Nunito, sans-serif`; g.textBaseline = trail ? 'middle' : 'top'; g.textAlign = trail ? 'center' : 'left'; g.lineJoin = 'round';
+      for (let n = 1; n <= 100; n++) {   // the trail has its numbers in the middle of each tile
+        const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0, [x, y] = trail ? sq2d(n, c) : [k * c + c * .13, (9 - r) * c + c * .11];
         g.strokeStyle = 'rgba(255,250,240,.9)'; g.lineWidth = c * .07; g.strokeText(n, x, y);
         g.fillStyle = n === 100 ? B.num100 : B.num; g.fillText(n, x, y);
       }
@@ -6037,14 +6081,86 @@ const Jungle = (() => {
   // ---- the snakes and ladders are printed flat on the tile face (flat cartoon art, no 3D geometry). They use the
   // same centres and the same wavy body as the flat board (SL's snakePts), so a pawn sliding down in a match follows
   // the drawn snake exactly. c: one square in texture pixels; rows go upwards from the bottom like the board.
-  const sq2d = (n, c) => { const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0; return [k * c + c / 2, (9 - r) * c + c / 2]; };
+  let lay = null;   // the layout of the board being painted (SL_LAYOUTS), null for the grid
+  const sq2d = (n, c) => {
+    if (lay) { const [u, v] = lay(n); return [u * c * 10, v * c * 10]; }
+    const r = Math.floor((n - 1) / 10), k0 = (n - 1) % 10, k = r % 2 ? 9 - k0 : k0; return [k * c + c / 2, (9 - r) * c + c / 2];
+  };
+  // the snake-trail board (B.trail colours): sky with soft clouds, the road as one long cartoon snake (outlined body,
+  // head before square 1, tail after 100 with a trophy), tiles as body segments: snake heads red, ladder feet yellow
+  function paintTrail(g, c, B) {
+    const T = B.trail, L = SL_LAYOUTS.trail, HW = .4, X = x => x * c, Y = y => (10 - y) * c;
+    const pt = s => { const [x, y, dx, dy] = L.at(s); return [X(x), Y(y), dx, -dy]; };   // texture space (y down)
+    g.fillStyle = T.cloud; g.globalAlpha = .9;
+    [[1.6, 9.7, .5], [5.2, 9.75, .6], [8.6, 9.7, .45], [3.4, .25, .5], [7.2, .2, .55], [9.7, 5, .35], [.3, 4.6, .35]].forEach(([x, y, s]) => {
+      [[0, 0, 1], [.8, .1, .7], [-.8, .12, .75], [.3, -.35, .65]].forEach(([a, b, k]) => { g.beginPath(); g.arc(X(x + a * s), Y(y) + b * s * c, k * s * c, 0, Math.PI * 2); g.fill(); });
+    });
+    g.globalAlpha = 1;
+    const band = (s0, s1, hw0, hw1 = hw0) => {   // the road between distances s0 and s1 as one closed shape
+      const k = Math.max(2, Math.ceil((s1 - s0) / .08)), left = [], right = [];
+      for (let i = 0; i <= k; i++) { const s = s0 + (s1 - s0) * i / k, [x, y, dx, dy] = pt(s), h = (hw0 + (hw1 - hw0) * i / k) * c; left.push([x - dy * h, y + dx * h]); right.push([x + dy * h, y - dx * h]); }
+      g.beginPath(); left.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); right.reverse().forEach(([x, y]) => g.lineTo(x, y)); g.closePath();
+    };
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    // the outline under the whole body (one fat stroke along the path), then the tail and head
+    g.strokeStyle = T.outline; g.lineWidth = (HW * 2 + .1) * c; g.beginPath();
+    for (let s = 0; s <= L.total; s += .05) { const [x, y] = pt(s); s ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+    const [ex, ey, edx, edy] = pt(L.total), tail = [];   // the tail: tapering on past 100, with a little upward flick
+    for (let i = 0; i <= 12; i++) { const f = i / 12; tail.push([ex + edx * f * .95 * c, ey + edy * f * .95 * c - f * f * .35 * c, (1 - f) * HW * c]); }
+    const tailPath = grow => { g.beginPath(); tail.forEach(([x, y, h], i) => i ? g.lineTo(x, y - h - grow) : g.moveTo(x, y - h - grow)); tail.slice().reverse().forEach(([x, y, h]) => g.lineTo(x, y + h + grow)); g.closePath(); };
+    g.fillStyle = T.outline; tailPath(c * .05); g.fill(); g.fillStyle = T.tiles[0]; tailPath(0); g.fill();
+    const [sx, sy, sdx, sdy] = pt(0), hx = sx - sdx * .52 * c, hy = sy - sdy * .52 * c;   // the head, looking back along the trail
+    g.save(); g.translate(hx, hy); g.scale(.8, .8); g.translate(-hx, -hy);
+    g.fillStyle = T.tiles[0]; g.strokeStyle = T.outline; g.lineWidth = c * .05;
+    g.beginPath(); g.ellipse(hx, hy, c * .62, c * .5, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = '#e5484d'; g.lineWidth = c * .045;   // forked tongue
+    seg(g, hx - c * .5, hy + c * .2, hx - c * .66, hy + c * .42); seg(g, hx - c * .66, hy + c * .42, hx - c * .78, hy + c * .42); seg(g, hx - c * .66, hy + c * .42, hx - c * .66, hy + c * .55);
+    [[-.2, -.42], [.2, -.46]].forEach(([a, b]) => {   // big googly eyes on top
+      g.fillStyle = '#fff'; g.strokeStyle = T.outline; g.lineWidth = c * .04; g.beginPath(); g.ellipse(hx + a * c, hy + b * c, c * .2, c * .24, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = '#1d2a14'; g.beginPath(); g.arc(hx + a * c + c * .06, hy + b * c + c * .04, c * .1, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(hx + a * c + c * .09, hy + b * c, c * .035, 0, Math.PI * 2); g.fill();
+    });
+    g.fillStyle = shade(T.tiles[0], -.35); [[-.42, -.02], [-.3, .05]].forEach(([a, b]) => { g.beginPath(); g.arc(hx + a * c, hy + b * c, c * .04, 0, Math.PI * 2); g.fill(); });   // nostrils
+    g.strokeStyle = T.outline; g.lineWidth = c * .045; g.beginPath(); g.arc(hx + c * .05, hy - c * .02, c * .32, .45, 1.9); g.stroke();   // a wide smile
+    g.fillStyle = 'rgba(255,140,160,.5)'; g.beginPath(); g.ellipse(hx + c * .3, hy + c * .12, c * .09, c * .06, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+    for (let n = 1; n <= 100; n++) {   // the body segments: one tile per square, outlined like the reference trail
+      band((n - 1) * L.pitch, n * L.pitch, HW);
+      g.fillStyle = n === 100 ? B.goal : L.snakes[n] ? T.red : L.ladders[n] ? T.yellow : T.tiles[n % T.tiles.length]; g.fill();
+      g.strokeStyle = T.outline; g.lineWidth = c * .04; g.stroke();
+    }
+    { const [tx, ty] = tail[12], s = c * .2; g.fillStyle = T.trophy; g.strokeStyle = shade(T.trophy, -.45); g.lineWidth = c * .03;   // the trophy at the tail's tip
+      const x = tx - c * .05, y = ty - c * .32;
+      g.beginPath(); g.moveTo(x - s, y - s * .5); g.lineTo(x + s, y - s * .5); g.quadraticCurveTo(x + s, y + s * .6, x, y + s * .7); g.quadraticCurveTo(x - s, y + s * .6, x - s, y - s * .5); g.fill(); g.stroke();
+      [-1, 1].forEach(k => { g.beginPath(); g.arc(x + k * s * 1.05, y - s * .1, s * .32, 0, Math.PI * 2); g.stroke(); });
+      g.fillRect(x - s * .15, y + s * .7, s * .3, s * .35); g.fillRect(x - s * .55, y + s * 1.05, s * 1.1, s * .25); }
+  }
   const shade = (hex, k) => {   // k < 0 darkens, k > 0 lightens
     const n = parseInt(hex.slice(1), 16), f = v => Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k);
     return `rgb(${f(n >> 16)},${f(n >> 8 & 255)},${f(n & 255)})`;
   };
   const seg = (g, a, b, x, y) => { g.beginPath(); g.moveTo(a, b); g.lineTo(x, y); g.stroke(); };
+  // a small, faint decoration in a tile's corner (B.marks): ['sprinkles', cols] two candy sprinkles on every tile;
+  // ['glyphs', col] a sun, a pyramid or an eye-like diamond on every third tile
+  function tileMark(g, [kind, cols], n, x, y, c) {
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    if (kind === 'sprinkles') {
+      g.lineWidth = c * .035;
+      [[-.05, -.05, .5], [.05, .05, -.6]].forEach(([fx, fy, a], j) => {
+        const sx = x + c * fx, sy = y + c * fy, d = c * .045; g.strokeStyle = cols[(n * 3 + j) % cols.length];
+        seg(g, sx - Math.cos(a + n) * d, sy - Math.sin(a + n) * d, sx + Math.cos(a + n) * d, sy + Math.sin(a + n) * d);
+      });
+      return;
+    }
+    if (n % 3) return;
+    const d = c * .08; g.strokeStyle = cols; g.fillStyle = cols; g.lineWidth = c * .022; g.globalAlpha = .6;
+    if (n % 9 === 0) { g.beginPath(); g.arc(x, y, d * .45, 0, Math.PI * 2); g.fill(); for (let a = 0; a < 8; a++) { const q = a * Math.PI / 4; seg(g, x + Math.cos(q) * d * .7, y + Math.sin(q) * d * .7, x + Math.cos(q) * d, y + Math.sin(q) * d); } }
+    else if (n % 9 === 3) { g.beginPath(); g.moveTo(x - d, y + d * .7); g.lineTo(x, y - d * .8); g.lineTo(x + d, y + d * .7); g.closePath(); g.stroke(); seg(g, x - d * .45, y + d * .05, x + d * .45, y + d * .05); }
+    else { g.beginPath(); g.moveTo(x - d, y); g.lineTo(x, y - d * .6); g.lineTo(x + d, y); g.lineTo(x, y + d * .6); g.closePath(); g.stroke(); g.beginPath(); g.arc(x, y, d * .22, 0, Math.PI * 2); g.fill(); }
+    g.globalAlpha = 1;
+  }
   function paintLadders(g, c, B) {   // two rails and even rungs: an outline pass, then the colours, then a thin shine
-    Object.entries(SL.LADDERS).forEach(([f, t]) => {
+    Object.entries((lay && lay.ladders) || SL.CLASSIC.ladders).forEach(([f, t]) => {
       const [x1, y1] = sq2d(+f, c), [x2, y2] = sq2d(t, c), dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
       const ux = dx / L, uy = dy / L, nx = -uy * c * .19, ny = ux * c * .19, ex = ux * c * .12, ey = uy * c * .12;
       const rail = s => [x1 + nx * s - ex, y1 + ny * s - ey, x2 + nx * s + ex, y2 + ny * s + ey];
@@ -6070,7 +6186,7 @@ const Jungle = (() => {
   }
   function paintSnakes(g, c, B) {   // a smooth tapered body with soft back spots, then a round head with big eyes
     const cols = B.snakes || SL.SNAKE_COL;
-    Object.entries(SL.SNAKES).forEach(([h, t], i) => {
+    Object.entries((lay && lay.snakes) || SL.CLASSIC.snakes).forEach(([h, t], i) => {
       const col = cols[i % cols.length], ink = shade(col, -.5);
       const [x1, y1] = sq2d(+h, c), [x2, y2] = sq2d(t, c), dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
       const nx = -dy / len, ny = dx / len, waves = Math.max(1.5, len / (c * 2.2)), amp = c * .32, P = [], N = 40;
@@ -6087,8 +6203,20 @@ const Jungle = (() => {
       for (let j = N; j >= 0; j--) g.lineTo(...right[j]);
       g.closePath();
       g.lineJoin = 'round'; g.strokeStyle = ink; g.lineWidth = c * .05; g.stroke(); g.fillStyle = col; g.fill();
-      g.fillStyle = shade(col, -.18);   // back spots
-      for (let j = 5; j < N - 3; j += 4) { const [p, q] = [P[j - 1], P[j + 1]]; g.beginPath(); g.ellipse(P[j][0], P[j][1], hw(j) * .62, hw(j) * .4, Math.atan2(q[1] - p[1], q[0] - p[0]), 0, Math.PI * 2); g.fill(); }
+      if (B.snakePattern === 'stripes') {   // slanted candy bands across the body (kept inside it by a clip)
+        g.save(); g.clip(); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineCap = 'butt';
+        for (let j = 4; j < N - 2; j += 3) { g.lineWidth = hw(j) * .7; seg(g, ...left[j], ...right[j + 1]); }
+        g.restore();
+      } else if (B.snakePattern === 'diamonds') {   // a row of pale diamonds down the back
+        g.fillStyle = 'rgba(255,244,214,.62)';
+        for (let j = 4; j < N - 3; j += 3) {
+          const [p, q] = [P[j - 1], P[j + 1]], a = Math.atan2(q[1] - p[1], q[0] - p[0]), l = hw(j) * 1.05, w = hw(j) * .55, ca = Math.cos(a), sa = Math.sin(a), [x, y] = P[j];
+          g.beginPath(); g.moveTo(x - ca * l, y - sa * l); g.lineTo(x - sa * w, y + ca * w); g.lineTo(x + ca * l, y + sa * l); g.lineTo(x + sa * w, y - ca * w); g.closePath(); g.fill();
+        }
+      } else {
+        g.fillStyle = shade(col, -.18);   // back spots
+        for (let j = 5; j < N - 3; j += 4) { const [p, q] = [P[j - 1], P[j + 1]]; g.beginPath(); g.ellipse(P[j][0], P[j][1], hw(j) * .62, hw(j) * .4, Math.atan2(q[1] - p[1], q[0] - p[0]), 0, Math.PI * 2); g.fill(); }
+      }
       g.strokeStyle = 'rgba(255,255,255,.38)'; g.lineWidth = c * .028; g.lineCap = 'round';   // a soft shine along one side
       g.beginPath(); for (let j = 3; j < N - 6; j++) { const x = (P[j][0] * 2 + left[j][0]) / 3, y = (P[j][1] * 2 + left[j][1]) / 3; j > 3 ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
       // the head, pointing away from the body, on the head square
@@ -6116,9 +6244,48 @@ const Jungle = (() => {
     const L = a.distanceTo(b), n = Math.max(2, Math.round(L / .09));
     for (let i = 0; i < n; i++) rod(a.clone().lerp(b, i / n), a.clone().lerp(b, (i + 1) / n), r, std(cols[i % cols.length], .3), parent);
   }
+  // premium board trim (B.trim), all on the rim, off the tiles:
+  //   lip: ['stripes' | 'diamonds', a, b]  a patterned lip (in board units, from the rounded box's own UVs)
+  //   corner: ['mint' | 'sun', a, b]       a flat round piece on each corner (peppermint swirl / sun on a medallion)
+  //   mid: ['gumdrop' | 'tile', cols]      a small piece in the middle of each side (round gumdrop / flat diamond tile)
+  function patternLip([kind, a, b]) {
+    const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 255];
+    const A = rgb(a), Bc = rgb(b);
+    const tx = tex(128, 128, (g, w) => {
+      const d = g.createImageData(w, w);
+      for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+        const on = kind === 'diamonds' ? Math.abs((x / w * 8) % 1 - .5) + Math.abs((y / w * 8) % 1 - .5) < .3 : ((x + y) / w * 7) % 1 < .5;
+        d.data.set(on ? A : Bc, (y * w + x) * 4);
+      }
+      g.putImageData(d, 0, 0);
+    });
+    tx.wrapS = tx.wrapT = THREE.RepeatWrapping;
+    return new THREE.MeshStandardMaterial({ map: tx, roughness: .35 });
+  }
+  function boardTrim(parent, T) {
+    const E = BOARD / 2 - .1, [ck, ca, cb] = T.corner, [mk, mcols] = T.mid;
+    const face = tex(128, 128, (g, w) => {
+      const m = w / 2; g.fillStyle = cb; g.beginPath(); g.arc(m, m, m, 0, Math.PI * 2); g.fill(); g.fillStyle = ca;
+      if (ck === 'mint') {   // a peppermint swirl seen from above
+        for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; g.beginPath(); g.moveTo(m, m); g.quadraticCurveTo(m + Math.cos(a + .5) * m * .7, m + Math.sin(a + .5) * m * .7, m + Math.cos(a + .25) * m * .96, m + Math.sin(a + .25) * m * .96); g.arc(m, m, m * .96, a + .25, a + .55); g.quadraticCurveTo(m + Math.cos(a + .75) * m * .5, m + Math.sin(a + .75) * m * .5, m, m); g.fill(); }
+        g.fillStyle = cb; g.beginPath(); g.arc(m, m, m * .16, 0, Math.PI * 2); g.fill();
+      } else {   // a sun: a round face and twelve pointed rays inside a thin ring
+        g.beginPath(); for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, q = k % 2 ? m * .42 : m * .72; g.lineTo(m + Math.cos(a) * q, m + Math.sin(a) * q); } g.fill();
+        g.fillStyle = cb; g.beginPath(); g.arc(m, m, m * .3, 0, Math.PI * 2); g.fill();
+        g.fillStyle = ca; g.beginPath(); g.arc(m, m, m * .2, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = ca; g.lineWidth = m * .07; g.beginPath(); g.arc(m, m, m * .86, 0, Math.PI * 2); g.stroke();
+      }
+    });
+    const top = new THREE.MeshStandardMaterial({ map: face, roughness: .3 }), side = std(ck === 'mint' ? cb : ca, .3);
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sz], i) => add(new THREE.CylinderGeometry(.15, .15, .045, 32), [side, top, side], sx * E, BOARD_H + .085, sz * E, parent, { ry: i }));
+    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([sx, sz], i) => mk === 'gumdrop'
+      ? add(SPH, std(mcols[i % mcols.length], .3), sx * (E + .03), BOARD_H + .06, sz * (E + .03), parent, { s: [.1, .07, .1] })
+      : add(new THREE.CylinderGeometry(.11, .11, .03, 4), std(mcols[i % mcols.length], .45), sx * (E + .03), BOARD_H + .07, sz * (E + .03), parent));
+  }
   function buildBoard(parent, B) {
     add(rbox(BOARD, BOARD, BOARD_H, .14), std(B.frame, B.frameR, B.frameM), 0, BOARD_H / 2, 0, parent, { rx: -Math.PI / 2 });
-    add(rbox(FACE + .22, FACE + .22, .08, .035), std(B.lip, .35, B.lipM), 0, BOARD_H + .02, 0, parent, { rx: -Math.PI / 2 });
+    add(rbox(FACE + .22, FACE + .22, .08, .035), B.trim ? patternLip(B.trim.lip) : std(B.lip, .35, B.lipM), 0, BOARD_H + .02, 0, parent, { rx: -Math.PI / 2 });
+    if (B.trim) boardTrim(parent, B.trim);
     // the tiles, ladders and snakes are one flat texture on the face (2048 px, so the line art stays crisp up close)
     const face = boardFace(Math.min(2048, renderer.capabilities.maxTextureSize), B); face.anisotropy = renderer.capabilities.getMaxAnisotropy();
     add(new THREE.PlaneGeometry(FACE, FACE), new THREE.MeshStandardMaterial({ map: face, roughness: .5 }), 0, SURF, 0, parent, { rx: -Math.PI / 2 });
@@ -6209,15 +6376,34 @@ const Jungle = (() => {
     candy: {
       sky: ['#ff9fcf', '#ffe4f3', '#ffd0ea', '#f08cc0'], fog: ['#ffd9ee', 30, 95], light: ['#fff4fb', '#d86aa6', .72, '#fff2e6', .78, .14],
       ground: '#ffb6d8', clearing: [255, 240, 228], table: ['#ff9cc6', '#e0609e', .25, .05],
-      board: { bands: ['#ffd1e8', '#d6efff', '#fff1a8', '#d8f5d0', '#e8dcff'], cream: '#fffaf6', grout: '#f6c6dc', goal: '#ffe066', star: '#ff7ab6', num: '#8a3f68', num100: '#b0306f', frame: '#fff6fb', frameR: .3, lip: '#ff8fc1', rail: '#e5484d', rung: '#fff4f8', stripe: ['#e5484d', '#ffffff'], snakes: ['#ff6fae', '#7ad3ff', '#b58cff', '#59d6a8', '#ffb347', '#ff8a8a', '#6fb4ff', '#f7d046', '#c06cff', '#4fd1c5'] },
+      // the Candy Kingdom board: pink / peach / cream / mint tiles with faint sprinkles, a candy-cane lip with
+      // peppermints and gumdrops on the rim, candy-striped snakes, candy-cane ladders with mint rungs
+      board: { bands: ['#ffd1e8', '#d6efff', '#fff1a8', '#d8f5d0', '#e8dcff'], tiles: ['#ffc9df', '#ffd6ba', '#fff4e2', '#c2eed8'], marks: ['sprinkles', ['#ff6fae', '#5fd0b0', '#b58cff', '#3fc6c9', '#e5484d']], cream: '#fffaf6', grout: '#f7c3da', goal: '#ffe066', star: '#ff7ab6', num: '#8a3f68', num100: '#b0306f', frame: '#ffe6f2', frameR: .3, lip: '#ff8fc1',
+        trim: { lip: ['stripes', '#e5484d', '#fff8fb'], corner: ['mint', '#e5484d', '#fff8fb'], mid: ['gumdrop', ['#5fd0b0', '#b58cff', '#3fc6c9', '#ff8fbf']] }, rail: '#e5484d', rung: '#7fdcbf', stripe: ['#e5484d', '#ffffff'], snakePattern: 'stripes', snakes: ['#ff6fae', '#a77bf0', '#3fcf9f', '#ff7f6e', '#38c6c9', '#e5484d', '#c99bff', '#ff8fbf', '#2fbf8f', '#ff9a7a'] },
       sign: { plank: '#ff9ec7', grain: 'rgba(200,60,120,A)', edge: '#d9628f', stroke: '#8f2a5c', rope: '#ffffff', c1: '#ffffff', c2: '#ffe066', top: 'cloud', snake: ['#7ad3ff', '#3f9fd8', '#fff6fb'] },
       tableSnake: ['#b58cff', '#7c4ddb', '#fff3ff'], motes: ['fly', '#ffffff', 40, .35], fall: ['#ff6fae', '#7ad3ff', '#ffe066', '#9be38a'], beams: null,
       world: candyWorld,
     },
+    // Snake Trail (free): a sunny meadow with a wooden fence, flowers and clouds; the board is one winding trail
+    trail: {
+      sky: ['#4fb3f0', '#9fdcff', '#d6f1ff', '#bfe8a0'], fog: ['#d6f1ff', 30, 95], light: ['#fff8e6', '#5a9a3a', .7, '#fff3d0', .85, .14],
+      ground: '#86cf5a', clearing: [206, 238, 160], table: ['#c98a4a', '#8a552c', .55, 0],
+      board: { layout: 'trail', bands: ['#ffd2b0', '#ffc8c4', '#cfe9c2', '#ffe39a', '#cfe4f2'], cream: '#fff4e2', grout: '#bfe6ff', goal: '#ffd45c', star: '#f4a92a', num: '#1f3312', num100: '#7a4a00', frame: '#fff6e8', frameR: .38, lip: '#7cc84a', rail: '#2f6fd6', rung: '#6aa8ff',
+        snakes: ['#ff8a3d', '#c04fe0', '#ffd23f', '#ff9fc0', '#e5484d', '#3fb6e0', '#ff7a5a', '#a46be8', '#f4b400', '#ff6f91'],
+        trail: { cloud: '#ffffff', outline: '#2c5a17', tiles: ['#7cc84a', '#c5ea6a'], red: '#ff5a4f', yellow: '#ffd84d', trophy: '#f4b82a' } },
+      sign: { ...wood, c1: '#2fa86b', c2: '#f4c430', top: 'vine', snake: ['#7cc84a', '#3f8f2a', '#fff0b8'] },
+      tableSnake: ['#ffd23f', '#d99a00', '#fff7d0'], motes: ['fly', '#ffffff', 18, .3], fall: null, beams: null,
+      world: trailWorld,
+    },
     desert: {
       sky: ['#ffb46b', '#ffe4ad', '#ffd38f', '#e9a35a'], fog: ['#f4d29c', 40, 130], light: ['#fff1d6', '#b8803e', .66, '#ffe0a8', .95, .12],
       ground: '#ddb173', clearing: [240, 214, 160], table: ['#7a4a2a', '#e3b04b', .5, .65],
-      board: { bands: ['#f6d9a8', '#f2c6a0', '#e9dcb0', '#f7e3b9', '#efc9a0'], cream: '#fff3dc', grout: '#d9b07a', goal: '#ffd45c', star: '#d48a1e', num: '#6e4628', num100: '#9a5a00', frame: '#f3e2c2', frameR: .5, lip: '#e0a83a', lipM: .6, rail: '#9a6a3a', rung: '#e3b066' },
+      // the Desert Temple board: ivory / sandstone / sandy-beige tiles with faint terracotta glyphs, a sandstone frame,
+      // a deep-teal lip with gold diamonds, sun medallions on the corners and terracotta tiles mid-side, wooden ladders,
+      // turquoise / emerald / terracotta / gold snakes with pale back diamonds
+      board: { bands: ['#f6d9a8', '#f2c6a0', '#e9dcb0', '#f7e3b9', '#efc9a0'], tiles: ['#fff5e2', '#f1d9ae', '#e7cd9f'], marks: ['glyphs', '#c4643a'], cream: '#fff3dc', grout: '#cf9f62', goal: '#ffd45c', star: '#c4643a', num: '#5e3b22', num100: '#9a5a00', frame: '#e8cd9c', frameR: .6, lip: '#e0a83a', lipM: .6,
+        trim: { lip: ['diamonds', '#d9a441', '#1f6f6a'], corner: ['sun', '#e0ad4a', '#1f6f6a'], mid: ['tile', ['#c4643a']] }, rail: '#a8693a', rung: '#e6bf83', snakePattern: 'diamonds',
+        snakes: ['#2fb3a6', '#2f9e5f', '#c9643c', '#c9a03f', '#1f7a78', '#3fc6b8', '#4aa36a', '#d4774a', '#b8913a', '#2a8f8a'] },
       sign: { plank: '#d9b27c', grain: 'rgba(130,80,30,A)', edge: '#a07a48', stroke: '#5a2e14', rope: '#c9a46a', c1: '#c9532e', c2: '#ffd56a', top: 'none', snake: ['#d4a64a', '#8a5a2a', '#fff0c8'] },
       tableSnake: ['#5fb3a0', '#2f7d6e', '#f6f0d8'], motes: ['fly', '#fff1c8', 34, .3], fall: null, beams: 'rgba(255,240,200,.45)',
       world: desertWorld,
@@ -6364,6 +6550,34 @@ const Jungle = (() => {
     const vines = new THREE.Group(); J.add(vines); anchor(vines, 0, .99, 1.0, false, .9);
     vine(V3(-9, 1, 0), V3(9, 1.2, 0), 2.2, vines); vine(V3(-8, 2, -1), V3(4, 2.4, -1), 1.4, vines);
   }
+  function fence(parent, x, z, len, ry) {   // a wooden picket fence piece: rounded posts and two rails
+    const g = new THREE.Group(); g.position.set(x, GROUND, z); g.rotation.y = ry; parent.add(g);
+    const wd = lam('#a8692e'), lt = lam('#c98a4a');
+    for (let px = -len / 2; px <= len / 2 + .01; px += .8) { add(rbox(.34, 1.7, .16, .08), lt, px, .85, 0, g); add(SPH, lt, px, 1.7, 0, g, { s: [.17, .12, .08] }); }
+    [.55, 1.2].forEach(y => add(rbox(len + .4, .16, .1, .04), wd, 0, y, -.1, g));
+    return g;
+  }
+  function daisies(parent, x, z, n, s = 1) {   // a little patch of white daisies with yellow hearts
+    for (let k = 0; k < n; k++) {
+      const a = k * 2.4, r = .25 + k * .12, fx = x + Math.cos(a) * r * s, fz = z + Math.sin(a) * r * s;
+      add(SPH, lam('#ffffff'), fx, GROUND + .22 * s, fz, parent, { s: [.16 * s, .05 * s, .16 * s] });
+      add(SPH, lam('#ffcf3a'), fx, GROUND + .25 * s, fz, parent, { s: .06 * s });
+    }
+  }
+  function trailWorld() {
+    const greens = [['#4caf50', '#5cbf4a', '#8fd16a'], ['#3f9a3a', '#4caf50', '#7cc95a'], ['#57b847', '#66c255', '#9be37a']];
+    swayOn = false;
+    [[-16, -18, 4.5, 1], [-6, -27, 5.5, 1.1], [7, -26, 5, 1], [17, -17, 4.5, .95], [0, -38, 6.5, 1.3]].forEach(([x, z, h, r], i) => tree(x, z, h, r, greens[i % 3]));
+    [[-14, 9, -34, 2.6], [6, 11, -38, 3], [18, 8, -30, 2.2], [-4, 13, -44, 3.4], [-24, 10, -26, 2]].forEach(([x, y, z, s]) => puff(J, x, GROUND + y, z, s));   // clouds
+    for (let i = 0; i < 9; i++) { const a = Math.PI * (1.06 + i / 8 * .88), r = 11.5; fence(J, Math.cos(a) * r, Math.sin(a) * r, 3.6, Math.atan2(-Math.cos(a), -Math.sin(a))); }
+    for (let i = 0; i < 8; i++) { const a = Math.PI * (1.1 + i / 7 * .8), r = 9.4; bush(J, Math.cos(a) * r, Math.sin(a) * r, 1.2 + (i % 3) * .25, greens[i % 3], i % 2 ? ['#ff8fb3', '#ffd34d', '#ffffff'] : null); daisies(J, Math.cos(a) * (r - 1.6), Math.sin(a) * (r - 1.6), 5); }
+    swayOn = true;
+    const leftTree = tree(0, 0, 16, 1.1, greens[0], '#7a4a2a'); anchor(leftTree, -1.04, 0, 1.02, true, .9);
+    coilTree = leftTree; coilOn(leftTree, 1.42, ['#7cc84a', '#3f8f2a', '#fff0b8']);
+    const rightTree = tree(0, 0, 17, 1.2, greens[1], '#7a4a2a'); rightTree.rotation.y = Math.PI; anchor(rightTree, 1.07, 0, 1.12, true, .9);
+    const fl = new THREE.Group(); J.add(fl); anchor(fl, -.92, -.66, .72, true, .8); fence(fl, .4, 0, 2.4, .3); daisies(fl, 1.2, .9, 6, 1.4);
+    const fr = new THREE.Group(); J.add(fr); anchor(fr, .96, -.42, .9, true, .9); bush(fr, 0, 0, 1.3, greens[2], ['#ff8fb3', '#ffd34d']); daisies(fr, -1, .8, 5, 1.3);
+  }
   function candyWorld() {
     const pinks = [['#ffb3d9', '#ff9cc9', '#ffe0f0'], ['#b9e4ff', '#9fd6ff', '#e6f6ff'], ['#e5d4ff', '#d3bcff', '#f6efff']];
     swayOn = false;
@@ -6480,6 +6694,7 @@ const Jungle = (() => {
     const T = SCENES[id] || SCENES.jungle;
     if (J) disposeWorld(J);
     theme = T; themeId = SCENES[id] ? id : 'jungle';
+    SL.setLayout(T.board.layout);   // pawns stand on this board's squares (the trail has its own positions)
     [sway, heads, tongues, leaves, beams, anchors, bobs].forEach(a => { a.length = 0; });
     sign = null; flies = null; decorPawns = []; coilTree = null; pawnSet = []; pawnsFor = 0; turnRing = null; camCur = null; playCache = null;
     J = new THREE.Scene();
@@ -6902,9 +7117,9 @@ function ensureProfile() {   // fill only missing fields, never overwrite saved 
   P.rooms = P.rooms.filter(id => ROOMS[id]);
   FREE_ROOMS.slice().reverse().forEach(id => { if (!P.rooms.includes(id)) P.rooms.unshift(id); });   // free rooms are always owned
   if (!P.rooms.includes(P.room)) P.room = DEFAULT_ROOM;
-  // Snakes & Ladders scenes: the jungle is always owned and is the default; only known scenes count
+  // Snakes & Ladders scenes: the free ones (price 0) are always owned, the jungle is the default; only known scenes count
   if (!Array.isArray(P.scenes)) P.scenes = [];
-  P.scenes = [...new Set(['jungle', ...P.scenes])].filter(id => SL_SCENES.some(s => s.id === id));
+  P.scenes = [...new Set([...SL_SCENES.filter(s => !s.price).map(s => s.id), ...P.scenes])].filter(id => SL_SCENES.some(s => s.id === id));
   if (!P.scenes.includes(P.scene)) P.scene = 'jungle';
   // emote sets: the Starter set is always owned and is the default; only known sets count
   if (!Array.isArray(P.emoteSets)) P.emoteSets = [];

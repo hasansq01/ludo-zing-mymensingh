@@ -87,6 +87,17 @@ Last reviewed: 2026-10-19.
       texture (`paintLadders` / `paintSnakes`), replacing the 3D tube snakes and rod ladders. Same squares, paths, colours
       and rules; scenery, table, framing snakes, camera and UI unchanged. Checked in the 3D and Top camera views (2026-10-26).
       Not committed or deployed yet.
+- [x] Candy Kingdom scene board redesign (S&L only, existing scene / shop / ownership): pink-peach-cream-mint tiles
+      (`tiles`), faint sprinkles, candy-cane striped lip with peppermints + gumdrops on the rim (`candyTrim`), candy-striped
+      flat snakes (`candyStripes`), candy-cane ladders with mint rungs. Jungle default unchanged; no Ludo code touched.
+      Checked in 3D and Top views (2026-10-26).
+- [x] Desert Temple scene board redesign (S&L only, existing scene / shop): ivory-sandstone-beige tiles, faint terracotta
+      glyphs (sun / pyramid / diamond) on every third tile, sandstone frame, deep-teal lip with gold diamonds, sun
+      medallions on the corners, terracotta tiles mid-side, wooden ladders, turquoise / emerald / terracotta / gold snakes
+      with pale back diamonds. Board trim is now generic per scene (`B.trim`, `B.marks`, `B.snakePattern`); Candy
+      Kingdom moved onto it and re-checked. Checked in 3D and Top views (2026-10-26).
+- [x] Enchanted Jungle scene is free (price 0) and owned by every player (free scenes are always added to `P.scenes` on
+      load), so anyone can pick it with Use. Jungle Clearing stays the equipped default (2026-10-26).
 
 ## In progress
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
