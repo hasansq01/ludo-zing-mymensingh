@@ -71,7 +71,8 @@ func _init(singleton: Object = null, deferred := true) -> void:
 		singleton = Engine.get_singleton(SINGLETON)
 	_pg = singleton
 	var test_ads := str(ProjectSettings.get_setting(TEST_ADS_SETTING, "")).strip_edges()
-	if _pg != null and test_ads != "" and _pg.has_method("set_test_devices"):
+	# (an Android plugin singleton answers has_method false for its methods: the real plugin always has this one)
+	if _pg != null and test_ads != "" and (Engine.has_singleton(SINGLETON) or _pg.has_method("set_test_devices")):
 		_pg.call("set_test_devices", test_ads)
 	if _pg == null:
 		return
