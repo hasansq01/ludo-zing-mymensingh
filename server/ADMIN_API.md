@@ -139,7 +139,7 @@ Errors: `{error: "<code>", msg?}`: 400 `bad_request` (bad input, bad limit / cur
 ## v2: accounts, economy, leaderboards, quick match (ONLINE_V2.md §6)
 
 Same rules as v1: session cookie, `X-Admin: 1` on writes (else `403 csrf`), every write audited in `admin_log`
-(new actions: `account.coins`, `account.gems`, `account.ban`, `account.unban`, `account.note`), list endpoints take
+(new actions: `account.coins`, `account.gems`, `account.ban`, `account.unban`, `account.note`, `account.erase`), list endpoints take
 `limit` / `cursor` and return `{items, next}`, errors as above.
 
 ### D1 schema v2 (migrations/0002_accounts.sql, 0003_policy.sql)
@@ -202,10 +202,30 @@ account. Sum of an account's `ledger.delta_coins` = its coins.
 | POST | `/admin/api/accounts/:id/coins` `{delta, reason}` | delta: non-zero integer, \|delta\| ≤ 1,000,000; reason 3–200 chars. Ledger row reason `admin`, `ref` = the reason (not counted as coins earned) → `{ok: true, coins, account}`; `409 {error: "coins", coins}` if the balance would go below 0 |
 | POST | `/admin/api/accounts/:id/gems` `{delta, reason}` | As `/coins`, for gems (Economy v1): delta non-zero integer, \|delta\| ≤ 1,000,000; reason 3–200 chars. Ledger row reason `admin` (`delta_coins` 0, `delta_gems`, `gems_after`, `ref` = the reason); audit action `account.gems` → `{ok: true, gems, account}`; `409 {error: "gems", gems}` if the balance would go below 0 |
 | POST | `/admin/api/accounts/:id/ban` `{reason}` (3–200) / `.../unban` | → `{ok: true, kicked: n, account}` (unban: `{ok: true, account, still_banned_pids: [pid]}`); kicks its devices from the room of their latest join (best effort); bans / lifts device pid bans per "Ban sources" |
+| POST | `/admin/api/accounts/:id/erase` `{confirm, reason}` | Erases the account (Google Play account-deletion requests; see "Erase account" below). `confirm`: the account's `public_id` (`LZM-XXXX-XXXX`, any case) or its id; reason 3–200 chars → `{ok: true, erased: {accounts, devices, players, claims, scores, push_tokens}, scrubbed: {matches, rooms}}`; `400` when `confirm` doesn't match, `404` unknown id, `409 {error: "busy"}` while an `entries` row is `held` / `playing` |
 | PATCH | `/admin/api/accounts/:id` `{note}` (≤ 500, null / "" clears) | → `{ok: true, account}` |
 | GET | `/admin/api/leaderboards?board=xp\|wins&period=all\|week&week=YYYY-Www&limit=` | `{board, period, week (null for all), total, top: [{rank, account_id, name, avatar, frame, level, value, updated_at}]}`; `week` picks a past week (period=week only; weeks older than 26 are pruned); limit 1–200 (default 50). The same population as the public board: banned / merged accounts and accounts with fewer than 3 `completed_matches` are left out (also of `total`) |
 | GET | `/admin/api/quick?days=14` | days 1–90 → `{days, from, rows: [{day, game, size, queued, matched, ghost_filled, ghost_fill_rate, avg_wait_ms, human_wins, ghost_wins, human_win_rate}] (newest first), totals: [same, day "total", per game + size]}`. `ghost_fill_rate` = ghost seats / (matched humans + ghost seats); `avg_wait_ms` = wait_ms_total / matched; `human_win_rate` = human_wins / (human_wins + ghost_wins); null when the divisor is 0 |
 | GET | `/admin/api/overview` | v1 fields plus `accounts: {total, linked, guests, banned, new_today (UTC), coins_in_circulation, claims_limited_today (Bangladesh day)}` (merged accounts not counted) |
+
+### Erase account
+
+`POST /admin/api/accounts/:id/erase {confirm, reason}`: the player emails their Player ID, an admin erases the account.
+One D1 batch, which also covers accounts merged into this one (`merged_into`); audit action `account.erase`
+(target = the account id, detail `{reason, merged_accounts}`, no personal data: keep emails out of the reason).
+The `accounts` row is gone, so `checkSession` / `authenticate` refuse its sessions (401); a later `POST /v1/auth/guest`
+with one of its old pids finds no device and creates a fresh account. A `players` row (and so a pid ban) is erased too.
+
+| table | decision |
+|---|---|
+| `accounts`, `devices` | deleted |
+| `players` (per pid), `events`, `player_days` (by pid) | deleted |
+| `push_tokens`, `push_opens`, `scores`, `claims`, `broke_bonus`, `weekly_prizes` | deleted |
+| `ad_rewards` | `pending` rows deleted; granted / expired / rejected kept |
+| `matches.players[].name` | replaced by "Deleted player" where `pid` or `account_id` matches (the pid / account id stay in the JSON) |
+| `rooms.host_name` | replaced by "Deleted player" where `host_pid` matches |
+| `ledger`, `entries`, `match_grants`, `rerolls`, `purchases` | kept: account id and amounts only, needed for refunds, voided purchases and accounting |
+| `table_matches`, `quick_stats`, `push_campaigns`, `push_events`, `guest_creations` (HMAC of the IP), `login_attempts`, `config`, `admin_log` | hold no account or pid; untouched |
 
 `account_id` in paths must look like `acc_` + 16 of `[a-z2-7]`, else `404`. Account rows carry the new columns
 `completed_matches` and `ban_source`.

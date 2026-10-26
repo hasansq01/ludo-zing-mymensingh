@@ -9,6 +9,7 @@ import * as D from "./db";
 import * as Ads from "./ads";
 import * as E from "./economy";
 import * as Iap from "./iap";
+import { deleteAccountPage, privacyPage } from "./pages";
 import { handleLeaderboard } from "./leaderboard";
 import * as P from "./push";
 import { handleQuick } from "./quick";
@@ -195,6 +196,11 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   const url = new URL(req.url);
   const parts = url.pathname.split("/").filter(Boolean); // ["v1", "rooms", CODE, "ws"]
   if (parts[0] === "v1") return v1(req, env, ctx, parts);
+  // public pages linked from Google Play (privacy policy, account deletion)
+  if (parts.length === 1 && (parts[0] === "privacy" || parts[0] === "delete-account")) {
+    if (req.method !== "GET" && req.method !== "HEAD") return json({ error: "method" }, 405);
+    return parts[0] === "privacy" ? privacyPage() : deleteAccountPage();
+  }
   if (parts[0] === "admin") {
     if (parts[1] === "api") return handleAdmin(req, env, ctx, parts.slice(2));
     return adminFiles(req, env, url);

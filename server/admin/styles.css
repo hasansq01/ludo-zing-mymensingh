@@ -571,6 +571,7 @@ a.code:hover { background: var(--honey-tint); text-decoration: none; }
 /* note + moderation */
 .note-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .save-status { font-size: 12px; color: var(--muted); font-weight: 700; }
+.erase-zone { display: grid; gap: 10px; justify-items: start; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
 .mod { display: grid; gap: 12px; justify-items: start; }
 
 /* ---------- room: board ---------- */

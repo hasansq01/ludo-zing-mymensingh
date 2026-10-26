@@ -929,6 +929,21 @@ async function api(req, res, url) {
         addAudit(Date.now(), ip, "account.gems", acc.id, { delta: d, reason, balance: acc.gems });
         return send(res, 200, { ok: true, gems: acc.gems, account: accountOut(acc) });
       }
+      if (sub[2] === "erase" && m === "POST") {
+        const body = await readBody(req);
+        const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+        const confirm = typeof body?.confirm === "string" ? body.confirm.trim() : "";
+        if (reason.length < 3 || reason.length > 200) return fail(res, 400, "bad_request", "reason: 3-200 characters");
+        if (confirm !== acc.id && confirm.toUpperCase() !== String(acc.public_id).toUpperCase()) return fail(res, 400, "bad_request", "confirm: must be the account's Player ID (LZM-XXXX-XXXX) or its id");
+        const pids = new Set(devicesOf.get(acc.id).map((d) => d.pid));
+        for (const mt of matches) for (const pp of mt.players) if ((pp.pid && pids.has(pp.pid)) || pp.account_id === acc.id) pp.name = "Deleted player";
+        for (let i = players.length - 1; i >= 0; i--) if (pids.has(players[i].pid)) { byPid.delete(players[i].pid); accOfPid.delete(players[i].pid); players.splice(i, 1); }
+        accounts.splice(accounts.indexOf(acc), 1);
+        accById.delete(acc.id);
+        devicesOf.delete(acc.id);
+        addAudit(Date.now(), ip, "account.erase", acc.id, { reason, merged_accounts: 0 });
+        return send(res, 200, { ok: true, erased: { accounts: 1, devices: pids.size, players: pids.size, claims: 0, scores: 0, push_tokens: 0 }, scrubbed: { matches: 0, rooms: 0 } });
+      }
       if ((sub[2] === "ban" || sub[2] === "unban") && m === "POST") {
         const body = await readBody(req);
         const devs = devicesOf.get(acc.id).map((d) => byPid.get(d.pid)).filter(Boolean);

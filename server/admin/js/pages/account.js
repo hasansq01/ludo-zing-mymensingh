@@ -140,7 +140,8 @@ export default function accountPage(root, [id], ctx) {
       tiles,
       h("div", { class: "grid-2-1" },
         h("div", { class: "stack" }, ledgerCard, claimsCard, grantsCard, matchesCard),
-        h("div", { class: "stack" }, profile, devCard, noteCard(a), moderationCard(a, banned))));
+        h("div", { class: "stack" }, profile, devCard, noteCard(a), moderationCard(a, banned))),
+      eraseSection(a));
     tickTimes(body);
   }
 
@@ -293,6 +294,48 @@ export default function accountPage(root, [id], ctx) {
       if (res) { notice = null; toast(name + " banned" + (res.kicked ? " (" + res.kicked + " kicked)" : ""), "ok"); load(); }
     });
     return card("Moderation", h("div", { class: "mod" }, h("p", null, "Banning blocks the account and all of its devices. It can be undone."), btn), { cls: "card-danger" });
+  }
+
+  // ---------- erase (Google Play account deletion) ----------
+
+  function eraseSection(a) {
+    const name = a.name || "player";
+    const pid = a.public_id || a.id;
+    const btn = h("button", { class: "btn btn-danger", type: "button" }, icon("alert", { size: 15 }), "Erase account…");
+    btn.addEventListener("click", async () => {
+      const typed = h("input", { type: "text", class: "input mono", id: "erase-confirm", autocomplete: "off", autocapitalize: "characters", spellcheck: false, placeholder: pid });
+      const reason = h("textarea", { class: "input textarea", rows: 3, maxlength: REASON_MAX, id: "erase-reason", placeholder: "e.g. Deletion request by email, 2026-10-26 (3–200 characters; no email addresses)", required: true });
+      const count = h("span", { class: "counter" }, `0 / ${REASON_MAX}`);
+      reason.addEventListener("input", () => { count.textContent = `${reason.value.length} / ${REASON_MAX}`; });
+      const matches = () => { const t = typed.value.trim().toUpperCase(); return t === pid.toUpperCase() || typed.value.trim() === a.id; };
+      const res = await openDialog({
+        title: "Erase " + name + "?",
+        danger: true,
+        confirmLabel: "Erase account",
+        body: [
+          h("p", null, h("strong", null, "This cannot be undone."), " The player's sessions stop working and the same device starts over with a fresh account."),
+          h("p", { class: "label" }, "Deleted"),
+          h("ul", null,
+            h("li", null, "The account: profile, name, avatar, coins, gems, stats, Google link"),
+            h("li", null, "Its devices and the per-device player rows (including pid bans)"),
+            h("li", null, "Push tokens, leaderboard scores, offline claims, bonus and prize records, pending ad rewards")),
+          h("p", { class: "label" }, "Kept (only the account id, no personal data)"),
+          h("ul", null,
+            h("li", null, "Ledger, coin-table entries, match rewards, re-rolls, purchases and granted ad rewards: needed for refunds and accounting"),
+            h("li", null, "Matches stay, with the player's name replaced by \"Deleted player\"")),
+          h("div", { class: "who who-box" }, avatar(a.avatar, a.name), h("div", { class: "who-text" }, h("strong", null, name), h("span", { class: "who-sub mono" }, pid))),
+          h("label", { class: "label", for: "erase-confirm" }, "Type the Player ID ", h("span", { class: "mono" }, pid), " to confirm"),
+          typed,
+          h("label", { class: "label", for: "erase-reason" }, "Reason ", h("span", { class: "muted" }, "(required, 3–200 characters; kept in the audit log)")),
+          reason, h("div", { class: "field-foot" }, count),
+        ],
+        validate: () => { if (!matches()) return "confirm"; const n = reason.value.trim().length; return n < 3 || n > REASON_MAX ? "reason" : ""; },
+        onConfirm: () => api.post("/accounts/" + enc(a.id) + "/erase", { confirm: typed.value.trim(), reason: reason.value.trim() }),
+      });
+      if (res) { toast("Account erased", "ok"); location.hash = "#/accounts"; }
+    });
+    return h("section", { class: "erase-zone" },
+      h("p", { class: "muted" }, "Player asked for their account to be deleted (Google Play)? Erase it here."), btn);
   }
 
   load();
