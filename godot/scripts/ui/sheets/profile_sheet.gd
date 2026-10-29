@@ -71,9 +71,10 @@ func _init(width := 360.0) -> void:
 	var ps := TabStrip.pane_style("folder")
 	ps.content_margin_left = UIKit.PAD.pane - 2
 	ps.content_margin_right = UIKit.PAD.pane - 2
-	ps.content_margin_top = UIKit.PAD.pane
+	ps.content_margin_top = UIKit.PAD.pane + TabStrip.F_EDGE     # under the pane's own top line
 	ps.content_margin_bottom = UIKit.SPACE.sm
 	_pane_box.add_theme_stylebox_override("panel", ps)
+	_tabs.bind_pane(_pane_box)
 	_pane_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	stack.add_child(_pane_box)
 	var list := add_scroll_body(UIKit.SPACE.md)

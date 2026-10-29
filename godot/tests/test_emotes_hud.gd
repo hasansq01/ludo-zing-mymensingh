@@ -133,6 +133,16 @@ func _layer() -> void:
 	var seen := []
 	l.shown.connect(func(c: int, id: String): seen.append([c, id]))
 	check("layer: a reaction shows", l.show_emote(0, "happy") and l.showing.has(0) and seen == [[0, "happy"]])
+	var card := Rect2(100, 400, 150, 100)
+	check("tail: a bubble under the card has it on top, above the card at the bottom",
+		EmoteLayer.tail_for(Rect2(120, 504, 116, 73), card).side == "top" and EmoteLayer.tail_for(Rect2(120, 323, 116, 73), card).side == "bottom")
+	check("tail: a bubble right of the card has it on the left, left of the card on the right",
+		EmoteLayer.tail_for(Rect2(254, 410, 116, 73), card).side == "left" and EmoteLayer.tail_for(Rect2(-20, 410, 116, 73), card).side == "right")
+	check("tail: it leans toward the card's centre, kept off the bubble's corners",
+		is_equal_approx(float(EmoteLayer.tail_for(Rect2(200, 504, 116, 73), card).at), EmoteLayer.TAIL_MIN)
+		and is_equal_approx(float(EmoteLayer.tail_for(Rect2(20, 504, 116, 73), card).at), 1.0 - EmoteLayer.TAIL_MIN)
+		and is_equal_approx(float(EmoteLayer.tail_for(Rect2(100 + 75 - 58, 504, 116, 73), card).at), 0.5))
+	check("layer: the bubble's tail faces its card (above the bottom tile: at the bottom)", b0_tail(l, 0) == "bottom", b0_tail(l, 0))
 	check("layer: the next two wait, a third is dropped", l.show_emote(0, "laugh") and l.show_emote(0, "cool") and not l.show_emote(0, "love")
 		and (l.queue[0] as Array) == ["laugh", "cool"], l.queue)
 	check("layer: another player's shows at the same time", l.show_emote(1, "angry") and l.showing.size() == 2)
@@ -164,6 +174,9 @@ func _layer() -> void:
 	check("layer: reduce motion: a fade only (no pop, no frames)", sb.scale == Vector2.ONE and fade_in > 0.0 and fade_in < 1.0 and sb.modulate.a == 1.0 and sb.frame == 0)
 	l.queue_free()
 	_tree().root.remove_child(l)
+
+func b0_tail(l: EmoteLayer, c: int) -> String:
+	return (l.showing[c] as EmoteLayer.Bubble).tail
 
 func _width_at(s: Vector2) -> float:
 	var l := EmoteLayer.new()

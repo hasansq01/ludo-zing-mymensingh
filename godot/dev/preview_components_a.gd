@@ -116,6 +116,7 @@ func _cream_page() -> void:
 	fv.add_child(fold)
 	var pane := PanelContainer.new()
 	pane.add_theme_stylebox_override("panel", TabStrip.pane_style("folder"))
+	fold.bind_pane(pane)
 	pane.add_child(UIKit.label("Pane content sits here.", UIKit.FS.label, Palette.SUB))
 	fv.add_child(pane)
 	var pm := PanelContainer.new()
@@ -223,6 +224,7 @@ func _night_page() -> void:
 	fv.add_child(f)
 	var pane := PanelContainer.new()
 	pane.add_theme_stylebox_override("panel", TabStrip.pane_style("folder"))
+	f.bind_pane(pane)
 	pane.custom_minimum_size.y = 40
 	fv.add_child(pane)
 	v.add_child(fv)

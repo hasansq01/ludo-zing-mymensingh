@@ -428,6 +428,7 @@ class Slot extends VBoxContainer:
 class TableRow extends PanelContainer:
 	signal picked
 
+	const PRIZE_W := 124.0                  ## the right column's minimum width: "Level 10", "Win 180"; it grows for "Win 150,000"
 	var row: Dictionary
 	var on := false
 	var title: Label
@@ -453,17 +454,29 @@ class TableRow extends PanelContainer:
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		h.add_child(title)
+		# The right column has one width on every row: the lock sits at its left edge, the text ends at its right edge,
+		# so locks line up and "Free" / "Win N" / "Level N" share one right edge whatever their length.
+		var right := UIKit.hbox(UIKit.SPACE.xs)
+		right.custom_minimum_size = Vector2(PRIZE_W, 0)
+		right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if bool(row.locked):
-			h.add_child(UIKit.icon("ic_lock", 18))
+			var lock := UIKit.icon("ic_lock", 18)
+			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			right.add_child(lock)
 			prize_label = UIKit.label("Level %d" % int(row.level), UIKit.FS.body, Palette.MUTED, UIKit.font_body(900))
 		elif entry <= 0:
 			prize_label = UIKit.label("Free", UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900))
 		else:
 			prize_label = UIKit.label("Win %s" % Fmt.coins_full(int(row.prize)), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
 		prize_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		prize_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		prize_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		prize_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		h.add_child(prize_label)
-		add_child(h)
+		right.add_child(prize_label)
+		h.add_child(right)
+		var pad := UIKit.margin(h, UIKit.SPACE.md, 0, UIKit.SPACE.md, 0)    # room between the text and the rounded corners
+		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(pad)
 		set_on(on)
 		modulate.a = 1.0 if bool(row.ok) else 0.5
 

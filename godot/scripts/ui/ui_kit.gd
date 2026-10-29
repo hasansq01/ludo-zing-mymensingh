@@ -885,12 +885,14 @@ static func segmented(options: Array, selected, on_pick: Callable, size: Variant
 		off.anti_aliasing = true
 		var on := off.duplicate() as StyleBoxFlat
 		on.bg_color = Color.WHITE
-		shade(on, "sm")
+		on.border_width_bottom = LIP.sm                # the same cream lip as the white buttons (a drop shadow got clipped / uneven here)
+		on.border_color = Palette.LIP_CREAM
 		for sb: StyleBoxFlat in [off, on]:
 			sb.expand_margin_left = -l_in; sb.expand_margin_right = -r_in
 			sb.expand_margin_top = -3; sb.expand_margin_bottom = -3
 			sb.content_margin_left = side + l_in; sb.content_margin_right = side + r_in
-			sb.content_margin_top = 9; sb.content_margin_bottom = 9
+			sb.content_margin_top = 9
+			sb.content_margin_bottom = 9 + (LIP.sm if sb == on else 0)       # the label centres on the white face, above the lip
 		var hov := off.duplicate() as StyleBoxFlat
 		if not OS.has_feature("mobile"):
 			hov.bg_color = Color(1, 1, 1, 0.35)

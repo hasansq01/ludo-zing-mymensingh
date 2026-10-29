@@ -7,12 +7,15 @@ extends Control
 ##            goes above a smaller label (14 -> 12 px); if even that doesn't fit, the strip scrolls sideways (drag).
 ##   "folder" web .ftabs: folder tabs with a 3 px PANE_EDGE outline joined to the pane below (pane_style("folder")).
 ##            The active tab is PANE cream and opens into the pane, the others are tan and stop above its top line.
+##            The pane draws that top line itself (a full rounded box); the strip sits over it (z 1), lets the active tab
+##            cover the line and, via bind_pane(), squares the pane's top corner that the active tab joins.
 ## Every tab shows an icon AND a label (no icon-only tabs). A red count badge can sit on any tab (set_count).
 ## The whole strip height is the touch target (>= 48 px); taps give UIKit.press_fx feedback.
 ##
 ##   var tabs := TabStrip.new([{key = "rooms", text = "Rooms", cat = "rooms"}, ...], "rooms")
 ##   tabs.picked.connect(show_tab)
 ##   pane.add_theme_stylebox_override("panel", TabStrip.pane_style("folder"))
+##   tabs.bind_pane(pane)                 # folder look: the pane's top corners follow the active tab
 ##
 ## items: [{key: String, text: String, icon: String (assets/ui name or res:// path) or Texture2D (optional,
 ## default "cat_<cat>" / "cat_<key>"), cat: String (a Palette.CAT key; gtabs colour, default = key)}].
@@ -54,6 +57,7 @@ var _fs := 15
 var _ic := 22.0
 var _content_w := 0.0
 var _shown_once := false
+var _pane: Control = null            # folder: the pane under the strip (bind_pane)
 
 
 func _init(items_: Array = [], selected_ := "", look_ := "gtabs") -> void:
@@ -62,7 +66,9 @@ func _init(items_: Array = [], selected_ := "", look_ := "gtabs") -> void:
 	focus_mode = Control.FOCUS_NONE
 	clip_contents = look == "gtabs"
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	custom_minimum_size = Vector2(0, H_ON if look == "gtabs" else F_H)
+	custom_minimum_size = Vector2(0, H_ON if look == "gtabs" else F_H - F_EDGE)     # folder: the pane's top line is the last F_EDGE
+	if look == "folder":
+		z_index = 1                          # above the pane: the active tab covers the pane's top line
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	set_items(items_, selected_)
 
@@ -113,16 +119,50 @@ func scrolls() -> bool:
 	return _content_w > size.x + 0.5
 
 
-## The style of the pane under the tabs: "folder" -> the .pm-inner pane with an open top (PANE, 3 px PANE_EDGE,
-## rounded bottom; the strip draws its top line); "gtabs" -> web .gtray, no frame, 12 px above / 14 px below.
+## The style of the pane under the tabs: "folder" -> the .pm-inner pane (PANE, 3 px PANE_EDGE all round, rounded;
+## bind_pane() squares the top corner an active tab joins); "gtabs" -> web .gtray, no frame, 12 px above / 14 px below.
 ## A fresh copy: change its margins freely.
 static func pane_style(look_ := "gtabs") -> StyleBox:
 	if look_ == "folder":
-		return UIKit.surface("pane_open_top").duplicate()
+		return UIKit.surface("pane").duplicate()
 	var e := StyleBoxEmpty.new()
 	e.content_margin_top = UIKit.SPACE.md
 	e.content_margin_bottom = 14
 	return e
+
+
+## Folder look: the pane (a PanelContainer with pane_style("folder")) under this strip. Its top corners are rounded
+## like the bottom ones, except where the active tab joins its edge (that corner stays square so the tab opens into it).
+func bind_pane(pane: Control) -> void:
+	_pane = pane
+	if not pane.resized.is_connected(_sync_pane):
+		pane.resized.connect(_sync_pane)
+	if not resized.is_connected(_sync_pane):
+		resized.connect(_sync_pane)
+	_sync_pane()
+
+
+func _sync_pane() -> void:
+	if _pane == null or not is_instance_valid(_pane) or look != "folder":
+		return
+	var st := _pane.get_theme_stylebox("panel") as StyleBoxFlat
+	if st == null:
+		return
+	_layout()
+	var left_joined := false
+	var right_joined := false
+	for i in items.size():
+		if str(items[i].get("key", "")) != selected:
+			continue
+		var r: Rect2 = _rects[i]
+		left_joined = absf(global_position.x + r.position.x - _pane.global_position.x) < 2.0
+		right_joined = absf(global_position.x + r.end.x - (_pane.global_position.x + _pane.size.x)) < 2.0
+	var rl := 0 if left_joined else int(UIKit.R.lg)
+	var rr := 0 if right_joined else int(UIKit.R.lg)
+	if st.corner_radius_top_left != rl:
+		st.corner_radius_top_left = rl
+	if st.corner_radius_top_right != rr:
+		st.corner_radius_top_right = rr
 
 
 ## The colour pair [face, bar] of an item (Palette.CAT, honey for unknown categories).
@@ -312,13 +352,14 @@ func _fade(r: Rect2, left: bool) -> void:
 
 
 func _draw_folder() -> void:
-	draw_rect(Rect2(0, size.y - F_EDGE, size.x, F_EDGE), Palette.PANE_EDGE)       # the pane's top line
+	_sync_pane()
+	var top := size.y - (F_H - F_EDGE)       # the tabs' top; the pane's top line (F_EDGE) starts at the strip's bottom
 	var font := UIKit.font_display()
 	for i in items.size():
 		var it: Dictionary = items[i]
 		var on: bool = str(it.get("key", "")) == selected
 		var r: Rect2 = _rects[i]
-		r = Rect2(r.position.x, size.y - F_H + (0.0 if on else F_OFF_TOP), r.size.x, F_H if on else F_H - F_OFF_TOP - F_EDGE)
+		r = Rect2(r.position.x, top + (0.0 if on else F_OFF_TOP), r.size.x, F_H if on else F_H - F_OFF_TOP - F_EDGE)   # active: runs F_EDGE over the pane's line
 		var pressed := _press == i and not on
 		if pressed:
 			r.position.y += 1.0

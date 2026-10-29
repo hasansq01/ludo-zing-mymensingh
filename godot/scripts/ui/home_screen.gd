@@ -368,8 +368,7 @@ func _build_switch() -> void:
 	_switch.add_child(row)
 	var group := ButtonGroup.new()
 	var on := UIKit.box(Color.WHITE, UIKit.R.md, 0)
-	UIKit.shade(on, "sm")
-	on.border_width_bottom = UIKit.LIP.sm
+	on.border_width_bottom = UIKit.LIP.sm      # the lip only: a blurred shadow here was sliced flat by the button clip
 	on.border_color = Palette.LIP_CREAM
 	var off := StyleBoxFlat.new()
 	off.bg_color = Color(1, 1, 1, 0)

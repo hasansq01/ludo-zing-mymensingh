@@ -15,6 +15,8 @@ extends Control
 ## Computer players (offline): cpu_say() and the react_* rules: a reaction now and then (random chance), throttled
 ## (CPU_GAP s per computer, ANY_GAP s overall, never the same emote twice running), shown after a short delay.
 ## Time is driven by tick(dt) (from _process; tests call it); now_fn is the clock in ms (tests replace it).
+## The bubble's tail faces the sender's card: on the top edge for a bubble under a tile, the bottom edge for one above
+## it, leaning toward the card's centre (tail_for); beside a tile it is the art's own left tail, mirrored for a right-hand tile.
 ## Reduce motion: the sticker fades in and out (no pop, no frame animation).
 
 signal shown(c: int, id: String)
@@ -29,6 +31,7 @@ const ASPECT := 218.0 / 344.0            ## the sticker art (EmoteArt frames are
 const BGAP := 4.0                        ## px between the tile and the bubble
 const BSIDE := 24.0                      ## px the bubble sits beyond the dice slot (at BASE_W)
 const EDGE := 8.0
+const TAIL_MIN := 0.2                    ## the tail stays this far (fraction of the width) from the bubble's ends
 const CPU_GAP := 9000                    ## ms between two reactions of one computer
 const ANY_GAP := 4000                    ## ms between two computer reactions at all
 const CPU_DELAY := [0.35, 0.85]          ## s before a computer's reaction shows
@@ -174,6 +177,29 @@ func spot(c: int) -> Rect2:
 	cy = clampf(cy, h / 2.0 + EDGE, H - h / 2.0 - EDGE)
 	return Rect2(roundf(cx - w / 2.0), roundf(cy - h / 2.0), w, h)
 
+## Which edge of the bubble `r` carries its tail, and where along it: {side: "top" | "bottom" | "left" | "right", at:
+## 0..1}. The side faces the sender's card (the edge on which the bubble is clearest of it, so the tail points
+## back at the card); `at` is where the card's centre sits across the bubble (so the tail leans toward it), kept off the corners.
+static func tail_for(r: Rect2, card: Rect2) -> Dictionary:
+	var below := r.position.y - card.end.y           # the gap on each side of the card (negative: overlapping)
+	var above := card.position.y - r.end.y
+	var right := r.position.x - card.end.x
+	var left := card.position.x - r.end.x
+	var best := maxf(maxf(below, above), maxf(right, left))
+	var side := "top"
+	if below >= best:
+		side = "top"
+	elif above >= best:
+		side = "bottom"
+	elif right >= best:
+		side = "left"
+	else:
+		side = "right"
+	var at := 0.5
+	if r.size.x > 0.0 and (side == "top" or side == "bottom"):
+		at = clampf((card.get_center().x - r.position.x) / r.size.x, TAIL_MIN, 1.0 - TAIL_MIN)
+	return {side = side, at = at}
+
 
 # ---------- computer players ----------
 
@@ -257,6 +283,9 @@ func _place(b: Bubble) -> void:
 		return
 	b.base = r.position
 	b.size = r.size
+	var st := _seat(b.c)
+	var tl := tail_for(r, st.get("card", r))
+	b.set_tail(str(tl.side), float(tl.at))
 	b.apply()
 
 func _is_cpu(c: int) -> bool:
@@ -290,22 +319,63 @@ shader_type canvas_item;
 uniform vec4 glow : source_color = vec4(1.0);
 uniform vec4 shade : source_color = vec4(0.31, 0.16, 0.12, 0.35);
 uniform vec2 px = vec2(0.003, 0.005);      // one screen pixel in UV
+uniform int tail = 0;                      // 0: the art's own left tail, 1: a tail on the top edge, 2: on the bottom edge
+uniform float tail_x = 160.0;              // that tail's tip across the art (344 x 218 units)
 varying vec4 tint;                         // the draw's own colour (COLOR in fragment() already holds the texture)
+const vec2 ART = vec2(344.0, 218.0);
+const vec3 INK = vec3(0.17, 0.10, 0.08);   // the art's outline and fill
+const vec3 CREAM = vec3(0.98, 0.94, 0.87);
 void vertex() {
 	tint = COLOR;
 }
+float sd_tri(vec2 p, vec2 a, vec2 b, vec2 c) {
+	vec2 e0 = b - a; vec2 e1 = c - b; vec2 e2 = a - c;
+	vec2 v0 = p - a; vec2 v1 = p - b; vec2 v2 = p - c;
+	vec2 q0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+	vec2 q1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+	vec2 q2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
+	float s = sign(e0.x * e2.y - e0.y * e2.x);
+	vec2 d = min(min(vec2(dot(q0, q0), s * (v0.x * e0.y - v0.y * e0.x)),
+		vec2(dot(q1, q1), s * (v1.x * e1.y - v1.y * e1.x))),
+		vec2(dot(q2, q2), s * (v2.x * e2.y - v2.y * e2.x)));
+	return -sqrt(d.x) * sign(d.y);
+}
+// The sticker at uv. The art has its tail on the left; for a top or bottom tail that one is cut off (and the
+// outline closed) and a tail of the same look is drawn over the body's top / bottom edge instead.
+vec4 art(sampler2D tex, vec2 uv) {
+	vec4 c = texture(tex, uv);
+	if (tail == 0) {
+		return c;
+	}
+	vec2 p = uv * ART;
+	if (p.y > 92.0 && p.y < 150.0) {
+		if (p.x < 45.5) {
+			c = vec4(0.0);
+		} else if (p.x < 50.0) {
+			c = vec4(INK, 1.0);
+		}
+	}
+	vec2 q = vec2(p.x, tail == 2 ? 237.0 - p.y : p.y);     // the bottom tail is the top one upside down
+	float d = sd_tri(q, vec2(tail_x, 20.0), vec2(tail_x - 29.0, 52.0), vec2(tail_x + 29.0, 52.0));
+	if (q.y < 47.5 && d < 1.0) {
+		vec4 t = vec4(INK, smoothstep(1.0, -1.0, d));
+		t.rgb = mix(t.rgb, CREAM, smoothstep(-3.5, -5.5, d));
+		c = vec4(mix(c.rgb, t.rgb, t.a), c.a + t.a * (1.0 - c.a));   // over the art: the tail is never hidden
+	}
+	return c;
+}
 void fragment() {
-	vec4 c = texture(TEXTURE, UV);
+	vec4 c = art(TEXTURE, UV);
 	float a = 0.0;                             // a crisp ring, then a softer one outside it
 	for (int k = 0; k < 12; k++) {
 		float ang = float(k) * 0.5236;
 		vec2 d = vec2(cos(ang), sin(ang)) * px;
-		a = max(a, max(texture(TEXTURE, UV + d * 1.4).a, texture(TEXTURE, UV + d * 2.6).a * 0.5));
+		a = max(a, max(art(TEXTURE, UV + d * 1.4).a, art(TEXTURE, UV + d * 2.6).a * 0.5));
 	}
 	float s = 0.0;
 	for (int k = 0; k < 8; k++) {
 		float ang = float(k) * 0.7854;
-		s += texture(TEXTURE, UV + vec2(cos(ang), sin(ang)) * px * 3.0 - vec2(0.0, 5.0) * px).a;
+		s += art(TEXTURE, UV + vec2(cos(ang), sin(ang)) * px * 3.0 - vec2(0.0, 5.0) * px).a;
 	}
 	s = s / 8.0 * shade.a;
 	vec4 under = vec4(shade.rgb, s);
@@ -330,6 +400,8 @@ class Bubble extends Control:
 	var t := 0.0
 	var still := false
 	var base := Vector2.ZERO
+	var tail := "left"                    # the edge the tail is on (see tail_for)
+	var tail_at := 0.5                    # across that edge, 0..1 of the width (top / bottom tails)
 	var frames: SpriteFrames
 	var frame := 0
 	var _fps := 15.0
@@ -354,6 +426,12 @@ class Bubble extends Control:
 		var f := 0 if still or _count == 0 else int(floor(t * _fps)) % _count
 		if f != frame or dt == 0.0:
 			frame = f
+			queue_redraw()
+
+	func set_tail(side: String, at: float) -> void:
+		if side != tail or not is_equal_approx(at, tail_at):
+			tail = side
+			tail_at = at
 			queue_redraw()
 
 	## Position, scale and fade for the time now (emPop / emOut; reduce motion: emFade).
@@ -406,6 +484,13 @@ class Bubble extends Control:
 		var m := material as ShaderMaterial
 		if m:
 			m.set_shader_parameter("px", Vector2(1.0 / size.x, 1.0 / size.y))   # UV 0..1 spans the art's rect
+			m.set_shader_parameter("tail", 1 if tail == "top" else (2 if tail == "bottom" else 0))
+			var tx := clampf(tail_at * 344.0, 98.0, 246.0)   # clear of the body's rounded corners
+			if tail == "top":                # the character's head rises through the top edge's middle: to one side
+				tx = 98.0 if tail_at < 0.5 else 246.0
+			m.set_shader_parameter("tail_x", tx)
+		if tail == "right":                  # the art's tail is on the left: mirrored for a bubble left of its card
+			draw_set_transform(Vector2(size.x, 0.0), 0.0, Vector2(-1.0, 1.0))
 		# drawn over a region a little larger than the art: the glow and the shadow have room past its edges (the
 		# frames' borders are transparent, so the clamped samples outside them are empty)
 		draw_texture_rect_region(tex, Rect2(-PAD, -PAD, size.x + 2.0 * PAD, size.y + 2.0 * PAD),
