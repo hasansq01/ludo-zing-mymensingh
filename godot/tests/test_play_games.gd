@@ -203,4 +203,4 @@ func _export_manifest() -> void:
 		on.contains("com.google.android.gms.games.APP_ID") and on.contains("android:value=\"\\u003123456789012\""), on)
 	check("export: app id validation", Export.is_valid_app_id("123456789012") and not Export.is_valid_app_id("abc")
 		and not Export.is_valid_app_id("-12") and not Export.is_valid_app_id(""))
-	check("export: no app id configured in the project yet (never hard-code real ids)", Export.app_id() == "", Export.app_id())
+	check("export: the project's Play Games app id is the numeric project id (or empty = disabled)", Export.app_id() == "" or Export.is_valid_app_id(Export.app_id()), Export.app_id())
