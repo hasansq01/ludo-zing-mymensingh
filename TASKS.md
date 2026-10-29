@@ -1,7 +1,7 @@
 # Tasks — Ludo Zing Mymensingh
 
 See `PROJECT_CONTEXT.md` for details. Update this list whenever work starts, finishes or is dropped.
-Last reviewed: 2026-10-27.
+Last reviewed: 2026-10-30.
 
 ## Completed
 - [x] 3D WebGL Ludo core: board, tokens, dice, turns, captures, exact finish, three-6s rule.
@@ -109,12 +109,18 @@ Last reviewed: 2026-10-27.
           rewarded videos (AdMob + UMP consent), Play Billing plugin, 2,500 starting coins. 2455/2455 Godot tests.
     - [x] AdMob: app + rewarded unit, SSV URL verified, European regulations consent message published (2026-10-27).
     - [x] Phone (v4): re-roll used (free and 5 gems).
-    - [ ] **User:** update the phone to v5 (published to internal testing 2026-10-27), watch a rewarded video, play a
-          coin match to the end.
-    - [ ] **User:** set up the Google Payments merchant account; then create the 4 gem products (gems_80 / 220 / 500 /
-          1200), add license testers (TeamDD) and make a test purchase.
-    - [ ] **User:** `npx wrangler login` with the Flipfold Cloudflare account (the CLI is on shihabsdev's account, which
-          can't see the D1 database), so the ad / payout / purchase rows can be checked.
+    - [x] Phone (v6, 2026-10-30): version 6 installed from Play internal testing; test gem purchases (80 and 1,200) granted
+          once each on the server; coin match 100 table paid out 180 of a 200 pot; re-roll charged 5 gems.
+    - [x] Google Play Games sign-in (2026-10-30): Play Games Services project linked to Cloud project ludo-zing-a1b7c,
+          consent screen (Testing), Android clients (Play signing `9A:C7:56:CB…`, upload key) and a Web client; Worker secrets
+          GOOGLE_WEB_CLIENT_ID / _SECRET; game settings `play_games/app_id` and `web_client_id`. Verified on the phone:
+          "SYNCED", account `acc_trk4…` linked to the Google player. Testers: Play Games Testers and Cloud test users must
+          list each Google account until the Play Games project and the consent screen are published.
+    - [ ] **AdMob review (waiting, 2026-10-30):** the account was resubmitted and shows "being verified" (24 h, up to 2
+          weeks). The app is not linked to a store listing (not public on Play), which AdMob lists as the step that prompts
+          the app review. Until approval the ad unit answers "Cannot determine request type" (error 1), so no rewarded video
+          has loaded and `ad_rewards` is empty. When it loads: watch "+2 gems", confirm the `ad_rewards` row is granted via
+          the SSV callback. This is the last open item of the Economy v1 goal.
   - [ ] Step 5: Play Store release. Internal testing is live (Oclasp org account, testers TeamDD, v5 0.2.0); store
         listing, content rating, data safety and policy pages are done. Production after Economy v1 is verified.
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
