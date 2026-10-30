@@ -10,11 +10,13 @@ rules stay as written in ONLINE_V2.md and `src/econ/README.md` unless this file 
 |---|---|
 | Starting coins (new profiles) | **2,500** (was 5,000). Existing accounts and saves keep their balance |
 | Starting gems / free re-rolls | 0 / 0 |
-| Coin tables (quick match, Ludo and S&L, 2 and 4 players) | Practice (free) · 100 · 500 (level 3) · 2,000 (level 6) · 10,000 (level 10) · 50,000 (level 15) |
-| Table fee | 10% of the pot |
-| Payout | 2 players: the winner gets the pot minus the fee. 4 players: of the pot minus the fee, 1st 75%, 2nd 25% (rounded down; 2nd gets the remainder) |
+| Coin tables (quick match, Ludo and S&L, 2 and 4 players) | Practice (free) · 100 · 500 (open from the start; owner 2026-10-30) · 2,000 (level 6) · 10,000 (level 10) · 50,000 (level 15) |
+| Table fee | **5%** of the pot (was 10%; owner 2026-10-31) |
+| Payout | The pool = the pot minus the fee (rounded down). 2 players: the winner gets the pool. 4 players: 1st **60%**, 2nd **30%**, 3rd **10%** of the pool, each rounded down, the remainder to the house (was 75 / 25; owner 2026-10-31) |
+| House bonus | 1st place at a paid table also gets **20% of the pool** as new coins, on top of the pot (ledger `table_bonus`). Not for ghosts, not at Practice (owner 2026-10-31). E.g. 100 table: 2 players 190 + 38 = 228; 4 players 228 + 76 = 304 (2nd 114, 3rd 38) |
 | Practice table | XP as before (ONLINE_REWARDS), coins: win 50, finish 10 |
-| Friend rooms | Free, unchanged (ONLINE_REWARDS: Ludo win 150, finish 20; S&L 100 / 10) |
+| Friend rooms | Free (ONLINE_REWARDS): Ludo win **300**, finish **50**; S&L **200** / **25** (was 150 / 20 and 100 / 10; owner 2026-10-31). XP unchanged |
+| Nobody connected (quick match) | The match freezes; back within 2 min resumes it; else it ends, settled by progress (§3 "Nobody connected"; owner 2026-10-31) |
 | Broke | Coins < 100 (can't afford the cheapest table): a **daily bonus of 300 coins** (once per Bangladesh day) and the **refill ad** (500 coins) |
 | Re-roll | Once per player per match, online matches only (quick and friend rooms). Costs **1 free re-roll** (if you have one) else **5 gems** |
 | Rewarded ads (max 8 a day) | `reroll` +1 free re-roll (3/day) · `refill` +500 coins, only while broke (2/day) · `double` the coin payout of a won coin-table match again (2/day) · `gems` +2 gems (1/day) |
@@ -91,14 +93,44 @@ gems of refunded purchases back (`iap_void`; the balance can't go below 0, any s
 - Ghost seats pay a virtual entry, so the pot is always `entry × size`. Payouts that would go to a ghost are not
   paid to anyone (so the bots must be fair; their win rate per table is on the Economy page).
 - At `over`, the Room settles: places are the final standings with **seats that left** (`leave`) removed (they
-  forfeit, whatever their place). The pot minus 10% goes to the first place (2 players) or 75 / 25% to the first
-  two (4 players), human or ghost. Each human entry becomes `settled` with its `payout` (ledger `payout`, ref =
-  match id), or `forfeit`. A disconnected player whose seat a bot played keeps their place and payout (reconnect
-  grace applies as before).
+  forfeit, whatever their place). The pool (pot minus 5%) goes to the first place (2 players) or 60 / 30 / 10% to the
+  first three (4 players), human or ghost. Each human entry becomes `settled` with its `payout` (ledger `payout`, ref =
+  match id), or `forfeit`; a human 1st place also gets the **house bonus** (20% of the pool, ledger `table_bonus`,
+  ref = match id, its own row in the same batch). A disconnected player whose seat a bot played keeps their place and
+  payout (reconnect grace applies as before).
 - XP at a coin table: as `ONLINE_REWARDS` (win / finish). Practice: XP + 50 / 10 coins.
-- Abandoned (every human left: they forfeited), no-show (nobody connected) or a room destroyed before `over`:
-  entries still `held` / `playing` are refunded. A cron refunds any `held` / `playing` entry older than 3 hours.
-- Invariant: for every match, `sum(payouts) ≤ entry × size × 0.9`. Tested.
+- Abandoned (every human left: they forfeited), no-show (nobody connected before the start), or an admin closing the
+  room: entries still `held` / `playing` are refunded (the leavers' forfeited). A running match is **never** closed
+  with refunds because people are away or the room is idle / empty / swept by the cron: it is settled by progress
+  (below). A cron still refunds any `held` / `playing` entry older than 3 hours (a lost Room or grant, never a
+  normal path).
+- Invariant: for every match, `sum(pot payouts) ≤ entry × size × 0.95` (the pool); the bonus is separate new coins.
+  Tested.
+
+### Nobody connected (owner decision 2026-10-31)
+
+- **Freeze.** The moment no person in a running match has an open socket (all disconnected or left), the match
+  freezes: no ghost, bot or timeout step is played, no ghost emote, nothing chained, and the room keeps one alarm: the
+  freeze's deadline (`TIMING.abandonAfter`, 2 min). While at least one other person is connected the 20 s per-seat
+  grace still applies as before (the seat becomes a bot). Friend rooms freeze too, and still end as abandoned (no
+  rewards) after the 10 min empty-room timeout.
+- **Resume.** Someone back within 2 minutes resumes the match where it was: their seat comes back from bot mode as on
+  any reconnect, the time spent frozen is added to the graces of the people still away and to an open re-roll hold,
+  and the current turn gets a fresh deadline (nobody loses a turn to the freeze).
+- **Settlement by progress** (`src/settle.ts`, `room.ts endAway`): after 2 minutes with nobody back the match ends for
+  good (status over, `over.ended = "away"`, the room is kept 10 min for people coming back, then deleted). Every seat
+  (people, bots, ghosts) is placed: sides that had finished keep their real places first, the rest by score. Ludo:
+  pawns home first, then the distance travelled (per pawn `min(p, 56) + 1`, 0 in base; pairs counted per pawn;
+  Teams: the team's sum). S&L: the square reached. Ties: the lower colour first. Places are then paid exactly as at
+  a normal `over` (seats that left forfeit and are skipped; normal payouts, bonus, XP and stats for the place; ghosts'
+  prizes stay with the house).
+- **Anti-gaming.** A person who was disconnected (not finished) and is 1st in the paid order gets the 1st prize (and
+  bonus) only with a **clear lead** over the next seat behind them (any seat: ghost, bot, or a leaver's bot; seats
+  that left while ahead don't count). Clear: Ludo, more pawns home, or a distance lead of more than 25% of one pawn's
+  full track (57 steps), i.e. 15+ steps; S&L, 20+ squares (`ECON_V1.away_lead`). Not clear: their entry is
+  **refunded** instead (entry `refunded`, ledger `entry_refund`, ref `<entry>:away`; outcome "finish", its XP; no
+  prize, no bonus, not doubled by an ad) and the 1st prize stays with the house. People placed 2nd or lower get their
+  place's normal payout; a loser loses the entry as if they had played on. Players who explicitly left forfeit.
 
 ## 4. Re-roll (rooms)
 
@@ -144,11 +176,22 @@ gems of refunded purchases back (`iap_void`; the balance can't go below 0, any s
 - Accounts: gems and free re-rolls shown; `POST /admin/api/accounts/:id/gems {delta, reason}` (as `/coins`;
   `account.gems` audit action).
 - **Economy** page: `GET /admin/api/economy?days=14` → per Bangladesh day: coins created / spent by ledger
-  reason, gems created / spent by reason, table fees (pot − payouts, human entries only), entries and payouts per
-  table, ghost win rate per table, re-rolls (free / gems / ghost), ad rewards per kind, purchases (count, gems,
-  voided).
+  reason, gems created / spent by reason, table fees (pot − the place shares), entries and payouts per table, ghost
+  win rate per table, re-rolls (free / gems / ghost), ad rewards per kind, purchases (count, gems, voided), and the
+  pot payouts and the **house bonus** (coins created per day, apart from the payouts; owner 2026-10-31).
 
-## 8. Order of work
+## 8. Owner decisions 2026-10-31
+
+1. Quick matches with nobody connected: freeze, resume within 2 min, else settle by progress with the anti-gaming
+   refund (§3 "Nobody connected"). Friend rooms: freeze, then abandoned after the empty timeout (no rewards).
+2. Rewards: A. friend-room coins Ludo 300 / 50, S&L 200 / 25 (XP unchanged). B. table fee 5%. C. 4-player tables pay
+   60 / 30 / 10% of the pool. D. the house bonus: 20% of the pool to a human 1st place at a paid table, as new coins
+   (ledger `table_bonus`), shown separately on the admin Economy page.
+
+The game shows the same maths (`godot/scripts/core/coin_tables.gd`): the Quick match picker's "Win N" is 1st place's
+total (its share plus the bonus), and the result screen shows the bonus, a refund and the away ending.
+
+## 9. Order of work
 
 1. Server: migration, profile gems / rerolls, mutate (level gems), shop gems, exchange, broke, tables, admin gems.
 2. Server: entries in Matchmaker + Room settlement; re-roll; ghosts' re-roll.

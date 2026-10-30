@@ -785,6 +785,8 @@ export const RETENTION_MS = 30 * DAY;
 
 /** Guest-creation rows (the per-IP rate limit, accounts.ts GUEST_LIMITS) are kept a day. */
 export const GUEST_CREATIONS_MS = DAY;
+/** Crash reports (diag.ts) are kept this long; their IP HMAC (the per-IP rate limit) only a day, like guest_creations. */
+export const CRASH_REPORTS_MS = 90 * DAY;
 
 /**
  * The daily prune: events, login attempts and player_days after 30 days, guest_creations after a day, weekly
@@ -794,23 +796,26 @@ export async function prune(
   db: D1Database,
   now: number,
   oldestWeek?: string,
-): Promise<{ events: number; login_attempts: number; player_days: number; guest_creations: number; scores: number }> {
+): Promise<{ events: number; login_attempts: number; player_days: number; guest_creations: number; scores: number; crash_reports: number }> {
   const cut = now - RETENTION_MS;
   const stmts = [
     db.prepare("DELETE FROM events WHERE at < ?").bind(cut),
     db.prepare("DELETE FROM login_attempts WHERE at < ?").bind(cut),
     db.prepare("DELETE FROM player_days WHERE day < ?").bind(utcDay(cut)),
     db.prepare("DELETE FROM guest_creations WHERE at < ?").bind(now - GUEST_CREATIONS_MS),
+    db.prepare("DELETE FROM crash_reports WHERE received_at < ?").bind(now - CRASH_REPORTS_MS),
+    db.prepare("UPDATE crash_reports SET ip = NULL WHERE ip IS NOT NULL AND received_at < ?").bind(now - GUEST_CREATIONS_MS),
   ];
   // "week:2026-W05" < "week:2026-W43" < "week:2027-W01": the keys sort by time
   if (oldestWeek) stmts.push(db.prepare("DELETE FROM scores WHERE period >= 'week:' AND period < ?").bind(`week:${oldestWeek}`));
-  const [e, l, p, g, w] = await db.batch(stmts);
+  const [e, l, p, g, cr, , w] = await db.batch(stmts);
   return {
     events: e.meta.changes,
     login_attempts: l.meta.changes,
     player_days: p.meta.changes,
     guest_creations: g.meta.changes,
     scores: w?.meta.changes ?? 0,
+    crash_reports: cr.meta.changes,
   };
 }
 

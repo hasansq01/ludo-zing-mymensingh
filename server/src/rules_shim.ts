@@ -5,6 +5,7 @@ export {
   applyRoll,
   move,
   answerPair,
+  defaultPairAnswer,
   movables,
   units,
   autoMoveToken,

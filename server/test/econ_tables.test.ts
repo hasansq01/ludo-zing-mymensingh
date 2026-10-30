@@ -3,7 +3,7 @@
 // a person who leaves forfeiting, a no-show refunded, the practice table's coins, the cron sweep.
 import { SELF } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ECON_V1, coinTable, tablePayouts } from "../src/econ";
+import { ECON_V1, coinTable, tableBonus, tablePayouts } from "../src/econ";
 import { sweepEntries } from "../src/economy";
 import { DB, eventually, row, rows } from "./admin_helpers";
 import { E, NEAR_GOAL, finishAll, sleep, type Msg } from "./room_client";
@@ -40,19 +40,36 @@ async function entriesOf(account: string) {
 }
 
 describe("payout math", () => {
-  it("2 players: the winner takes the pot minus 10%; 4 players: 75 / 25 of the pool", () => {
-    expect(tablePayouts(100, 2, 2)).toEqual({ pot: 200, pool: 180, pay: [180] });
-    expect(tablePayouts(500, 4, 4)).toEqual({ pot: 2000, pool: 1800, pay: [1350, 450] });
-    expect(tablePayouts(2_000, 4, 1).pay).toEqual([5400]); // only one place left to pay: 2nd is not paid
+  it("2 players: the winner takes the pot minus 5%; 4 players: 60 / 30 / 10 of the pool; 1st's bonus 20% of the pool", () => {
+    expect(ECON_V1.fee_pct).toBe(5);
+    expect(tablePayouts(100, 2, 2)).toEqual({ pot: 200, pool: 190, pay: [190], bonus: 38 });
+    expect(tablePayouts(100, 4, 4)).toEqual({ pot: 400, pool: 380, pay: [228, 114, 38], bonus: 76 });
+    expect(tablePayouts(500, 4, 4)).toEqual({ pot: 2000, pool: 1900, pay: [1140, 570, 190], bonus: 380 });
+    expect(tablePayouts(2_000, 2, 2)).toEqual({ pot: 4000, pool: 3800, pay: [3800], bonus: 760 });
+    expect(tablePayouts(2_000, 4, 1).pay).toEqual([4560]); // only one place left to pay: 2nd and 3rd are not paid
+    expect(tablePayouts(2_000, 4, 2).pay).toEqual([4560, 2280]);
+    expect(tablePayouts(0, 4, 4)).toMatchObject({ pot: 0, pool: 0, pay: [0, 0, 0], bonus: 0 }); // practice
+    expect(tableBonus(0, 2)).toBe(0);
   });
 
-  it("never pays more than the pot minus the fee, at every table and size", () => {
+  it("rounding down: the remainder stays with the house (odd pools)", () => {
+    // pool 133 (pot 140): 79.8 / 39.9 / 13.3 -> 79 / 39 / 13 = 131, 2 coins to the house; bonus 26.6 -> 26
+    expect(tablePayouts(35, 4, 4)).toEqual({ pot: 140, pool: 133, pay: [79, 39, 13], bonus: 26 });
+    expect(tablePayouts(7, 2, 2)).toEqual({ pot: 14, pool: 13, pay: [13], bonus: 2 });
+  });
+
+  it("pot payouts never exceed the pot minus the fee, at every table and size (the bonus is separate, new coins)", () => {
     for (const t of ECON_V1.tables) {
       for (const size of [2, 4]) {
-        const p = tablePayouts(t.entry, size, size);
-        const sum = p.pay.reduce((a, b) => a + b, 0);
-        expect(sum).toBeLessThanOrEqual(Math.floor((t.entry * size * 90) / 100));
-        expect(sum).toBe(p.pool);
+        for (let left = 0; left <= size; left++) {
+          const p = tablePayouts(t.entry, size, left);
+          const sum = p.pay.reduce((a, b) => a + b, 0);
+          expect(sum).toBeLessThanOrEqual(Math.floor((t.entry * size * 95) / 100));
+          expect(sum).toBeLessThanOrEqual(p.pot);
+          expect(p.pay.length).toBeLessThanOrEqual(left);
+          if (left === size) expect(p.pool - sum).toBeLessThan(3); // at most the rounding of three shares
+          expect(p.bonus).toBe(t.entry > 0 ? Math.floor((p.pool * 20) / 100) : 0);
+        }
       }
     }
   });
@@ -61,7 +78,7 @@ describe("payout math", () => {
     expect(ECON_V1.tables.map((t) => [t.id, t.entry, t.level])).toEqual([
       ["practice", 0, 1],
       ["t100", 100, 1],
-      ["t500", 500, 3],
+      ["t500", 500, 1],
       ["t2k", 2000, 6],
       ["t10k", 10000, 10],
       ["t50k", 50000, 15],
@@ -76,9 +93,9 @@ describe("GET /v1/tables", () => {
     const r = await SELF.fetch("https://x/v1/tables", { headers: { Authorization: `Bearer ${g.session}` } });
     const b = (await r.json()) as Msg;
     expect(r.status).toBe(200);
-    expect(b.fee_pct).toBe(10);
+    expect(b.fee_pct).toBe(5);
     expect(b.tables.find((t: Msg) => t.id === "t100")).toMatchObject({ entry: 100, unlocked: true, affordable: true });
-    expect(b.tables.find((t: Msg) => t.id === "t500")).toMatchObject({ unlocked: false });
+    expect(b.tables.find((t: Msg) => t.id === "t2k")).toMatchObject({ unlocked: false });
     expect(b.tables.find((t: Msg) => t.id === "t10k")).toMatchObject({ affordable: false });
     expect(b.broke).toBe(false);
   });
@@ -129,8 +146,8 @@ describe("entries in the queue", () => {
 
   it("a table above your level is locked; too few coins: error coins + short", async () => {
     const g = await guest();
-    const q = await queue("ludo", 2, "t500", g);
-    expect(await q.wait("error")).toMatchObject({ code: "locked", level: 3 });
+    const q = await queue("ludo", 2, "t2k", g);
+    expect(await q.wait("error")).toMatchObject({ code: "locked", level: 6 });
     await setAcc(g.account, { coins: 50 });
     const q2 = await queue("ludo", 2, "t100", g);
     expect(await q2.wait("error")).toMatchObject({ code: "coins", short: 50 });
@@ -162,17 +179,24 @@ describe("coin-table matches", () => {
       return x && x.status === "settled" ? x : null;
     }, 8000, "settled");
     expect(e.place).toBe(won ? 0 : 1);
-    expect(e.payout).toBe(won ? 180 : 0);
+    expect(e.payout).toBe(won ? 190 : 0);
     expect(e.room).toBe(m.code);
-    expect(await coins(g.account)).toBe(2400 + (won ? 180 : 0));
+    // the winner: the pool (190) plus the house bonus (38), on a separate ledger row
+    expect(await coins(g.account)).toBe(2400 + (won ? 190 + 38 : 0));
+    expect(over.table).toMatchObject({ tier: "t100", entry: 100, payouts: { [String(over.winner)]: 190 }, bonus: { [String(over.winner)]: 38 }, refunds: {} });
     const tm = await row<Msg>("SELECT * FROM table_matches WHERE match_id = ?", e.match_id);
-    expect(tm).toMatchObject({ tier: "t100", entry: 100, size: 2, humans: 1, ghosts: 1, pot: 200, fee: 20, paid_humans: won ? 180 : 0, winner_ghost: won ? 0 : 1 });
+    expect(tm).toMatchObject({ tier: "t100", entry: 100, size: 2, humans: 1, ghosts: 1, pot: 200, fee: 10, paid_humans: won ? 190 : 0, winner_ghost: won ? 0 : 1 });
     const grant = await row<Msg>("SELECT * FROM match_grants WHERE match_id = ? AND account_id = ?", e.match_id, g.account);
-    expect(grant).toMatchObject({ outcome: won ? "win" : "finish", coins: won ? 180 : 0 });
+    expect(grant).toMatchObject({ outcome: won ? "win" : "finish", coins: won ? 190 : 0 });
+    const led = await rows<Msg>("SELECT delta_coins, reason, ref, balance_after FROM ledger WHERE account_id = ? AND reason IN ('payout', 'table_bonus') ORDER BY id", g.account);
     if (won) {
-      const led = await row<Msg>("SELECT delta_coins, reason FROM ledger WHERE account_id = ? AND reason = 'payout'", g.account);
-      expect(led).toEqual({ delta_coins: 180, reason: "payout" });
-    }
+      expect(led).toEqual([
+        { delta_coins: 190, reason: "payout", ref: e.match_id, balance_after: 2590 },
+        { delta_coins: 38, reason: "table_bonus", ref: e.match_id, balance_after: 2628 },
+      ]);
+    } else expect(led.filter((l) => l.reason === "table_bonus")).toEqual([]); // a ghost's win: no bonus to anyone
+    const sum = await row<{ s: number }>("SELECT SUM(delta_coins) AS s FROM ledger WHERE account_id = ?", g.account);
+    expect(sum!.s).toBe(await coins(g.account)); // the ledger still sums to the balance
   });
 
   it("leaving the match forfeits the entry (the match is abandoned: nothing comes back)", async () => {

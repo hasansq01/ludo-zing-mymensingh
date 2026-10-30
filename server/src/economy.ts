@@ -126,6 +126,16 @@ export function entrySettleStmt(db: D1Database, g: { sql: string; params: unknow
     .bind(status, matchId, place < 0 ? null : place, payout, now, entryId, ...g.params);
 }
 
+/**
+ * A match's grant gives an entry back (settlement by progress: placed 1st while disconnected without a clear lead):
+ * `refunded`, place 0, payout 0 (the coins are the grant's `entry_refund` ledger row). Only an open entry changes.
+ */
+export function entryRefundStmt(db: D1Database, g: { sql: string; params: unknown[] }, entryId: string, matchId: string, now: number): D1PreparedStatement {
+  return db
+    .prepare(`UPDATE entries SET status = 'refunded', match_id = ?, place = 0, payout = 0, settled_at = ? WHERE id = ? AND status IN ('held', 'playing') AND ${g.sql}`)
+    .bind(matchId, now, entryId, ...g.params);
+}
+
 export async function entryOpen(db: D1Database, entryId: string): Promise<EntryRow | null> {
   const e = await getEntry(db, entryId);
   return e && (e.status === "held" || e.status === "playing") ? e : null;

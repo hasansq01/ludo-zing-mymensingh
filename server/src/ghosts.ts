@@ -5,7 +5,7 @@
 //
 // This module is pure (no I/O): identities, human-like delays and the move policy. room.ts drives the seats.
 import data from "./econ/catalog.json";
-import { GOAL, dest, movables, moverOf, pickAi, type LudoState } from "./rules/ludo";
+import { GOAL, SAFE, absIndex, dest, movables, moverOf, pickAi, threatsAt, type LudoState } from "./rules/ludo";
 import type { Rng } from "./rules/rng";
 
 // ---------- identities ----------
@@ -140,9 +140,29 @@ export function ghostPick(s: LudoState, rng: Rng, mistake = GHOST_MISTAKE): numb
   return pickAi(s, mv, rng, "normal");
 }
 
-/** Pair answers: people mostly say yes. */
-export function ghostPairYes(rng: Rng): boolean {
-  return rng.randf() < 0.85;
+/**
+ * How often a ghost says yes to "make a pair?", by situation (a person's reasoning: a pair can't be taken by a
+ * single and blocks the singles behind it, but it only moves on even rolls, half as far).
+ *   threat: an opponent single stands 1-6 squares behind (pairing makes both pawns safe from it, and blocks it)
+ *   calm:   on an open square with nobody behind
+ *   safe:   on a safe (star / start) square already, where pairing only slows the pawns down
+ *   home:   near the home lane (progress 45+), where a pair splits anyway and moves half
+ */
+export const GHOST_PAIR = { threat: 0.95, calm: 0.7, safe: 0.3, home: 0.25 } as const;
+
+/** The odds GHOST_PAIR gives the open pair question (phase "pair_ask", s.pending); calm when there is none. */
+export function ghostPairOdds(s: LudoState, odds: Readonly<Record<keyof typeof GHOST_PAIR, number>> = GHOST_PAIR): number {
+  const p = s.pending as { c?: number; to?: number };
+  if (p?.c === undefined || p.to === undefined) return odds.calm;
+  if (p.to >= 45) return odds.home;
+  const sq = absIndex(p.c, p.to);
+  if ((SAFE as readonly number[]).includes(sq)) return odds.safe;
+  return threatsAt(s, p.c, sq) > 0 ? odds.threat : odds.calm;
+}
+
+/** A ghost's answer to the open pair question: yes with ghostPairOdds (one draw from rng). */
+export function ghostPairYes(s: LudoState, rng: Rng): boolean {
+  return rng.randf() < ghostPairOdds(s);
 }
 
 // ---------- emotes (EMOTES.md) ----------

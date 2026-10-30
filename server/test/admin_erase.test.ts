@@ -33,6 +33,7 @@ async function seed() {
     DB.prepare("INSERT INTO match_grants (match_id, account_id, at, outcome) VALUES ('m1', ?, ?, 'win')").bind(id, now),
     DB.prepare("INSERT INTO rerolls (match_id, account_id, at, paid) VALUES ('m1', ?, ?, 'free')").bind(id, now),
     DB.prepare("INSERT INTO purchases (token, account_id, product_id, at, gems) VALUES (?, ?, 'gems_100', ?, 100)").bind("pt" + id, id, now),
+    DB.prepare("INSERT INTO crash_reports (id, received_at, pid, sid, account_id, reason, payload) VALUES (?, ?, ?, 's1', ?, 'unclean', '{}')").bind("crs_" + id, now, g.pid, id),
     DB.prepare("INSERT INTO entries (id, account_id, at, game, size, tier, amount, status) VALUES (?, ?, ?, 'ludo', 2, 't100', 100, 'settled')").bind("ent_" + id, id, now),
     DB.prepare("INSERT INTO rooms (code, host_pid, host_name, status) VALUES (?, ?, 'Rina', 'closed')").bind("E" + id.slice(4, 9).toUpperCase(), g.pid),
     DB.prepare("INSERT INTO matches (code, started_at, players, result) VALUES ('ERASE1', ?, ?, 'over')").bind(
@@ -57,7 +58,7 @@ describe("erase account", () => {
     expect(r).toMatchObject({ ok: true, erased: { accounts: 1, devices: 1, players: 1 } });
 
     const gone: Array<[string, string]> = [
-      ["accounts", "id"], ["devices", "account_id"], ["push_tokens", "account_id"], ["push_opens", "account_id"], ["scores", "account_id"],
+      ["accounts", "id"], ["crash_reports", "account_id"], ["devices", "account_id"], ["push_tokens", "account_id"], ["push_opens", "account_id"], ["scores", "account_id"],
       ["claims", "account_id"], ["broke_bonus", "account_id"], ["weekly_prizes", "account_id"],
     ];
     for (const [t, c] of gone) expect(await count(`SELECT COUNT(*) AS n FROM ${t} WHERE ${c} = ?`, id), t).toBe(0);

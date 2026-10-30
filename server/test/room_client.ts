@@ -69,6 +69,8 @@ export class Client {
 
   /** Sent as `session` in hello when set. */
   session: string | undefined;
+  /** Sent as `pair_ask` (the person's "Ask before pairing") in hello when set. */
+  pairAsk: boolean | undefined;
 
   // replica
   game = "ludo";
@@ -106,9 +108,13 @@ export class Client {
   }
 
   /** Opens a socket, says hello and waits for welcome. */
-  static async join(code: string, opts: { pid?: string; name?: string; token?: string; session?: string } = {}): Promise<Client> {
+  static async join(
+    code: string,
+    opts: { pid?: string; name?: string; token?: string; session?: string; pairAsk?: boolean } = {},
+  ): Promise<Client> {
     const c = await Client.open(code, opts.pid ?? newPid(), opts.name ?? "Tester");
     c.session = opts.session;
+    c.pairAsk = opts.pairAsk;
     c.hello(opts.token);
     const w = await c.waitFor((m) => m.t === "welcome" || m.t === "error");
     if (w.t === "error") throw new Error(`join refused: ${w.code}`);
@@ -116,7 +122,9 @@ export class Client {
   }
 
   hello(token?: string): void {
-    this.send({ t: "hello", v: 1, pid: this.pid, name: this.name, avatar: "a1", frame: "f1", token, session: this.session });
+    const m: Msg = { t: "hello", v: 1, pid: this.pid, name: this.name, avatar: "a1", frame: "f1", token, session: this.session };
+    if (this.pairAsk !== undefined) m.pair_ask = this.pairAsk;
+    this.send(m);
   }
 
   send(o: Msg): void {
@@ -239,12 +247,12 @@ export class Client {
   }
 }
 
-/** A room with k members (first = host), all welcomed and in the lobby. */
-export async function lobbyOf(k: number, hooks: TestHooks = {}): Promise<{ code: string; cs: Client[] }> {
+/** A room with k members (first = host), all welcomed and in the lobby; pairAsk[j]: member j's hello.pair_ask. */
+export async function lobbyOf(k: number, hooks: TestHooks = {}, pairAsk: Array<boolean | undefined> = []): Promise<{ code: string; cs: Client[] }> {
   const code = await createRoom({ ratePerSec: 1000, ...hooks }); // (the rate-limit test passes its own)
   const cs: Client[] = [];
   for (let j = 0; j < k; j++) {
-    const c = await Client.join(code, { name: `P${j + 1}` });
+    const c = await Client.join(code, { name: `P${j + 1}`, pairAsk: pairAsk[j] });
     await c.waitFor((m) => m.t === "lobby" && m.members.length === j + 1);
     cs.push(c);
   }

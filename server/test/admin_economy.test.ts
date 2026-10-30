@@ -61,22 +61,32 @@ describe("economy report", () => {
 
   it("aggregates seeded rows per Bangladesh day, with totals and circulation", async () => {
     const today = econDayStartMs(Date.now());
+    // The report finds its first ledger row by binary search on `at`, which assumes ids are in time order (true in
+    // production). Rows other tests wrote at the fixed clock T0 (2026-10-21) sit after rows at the real clock and fall
+    // out of the 7-day window as the real date moves on, so drop them (they are older than any window asked for).
+    // Rows earlier tests of this file wrote today (admin gem changes) would also sit before the rows inserted below
+    // for yesterday (ids out of time order), so a test run soon after Bangladesh midnight lost them from the 1-day
+    // window: start from an empty ledger instead (the guest's start row below moves no coins or gems).
+    await DB.prepare("DELETE FROM ledger").run();
     const g = await guest(); // its start ledger row counts too, so take the baseline after creating it
     await setAccount(g.id, { gems: 7 });
     const b7 = await get("economy?days=7");
     const bg = b7.totals; // plus whatever other tests put in the window (some write at the fixed clock T0, 2026-10-21)
     const bt = (await get("economy?days=1")).totals;
+    const bw = (await get("economy?days=60")).totals;
     const d1 = today - DAY; // yesterday (BD)
     const old = today - 40 * DAY;
     const led = (at: number, reason: string, dc: number, dg: number) =>
       DB.prepare("INSERT INTO ledger (account_id, at, delta_coins, delta_xp, reason, ref, balance_after, delta_gems, gems_after) VALUES ('acc_econ', ?, ?, 0, ?, NULL, 0, ?, 0)").bind(at, dc, reason, dg).run();
-    await led(old, "payout", 9999, 0); // outside every window we ask for below
+    // outside every window we ask for below; given the lowest id so the ids stay in time order
+    await DB.prepare("INSERT INTO ledger (id, account_id, at, delta_coins, delta_xp, reason, ref, balance_after, delta_gems, gems_after) VALUES ((SELECT COALESCE(MIN(id), 1) - 1 FROM ledger), 'acc_econ', ?, 9999, 0, 'payout', NULL, 0, 0, 0)").bind(old).run();
     await led(d1 + HOUR, "payout", 900, 0);
     await led(d1 + 2 * HOUR, "entry", -1000, 0);
     await led(d1 + 3 * HOUR, "level", 0, 5);
     await led(today + HOUR, "reroll", 0, -5);
     await led(today + 2 * HOUR, "payout", 450, 0);
     await led(today + 3 * HOUR, "entry", -500, 0);
+    await led(today + 4 * HOUR, "table_bonus", 90, 0); // the house bonus of a 1st place: new coins, apart from payouts
     // table matches: yesterday t100 x2 (one won by a ghost), today t500 x1
     const tm = (id: string, at: number, tier: string, entry: number, size: number, fee: number, paid: number, ghost: number) =>
       DB.prepare("INSERT INTO table_matches (match_id, at, game, size, tier, entry, humans, ghosts, pot, fee, paid_humans, winner_ghost) VALUES (?, ?, 'ludo', ?, ?, ?, 1, ?, ?, ?, ?, ?)")
@@ -113,10 +123,14 @@ describe("economy report", () => {
     expect(e.per_day.map((p: { day: string }) => p.day)).toEqual([...e.per_day.map((p: { day: string }) => p.day)].sort());
     const [yest, tod] = e.per_day.slice(-2);
     expect(yest).toMatchObject({ coins_created: 900, coins_spent: 1000, gems_created: 5, gems_spent: 0, fees: 40 });
-    expect(tod).toMatchObject({ coins_created: bt.coins_created + 450, coins_spent: bt.coins_spent + 500, gems_created: bt.gems_created, gems_spent: bt.gems_spent + 5, fees: 100 });
+    expect(tod).toMatchObject({ coins_created: bt.coins_created + 540, coins_spent: bt.coins_spent + 500, gems_created: bt.gems_created, gems_spent: bt.gems_spent + 5, fees: 100 });
+    expect([yest.payouts, yest.bonus]).toEqual([900, 0]);
+    expect([tod.payouts - bt.payouts, tod.bonus - bt.bonus]).toEqual([450, 90]);
+    expect(e).toMatchObject({ fee_pct: 5, bonus_pct: 20 });
     expect(e.per_day[0]).toMatchObject({ coins_created: b7.per_day[0].coins_created, fees: b7.per_day[0].fees });
     expect(e.to).toBe(tod.day);
-    expect(e.totals).toMatchObject({ coins_created: bg.coins_created + 1350, coins_spent: bg.coins_spent + 1500, gems_created: bg.gems_created + 5, gems_spent: bg.gems_spent + 5, fees: 140 });
+    expect(e.totals).toMatchObject({ coins_created: bg.coins_created + 1440, coins_spent: bg.coins_spent + 1500, gems_created: bg.gems_created + 5, gems_spent: bg.gems_spent + 5, fees: 140 });
+    expect([e.totals.payouts - bg.payouts, e.totals.bonus - bg.bonus]).toEqual([1350, 90]);
     expect(e.totals.by_reason).toEqual(
       expect.arrayContaining([
         { reason: "payout", coins_created: 1350, coins_spent: 0, gems_created: 0, gems_spent: 0 },
@@ -138,12 +152,12 @@ describe("economy report", () => {
 
     // a window that includes the old rows
     const wide = await get("economy?days=60");
-    expect(wide.totals.coins_created).toBe(bg.coins_created + 1350 + 9999);
+    expect(wide.totals.coins_created).toBe(bw.coins_created + 1440 + 9999);
     expect(wide.totals.tables.find((t: { tier: string }) => t.tier === "t100").matches).toBe(3);
     // a 1-day window: only today
     const one = await get("economy?days=1");
     expect(one.per_day).toHaveLength(1);
-    expect(one.totals).toMatchObject({ coins_created: bt.coins_created + 450, fees: 100 });
+    expect(one.totals).toMatchObject({ coins_created: bt.coins_created + 540, fees: 100, bonus: bt.bonus + 90 });
   });
 
   it("clamps days to 1-60 (default 14)", async () => {

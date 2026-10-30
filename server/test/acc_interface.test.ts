@@ -6,7 +6,7 @@ import * as D from "../src/db";
 import { DB, ENV, guest, ledgerSum, ok, row, rows, setAccount } from "./acc_helpers";
 
 describe("grantOnlineMatch", () => {
-  it("Ludo: win 150 + 100 XP, finish 20 + 40 XP, left 0; once per account per match", async () => {
+  it("Ludo: win 300 + 100 XP, finish 50 + 40 XP, left 0; once per account per match", async () => {
     const [w, f, l] = await Promise.all([guest(), guest(), guest()]);
     const m = { match_id: `m-ludo-${w.id}`, game: "ludo" as const, results: [
       { account_id: w.id, outcome: "win" as const },
@@ -18,37 +18,37 @@ describe("grantOnlineMatch", () => {
     const pw = (await ok("me", { session: w.session })).profile;
     const pf = (await ok("me", { session: f.session })).profile;
     const pl = (await ok("me", { session: l.session })).profile;
-    expect([pw.coins, pw.xp, pw.stats.coinsEarned]).toEqual([2650, 100, 150]);
-    expect([pf.coins, pf.xp]).toEqual([2520, 40]);
+    expect([pw.coins, pw.xp, pw.stats.coinsEarned]).toEqual([2800, 100, 300]);
+    expect([pf.coins, pf.xp]).toEqual([2550, 40]);
     expect([pl.coins, pl.xp]).toEqual([2500, 0]);
     expect(pw.stats.wins).toBe(0); // online results don't touch the offline stats
     expect(await rows("SELECT reason, ref, delta_coins, delta_xp FROM ledger WHERE account_id = ? AND reason = 'match'", w.id)).toEqual([
-      { reason: "match", ref: m.match_id, delta_coins: 150, delta_xp: 100 },
+      { reason: "match", ref: m.match_id, delta_coins: 300, delta_xp: 100 },
     ]);
     expect(await rows("SELECT account_id, outcome, coins, xp FROM match_grants WHERE match_id = ? ORDER BY coins DESC", m.match_id)).toEqual([
-      { account_id: w.id, outcome: "win", coins: 150, xp: 100 },
-      { account_id: f.id, outcome: "finish", coins: 20, xp: 40 },
+      { account_id: w.id, outcome: "win", coins: 300, xp: 100 },
+      { account_id: f.id, outcome: "finish", coins: 50, xp: 40 },
       { account_id: l.id, outcome: "left", coins: 0, xp: 0 },
     ]);
     expect((await row<{ online_wins: number }>("SELECT online_wins FROM accounts WHERE id = ?", w.id))!.online_wins).toBe(1);
-    expect(await ledgerSum(w.id)).toBe(2650);
+    expect(await ledgerSum(w.id)).toBe(2800);
     expect((await ok("me", { session: w.session })).account.online_wins).toBe(1);
   });
 
-  it("Snakes & Ladders: win 100 + 60 XP, finish 10 + 25 XP", async () => {
+  it("Snakes & Ladders: win 200 + 60 XP, finish 25 + 25 XP", async () => {
     const [w, f] = await Promise.all([guest(), guest()]);
     await grantOnlineMatch(ENV, { match_id: `m-sl-${w.id}`, game: "sl", results: [{ account_id: w.id, outcome: "win" }, { account_id: f.id, outcome: "finish" }] });
-    expect((await ok("me", { session: w.session })).profile).toMatchObject({ coins: 2600, xp: 60 });
-    expect((await ok("me", { session: f.session })).profile).toMatchObject({ coins: 2510, xp: 25 });
+    expect((await ok("me", { session: w.session })).profile).toMatchObject({ coins: 2700, xp: 60 });
+    expect((await ok("me", { session: f.session })).profile).toMatchObject({ coins: 2525, xp: 25 });
   });
 
   it("parallel calls for the same match grant once; other matches still grant", async () => {
     const a = await guest();
     const m = { match_id: `m-par-${a.id}`, game: "ludo" as const, results: [{ account_id: a.id, outcome: "win" as const }] };
     await Promise.all([0, 1, 2, 3].map(() => grantOnlineMatch(ENV, m)));
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(2650);
-    await grantOnlineMatch(ENV, { ...m, match_id: `${m.match_id}-2` });
     expect((await ok("me", { session: a.session })).profile.coins).toBe(2800);
+    await grantOnlineMatch(ENV, { ...m, match_id: `${m.match_id}-2` });
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(3100);
   });
 
   it("skips unknown, banned and merged accounts and duplicates in one call", async () => {
@@ -67,7 +67,7 @@ describe("grantOnlineMatch", () => {
         { account_id: "not an id", outcome: "win" },
       ],
     });
-    expect((await ok("me", { session: a.session })).profile.coins).toBe(2650);
+    expect((await ok("me", { session: a.session })).profile.coins).toBe(2800);
     expect((await row<{ coins: number }>("SELECT coins FROM accounts WHERE id = ?", b.id))!.coins).toBe(2500);
     expect((await row<{ coins: number }>("SELECT coins FROM accounts WHERE id = ?", c.id))!.coins).toBe(2500);
     await expect(grantOnlineMatch(ENV, { match_id: "", game: "ludo", results: [] })).rejects.toThrow();

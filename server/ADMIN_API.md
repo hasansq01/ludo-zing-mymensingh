@@ -240,7 +240,7 @@ online; ghosts don't count) → closed through the Room's `adminClose("stale-swe
 `stale-sweep`; the Room records a match still playing as `closed`); a room with someone online, or in `over`
 (its own alarm deletes it), is left alone. Returns `{pruned: {events, login_attempts, player_days,
 guest_creations, scores}, reconciled, swept, weekly}` (`weekly`: the weekly-result pushes queued on a Monday,
-Bangladesh time, else `null`; see "Notifications"). It also deletes `push_events` rows older than 30 days.
+Bangladesh time, else `null`; see "Notifications"). It also deletes `push_events` rows older than 30 days and `crash_reports` rows older than 90 days (`pruned.crash_reports`).
 
 ## Notifications (NOTIFICATIONS.md "N-SRV")
 
@@ -331,17 +331,57 @@ ledger has no index on `at`, so its start id is found by bisecting the id (ids g
 
 ```
 {now, days, from, to ("YYYY-MM-DD", oldest / today),
- per_day: [{day, coins_created, coins_spent, gems_created, gems_spent, fees}]   // every day, oldest first, zeros filled
+ per_day: [{day, coins_created, coins_spent, gems_created, gems_spent, fees, payouts, bonus}]   // every day, oldest first, zeros filled
  ledger: [{day, reason, coins_created, coins_spent, gems_created, gems_spent}]  // sparse, by reason
  tables: [{day, tier, matches, pot, fee, paid_humans, ghost_wins, ghost_win_rate, entries, coins_in, payouts}]  // sparse
  rerolls: [{day, paid: "free"|"gems", n}], ads: [{day, kind, granted}],
  purchases: [{day, count, gems, voided}],
- totals: {coins_created, coins_spent, gems_created, gems_spent, fees,
+ totals: {coins_created, coins_spent, gems_created, gems_spent, fees, payouts, bonus,
           by_reason: [{reason, coins_created, coins_spent, gems_created, gems_spent}],
           tables: [{tier, matches, pot, fee, paid_humans, ghost_wins, ghost_win_rate, entries, coins_in, payouts}],
           rerolls: {free, gems}, ads: {<kind>: granted}, purchases: {count, gems, voided}},
- coins_in_circulation, gems_in_circulation}   // sums over accounts that are not merged
+ coins_in_circulation, gems_in_circulation,   // sums over accounts that are not merged
+ fee_pct, bonus_pct}                          // ECON_V1 (5, 20)
 ```
 
-`fees` = the table fee (`table_matches.fee`, pot - pool). `ghost_win_rate` = `winner_ghost` / matches (null when no
+`fees` = what the house keeps of each pot (`table_matches.fee`: the fee plus the rounding remainder of the 4-player
+shares, pot - the sum of the place shares). `payouts` = coins created by ledger reason `payout` (pot payouts to people);
+`bonus` = coins created by ledger reason `table_bonus` (the house bonus of 1st place at a paid table: new coins on top of
+the pot, owner 2026-10-31), shown apart from the payouts on the Economy page ("Table payouts and house bonus").
+`table_matches.paid_humans` counts pot payouts only (not the bonus, not an entry refunded by the settlement by
+progress, which is a ledger `entry_refund` and an entry `refunded`). `ghost_win_rate` = `winner_ghost` / matches (null when no
 matches); a fair bot is near 1 / size. `purchases.gems` counts granted purchases only; `voided` is the number voided.
+
+## Crashes (migrations/0006_crash_reports.sql, `src/diag.ts`)
+
+**Ingest: `POST /v1/diag/crash`** (no login; a valid `Authorization: Bearer <session>` only attaches the account id, an
+invalid one is ignored). JSON body `{v, pid, sid, trigger, app, device, started_at, last_at, ended, foreground, screen,
+match, samples, crumbs, exit, log}`; `pid` (1-64 chars) and `sid` (1-40) are required, everything else optional, unknown
+fields are kept inside the stored payload. Strings are cut to sane lengths, numbers clamped, `samples` to the last 40,
+`crumbs` to the last 60, `log` to the last 32 KB, `exit.trace` to its first 64 KB. The log and `exit.description` are
+scrubbed server side (bearer tokens, JWT-like strings, e-mail addresses, hex / base64 tokens of 32+ characters ->
+`[redacted]`).
+
+| answer | when |
+|---|---|
+| `200 {ok: true, id}` | stored (`id` = `crs_` + 16 base32) |
+| `200 {ok: true, dup: true}` | the same (pid, sid) was stored before |
+| `400 {error: "bad_request"}` | bad JSON, not an object, missing / empty pid or sid |
+| `413 {error: "too_large"}` | body over 160 KB (Content-Length or actual size) |
+| `405 {error: "method"}` | not POST |
+| `429 {error: "rate"}` | over 20 reports per client IP (HMAC of CF-Connecting-IP) or 5 per pid in the last 24 h |
+| `503 {error: "busy"}` | D1 failed |
+
+The stored `payload` is capped at 128 KB: over it, the log is shortened first (its end stays), then the trace (its start
+stays), then samples / crumbs are dropped from the start, then unknown fields. Row columns: `id, received_at, pid, sid,
+account_id, ip (HMAC), app_code, app_version, model, android (device.os_version), gpu (device.gpu), reason (exit.reason,
+else trigger, else "unknown"), foreground, screen, game, mode, match_min, mem_peak_mb (max over samples of mem_peak /
+mem), payload`. Unique on (pid, sid). Deleted after 90 days (cron) and with an erased account (`account_id`).
+
+**Admin** (session required, GET only):
+
+| method | path | result |
+|---|---|---|
+| GET | `/admin/api/crashes?version=&model=&reason=&before=&limit=` | `{rows: [row without payload], next}` newest first; exact-match filters; `before` = a `received_at` (ms), `next` = the last row's `received_at` or `null`; `limit` 1-200 (default 50) |
+| GET | `/admin/api/crashes/summary?days=30` | `{days, total, by_model: [{model, n}], by_reason: [{reason, n}], by_version: [{version, n}], by_gpu: [{gpu, n}]}` (`days` 1-365, default 30; top 50 each, `""` = unknown) |
+| GET | `/admin/api/crashes/:id` | the row plus `payload` (parsed); 404 for an unknown or malformed id |

@@ -28,16 +28,14 @@ describe("full games", () => {
     expect(l.status).toBe("over");
   });
 
-  it("2 players with the Ask-before-pairing rule, random answers, to over", async () => {
-    const { cs } = await lobbyOf(2);
-    cs[0].send({ t: "settings", pair_ask: true });
-    await cs[1].waitFor((m) => m.t === "lobby" && m.settings.pair_ask);
+  it("2 players who both turned on Ask before pairing, random answers, to over", async () => {
+    const { cs } = await lobbyOf(2, {}, [true, true]);
     for (const c of cs) {
       c.autoplay = true;
       c.policy = { pairYes: Math.random() < 0.5 };
     }
     const st = await startAll(cs);
-    expect(st[0].state.pair_ask).toBe(true);
+    expect(st[0].state.pair_ask_by).toEqual([true, false, true, false]);
     await finishAll(cs);
     sameReplicas(cs);
   });

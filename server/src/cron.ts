@@ -67,7 +67,7 @@ export async function cron(env: Env, now = Date.now()): Promise<CronResult> {
   const voided = await voidRefunded(env as never, now).catch((e) => (console.error("voided purchases failed:", e), 0));
   const prizes = await weeklyPrizes(env as never, now).catch((e) => (console.error("weekly prizes failed:", e), null));
   console.log(
-    `cron: pruned ${JSON.stringify(pruned)} + ${pushEvents} push_events, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
+    `cron: pruned ${JSON.stringify(pruned)} (incl. ${pruned.crash_reports} crash reports) + ${pushEvents} push_events, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
   );
   return { pruned, reconciled, swept, weekly, entries, voided, prizes };
 }

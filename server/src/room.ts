@@ -25,6 +25,7 @@ import * as D from "./db";
 import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineOutcome } from "./accounts_shim";
 import { forfeitEntry, refundEntry, refundReroll, rerollBalance, spendReroll } from "./economy";
 import { ECON_V1, tablePayouts } from "./econ/rules";
+import { applyOrder, clearLead, rankByProgress } from "./settle";
 import { ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, ghostPick, makeGhosts, newGhostMemory, packOfEmote, progressLead, type GhostMemory, type GhostSituation, type GhostTrigger, type Persona } from "./ghosts";
 import type { Matchmaker } from "./matchmaker";
 import { EVENT_TTL_S, pushAccount, pushConfigured, type PushKind } from "./push";
@@ -71,6 +72,8 @@ export const TIMING = {
   lobbyAway: 300_000, // lobby grace when the app said it went to the background (sharing the invite, a call)
   empty: 10 * 60_000, // no connected member for this long -> the room is deleted
   stale: 2 * 60 * 60_000, // no action (or lobby change) for this long -> the room is deleted
+  // a quick match frozen this long (no person connected) ends for good: settled by progress (endAway; owner 2026-10-31)
+  abandonAfter: 2 * 60_000,
 };
 
 /**
@@ -85,6 +88,7 @@ export const CHAIN = { step: 4_000, total: 8_000, passes: 12 };
 export const QUICK = {
   autoStart: 10_000, // start this long after creation even if not every human connected
   overKeep: 2 * 60_000, // a finished quick room is deleted this long after `over`
+  endedKeep: 10 * 60_000, // ... and one ended by endAway this long (people coming back later get its `sync` + `over`)
 };
 
 /** Online reward grants (accounts.grantOnlineMatch) are retried this often, this many times. */
@@ -146,6 +150,11 @@ interface Member {
   persona?: Persona;
   /** Ghosts only: what the ghost remembers about the chat (spam heat, conversations, recent emotes); never sent. */
   emo?: GhostMemory;
+  /**
+   * The person's own "Ask before pairing" (Settings), from `hello.pair_ask`, dealt to their colour at the start
+   * (state.pair_ask_by), in friend and quick rooms alike. Missing: off (clients before it sent nothing).
+   */
+  pairAsk?: boolean;
   /** Event pushes sent to this member (epoch ms per kind) and the turn of the last turn push; never sent. */
   pushed?: { turn?: number; joined?: number; rematch?: number; turnKey?: string };
   /** Quick rooms at a coin table: this person's entry (ECONOMY_V1.md §3); never sent. */
@@ -204,6 +213,17 @@ interface Match {
   rr?: RerollOffer;
   /** Colours that used their re-roll in this match. */
   rrUsed?: number[];
+  /**
+   * Epoch ms since when the match is frozen: no person is connected, so nothing is played (no ghost / bot / timeout
+   * step, no ghost emote, no chained alarm; see updateFreeze). Missing / 0: not frozen.
+   */
+  frozenAt?: number;
+  /**
+   * The match was ended by the settlement by progress (endAway): why ("away": frozen TIMING.abandonAfter; "stale"),
+   * the colours placed by progress (their side had not finished), and those whose entry is refunded instead of the
+   * 1st prize (a disconnected person without a clear lead; ECON_V1.away_lead).
+   */
+  ended?: { reason: "away" | "stale"; at: number; byProgress: number[]; refund: number[] };
 }
 
 interface RerollOffer {
@@ -230,7 +250,8 @@ interface TurnTimers {
 
 interface Settings {
   teams: boolean;
-  pair_ask: boolean;
+  /** Gone: "Ask before pairing" is each person's own (Member.pairAsk). Rooms stored before still carry it; unused. */
+  pair_ask?: boolean;
   /** Missing in rooms stored before S&L: Ludo. */
   game?: GameKind;
 }
@@ -282,6 +303,8 @@ export interface TestHooks {
   dice?: number[];
   /** Ludo: token progress per colour applied to the state at `start` (to make games short). */
   tok?: number[][];
+  /** Ludo: same-colour pairs at `start` (with tok; only those of playing colours are kept). */
+  pairs?: Array<{ c: number; a: number; b: number }>;
   /** S&L: starting square per player (turn order) applied at `start`. */
   slPos?: number[];
   /** Multiplies every duration in TIMING / QUICK / ghost delays (e.g. 0.01 makes a 20 s grace 200 ms). */
@@ -542,7 +565,7 @@ export class Room extends DurableObject<Env> {
       host: -1,
       nextId: 1,
       members: [],
-      settings: { teams: false, pair_ask: false, game: "ludo" },
+      settings: { teams: false, game: "ludo" },
       match: null,
       touched: now,
       emptySince: now, // nobody connected yet: a code nobody joins is dropped after TIMING.empty
@@ -598,7 +621,7 @@ export class Room extends DurableObject<Env> {
       host: -1,
       nextId: members.length + 1,
       members,
-      settings: { teams: false, pair_ask: false, game: spec.game },
+      settings: { teams: false, game: spec.game },
       match: null,
       touched: now,
       emptySince: now,
@@ -669,7 +692,7 @@ export class Room extends DurableObject<Env> {
         ghost: mm.ghost ? true : undefined,
         persona: mm.ghost ? mm.persona : undefined,
       })),
-      settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask },
+      settings: { teams: r.settings.teams, pair_ask: this.anyoneAsked() },
       match: m
         ? {
             n: m.n,
@@ -700,6 +723,12 @@ export class Room extends DurableObject<Env> {
     const r = this.room;
     if (!r) return "gone";
     if (r.members.some((m) => !m.ghost && this.online(m.id))) return "live";
+    if (r.quick && r.status === "playing" && r.match) {
+      // a quick match is never refunded because nobody is there: it is settled by progress (its alarm deletes it)
+      this.endAway("away");
+      this.commit();
+      return "live";
+    }
     await this.destroy("stale-sweep", "abandoned");
     return "swept";
   }
@@ -931,22 +960,36 @@ export class Room extends DurableObject<Env> {
     if (!r) return;
     r.alarmAt = 0;
     const now = Date.now();
-    if (now >= r.touched + this.ms(TIMING.stale)) {
-      await this.destroy("stale", "abandoned");
-      return;
-    }
-    if (r.emptySince && now >= r.emptySince + this.ms(TIMING.empty)) {
-      await this.destroy("empty", "abandoned");
-      return;
-    }
     const q = r.quick;
+    // (a socket gone without a close event: freeze now; somebody online under a stale flag: thaw and re-plan)
+    if (this.updateFreeze(now) && r.match && !r.match.due) this.planStep();
+    const fm = r.status === "playing" ? r.match : null;
+    if (fm?.frozenAt) {
+      // frozen: only the freeze's deadline (and grant retries) can be due
+      if (q && now >= fm.frozenAt + this.ms(TIMING.abandonAfter)) this.endAway("away");
+      else if (!q && now >= r.touched + this.ms(TIMING.stale)) return this.destroy("stale", "abandoned");
+      else if (!q && r.emptySince && now >= r.emptySince + this.ms(TIMING.empty)) return this.destroy("empty", "abandoned");
+      if (r.grants?.some((g) => g.next <= now)) this.ctx.waitUntil(this.runGrants());
+      this.commit();
+      await this.settle();
+      return;
+    }
+    // a running quick match is never closed with refunds for being idle or empty: it is settled by progress
+    const quickLive = !!q && r.status === "playing" && !!r.match;
+    if (now >= r.touched + this.ms(TIMING.stale)) {
+      if (quickLive) this.endAway("stale");
+      else return this.destroy("stale", "abandoned");
+    } else if (r.emptySince && now >= r.emptySince + this.ms(TIMING.empty)) {
+      if (quickLive) this.endAway("away");
+      else return this.destroy("empty", "abandoned");
+    }
     if (q && r.status === "lobby" && now >= q.startBy) {
       if (!this.startQuick()) {
         await this.destroy("no_show", "abandoned"); // nobody came
         return;
       }
     }
-    if (q && r.status === "over" && q.overAt && now >= q.overAt + this.ms(QUICK.overKeep)) {
+    if (q && r.status === "over" && q.overAt && now >= q.overAt + this.overKeep()) {
       await this.destroy("done", "over");
       return;
     }
@@ -1051,6 +1094,7 @@ export class Room extends DurableObject<Env> {
       r.touched = now;
       this.playerSeen(mem, true);
     }
+    if (typeof msg.pair_ask === "boolean") mem.pairAsk = msg.pair_ask; // (a match in progress keeps what it was dealt)
     this.emoSets.delete(mem.id); // the account's packs are read again (a reconnect, or another account taking the seat)
     ws.serializeAttachment({ mid: mem.id } satisfies Att);
     r.emptySince = 0;
@@ -1058,6 +1102,8 @@ export class Room extends DurableObject<Env> {
 
     const m = r.match;
     if (r.status === "playing" && m) {
+      // back while frozen: the match resumes where it was (the turn gets a fresh deadline below, as m.due is 0)
+      if (m.frozenAt) this.thaw(m, now);
       const seat = m.seats.find((st) => st.id === mem.id && !st.left);
       this.broadcast({ t: "presence", id: mem.id, online: true }, ws);
       this.sendSnapshot(ws);
@@ -1067,7 +1113,7 @@ export class Room extends DurableObject<Env> {
         this.act({ k: "mode", c: seat.color, mode: "human" });
         if (this.ops.turnColor(s) === seat.color || !m.due) this.planStep();
       } else if (!m.due) {
-        this.planStep(); // bots were paused while nobody was online
+        this.planStep(); // nothing was played while nobody was online (frozen)
       }
     } else if (r.quick) {
       if (r.status === "over" && m) this.sendSnapshot(ws);
@@ -1104,6 +1150,7 @@ export class Room extends DurableObject<Env> {
       }
     }
     if (this.sockets(ws).length === 0) r.emptySince = Date.now();
+    this.updateFreeze();
     this.commit();
   }
 
@@ -1173,6 +1220,104 @@ export class Room extends DurableObject<Env> {
       this.broadcast(this.lobbyMsg());
     }
     if (this.sockets().length === 0 && !r.emptySince) r.emptySince = Date.now();
+    this.updateFreeze();
+  }
+
+  // ---------- freeze: nobody connected (owner 2026-10-31) ----------
+
+  /** A person (not a ghost; members who left are gone from r.members) has an open socket. */
+  private humansOnline(): boolean {
+    return this.room!.members.some((x) => !x.ghost && this.online(x.id));
+  }
+
+  /**
+   * Freezes or thaws a running match by presence. Frozen (no person connected): nothing is played (no ghost, bot or
+   * timeout step, no ghost emote, nothing chained) and the only alarm is the freeze's deadline: a quick match is
+   * ended by endAway after TIMING.abandonAfter, a friend room by the empty-room timeout (abandoned, as before). A
+   * person connecting again thaws it (see thaw). Returns true when it thawed (the caller re-plans the turn).
+   */
+  private updateFreeze(now = Date.now()): boolean {
+    const r = this.room;
+    const m = r?.match;
+    if (!r || r.status !== "playing" || !m) return false;
+    const on = this.humansOnline();
+    if (!on && !m.frozenAt) {
+      m.frozenAt = now;
+      m.due = 0;
+      m.shown = 0;
+      delete m.gemotes;
+    } else if (on && m.frozenAt) {
+      this.thaw(m, now);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Resumes a frozen match exactly where it was: the time spent frozen is added to every clock that was running (the
+   * disconnect graces of the people still away, an open re-roll hold), so nobody loses a turn or a grace to the
+   * freeze; the current step is re-planned by the caller (m.due is 0: planStep gives the turn a fresh deadline).
+   */
+  private thaw(m: Match, now: number): void {
+    const d = Math.max(0, now - (m.frozenAt ?? now));
+    delete m.frozenAt;
+    delete m.gemotes;
+    for (const mem of this.room!.members) if (mem.graceAt) mem.graceAt += d;
+    if (m.rr) {
+      m.rr.until += d;
+      if (m.rr.ghostAt) m.rr.ghostAt += d;
+    }
+    m.due = 0;
+    m.shown = 0;
+  }
+
+  /**
+   * Ends a quick match for good with the settlement by progress (owner 2026-10-31; settle.ts): nobody came back
+   * within TIMING.abandonAfter of the freeze (reason "away"), or the room went stale. Every seat, ghosts and bots
+   * included, is placed: sides that had finished keep their places, the rest by progress. Places are paid as at a
+   * normal `over` (seats that left forfeit), with one exception, the anti-gaming rule: a disconnected person placed 1st
+   * by progress without a clear lead over the runner-up (settle.ts clearLead) gets their entry refunded instead of the
+   * 1st prize and its bonus (no win, no loss), and that prize stays with the house. The room then stays QUICK.endedKeep
+   * (closed to play: a reconnect gets `sync` + `over` with `ended`).
+   */
+  private endAway(reason: "away" | "stale"): void {
+    const r = this.room!;
+    const m = r.match;
+    if (r.status !== "playing" || !m) return;
+    const game: GameKind = m.game ?? "ludo";
+    const O = this.ops;
+    const now = Date.now();
+    delete m.frozenAt;
+    delete m.rr;
+    delete m.gemotes;
+    const rk = rankByProgress(game, m.state);
+    if (O.phase(m.state) !== "over") {
+      O.apply(m.state, { k: "end" } as Action); // the rules end it (phase over) ...
+      m.n++;
+    }
+    applyOrder(game, m.state, rk.order); // ... in the settlement's order
+    r.touched = now;
+    const refund: number[] = [];
+    const paid = rk.order.map((c) => m.seats.find((st) => st.color === c)).filter((st): st is Seat => !!st && !st.left);
+    const first = paid[0];
+    if (first && !first.ghost && rk.byProgress.includes(first.color) && !this.online(first.id)) {
+      const teams = game === "ludo" && (m.state as LudoState).teams;
+      const mine = (c: number) => c === first.color || (teams && c === (first.color + 2) % 4);
+      // the runner-up: the next side behind it (a ghost, a bot, or a seat that left and is played by a bot); seats
+      // that left while ahead don't count (they forfeit: that is why this person is 1st in the paid order)
+      const runner = rk.order.slice(rk.order.indexOf(first.color) + 1).find((c) => !mine(c));
+      if (!clearLead(game, rk.scores[first.color], runner === undefined ? undefined : rk.scores[runner])) refund.push(first.color);
+    }
+    m.ended = { reason, at: now, byProgress: rk.byProgress, refund };
+    this.noteRanked(m);
+    this.broadcast({ t: "sync", n: m.n, game, seats: this.seatsOut(), state: m.state, h: O.hash(m.state) });
+    this.event("info", "ended", `quick match ended (${reason}): order ${rk.order.join(",")}${refund.length ? `, refund ${refund.join(",")}` : ""}`);
+    this.finish();
+  }
+
+  /** How long a finished quick room stays: QUICK.overKeep, or QUICK.endedKeep after endAway. */
+  private overKeep(): number {
+    return this.ms(this.room?.match?.ended ? QUICK.endedKeep : QUICK.overKeep);
   }
 
   /**
@@ -1194,12 +1339,9 @@ export class Room extends DurableObject<Env> {
     if (r.host !== mem.id) return this.error(ws, "not_host", "only the host changes settings");
     if (r.status === "playing") return this.error(ws, "bad_action", "the match is in progress");
     if (msg.teams !== undefined && typeof msg.teams !== "boolean") return this.error(ws, "bad_message", "teams: bool");
-    if (msg.pair_ask !== undefined && typeof msg.pair_ask !== "boolean") {
-      return this.error(ws, "bad_message", "pair_ask: bool");
-    }
     if (msg.game !== undefined && !isGame(msg.game)) return this.error(ws, "bad_message", 'game: "ludo" | "sl"');
     if (typeof msg.teams === "boolean") r.settings.teams = msg.teams;
-    if (typeof msg.pair_ask === "boolean") r.settings.pair_ask = msg.pair_ask;
+    // (pair_ask from clients before per-person "Ask before pairing" is ignored: each person's own hello says it)
     if (isGame(msg.game)) r.settings.game = msg.game;
     r.touched = Date.now();
     this.broadcast(this.lobbyMsg());
@@ -1277,11 +1419,17 @@ export class Room extends DurableObject<Env> {
     } else {
       const players = ["off", "off", "off", "off"];
       for (const c of colors) players[c] = "human";
-      const g = R.newGame(players, r.settings.teams, { pair_ask: r.settings.pair_ask });
+      // "Ask before pairing" is each person's own (their hello); ghosts are asked too and answer like people
+      const byColor = [false, false, false, false];
+      for (const st of seats) byColor[st.color] = !!st.ghost || r.members.find((mm) => mm.id === st.id)?.pairAsk === true;
+      const g = R.newGame(players, r.settings.teams, { pair_ask: false, pair_ask_by: byColor });
       for (let c = 0; c < 4; c++) g.names[c] = "";
       for (const st of seats) g.names[st.color] = st.name;
       if (this.hooks.tok) {
         for (const st of seats) if (this.hooks.tok[st.color]) g.tok[st.color] = [...this.hooks.tok[st.color]];
+        if (this.env.TEST_MODE === "1" && this.hooks.pairs) {
+          g.pairs = this.hooks.pairs.filter((q) => seats.some((st) => st.color === q.c)).map((q) => ({ ...q }));
+        }
       }
       s = g;
     }
@@ -1311,7 +1459,7 @@ export class Room extends DurableObject<Env> {
         return p;
       }),
       teams: game === "ludo" && r.settings.teams,
-      pair_ask: game === "ludo" && r.settings.pair_ask,
+      pair_ask: game === "ludo" && seats.some((st) => !st.ghost && (s as LudoState).pair_ask_by?.[st.color] === true),
       // matches.game / quick / ghosts (migration 0002; db.ts ignores them until it writes those columns)
       game,
       quick: !!r.quick,
@@ -1390,7 +1538,7 @@ export class Room extends DurableObject<Env> {
     const s = m.state;
     const c = O.turnColor(s);
     if (this.seatOfColor(c)?.ghost && !O.isCpu(s, c)) {
-      this.ghostAct(c); // ghosts never time out and play on like people (no pause when nobody watches)
+      this.ghostAct(c); // ghosts never time out (and never play while the match is frozen: no step is due then)
     } else if (!O.isCpu(s, c)) {
       m.strikes[c]++;
       this.autoAct(c, "easy", true);
@@ -1434,7 +1582,8 @@ export class Room extends DurableObject<Env> {
       }
       this.act({ k: "move", c, i });
     } else if (s.phase === "pair_ask") {
-      this.act({ k: "pair", c, yes: true });
+      // nobody answered (the timer) or a bot holds the seat: what would have happened unasked (yes off safe squares)
+      this.act({ k: "pair", c, yes: R.defaultPairAnswer(s) });
     }
   }
 
@@ -1455,7 +1604,7 @@ export class Room extends DurableObject<Env> {
       if (i >= 0) this.act({ k: "move", c, i });
     } else if (s.phase === "pair_ask") {
       const { g, done } = this.rng();
-      const yes = ghostPairYes(g);
+      const yes = ghostPairYes(s, g);
       done();
       this.act({ k: "pair", c, yes });
     }
@@ -1636,8 +1785,8 @@ export class Room extends DurableObject<Env> {
     const m = r.match!;
     const O = this.ops;
     const s = m.state;
-    if (r.status !== "playing" || s.phase === "over") {
-      m.due = 0;
+    if (r.status !== "playing" || s.phase === "over" || m.frozenAt) {
+      m.due = 0; // (frozen: nothing is planned until somebody is back)
       m.shown = 0;
       return;
     }
@@ -1679,14 +1828,29 @@ export class Room extends DurableObject<Env> {
     const msg: Record<string, unknown> = { t: "over", finished: O.finished(m.state), winner: O.winner(m.state), standings: O.standings(m.state), match_id: `${r.code}-${m.startedAt ?? 0}` };
     const t = r.quick?.table;
     if (r.quick && t) {
-      // the coin table's result (ECONOMY_V1.md §3): coins paid per colour (seats that left get none)
+      // the coin table's result (ECONOMY_V1.md §3): pot payouts per colour (seats that left get none), the house
+      // bonus of 1st place, entries refunded by the settlement's anti-gaming rule. Shown for every seat alike (a
+      // ghost's prize and bonus are shown but not paid: ghosts look like people).
       const paid = this.paidOrder(m);
-      const { pay } = tablePayouts(t.entry, r.quick.size, paid.length);
+      const { pay, bonus } = tablePayouts(t.entry, r.quick.size, paid.length);
+      const refund = m.ended?.refund ?? [];
       const payouts: Record<string, number> = {};
+      const bonuses: Record<string, number> = {};
+      const refunds: Record<string, number> = {};
       for (const st of m.seats) payouts[String(st.color)] = 0;
-      if (t.entry > 0) paid.forEach((st, k) => (payouts[String(st.color)] = pay[k] ?? 0));
-      msg.table = { tier: t.tier, entry: t.entry, payouts };
+      if (t.entry > 0) {
+        paid.forEach((st, k) => {
+          const key = String(st.color);
+          if (refund.includes(st.color)) refunds[key] = t.entry;
+          else {
+            payouts[key] = pay[k] ?? 0;
+            if (k === 0 && payouts[key] > 0 && bonus > 0) bonuses[key] = bonus;
+          }
+        });
+      }
+      msg.table = { tier: t.tier, entry: t.entry, payouts, bonus: bonuses, refunds };
     }
+    if (m.ended) msg.ended = m.ended.reason;
     return msg;
   }
 
@@ -1753,7 +1917,7 @@ export class Room extends DurableObject<Env> {
         online: this.memberOnline(m),
         color: colors[j],
       })),
-      settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask, game: r.settings.game ?? "ludo" },
+      settings: { teams: r.settings.teams, game: r.settings.game ?? "ludo" },
       max: LIMITS.maxMembers,
       status: r.status,
     };
@@ -2090,14 +2254,25 @@ export class Room extends DurableObject<Env> {
   private commit(): void {
     const r = this.room;
     if (!r) return;
-    const due: number[] = [r.touched + this.ms(TIMING.stale)];
-    if (r.emptySince) due.push(r.emptySince + this.ms(TIMING.empty));
-    if (r.status === "playing" && r.match?.due) due.push(r.match.due);
-    if (r.status === "playing" && r.match?.rr?.ghostAt) due.push(r.match.rr.ghostAt);
-    for (const mem of r.members) if (mem.graceAt) due.push(mem.graceAt);
-    if (r.match?.gemotes?.length && r.status !== "lobby") for (const e of r.match.gemotes) due.push(e.at);
-    if (r.quick && r.status === "lobby") due.push(r.quick.startBy);
-    if (r.quick && r.status === "over" && r.quick.overAt) due.push(r.quick.overAt + this.ms(QUICK.overKeep));
+    const due: number[] = [];
+    const fz = r.status === "playing" ? r.match?.frozenAt : 0;
+    if (fz) {
+      // frozen: one alarm, the freeze's deadline (quick: the settlement; friend rooms: the empty / stale cleanup)
+      if (r.quick) due.push(fz + this.ms(TIMING.abandonAfter));
+      else {
+        due.push(r.touched + this.ms(TIMING.stale));
+        if (r.emptySince) due.push(r.emptySince + this.ms(TIMING.empty));
+      }
+    } else {
+      due.push(r.touched + this.ms(TIMING.stale));
+      if (r.emptySince) due.push(r.emptySince + this.ms(TIMING.empty));
+      if (r.status === "playing" && r.match?.due) due.push(r.match.due);
+      if (r.status === "playing" && r.match?.rr?.ghostAt) due.push(r.match.rr.ghostAt);
+      for (const mem of r.members) if (mem.graceAt) due.push(mem.graceAt);
+      if (r.match?.gemotes?.length && r.status !== "lobby") for (const e of r.match.gemotes) due.push(e.at);
+      if (r.quick && r.status === "lobby") due.push(r.quick.startBy);
+      if (r.quick && r.status === "over" && r.quick.overAt) due.push(r.quick.overAt + this.overKeep());
+    }
     for (const g of r.grants ?? []) due.push(g.next);
     const next = Math.ceil(Math.min(...due));
     if (next !== r.alarmAt) {
@@ -2186,6 +2361,10 @@ export class Room extends DurableObject<Env> {
    * (a player who finished and then left keeps their outcome). Matches stored before play on: away at `over`.
    */
   private outcome(m: Match, st: Seat, won: Set<number>): OnlineOutcome {
+    // ended by the settlement: a seat placed by progress gets its place's outcome (not "left"), unless it left
+    if (m.ended && !st.left && m.ended.byProgress.includes(st.color)) {
+      return won.has(st.color) && !m.ended.refund.includes(st.color) ? "win" : "finish";
+    }
     const away = m.ranked ? (m.away ?? []).includes(st.color) : st.left || opsFor(m.game).isCpu(m.state, st.color);
     if (away) return "left";
     return won.has(st.color) ? "win" : "finish";
@@ -2252,7 +2431,7 @@ export class Room extends DurableObject<Env> {
       status: r.status,
       members: r.members.length,
       online: r.members.filter((m) => !m.ghost && this.online(m.id)).length,
-      settings: { teams: r.settings.teams, pair_ask: r.settings.pair_ask },
+      settings: { teams: r.settings.teams, pair_ask: this.anyoneAsked() },
       closed_reason: null,
       // rooms.game / public / quick (migration 0002; db.ts ignores them until it writes those columns)
       game: r.settings.game ?? "ludo",
@@ -2262,11 +2441,19 @@ export class Room extends DurableObject<Env> {
     return st;
   }
 
+  /** For the console and the rooms row ("Ask pair"): a person (not a ghost) in the current Ludo match is asked. */
+  private anyoneAsked(): boolean {
+    const m = this.room?.match;
+    if (!m || (m.game ?? "ludo") !== "ludo") return false;
+    const s = m.state as LudoState;
+    return m.seats.some((st) => !st.ghost && (s.pair_ask_by ? s.pair_ask_by[st.color] === true : s.pair_ask === true));
+  }
+
   /** What the rooms row shows, as a string: a change queues a (debounced) write. */
   private roomSig(): string {
     const r = this.room!;
     const ms = r.members.map((m) => `${m.id}${!m.ghost && this.online(m.id) ? "+" : "-"}`).join(",");
-    return `${r.status}|${r.host}|${ms}|${r.settings.teams ? 1 : 0}${r.settings.pair_ask ? 1 : 0}|${r.settings.game ?? "ludo"}`;
+    return `${r.status}|${r.host}|${ms}|${r.settings.teams ? 1 : 0}${this.anyoneAsked() ? 1 : 0}|${r.settings.game ?? "ludo"}`;
   }
 
   /** A status change is written at once; anything else at most once per TELEMETRY.roomDebounce (plus a final one). */
@@ -2352,6 +2539,7 @@ export class Room extends DurableObject<Env> {
         if (q) {
           res.place = st.left ? -1 : paidOrder.indexOf(st);
           if (st.entry) res.entry_id = st.entry;
+          if (!st.left && m.ended?.refund.includes(st.color)) res.refund = true;
         }
         return res;
       });

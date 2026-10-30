@@ -23,7 +23,7 @@ import {
   newProfile,
   normalizeProfile,
 } from "./econ";
-import { entryOpen, entrySettleStmt } from "./economy";
+import { entryOpen, entryRefundStmt, entrySettleStmt } from "./economy";
 import { type GoogleEnv, type GooglePlayer, googleConfigured, playerFromAuthCode } from "./google";
 import { type Guard, scoreStmts } from "./leaderboard";
 import type { Env } from "./room";
@@ -224,6 +224,11 @@ export interface Write {
   /** The new profile (omitted: unchanged; the version still moves, which serializes concurrent requests). */
   profile?: Profile;
   ledger?: LedgerEntry;
+  /**
+   * More ledger rows of the same write, after `ledger` (e.g. a coin table's house bonus or an entry refund next to
+   * the match row). Each row's balance_after is the running balance; the profile already includes their coins.
+   */
+  more?: LedgerEntry[];
   /** Online wins to add (accounts.online_wins and the wins board). */
   wins?: number;
   /** Completed matches to add (accounts.completed_matches: online matches finished + granted claims). */
@@ -309,8 +314,17 @@ export async function mutate<T>(
     const coins = w.profile ? Math.trunc(w.profile.coins) : row.coins;
     const xp = w.profile ? Math.trunc(w.profile.xp) : row.xp;
     const gems = w.profile ? Math.trunc(w.profile.gems ?? 0) : row.gems;
+    const more = (w.more ?? []).filter((l) => l.coins !== 0 || l.xp !== 0 || (l.gems ?? 0) !== 0);
+    // balances after each row: the main row comes before the `more` rows (and the level row last)
+    let bal = coins - more.reduce((a, l) => a + Math.trunc(l.coins), 0);
+    let gbal = gems - lv.gems - more.reduce((a, l) => a + Math.trunc(l.gems ?? 0), 0);
     if (w.ledger && (w.ledger.coins !== 0 || w.ledger.xp !== 0 || (w.ledger.gems ?? 0) !== 0)) {
-      stmts.push(ledgerStmt(db, g, accountId, w.ledger, coins, now, gems - lv.gems));
+      stmts.push(ledgerStmt(db, g, accountId, w.ledger, bal, now, gbal));
+    }
+    for (const l of more) {
+      bal += Math.trunc(l.coins);
+      gbal += Math.trunc(l.gems ?? 0);
+      stmts.push(ledgerStmt(db, g, accountId, l, bal, now, gbal));
     }
     if (lv.gems > 0) stmts.push(ledgerStmt(db, g, accountId, { coins: 0, xp: 0, gems: lv.gems, reason: "level", ref: String(lv.level) }, coins, now, gems));
     const xpWeek = w.xpWeek ?? (w.ledger && w.ledger.xp > 0 ? w.ledger.xp : 0);
@@ -470,13 +484,16 @@ export async function grantOnlineMatch(env: AccEnv, m: MatchGrant): Promise<void
   if (m.table && m.table.entry > 0) {
     // the Economy page's row for this coin-table match (once)
     const t = m.table;
-    const { pot, pool, pay } = tablePayouts(t.entry, t.size, t.size);
-    const paidHumans = m.results.reduce((n, r) => n + (r.place !== undefined && r.place >= 0 && r.entry_id ? (pay[r.place] ?? 0) : 0), 0);
+    const { pot, pay } = tablePayouts(t.entry, t.size, t.size);
+    // fee = what the house keeps of the pot: the fee and the rounding remainder of the places (the bonus is new
+    // coins, ledger `table_bonus`); paid_humans = pot payouts to people (an entry refund is not a payout)
+    const fee = pot - pay.reduce((a, v) => a + v, 0);
+    const paidHumans = m.results.reduce((n, r) => n + (r.place !== undefined && r.place >= 0 && r.entry_id && !r.refund ? (pay[r.place] ?? 0) : 0), 0);
     await env.DB.prepare(
       `INSERT OR IGNORE INTO table_matches (match_id, at, game, size, tier, entry, humans, ghosts, pot, fee, paid_humans, winner_ghost)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(m.match_id, now, m.game, t.size, t.tier, t.entry, t.humans, t.ghosts, pot, pot - pool, paidHumans, t.winner_ghost ? 1 : 0)
+      .bind(m.match_id, now, m.game, t.size, t.tier, t.entry, t.humans, t.ghosts, pot, fee, paidHumans, t.winner_ghost ? 1 : 0)
       .run();
   }
   for (const r of m.results) {
@@ -508,12 +525,19 @@ export interface MatchGrantResult {
   place?: number;
   /** Coin tables: this person's entry (ECONOMY_V1.md §3). */
   entry_id?: string;
+  /**
+   * Settlement by progress (room.ts endAway): placed 1st while disconnected without a clear lead, so the entry is
+   * given back (ledger `entry_refund`, entry `refunded`) instead of the 1st prize and its bonus. Outcome "finish".
+   */
+  refund?: boolean;
 }
 
 /**
  * One account's grant: XP (and online stats) by outcome as before; coins: friend rooms ONLINE_REWARDS, practice
  * ECON_V1.practice, coin tables the payout of `place` (ledger `payout`) with the entry settled (or forfeit) in the
- * same batch. Once per match (match_grants).
+ * same batch, plus for 1st place the house bonus (its own ledger row `table_bonus`, ref = match id). A `refund`
+ * result gets its entry back instead (ledger `entry_refund`, entry `refunded`). Once per match (match_grants); the
+ * coins move only against an open entry of this account, so retries and races never pay twice.
  */
 async function grantOne(env: AccEnv, m: MatchGrant, r: MatchGrantResult, now: number) {
   const db = env.DB;
@@ -527,30 +551,46 @@ async function grantOne(env: AccEnv, m: MatchGrant, r: MatchGrantResult, now: nu
   const paid = !!t && t.entry > 0;
   let coins: number = ONLINE_REWARDS[game][outcome].coins;
   if (t && !paid) coins = outcome === "left" ? 0 : (ECON_V1.practice[game]?.[outcome] ?? 0);
-  if (paid) coins = r.place !== undefined && r.place >= 0 ? (tablePayouts(t.entry, t.size, t.size).pay[r.place] ?? 0) : 0;
+  const refund = paid && r.refund === true && r.place !== undefined && r.place >= 0;
+  let bonus = 0;
+  if (paid) {
+    const tp = tablePayouts(t.entry, t.size, t.size);
+    coins = !refund && r.place !== undefined && r.place >= 0 ? (tp.pay[r.place] ?? 0) : 0;
+    if (r.place === 0 && coins > 0) bonus = tp.bonus;
+  }
   const xp = ONLINE_REWARDS[game][outcome].xp;
   try {
     await mutate(env, accountId, now, async (row, p) => {
       if (row.merged_into || row.banned) return { result: undefined };
       // a coin table pays only against an open entry (settled once, whatever retries do)
       const entry = paid && r.entry_id ? await entryOpen(db, r.entry_id) : null;
-      const payout = paid ? (entry && entry.account_id === accountId ? coins : 0) : coins;
+      const mine = !!entry && entry.account_id === accountId;
+      const payout = paid ? (mine ? coins : 0) : coins;
+      const extraCoins = mine ? (refund ? entry.amount : bonus) : 0;
       const g0 = applyOnlineResult(p, game, outcome);
       const prof = structuredClone(g0.profile);
       // applyOnlineResult paid ONLINE_REWARDS coins: replace them with this match's coins
       prof.coins = Math.trunc(p.coins);
       prof.stats = structuredClone(p.stats);
       if (payout > 0) addCoins(prof, payout);
+      // the bonus is earned coins too; a refund only gives the entry back (not "earned")
+      if (extraCoins > 0 && !refund) addCoins(prof, extraCoins);
+      if (extraCoins > 0 && refund) prof.coins = Math.trunc(prof.coins) + extraCoins;
+      const more: LedgerEntry[] = [];
+      if (extraCoins > 0) {
+        more.push(refund ? { coins: extraCoins, xp: 0, reason: "entry_refund", ref: `${entry!.id}:away` } : { coins: extraCoins, xp: 0, reason: "table_bonus", ref: matchId });
+      }
       return {
         result: undefined,
         write: {
           profile: prof,
           ledger: { coins: payout, xp, reason: paid ? "payout" : "match", ref: matchId },
+          more,
           wins: outcome === "win" ? 1 : 0,
           matches: outcome === "left" ? 0 : 1,
           extra: (g) => [
             guardedInsert(db, g, "match_grants", ["match_id", "account_id", "at", "game", "outcome", "coins", "xp"], [matchId, accountId, now, game, outcome, payout, xp]),
-            ...(entry ? [entrySettleStmt(db, g, entry.id, matchId, r.place ?? -1, payout, now)] : []),
+            ...(entry ? [refund && mine ? entryRefundStmt(db, g, entry.id, matchId, now) : entrySettleStmt(db, g, entry.id, matchId, r.place ?? -1, payout, now)] : []),
           ],
         },
       };
@@ -690,7 +730,7 @@ export const GUEST_LIMITS = { per_hour: 20, per_day: 60 } as const;
  * The key guest_creations stores for a request: an HMAC of CF-Connecting-IP (Cloudflare always sets it; a request
  * without it, i.e. local tools and tests, is not limited).
  */
-async function ipKey(env: AccEnv, req: Request): Promise<string | null> {
+export async function ipKey(env: AccEnv, req: Request): Promise<string | null> {
   const ip = req.headers.get("CF-Connecting-IP")?.trim().toLowerCase();
   if (!ip || !env.SESSION_KEY) return null;
   return (await sign(env.SESSION_KEY, "ip", ipBucket(ip))).slice(0, 22);

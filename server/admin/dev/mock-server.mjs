@@ -552,6 +552,66 @@ function snapshot(L) {
   };
 }
 
+// ---------- crash reports (src/diag.ts; GET /crashes, /crashes/summary, /crashes/<id>) ----------
+const CRASH_DEVICES = [
+  ["INFINIX Infinix X6880", "16", "Mali-G57 MC2", "ARM"], ["samsung SM-A055F", "14", "Mali-G52", "ARM"],
+  ["Xiaomi 23106RN0DA", "14", "Mali-G52 MC2", "ARM"], ["TECNO KJ5", "13", "IMG BXM-8-256", "Imagination Technologies"],
+  ["realme RMX3710", "14", "Adreno (TM) 610", "Qualcomm"],
+];
+const CRASH_REASONS = ["low_memory", "low_memory", "crash_native", "unclean", "anr", "crash", "signaled"];
+const crashReports = Array.from({ length: 36 }, (_, i) => {
+  const [model, android, gpu, vendor] = pick(CRASH_DEVICES);
+  const reason = pick(CRASH_REASONS);
+  const at = NOW0 - ri(0, 30 * DAY);
+  const started = at - ri(60e3, 1800e3);
+  const game = pick(["ludo", "sl", null]);
+  const samples = Array.from({ length: 20 }, (_, k) => ({ t: k * 15, mem: 220 + k * ri(2, 9), mem_peak: 230 + k * 9, vmem: 90 + k, static_mb: 40, fps: ri(18, 31), objects: 30000 + k * 300, nodes: 2400 + k * 12, draws: ri(80, 160), avail: 900 - k * 30, screen: game || "home", fg: true }));
+  const crumbs = [{ t: 0, e: "start", d: "0.2.0 8" }, { t: 4, e: "screen", d: "home" }, { t: 30, e: "sheet", d: "SetupSheet" }, { t: 35, e: "screen", d: game || "home" }, { t: 240, e: "memory_warning", d: "" }];
+  const exit = reason === "unclean" ? null : {
+    reason, code: { low_memory: 3, crash_native: 5, anr: 6, crash: 4, signaled: 2 }[reason], status: reason === "signaled" ? 9 : 0,
+    importance: 100, importance_name: "foreground", pss_kb: ri(250, 600) * 1000, rss_kb: ri(300, 700) * 1000, at,
+    description: reason === "low_memory" ? "lmk: oom_score_adj 0" : reason === "anr" ? "Input dispatching timed out" : "",
+    trace: reason === "crash_native" ? "*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***\nABI: 'arm64'\nsignal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x10\n\nbacktrace:\n      #00 pc 0000000000a1b2c3  /data/app/lib/arm64/libgodot_android.so (BuildId: 270121fef88100c19643517c328b5868e01d345c)\n" : undefined,
+  };
+  const payload = {
+    v: 1, pid: randStr(24, "0123456789abcdef"), sid: randStr(18, "0123456789abcdef"), trigger: exit ? "exit_reason" : "unclean",
+    app: { code: pick([7, 8]), name: "0.2.0" },
+    device: { model, os: "Android", os_version: android, sdk: 20 + Number(android), cpu_count: 8, cpu: "MT6789", gpu, gpu_vendor: vendor, gpu_api: "OpenGL ES 3.2 v1.r38p1", screen: "720x1600", ram_gb: pick([3.6, 5.6, 7.5]), tier: pick(["low", "medium"]), low_ram_device: false, mem_class_mb: 256, installer: "com.android.vending" },
+    started_at: started, last_at: at - 2000, ended: false, foreground: true, screen: game || "home",
+    match: game ? { game, mode: pick(["cpu", "local", "friends", "quick:t100"]), minutes: ri(1, 25) } : null,
+    samples, crumbs, exit,
+    log: "Godot Engine v4.7.2.stable.official\nmain ready (low tier)\n[ludo] Red rolled 6\n<img src=x onerror=alert('log')>\nERROR: Condition \"!texture\" is true.\n",
+  };
+  return {
+    id: "crs_" + randStr(16, "abcdefghijklmnopqrstuvwxyz234567"), received_at: at + ri(5e3, 60e3), pid: payload.pid, sid: payload.sid,
+    account_id: rnd() < 0.7 ? "acc_" + randStr(16, "abcdefghijklmnopqrstuvwxyz234567") : null, app_code: payload.app.code, app_version: "0.2.0",
+    model, android, gpu, reason, foreground: 1, screen: payload.screen, game, mode: payload.match?.mode ?? null, match_min: payload.match?.minutes ?? null,
+    mem_peak_mb: Math.max(...samples.map((x) => x.mem_peak)), payload,
+  };
+});
+
+function crashesApi(sub, q, res) {
+  if (sub[1] === "summary") {
+    const days = Math.min(365, Math.max(1, Number(q("days") || 30) || 30));
+    const list = crashReports.filter((r) => r.received_at >= Date.now() - days * DAY);
+    const by = (k, name) => Object.entries(list.reduce((m, r) => ((m[r[k] ?? ""] = (m[r[k] ?? ""] || 0) + 1), m), {}))
+      .map(([v, n]) => ({ [name]: v, n })).sort((a, b) => b.n - a.n);
+    return send(res, 200, { days, total: list.length, by_model: by("model", "model"), by_reason: by("reason", "reason"), by_version: by("app_version", "version"), by_gpu: by("gpu", "gpu") });
+  }
+  if (sub[1]) {
+    const r = crashReports.find((x) => x.id === sub[1]);
+    return r ? send(res, 200, r) : fail(res, 404, "not_found", "no such report");
+  }
+  const before = Number(q("before") || 0);
+  const limit = Math.min(200, Math.max(1, Number(q("limit") || 50) || 50));
+  const rows = crashReports
+    .filter((r) => (!q("version") || r.app_version === q("version")) && (!q("model") || r.model === q("model")) && (!q("reason") || r.reason === q("reason")) && (!before || r.received_at < before))
+    .sort((a, b) => b.received_at - a.received_at)
+    .map(({ payload, ...row }) => row);
+  const page = rows.slice(0, limit);
+  return send(res, 200, { rows: page, next: rows.length > limit ? page[page.length - 1].received_at : null });
+}
+
 // GET /economy (src/admin.ts economy()): per Bangladesh day aggregates. Numbers are fake but add up (pot = fee + payouts).
 function economy(days) {
   const bdDay = (t) => new Date(t + 6 * 3600e3).toISOString().slice(0, 10);
@@ -564,26 +624,29 @@ function economy(days) {
   const byReason = new Map(), tierT = new Map();
   const add = (m, k, o) => { const t = m.get(k) || {}; for (const [f, v] of Object.entries(o)) t[f] = (t[f] || 0) + v; m.set(k, t); };
   for (const day of dayList) {
-    const pd = { day, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0, fees: 0 };
+    const pd = { day, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0, fees: 0, payouts: 0, bonus: 0 };
     const led = (reason, cc, cs, gc, gs) => {
       if (!(cc || cs || gc || gs)) return;
       ledger.push({ day, reason, coins_created: cc, coins_spent: cs, gems_created: gc, gems_spent: gs });
       add(byReason, reason, { coins_created: cc, coins_spent: cs, gems_created: gc, gems_spent: gs });
       pd.coins_created += cc; pd.coins_spent += cs; pd.gems_created += gc; pd.gems_spent += gs;
     };
-    let entries = 0, payouts = 0;
+    let entries = 0, payouts = 0, bonus = 0;
     for (const [tier, entry, base] of TIERS) {
       const n = Math.round(base * (0.6 + r() * 0.8));
       const size = 2;
       const gw = Math.round(n * Math.min(1, Math.max(0, GHOST[tier] + (r() - 0.5) * 0.1)));
-      const pot = n * entry * size, fee = Math.round(pot * 0.1);
-      const paid = (n - gw) * (entry * size - Math.round(entry * size * 0.1));
+      const pot = n * entry * size, fee = Math.round(pot * 0.05);
+      const pool = entry * size - Math.round(entry * size * 0.05);
+      const paid = (n - gw) * pool;
+      bonus += (n - gw) * Math.floor(pool * 0.2); // the house bonus of each human 1st place (new coins)
       const ent = n * (1 + (r() < 0.5 ? 1 : 0) * 0), coinsIn = ent * entry;
       tables.push({ day, tier, matches: n, pot, fee, paid_humans: paid, ghost_wins: gw, ghost_win_rate: gw / n, entries: ent, coins_in: coinsIn, payouts: paid });
       add(tierT, tier, { matches: n, pot, fee, paid_humans: paid, ghost_wins: gw, entries: ent, coins_in: coinsIn, payouts: paid });
       pd.fees += fee; entries += coinsIn; payouts += paid;
     }
-    led("payout", payouts, 0, 0, 0); led("entry", 0, entries, 0, 0);
+    led("payout", payouts, 0, 0, 0); led("table_bonus", bonus, 0, 0, 0); led("entry", 0, entries, 0, 0);
+    pd.payouts = payouts; pd.bonus = bonus;
     led("match", ri(20, 60) * 50, 0, 0, 0); led("daily", ri(10, 40) * 300, 0, 0, 0); led("broke", ri(2, 20) * 300, 0, 0, 0);
     led("buy", 0, ri(10, 40) * 400, 0, ri(0, 3) * 10); led("level", 0, 0, ri(2, 8) * 5, 0);
     led("iap", 0, 0, ri(0, 3) * 80, 0); led("reroll", 0, 0, 0, ri(2, 12) * 5); led("exchange", ri(0, 3) * 1000, 0, 0, ri(0, 3) * 10);
@@ -603,12 +666,14 @@ function economy(days) {
     totals: {
       coins_created: sum(per_day, (x) => x.coins_created), coins_spent: sum(per_day, (x) => x.coins_spent),
       gems_created: sum(per_day, (x) => x.gems_created), gems_spent: sum(per_day, (x) => x.gems_spent), fees: sum(per_day, (x) => x.fees),
+      payouts: sum(per_day, (x) => x.payouts), bonus: sum(per_day, (x) => x.bonus),
       by_reason: [...byReason].map(([reason, t]) => ({ reason, ...t })).sort((a, b) => a.reason.localeCompare(b.reason)),
       tables: [...tierT].map(([tier, t]) => ({ tier, ...t, ghost_win_rate: t.ghost_wins / t.matches })),
       rerolls: { free: sum(rerolls.filter((x) => x.paid === "free"), (x) => x.n), gems: sum(rerolls.filter((x) => x.paid === "gems"), (x) => x.n) },
       ads: adT, purchases: { count: sum(purchases, (x) => x.count), gems: sum(purchases, (x) => x.gems), voided: sum(purchases, (x) => x.voided) },
     },
     coins_in_circulation: accounts.reduce((t, a) => t + a.coins, 0), gems_in_circulation: accounts.reduce((t, a) => t + a.gems, 0),
+    fee_pct: 5, bonus_pct: 20,
   };
 }
 
@@ -765,6 +830,7 @@ async function api(req, res, url) {
   switch (sub[0]) {
     case "me": return send(res, 200, { ok: true });
     case "overview": return send(res, 200, overview());
+    case "crashes": return crashesApi(sub, q, res);
     case "economy": return send(res, 200, economy(Math.min(60, Math.max(1, Math.trunc(Number(q("days") || 14)) || 14))));
     case "usage": return USAGE_ERR ? fail(res, 502, "cloudflare_failed", "Cloudflare Analytics API: Authentication error") : send(res, 200, usage());
     case "rooms": {

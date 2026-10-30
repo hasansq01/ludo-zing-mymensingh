@@ -19,6 +19,7 @@ import quickPage from "./pages/quick.js";
 import notificationsPage from "./pages/notifications.js";
 import usagePage from "./pages/usage.js";
 import economyPage from "./pages/economy.js";
+import crashesPage, { crashDetailPage } from "./pages/crashes.js";
 
 const NAV = [
   { id: "status", label: "Status", icon: "status" },
@@ -31,6 +32,7 @@ const NAV = [
   { id: "events", label: "Events", icon: "events" },
   { id: "notifications", label: "Notifications", icon: "send" },
   { id: "economy", label: "Economy", icon: "economy" },
+  { id: "crashes", label: "Crashes", icon: "alert" },
   { id: "usage", label: "Usage", icon: "usage" },
   { id: "config", label: "Config", icon: "config" },
   { id: "audit", label: "Audit", icon: "audit" },
@@ -50,6 +52,8 @@ const ROUTES = [
   { re: /^\/matches$/, nav: "matches", page: matchesPage },
   { re: /^\/events$/, nav: "events", page: eventsPage },
   { re: /^\/economy$/, nav: "economy", page: economyPage },
+  { re: /^\/crashes$/, nav: "crashes", page: crashesPage },
+  { re: /^\/crashes\/([^/]+)$/, nav: "crashes", page: crashDetailPage },
   { re: /^\/usage$/, nav: "usage", page: usagePage },
   { re: /^\/config$/, nav: "config", page: configPage },
   { re: /^\/audit$/, nav: "audit", page: auditPage },

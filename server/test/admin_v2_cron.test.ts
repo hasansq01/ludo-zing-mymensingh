@@ -43,6 +43,31 @@ describe("cron: pruning", () => {
   });
 });
 
+describe("cron: crash reports", () => {
+  it("deletes crash reports older than 90 days", async () => {
+    const ins = (id: string, at: number) =>
+      DB.prepare("INSERT INTO crash_reports (id, received_at, pid, sid, reason, payload) VALUES (?, ?, ?, ?, 'unclean', '{}')").bind(id, at, id, id).run();
+    await ins("crs_cron_old", NOW - 91 * 24 * HOUR);
+    await ins("crs_cron_edge", NOW - 89 * 24 * HOUR);
+    await ins("crs_cron_new", NOW - HOUR);
+    const res = await cron(E as Env, NOW);
+    expect(res.pruned.crash_reports).toBe(1);
+    expect((await rows<{ id: string }>("SELECT id FROM crash_reports WHERE id LIKE 'crs_cron_%' ORDER BY id")).map((r) => r.id)).toEqual(["crs_cron_edge", "crs_cron_new"]);
+  });
+
+  it("forgets a report's IP HMAC after a day (the privacy page's promise), keeping the report", async () => {
+    const ins = (id: string, at: number) =>
+      DB.prepare("INSERT INTO crash_reports (id, received_at, pid, sid, ip, reason, payload) VALUES (?, ?, ?, ?, 'h', 'unclean', '{}')").bind(id, at, id, id).run();
+    await ins("crs_ip_old", NOW - 25 * HOUR);
+    await ins("crs_ip_new", NOW - HOUR);
+    await cron(E as Env, NOW);
+    expect(await rows<{ id: string; ip: string | null }>("SELECT id, ip FROM crash_reports WHERE id LIKE 'crs_ip_%' ORDER BY id")).toEqual([
+      { id: "crs_ip_new", ip: "h" },
+      { id: "crs_ip_old", ip: null },
+    ]);
+  });
+});
+
 describe("cron: stale rooms", () => {
   it("closes a lobby room nobody is in after 2 h without updates (stale-sweep)", async () => {
     const code = await createRoom();

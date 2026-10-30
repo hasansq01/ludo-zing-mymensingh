@@ -56,7 +56,7 @@ describe("hello and lobby", () => {
     expect(w).toMatchObject({ code, host: w.id, id: w.id });
     expect(typeof w.token).toBe("string");
     const l1 = await a.wait("lobby");
-    expect(l1).toMatchObject({ code, host: w.id, max: 4, settings: { teams: false, pair_ask: false, game: "ludo" } });
+    expect(l1).toMatchObject({ code, host: w.id, max: 4, settings: { teams: false, game: "ludo" } });
     expect(l1.members).toEqual([{ id: w.id, name: "Alice", avatar: "a1", frame: "f1", level: 1, online: true, color: 0 }]);
 
     const b = await Client.join(code, { name: "Bob" });
@@ -140,18 +140,18 @@ describe("hello and lobby", () => {
     await e.waitClosed();
   });
 
-  it("settings: host only, booleans only, broadcast in lobby", async () => {
+  it("settings: host only, booleans only, broadcast in lobby; an old client's pair_ask is ignored", async () => {
     const { cs } = await lobbyOf(2);
     const [h, g] = cs;
     g.send({ t: "settings", teams: true });
     expect(await g.wait("error")).toMatchObject({ code: "not_host" });
     h.send({ t: "settings", teams: "yes" });
     expect(await h.wait("error")).toMatchObject({ code: "bad_message" });
-    h.send({ t: "settings", pair_ask: true });
-    const l = await g.waitFor((m) => m.t === "lobby" && m.settings.pair_ask === true);
-    expect(l.settings).toEqual({ teams: false, pair_ask: true, game: "ludo" });
-    h.send({ t: "settings", teams: true });
-    expect((await g.waitFor((m) => m.t === "lobby" && m.settings.teams)).settings).toEqual({ teams: true, pair_ask: true, game: "ludo" });
+    h.send({ t: "settings", pair_ask: true }); // ("Ask before pairing" is everyone's own now: harmless, ignored)
+    const l = await g.waitFor((m) => m.t === "lobby");
+    expect(l.settings).toEqual({ teams: false, game: "ludo" });
+    h.send({ t: "settings", teams: true, pair_ask: "junk" });
+    expect((await g.waitFor((m) => m.t === "lobby" && m.settings.teams)).settings).toEqual({ teams: true, game: "ludo" });
   });
 
   it("start: host only, needs 2, teams need exactly 4", async () => {

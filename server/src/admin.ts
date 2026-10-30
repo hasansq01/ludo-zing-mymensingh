@@ -1,7 +1,7 @@
 // The admin console's JSON API: /admin/api/* (ADMIN_API.md is the contract). Auth: one password (secret
 // ADMIN_PASSWORD) -> an HMAC-signed session cookie; X-Admin: 1 on every write (CSRF); every write is audited.
 import { ACCOUNT_RE, type AccountRow, type Step, adminAccountOut, getAccount, guardedInsert, mutate } from "./accounts";
-import { DAY_OFFSET_MIN } from "./econ/rules";
+import { DAY_OFFSET_MIN, ECON_V1 } from "./econ/rules";
 import { econDayStartMs } from "./wallet";
 import * as D from "./db";
 import { BOARDS, PERIODS, type Board, type PeriodArg, countScores, periodKey, topScores } from "./leaderboard";
@@ -252,6 +252,11 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
       case "economy":
         if (b !== undefined) break;
         return m === "GET" ? await economy(c) : fail(405, "method");
+      case "crashes":
+        if (d !== undefined) break;
+        if (m !== "GET") return fail(405, "method");
+        if (b === undefined) return await crashes(c);
+        return b === "summary" ? await crashSummary(c) : await crashDetail(c, b);
       case "usage":
         if (b !== undefined) break;
         if (m !== "GET") return fail(405, "method");
@@ -524,6 +529,67 @@ async function events(c: Ctx): Promise<Response> {
   return page(await D.listEvents(c.env.DB, { level, kind, ...pageArgs(c.url) }));
 }
 
+// ----- crashes (diag.ts) -----
+
+const CRASH_ID_RE = /^crs_[a-z2-7]{16}$/;
+const CRASH_COLS = "id, received_at, pid, sid, account_id, app_code, app_version, model, android, gpu, reason, foreground, screen, game, mode, match_min, mem_peak_mb";
+
+async function crashes(c: Ctx): Promise<Response> {
+  const version = param(c.url, "version", 40);
+  const model = param(c.url, "model", 80);
+  const reason = param(c.url, "reason", 40);
+  const bef = param(c.url, "before", 16);
+  if (bef !== undefined && !/^\d{1,15}$/.test(bef)) throw new BadRequest("before: epoch ms");
+  const { limit } = pageArgs(c.url);
+  const where: string[] = [];
+  const args: (string | number)[] = [];
+  if (version !== undefined) (where.push("app_version = ?"), args.push(version));
+  if (model !== undefined) (where.push("model = ?"), args.push(model));
+  if (reason !== undefined) (where.push("reason = ?"), args.push(reason));
+  if (bef !== undefined) (where.push("received_at < ?"), args.push(Number(bef)));
+  const { results } = await c.env.DB
+    .prepare(`SELECT ${CRASH_COLS} FROM crash_reports ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY received_at DESC, id DESC LIMIT ?`)
+    .bind(...args, limit + 1)
+    .all<{ received_at: number }>();
+  const more = results.length > limit;
+  const rows = more ? results.slice(0, limit) : results;
+  return json({ rows, next: more ? rows[rows.length - 1].received_at : null });
+}
+
+/** GET /admin/api/crashes/summary?days=30: counts by model, reason, version and GPU over the last `days` days. */
+async function crashSummary(c: Ctx): Promise<Response> {
+  const dv = param(c.url, "days", 6);
+  const days = dv && /^\d+$/.test(dv) ? Math.min(365, Math.max(1, Number(dv))) : 30;
+  const since = c.now - days * DAY_MS;
+  const group = (col: string) =>
+    c.env.DB.prepare(`SELECT COALESCE(${col}, '') AS k, COUNT(*) AS n FROM crash_reports WHERE received_at >= ? GROUP BY k ORDER BY n DESC, k LIMIT 50`).bind(since);
+  const [tot, model, reason, version, gpu] = await c.env.DB.batch<{ k: string; n: number }>([
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM crash_reports WHERE received_at >= ?").bind(since),
+    group("model"), group("reason"), group("app_version"), group("gpu"),
+  ]);
+  return json({
+    days,
+    total: (tot.results[0] as unknown as { n: number }).n,
+    by_model: model.results.map((r) => ({ model: r.k, n: r.n })),
+    by_reason: reason.results.map((r) => ({ reason: r.k, n: r.n })),
+    by_version: version.results.map((r) => ({ version: r.k, n: r.n })),
+    by_gpu: gpu.results.map((r) => ({ gpu: r.k, n: r.n })),
+  });
+}
+
+async function crashDetail(c: Ctx, id: string): Promise<Response> {
+  if (!CRASH_ID_RE.test(id)) return fail(404, "not_found");
+  const r = await c.env.DB.prepare(`SELECT ${CRASH_COLS}, payload FROM crash_reports WHERE id = ?`).bind(id).first<Record<string, unknown> & { payload: string }>();
+  if (!r) return fail(404, "not_found");
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(r.payload);
+  } catch {
+    /* unreadable: null */
+  }
+  return json({ ...r, payload });
+}
+
 // ----- config -----
 
 async function configPut(c: Ctx): Promise<Response> {
@@ -684,7 +750,8 @@ const DELETED_NAME = "Deleted player";
  * reason only, no personal data). It covers the account and any retired account merged into it (accounts.merged_into).
  * Table by table (every table of migrations/*.sql with an account_id / pid / player name):
  *   DELETED  accounts, devices, players (per-pid rows: name, avatar, ban), push_tokens, push_opens, scores, claims
- *            (payload), broke_bonus, weekly_prizes, ad_rewards still `pending`, events (by pid), player_days (by pid)
+ *            (payload), broke_bonus, weekly_prizes, ad_rewards still `pending`, events (by pid), player_days (by pid),
+ *            crash_reports (by account_id)
  *   SCRUBBED matches.players[].name -> "Deleted player" where pid / account_id matches; rooms.host_name likewise
  *            (host_pid matches). pids and account ids stay in the match JSON (pseudonymous).
  *   KEPT     ledger, entries, match_grants, rerolls, purchases, ad_rewards not pending (granted / expired / rejected):
@@ -741,6 +808,7 @@ async function accountErase(c: Ctx, raw: string): Promise<Response> {
     del("ad_rewards", "account_id", " AND status = 'pending'"),
     del("devices", "account_id"),
     del("accounts", "id"),
+    del("crash_reports", "account_id"), // after "accounts" (n(13)), so the indices above hold; by account id only: reports sent without a session expire in 90 days
     D.addAudit(db, { ip: c.ip, action: "account.erase", target: id, detail: { reason, merged_accounts: merged.length } }, c.now),
   ];
   const res = await db.batch(stmts);
@@ -823,12 +891,16 @@ async function economy(c: Ctx): Promise<Response> {
   const num = (v: unknown): number => Math.trunc(Number(v) || 0);
   const inRange = (r: R): boolean => num(r.d) >= firstN && num(r.d) <= todayN;
   const dayList = Array.from({ length: days }, (_, i) => dayName(firstN + i));
-  const perDay = new Map(dayList.map((d) => [d, { day: d, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0, fees: 0 }]));
+  // payouts: coin-table pot payouts to people (ledger `payout`); bonus: the house bonus of 1st place (ledger
+  // `table_bonus`, new coins on top of the pot, owner 2026-10-31), shown apart from the payouts
+  const perDay = new Map(dayList.map((d) => [d, { day: d, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0, fees: 0, payouts: 0, bonus: 0 }]));
   const byReason = new Map<string, { reason: string; coins_created: number; coins_spent: number; gems_created: number; gems_spent: number }>();
   const ledger = (led.results as R[]).filter(inRange).map((r) => {
     const o = { day: dayName(num(r.d)), reason: String(r.reason), coins_created: num(r.coins_created), coins_spent: num(r.coins_spent), gems_created: num(r.gems_created), gems_spent: num(r.gems_spent) };
     const pd = perDay.get(o.day)!;
     pd.coins_created += o.coins_created; pd.coins_spent += o.coins_spent; pd.gems_created += o.gems_created; pd.gems_spent += o.gems_spent;
+    if (o.reason === "payout") pd.payouts += o.coins_created;
+    if (o.reason === "table_bonus") pd.bonus += o.coins_created;
     const t = byReason.get(o.reason) ?? { reason: o.reason, coins_created: 0, coins_spent: 0, gems_created: 0, gems_spent: 0 };
     t.coins_created += o.coins_created; t.coins_spent += o.coins_spent; t.gems_created += o.gems_created; t.gems_spent += o.gems_spent;
     byReason.set(o.reason, t);
@@ -883,6 +955,8 @@ async function economy(c: Ctx): Promise<Response> {
       gems_created: sumBy(pd, (r) => r.gems_created),
       gems_spent: sumBy(pd, (r) => r.gems_spent),
       fees: sumBy(pd, (r) => r.fees),
+      payouts: sumBy(pd, (r) => r.payouts),
+      bonus: sumBy(pd, (r) => r.bonus),
       by_reason: [...byReason.values()].sort((a, b) => a.reason.localeCompare(b.reason)),
       tables: [...tierTotals.values()].map(rate).sort((a, b) => a.tier.localeCompare(b.tier)),
       rerolls: { free: sumBy(rerollRows.filter((r) => r.paid === "free"), (r) => r.n), gems: sumBy(rerollRows.filter((r) => r.paid === "gems"), (r) => r.n) },
@@ -891,6 +965,8 @@ async function economy(c: Ctx): Promise<Response> {
     },
     coins_in_circulation: num(cc.coins),
     gems_in_circulation: num(cc.gems),
+    fee_pct: ECON_V1.fee_pct,
+    bonus_pct: ECON_V1.bonus_pct,
   });
 }
 

@@ -162,8 +162,8 @@ export class QuickClient {
 }
 
 /** The room socket for a matched person (hello with the session, the room token and the queue identity). */
-export async function joinMatched(code: string, token: string, g: Guest, name = "Me"): Promise<Client> {
-  return Client.join(code, { pid: g.pid, name, token, session: g.session });
+export async function joinMatched(code: string, token: string, g: Guest, name = "Me", pairAsk?: boolean): Promise<Client> {
+  return Client.join(code, { pid: g.pid, name, token, session: g.session, pairAsk });
 }
 
 /** Queues these guests one after the other and returns their `matched` messages. */

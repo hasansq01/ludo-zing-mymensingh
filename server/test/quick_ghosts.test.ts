@@ -118,7 +118,9 @@ function audit(p: Played, game: string, humanNames: string[]): void {
       if (m.t === "presence") expect(p.ghostIds.has(m.id)).toBe(false);
       if (m.t === "over") {
         expect(Object.keys(m).sort()).toEqual(["finished", "match_id", "standings", "t", "table", "winner"]);
-        expect(Object.keys(m.table).sort()).toEqual(["entry", "payouts", "tier"]);
+        expect(Object.keys(m.table).sort()).toEqual(["bonus", "entry", "payouts", "refunds", "tier"]);
+        // the house bonus is shown for 1st place whoever holds it (a ghost's too: ghosts look like people)
+        expect(Object.keys(m.table.bonus)).toEqual(m.table.entry > 0 ? [String(m.finished[0])] : []);
         const ks = m.standings.map((s: Msg) => Object.keys(s).sort().join(","));
         expect(new Set(ks).size).toBe(1);
       }

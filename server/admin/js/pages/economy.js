@@ -1,5 +1,6 @@
-// Economy: coins and gems created / spent per Bangladesh day, the coin tables (entries, pot, fees, payouts to people,
-// ghost win rate), re-rolls, rewarded ads and gem purchases (ADMIN_API.md "Economy").
+// Economy: coins and gems created / spent per Bangladesh day, coin-table payouts and the house bonus per day, the coin
+// tables (entries, pot, fees, payouts to people, ghost win rate), re-rolls, rewarded ads and gem purchases (ADMIN_API.md
+// "Economy").
 import { h, replace, fmtInt, poll } from "../dom.js";
 import { api } from "../api.js";
 import { lineChart } from "../chart.js";
@@ -66,7 +67,7 @@ export default function economyPage(root, _params, ctx) {
     replace(tilesBox,
       tile({ label: "Coins in circulation", value: Number(d.coins_in_circulation) || 0, ic: "coin", tone: "tile-accent", foot: h("span", { class: "tile-sub" }, "All accounts, now") }),
       tile({ label: "Gems in circulation", value: Number(d.gems_in_circulation) || 0, ic: "gem", foot: h("span", { class: "tile-sub" }, "All accounts, now") }),
-      tile({ label: "Table fees", value: Number(t.fees) || 0, ic: "coin", foot: h("span", { class: "tile-sub" }, `Last ${d.days} days: coins taken out of every pot (10%)`) }),
+      tile({ label: "Table fees", value: Number(t.fees) || 0, ic: "coin", foot: h("span", { class: "tile-sub" }, `Last ${d.days} days: coins taken out of every pot (${d.fee_pct ?? 5}%)`) }),
       tile({ label: "Net coins in the period", value: sign(net(t.coins_created, t.coins_spent)), foot: h("span", { class: "tile-sub" }, `${fmtInt(t.coins_created)} created, ${fmtInt(t.coins_spent)} spent`) }));
 
     const days = (d.per_day || []).map((x) => x.day);
@@ -91,8 +92,28 @@ export default function economyPage(root, _params, ctx) {
       pair("Coins created vs spent", "Coins", col("coins_created"), col("coins_spent"), "Created: payouts, rewards, sales. Spent: entries, shop."),
       pair("Gems created vs spent", "Gems", col("gems_created"), col("gems_spent"), "Created: purchases, level-ups, prizes, ads. Spent: re-rolls, shop, exchange."));
 
-    replace(tableBox, tablesCard(t.tables || []), reasonCard(t.by_reason || []));
+    replace(tableBox, bonusCard(d, days, col("payouts"), col("bonus")), tablesCard(t.tables || []), reasonCard(t.by_reason || []));
     replace(moreBox, h("div", { class: "grid-3" }, rerollCard(t.rerolls), adsCard(t.ads || {}), purchaseCard(t.purchases)));
+  }
+
+  // the house bonus (ledger table_bonus) is new coins on top of the pot, so it is shown apart from the pot payouts
+  function bonusCard(d, days, payouts, bonus) {
+    const t = d.totals || {};
+    const sub = `The house bonus (${d.bonus_pct ?? 20}% of the pool, 1st place at a paid table) is new coins on top of the pot; payouts come out of the entries. Last ${d.days} days: ${fmtInt(t.payouts || 0)} paid out, ${fmtInt(t.bonus || 0)} bonus created.`;
+    if (!days.length || ![...payouts, ...bonus].some((v) => v > 0)) {
+      return card("Table payouts and house bonus", emptyState("Nothing yet", "No coin-table payouts in this period.", "chart"), { sub });
+    }
+    const el = lineChart({
+      title: `Coin-table payouts and house bonus per day, last ${d.days} days`,
+      days,
+      series: [
+        { key: "payouts", name: "Payouts (from the pot)", tone: 1, values: payouts },
+        { key: "bonus", name: "House bonus (created)", tone: 2, values: bonus },
+      ],
+      yLabel: "Coins per day", xLabel: "Day (Bangladesh)", height: 200,
+    });
+    charts.push(el);
+    return card("Table payouts and house bonus", h("div", { class: "chart-box" }, el), { sub });
   }
 
   function tablesCard(tables) {

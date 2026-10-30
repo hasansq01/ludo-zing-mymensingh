@@ -51,7 +51,7 @@ Product decisions (owner, 2026-10-24):
   S&L vs Computer wins (placing 1) are still verified by replaying the rolls.
   with limits: duration ≥ 60 s (Ludo) / 30 s (S&L), ≤ 20 claims per hour, ≤ 6,000 coins per day from claims;
   over-limit claims are recorded but grant 0 (`limited: true`). Claims carry a client id so retries are idempotent.
-- Online matches (friend rooms and quick match): the Room DO grants at `over` (win 150, finish 20, XP 100/40),
+- Online matches (friend rooms and quick match): the Room DO grants at `over` (win 150, finish 20, XP 100/40; coins raised 2026-10-31, see ECONOMY_V1.md §0),
   once per account per match.
 - Every change is a ledger row `{account, at, delta_coins, delta_xp, reason, ref}`.
 - Offline-first client: the local profile is a cache. Purchases, daily, spin and free need a connection ("Connect to
@@ -135,7 +135,7 @@ Product decisions (owner, 2026-10-24):
 
 1. Day boundary for daily / spin / free: **Bangladesh midnight** (`DAY_OFFSET_MIN = 360`, UTC+6) — the players are
    in Bangladesh; the offline game used the device day.
-2. Online rewards: **Ludo** win 150 coins + 100 XP, finish 20 + 40 XP; **Snakes & Ladders** win 100 + 60 XP, finish
+2. Online rewards (coins changed 2026-10-31: Ludo 300 / 50, S&L 200 / 25, ECONOMY_V1.md §8): **Ludo** win 150 coins + 100 XP, finish 20 + 40 XP; **Snakes & Ladders** win 100 + 60 XP, finish
    10 + 25 XP (S&L offline pays half of Ludo and no XP; online S&L gives XP so it counts for the XP board).
    Left early: 0.
 3. The 6,000-coins-per-day claim cap pays the **partial remainder** (not 0); the 20-per-hour cap and too-short

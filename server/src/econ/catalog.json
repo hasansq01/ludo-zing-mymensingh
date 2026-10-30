@@ -199,12 +199,11 @@
       "kind": "scene",
       "id": "enchanted",
       "name": "Enchanted Jungle",
-      "price": 25000,
-      "buy": true,
-      "free": false,
+      "price": 0,
+      "buy": false,
+      "free": true,
       "default": false,
-      "unlock": null,
-      "gems": 250
+      "unlock": null
     },
     {
       "kind": "char",

@@ -13,7 +13,8 @@
 // - move() rejects a token index outside 0-3 (GDScript would index from the end for -1; the server validates first).
 //
 // State: { players[4] ("human" | "cpu" | "off"), names[4], view, tok[4][4], pairs [{c, a, b}], turn, dice, sixes,
-//   phase, pick ("" | "single" | "pair"), winner, teams, free[4], pending, pair_ask, finished [colours] }
+//   phase, pick ("" | "single" | "pair"), winner, teams, free[4], pending, pair_ask, finished [colours],
+//   pair_ask_by[4] (optional: per colour, see asksPair) }
 // Progress per token: -1 base, 0-50 track, 51-55 home column, 56 (GOAL) finished.
 // Colours: 0 red, 1 green, 2 yellow, 3 blue.
 //
@@ -71,6 +72,8 @@ export interface LudoState {
   free: boolean[];
   pending: Pending | Record<string, never>;
   pair_ask?: boolean;
+  /** "Ask before pairing" per colour (quick matches: each person's own choice); overrides pair_ask when present. */
+  pair_ask_by?: boolean[];
   finished?: number[];
 }
 
@@ -110,6 +113,8 @@ export interface Standing {
 
 export interface NewGameOpts {
   pair_ask?: boolean;
+  /** Per colour (4 entries); the state gets pair_ask_by only when this is given. */
+  pair_ask_by?: boolean[];
 }
 
 function isEmpty(d: object): boolean {
@@ -118,7 +123,7 @@ function isEmpty(d: object): boolean {
 
 // ---------- setup ----------
 
-/** opts: {pair_ask} - the "Ask before pairing" house rule (default false). */
+/** opts: {pair_ask} - the "Ask before pairing" house rule (default false); {pair_ask_by} per colour (asksPair). */
 export function newGame(players: string[], teams = false, opts: NewGameOpts = {}): LudoState {
   teams = teams && players.every((p) => p !== "off"); // Pair Mode needs all four seats
   const humans = players.filter((p) => p === "human").length;
@@ -135,7 +140,7 @@ export function newGame(players: string[], teams = false, opts: NewGameOpts = {}
     }
   }
   const h = players.indexOf("human");
-  return {
+  const s: LudoState = {
     players: [...players],
     names,
     view: h >= 0 ? h : 0,
@@ -158,6 +163,8 @@ export function newGame(players: string[], teams = false, opts: NewGameOpts = {}
     pair_ask: Boolean(opts.pair_ask ?? false),
     finished: [],
   };
+  if (Array.isArray(opts.pair_ask_by) && opts.pair_ask_by.length === 4) s.pair_ask_by = opts.pair_ask_by.map(Boolean);
+  return s;
 }
 
 // ---------- board helpers ----------
@@ -172,6 +179,17 @@ export function active(s: LudoState, c: number): boolean {
 
 export function isHuman(s: LudoState, c: number): boolean {
   return s.players[c] === "human";
+}
+
+/**
+ * "Ask before pairing" for colour c's moves: only a human seat is asked; s.pair_ask_by[c] when the state has it (per
+ * colour), else the table's s.pair_ask.
+ */
+export function asksPair(s: LudoState, c: number): boolean {
+  if (!isHuman(s, c)) return false;
+  const by = s.pair_ask_by;
+  if (Array.isArray(by) && by.length === 4) return Boolean(by[c]);
+  return Boolean(s.pair_ask ?? false);
 }
 
 export function pname(s: LudoState, c: number): string {
@@ -518,17 +536,32 @@ export function move(s: LudoState, i: number): LudoEvent[] {
   const pend: Pending = { c, i, to, extra };
   const partner = pairPartner(s, c, i);
   if (partner >= 0) {
-    if (isHuman(s, roller) && Boolean(s.pair_ask ?? false)) {
+    if (asksPair(s, roller)) {
       pend.partner = partner;
       s.pending = pend;
       s.phase = "pair_ask";
       ev.push({ type: "pair_offer", c, a: i, b: partner });
       return ev;
     }
-    if (!(SAFE as readonly number[]).includes(absIndex(c, to))) formPair(s, c, i, partner, ev);
+    if (pairsByItself(c, to)) formPair(s, c, i, partner, ev);
   }
   finishMove(s, pend, ev);
   return ev;
+}
+
+/** Where nobody is asked, a landing on a loose own pawn pairs up by itself only off the safe squares. */
+function pairsByItself(c: number, to: number): boolean {
+  return !(SAFE as readonly number[]).includes(absIndex(c, to));
+}
+
+/**
+ * The answer "make a pair?" gets when nobody gives one (online: the pair timer runs out, or a bot holds the seat):
+ * what would have happened if the player hadn't been asked (yes off the safe squares). false outside "pair_ask".
+ */
+export function defaultPairAnswer(s: LudoState): boolean {
+  const p = s.pending as Partial<Pending>;
+  if (s.phase !== "pair_ask" || p?.to === undefined || p.c === undefined) return false;
+  return pairsByItself(p.c, p.to);
 }
 
 /** Human only: the answer to "make a pair?" (phase "pair_ask"). */

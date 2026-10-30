@@ -12,12 +12,13 @@ import { deepEqual } from "./rules_helpers";
 
 type Step = [string, number, number | boolean | string, number, string, Record<string, unknown>, Extra?];
 interface Extra {
-  auto: number;
-  units: unknown[];
+  auto?: number;
+  units?: unknown[];
+  pair_default?: boolean;
 }
 interface Game {
   seed: number;
-  args: { players: string[]; teams: boolean; opts: { pair_ask?: boolean } };
+  args: { players: string[]; teams: boolean; opts: { pair_ask?: boolean; pair_ask_by?: boolean[] } };
   levels: string[];
   s0: LudoState;
   h0: string;
@@ -88,11 +89,32 @@ describe("GDScript parity traces", () => {
     expect(T.games.some((g) => g.steps.some((st) => st[0] === "end" && T.ev[st[3]].length === 0))).toBe(true);
     expect(T.games.some((g) => g.args.teams && g.end)).toBe(true);
     expect(new Set(T.games.map((g) => g.args.players.filter((p) => p !== "off").length))).toEqual(new Set([2, 3, 4]));
+    // "Ask before pairing" per colour (quick matches): some seats asked, some pairing by themselves, in one game
+    const byGames = T.games.filter((g) => g.args.opts.pair_ask_by);
+    expect(byGames.length).toBeGreaterThanOrEqual(10);
+    const mixed = byGames.filter((g) => {
+      const by = g.args.opts.pair_ask_by!;
+      const flat = evOf(g).flat() as { type: string; c?: number; human?: boolean }[];
+      return flat.some((e) => e.type === "pair_offer" && by[e.c!]) &&
+        flat.some((e, j) => e.type === "pair_formed" && e.human && !by[e.c!] && flat[j - 1]?.type !== "pair_offer");
+    });
+    expect(mixed.length).toBeGreaterThanOrEqual(1);
+    // the default answer (timeouts, bots) is recorded at every pair question: both answers come up
+    const dflt = T.games.flatMap((g) => g.steps.filter((st) => st[6]?.pair_default !== undefined).map((st) => st[6]!.pair_default));
+    expect(dflt.length).toBeGreaterThanOrEqual(50);
+    expect(new Set(dflt)).toEqual(new Set([true, false]));
+    for (const g of byGames) {
+      const by = g.args.opts.pair_ask_by!;
+      // no colour whose entry is off is ever asked (a Free Hand roller's own entry decides, so check the roller)
+      for (const st of g.steps) {
+        for (const e of T.ev[st[3]] as { type: string }[]) if (e.type === "pair_offer") expect(by[st[1]], `game ${g.seed}`).toBe(true);
+      }
+    }
   });
 
   for (const g of T.games) {
     const seats = g.args.players.map((p) => p[0]).join("");
-    it(`game ${g.seed} (${seats}${g.args.teams ? " teams" : ""}${g.args.opts.pair_ask ? " ask" : ""}, ${g.steps.length} steps)`, () => {
+    it(`game ${g.seed} (${seats}${g.args.teams ? " teams" : ""}${g.args.opts.pair_ask ? " ask" : ""}${g.args.opts.pair_ask_by ? " ask-by" : ""}, ${g.steps.length} steps)`, () => {
       const s = Ludo.newGame(g.args.players, g.args.teams, g.args.opts);
       if (!deepEqual(s, g.s0)) fail("new_game", s, g.s0);
       expect(stateHash(s)).toBe(g.h0);
@@ -109,7 +131,10 @@ describe("GDScript parity traces", () => {
         const h = stateHash(s);
         if (h !== st[4]) fail(`${where}: hash`, h, st[4]);
         const extra = st[6];
-        if (extra) {
+        if (extra?.pair_default !== undefined) {
+          if (Ludo.defaultPairAnswer(s) !== extra.pair_default) fail(`${where}: defaultPairAnswer`, Ludo.defaultPairAnswer(s), extra.pair_default);
+        }
+        if (extra?.auto !== undefined) {
           if (Ludo.autoMoveToken(s) !== extra.auto) fail(`${where}: auto_move_token`, Ludo.autoMoveToken(s), extra.auto);
           if (!deepEqual(Ludo.units(s), extra.units)) fail(`${where}: units`, Ludo.units(s), extra.units);
         }

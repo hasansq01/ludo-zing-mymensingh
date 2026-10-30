@@ -230,8 +230,9 @@ export function sceneIds(p: Dict): string[] {
 
 /** SLScenes.owns_scene. */
 export function ownsScene(p: Dict, id: string): boolean {
-  if (!item("scene", id)) return false;
-  return id === DEFAULT_SCENE || sceneIds(p).includes(id);
+  const it = item("scene", id);
+  if (!it) return false;
+  return id === DEFAULT_SCENE || it.free || sceneIds(p).includes(id);   // free scenes (SLScenes.FREE) are everyone's
 }
 
 /** Collection.ach_done. */

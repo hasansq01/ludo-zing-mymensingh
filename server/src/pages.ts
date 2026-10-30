@@ -55,7 +55,8 @@ Questions: <a href="mailto:${CONTACT}">${CONTACT}</a>.</p>
   The ads themselves are served by Google AdMob (see below).</li>
   <li><b>Notifications.</b> If you allow notifications: your device's Firebase push token, your notification choices
   (game alerts, news and offers) and your time-zone offset, so reminders don't arrive at night.</li>
-  <li><b>Abuse prevention.</b> To limit how many guest accounts one network creates, we keep a one-way scrambled form
+  <li><b>Crash reports.</b> When the app closes unexpectedly, it sends a diagnostic report (device model, Android version, memory use, which screen was open and the app's own log) that we use only to fix crashes and keep for 90 days.</li>
+  <li><b>Abuse prevention.</b> To limit how many guest accounts and crash reports one network creates, we keep a one-way scrambled form
   (HMAC) of your IP address for at most one day. Our hosting provider (Cloudflare) processes IP addresses to deliver
   the service.</li>
 </ul>
@@ -87,7 +88,7 @@ communicate only with preset emotes.</p>
 <p>Other players see your nickname, avatar, frame, level and, on leaderboards, your wins or XP.</p>
 
 <h2>How long we keep it</h2>
-<p>Your account is kept while you play. Server logs and room records are deleted after 30 days, weekly leaderboard
+<p>Your account is kept while you play. Server logs and room records are deleted after 30 days, crash reports after 90 days, weekly leaderboard
 scores after 26 weeks. If you ask us to delete your account we erase it within 30 days (see below).</p>
 
 <h2>Deleting your account</h2>

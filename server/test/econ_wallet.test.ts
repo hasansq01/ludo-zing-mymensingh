@@ -105,11 +105,11 @@ describe("GET /v1/tables", () => {
   it("lists the tables with unlocked / affordable and the broke state", async () => {
     const a = await guest();
     const t = await ok("tables", { session: a.session, now: T0 });
-    expect(t).toMatchObject({ fee_pct: 10, level: 1, broke: false });
+    expect(t).toMatchObject({ fee_pct: 5, level: 1, broke: false });
     expect(t.tables).toEqual([
       { id: "practice", entry: 0, level: 1, unlocked: true, affordable: true },
       { id: "t100", entry: 100, level: 1, unlocked: true, affordable: true },
-      { id: "t500", entry: 500, level: 3, unlocked: false, affordable: true },
+      { id: "t500", entry: 500, level: 1, unlocked: true, affordable: true },
       { id: "t2k", entry: 2000, level: 6, unlocked: false, affordable: true },
       { id: "t10k", entry: 10000, level: 10, unlocked: false, affordable: false },
       { id: "t50k", entry: 50000, level: 15, unlocked: false, affordable: false },
@@ -117,12 +117,12 @@ describe("GET /v1/tables", () => {
     expect(t.broke_bonus).toMatchObject({ available: false, amount: 300 });
   });
 
-  it("levels 3 and 6 unlock the 500 and 2,000 tables (XP 250 / 1,000)", async () => {
+  it("the 500 table is open from level 1; level 6 unlocks the 2,000 table (XP 1,000)", async () => {
     const a = await guest();
     await setAccount(a.id, { xp: 249, coins: 60_000 });
     let t = await ok("tables", { session: a.session, now: T0 });
     expect(t.level).toBe(2);
-    expect(t.tables.map((x: { unlocked: boolean }) => x.unlocked)).toEqual([true, true, false, false, false, false]);
+    expect(t.tables.map((x: { unlocked: boolean }) => x.unlocked)).toEqual([true, true, true, false, false, false]);
     expect(t.tables.map((x: { affordable: boolean }) => x.affordable)).toEqual([true, true, true, true, true, true]);
     await setAccount(a.id, { xp: 250 });
     t = await ok("tables", { session: a.session, now: T0 });

@@ -37,8 +37,11 @@ export interface PublicProfile {
 export interface OnlineMatchGrant {
   match_id: string;
   game: GameKind;
-  /** place / entry_id: quick matches (ECONOMY_V1.md §3; place -1 = left, forfeit). */
-  results: Array<{ account_id: string; outcome: OnlineOutcome; place?: number; entry_id?: string }>;
+  /**
+   * place / entry_id: quick matches (ECONOMY_V1.md §3; place -1 = left, forfeit). refund: a match ended by the
+   * settlement by progress gave this person's entry back instead of the 1st prize (no clear lead).
+   */
+  results: Array<{ account_id: string; outcome: OnlineOutcome; place?: number; entry_id?: string; refund?: boolean }>;
   /** Quick matches: the coin table (entry 0 = practice). */
   table?: { tier: string; entry: number; size: number; humans: number; ghosts: number; winner_ghost?: boolean };
 }

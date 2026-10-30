@@ -344,19 +344,19 @@ function winningRolls(): number[] {
 }
 
 describe("online match rewards", () => {
-  it("Ludo: win 150 + 100 XP, finish 20 + 40 XP, left nothing", () => {
-    expect(ONLINE_REWARDS.ludo.win).toEqual({ coins: 150, xp: 100 });
+  it("Ludo: win 300 + 100 XP, finish 50 + 40 XP, left nothing (owner 2026-10-31: was 150 / 20)", () => {
+    expect(ONLINE_REWARDS.ludo.win).toEqual({ coins: 300, xp: 100 });
     const w = applyOnlineResult(fresh(), "ludo", "win");
-    expect([w.coins, w.xp, w.profile.coins, w.profile.xp, w.profile.stats.coinsEarned]).toEqual([150, 100, 5150, 100, 150]);
-    expect(applyOnlineResult(fresh(), "ludo", "finish")).toMatchObject({ coins: 20, xp: 40, delta: { coins: 20, xp: 40 } });
+    expect([w.coins, w.xp, w.profile.coins, w.profile.xp, w.profile.stats.coinsEarned]).toEqual([300, 100, 5300, 100, 300]);
+    expect(applyOnlineResult(fresh(), "ludo", "finish")).toMatchObject({ coins: 50, xp: 40, delta: { coins: 50, xp: 40 } });
     const l = applyOnlineResult(fresh(), "ludo", "left");
     expect([l.coins, l.xp, l.profile.coins]).toEqual([0, 0, 5000]);
   });
 
-  it("Snakes & Ladders: win 100 + 60 XP, finish 10 + 25 XP, left nothing", () => {
-    expect(ONLINE_REWARDS.sl).toEqual({ win: { coins: 100, xp: 60 }, finish: { coins: 10, xp: 25 }, left: { coins: 0, xp: 0 } });
-    expect(applyOnlineResult(fresh(), "sl", "win")).toMatchObject({ coins: 100, xp: 60, profile: { coins: 5100, xp: 60 } });
-    expect(applyOnlineResult(fresh(), "sl", "finish")).toMatchObject({ coins: 10, xp: 25, delta: { coins: 10, xp: 25 } });
+  it("Snakes & Ladders: win 200 + 60 XP, finish 25 + 25 XP, left nothing (was 100 / 10)", () => {
+    expect(ONLINE_REWARDS.sl).toEqual({ win: { coins: 200, xp: 60 }, finish: { coins: 25, xp: 25 }, left: { coins: 0, xp: 0 } });
+    expect(applyOnlineResult(fresh(), "sl", "win")).toMatchObject({ coins: 200, xp: 60, profile: { coins: 5200, xp: 60 } });
+    expect(applyOnlineResult(fresh(), "sl", "finish")).toMatchObject({ coins: 25, xp: 25, delta: { coins: 25, xp: 25 } });
     expect(applyOnlineResult(fresh(), "sl", "left")).toMatchObject({ coins: 0, xp: 0 });
   });
 });

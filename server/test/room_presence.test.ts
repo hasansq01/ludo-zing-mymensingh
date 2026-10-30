@@ -153,27 +153,32 @@ describe("hibernation and cleanup", () => {
     expect(red.hashMismatches + yel.hashMismatches).toBe(0);
   });
 
-  it("bots pause while nobody is connected and resume on reconnect", async () => {
+  it("the match freezes while nobody is connected (no step, no grace runs) and resumes where it was", async () => {
     const { code, cs } = await lobbyOf(2, { timeScale: 0.01 });
     const [red, yel] = cs;
     await startAll(cs);
     red.close();
     yel.close();
-    await sleep(600); // graces (200 ms) over: both seats are bots, nobody watches
-    const nOf = () =>
-      runInDurableObject(stubFor(code), (_i, st) => (st.storage.kv.get("room") as { match: { n: number; due: number } }).match);
+    await sleep(600); // 3 graces (200 ms) long: nothing runs while frozen
+    type M = { n: number; due: number; frozenAt?: number; state: { players: string[] } };
+    const nOf = () => runInDurableObject(stubFor(code), (_i, st) => (st.storage.kv.get("room") as { match: M }).match);
     const a = await nOf();
+    expect(a.frozenAt).toBeGreaterThan(0);
+    expect(a.due).toBe(0);
     await sleep(300);
     const b = await nOf();
     expect(b.n).toBe(a.n);
     expect(b.due).toBe(0);
+    expect(b.state.players[2]).toBe("human"); // yellow's grace stood still while frozen: no bot took the seat
 
     const back = await Client.join(code, { token: yel.token });
     back.autoplay = true;
     await back.wait("sync");
-    await back.waitFor(isMode(2, "human"));
+    expect((await nOf()).frozenAt ?? 0).toBe(0);
+    await back.waitFor((m) => m.t === "turn"); // re-planned: the turn goes on
     const [over] = await finishAll([back], 25_000);
     expect([0, 2]).toContain(over.winner);
+    expect(back.log.some((m) => isMode(2, "cpu")(m))).toBe(false);
   });
 
   it("a room with no action for the stale timeout is deleted, connected or not", async () => {

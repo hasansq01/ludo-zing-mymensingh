@@ -6,6 +6,7 @@ import * as A from "./accounts";
 import { CSP, handleAdmin } from "./admin";
 import { cron } from "./cron";
 import * as D from "./db";
+import { postCrash } from "./diag";
 import * as Ads from "./ads";
 import * as E from "./economy";
 import * as Iap from "./iap";
@@ -77,7 +78,7 @@ const POST_AUTHED: Record<string, (req: Request, env: Env, a: A.Authed, now: num
 
 /**
  * /v1/auth/*, /v1/me, /v1/shop/*, /v1/rewards*, /v1/achievements/*, /v1/claims, /v1/leaderboard (ONLINE_V2.md),
- * /v1/push/* (NOTIFICATIONS.md).
+ * /v1/push/* (NOTIFICATIONS.md), /v1/diag/crash (diag.ts).
  */
 async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]): Promise<Response | null> {
   const path = parts.slice(1).join("/");
@@ -96,6 +97,8 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
         const me = await A.optionalAccount(req, env, now);
         return await handleLeaderboard(env.DB, ctx, new URL(req.url), me, now, env.TEST_MODE === "1");
       }
+      case "diag/crash":
+        return m === "POST" ? await postCrash(req, env, now) : json({ error: "method" }, 405);
       case "push/opened":
         return m === "POST" ? await P.postOpened(req, env, now) : json({ error: "method" }, 405);
       case "ads/ssv":

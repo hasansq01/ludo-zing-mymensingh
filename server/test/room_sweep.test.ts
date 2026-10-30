@@ -25,7 +25,7 @@ describe("sweepStale", () => {
     expect(r.closed_reason).toBe("stale-sweep");
   });
 
-  it("a quick match whose people all disconnected is swept (its ghosts don't keep it alive)", async () => {
+  it("a quick match whose people all disconnected is settled by progress, never swept with refunds", async () => {
     await mmHooks("ludo", 4, { wait: 100 });
     const g = await guest();
     const { matched } = await queueAll("ludo", 4, [g]);
@@ -33,8 +33,9 @@ describe("sweepStale", () => {
     await c.wait("start");
     c.close();
     await sleep(100);
-    expect(await stubFor(matched[0].code).sweepStale()).toBe("swept");
-    const m = await eventually(() => row("SELECT * FROM matches WHERE code = ?", matched[0].code), 5000, "match row");
-    expect(m).toMatchObject({ result: "abandoned", quick: 1, ghosts: 3 });
+    expect(await stubFor(matched[0].code).sweepStale()).toBe("live"); // ended now; its own alarm deletes it later
+    expect(((await stubFor(matched[0].code).adminSnapshot()) as unknown as { status: string }).status).toBe("over");
+    const m = await eventually(() => row("SELECT * FROM matches WHERE code = ? AND result = 'over'", matched[0].code), 5000, "match row");
+    expect(m).toMatchObject({ result: "over", quick: 1, ghosts: 3 });
   });
 });

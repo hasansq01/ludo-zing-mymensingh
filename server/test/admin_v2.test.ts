@@ -68,11 +68,11 @@ describe("accounts", () => {
     await grantOnlineMatch(ENV, { match_id: `adm-${g.id}`, game: "ludo", results: [{ account_id: g.id, outcome: "finish" }] });
     await D.insertMatch(DB, { code: "ADMV2X", started_at: Date.now(), players: [{ pid: g.pid, name: "x", color: 0, bot: false }], teams: false, pair_ask: false }).run();
     const d = await get(`accounts/${g.id}`);
-    expect(d.account).toMatchObject({ id: g.id, coins: 2720, xp: 140, linked: false });
+    expect(d.account).toMatchObject({ id: g.id, coins: 2750, xp: 140, linked: false });
     expect(d.devices.map((x: { pid: string }) => x.pid)).toEqual([g.pid]);
     expect(d.ledger.map((l: { reason: string }) => l.reason)).toEqual(["match", "level", "claim", "start"]);
     expect(d.claims[0]).toMatchObject({ coins: 200, xp: 100, granted: 1, limited: 0, payload: { game: "ludo", result: "win" } });
-    expect(d.grants[0]).toMatchObject({ outcome: "finish", coins: 20 });
+    expect(d.grants[0]).toMatchObject({ outcome: "finish", coins: 50 });
     expect(d.matches[0]).toMatchObject({ code: "ADMV2X" });
     await get("accounts/acc_nosuchaccount234", 404);
     await get("accounts/bad", 404);

@@ -15,4 +15,11 @@ describe("public pages", () => {
     }
     expect((await SELF.fetch("https://x/privacy", { method: "POST" })).status).toBe(405);
   });
+
+  it("/privacy says what the crash report holds and how long it is kept", async () => {
+    const t = await (await SELF.fetch("https://x/privacy")).text();
+    expect(t).toContain(
+      "When the app closes unexpectedly, it sends a diagnostic report (device model, Android version, memory use, which screen was open and the app's own log) that we use only to fix crashes and keep for 90 days.",
+    );
+  });
 });
