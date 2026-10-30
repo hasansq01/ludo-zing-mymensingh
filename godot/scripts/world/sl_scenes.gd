@@ -1262,8 +1262,10 @@ func _jungle_world() -> void:
 	right.rotation.y = PI
 	_anchor(right, 1.07, 0, 1.12, true, 0.9)
 	await _hanging_snake("#9a5ee8", "#6436b8", "#ffe9c8", "#6b3f22", ["#3f9a3a", "#4caf50", "#72c055"])
-	var lad := _ladder_prop(0, 0, 6, -0.28, 0.4)
-	_anchor(lad, -0.86, -0.2, 1.06, true, 0.6)
+	# leaning on the left tree, tipped away from the table, so it stands on the ground behind the rim instead of
+	# running through the table top
+	var lad := _ladder_prop(0, 0, 6, 0.24, 0.4)
+	_anchor(lad, -0.82, -0.05, 1.08, true, 0.6)
 	var fl := _group(_w, 0, 0, 0)
 	_anchor(fl, -0.92, -0.66, 0.72, true, 0.8)
 	_bush(fl, 0, 0, 1.3, ["#4caf50", "#66bb4a"], ["#ff8fb3", "#ffd34d"])

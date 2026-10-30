@@ -51,6 +51,7 @@ const NAV_H := 60.0
 const G := 16.0                          # screen gutter (UIKit.SCREEN_GUTTER)
 const BOTTOM_MIN := 20.0                 # gesture-nav phones report 0 in immersive mode: keep this clear anyway
 const PILL_H := 52.0                     # the Continue match pill
+const QUICK_INNER := 40.0                # its round icon and Resume pill: (PILL_H - 40) / 2 = 6 px all round, like the row's sides
 const SWITCH_H := 56.0                   # (its halves: 48 px tall)
 const PLAY_H := 76.0                     # the one big QUICK MATCH
 const MODE_H := 64.0                     # the row of three: Friends / Computer / Pass & Play
@@ -333,7 +334,7 @@ func _build_quick() -> void:
 	_fill(r)
 	r.offset_left = 6; r.offset_right = -6
 	_quick.add_child(r)
-	_quick_icon = UIKit.icon(HI % "resume", 36)
+	_quick_icon = UIKit.icon(HI % "resume", QUICK_INNER)
 	_quick_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(_quick_icon)
 	var col := UIKit.vbox(-2)
@@ -350,7 +351,14 @@ func _build_quick() -> void:
 	_quick_go = UIKit.button("Resume", "teal", "xs")
 	_quick_go.mouse_filter = Control.MOUSE_FILTER_IGNORE      # the whole pill is the button
 	_quick_go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_quick_go.custom_minimum_size.x = 84
+	_quick_go.custom_minimum_size = Vector2(92, QUICK_INNER)
+	# a pill inside the pill, inset as far as the round icon on the left, so both ends read the same
+	for k in ["normal", "hover", "pressed", "disabled", "hover_pressed"]:
+		var st := _quick_go.get_theme_stylebox(k)
+		if st is StyleBoxFlat:
+			st = st.duplicate()
+			(st as StyleBoxFlat).set_corner_radius_all(UIKit.R.pill)
+			_quick_go.add_theme_stylebox_override(k, st)
 	r.add_child(_quick_go)
 	_quick.visible = false
 
