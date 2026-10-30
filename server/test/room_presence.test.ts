@@ -182,7 +182,7 @@ describe("hibernation and cleanup", () => {
   });
 
   it("a room with no action for the stale timeout is deleted, connected or not", async () => {
-    const { code, cs } = await lobbyOf(2, { timeScale: 0.00005 }); // 2 h -> 360 ms
+    const { code, cs } = await lobbyOf(2, { timeScale: 0.0002 }); // 2 h -> 1.44 s (room for both joins on a busy run)
     const e = await cs[0].waitFor((m) => m.t === "error" && m.code === "not_found", 5000);
     expect(e.msg).toMatch(/closed/);
     expect(await cs[0].waitClosed()).toBe(4004);

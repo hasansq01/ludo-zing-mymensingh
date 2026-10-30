@@ -309,6 +309,8 @@ export interface TestHooks {
   slPos?: number[];
   /** Multiplies every duration in TIMING / QUICK / ghost delays (e.g. 0.01 makes a 20 s grace 200 ms). */
   timeScale?: number;
+  /** Quick rooms: the auto-start window in ms, unscaled (tests that scale time but join at test speed). */
+  autoStartMs?: number;
   /** Replaces LIMITS.ratePerSec (test clients play far faster than people tap). */
   ratePerSec?: number;
   /** Replaces the ghosts' 25% chance of reacting to an event (1 = always, 0 = never). */
@@ -626,7 +628,7 @@ export class Room extends DurableObject<Env> {
       touched: now,
       emptySince: now,
       alarmAt: 0,
-      quick: { size, startBy: now + this.ms(QUICK.autoStart), timers, overAt: 0, table: spec.table ?? { tier: "practice", entry: 0 } },
+      quick: { size, startBy: now + (this.hooks.autoStartMs ?? this.ms(QUICK.autoStart)), timers, overAt: 0, table: spec.table ?? { tier: "practice", entry: 0 } },
     };
     this.commit();
     const tokens: Record<string, string> = {};

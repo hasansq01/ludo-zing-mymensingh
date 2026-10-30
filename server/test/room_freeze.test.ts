@@ -30,7 +30,7 @@ interface Table {
 
 /** A started coin-table quick match with `humans` guests (each connected and started) and ghosts for the rest. */
 async function tableMatch(game: "ludo" | "sl", size: number, humans: number, room: TestHooks = {}, table = "t100"): Promise<Table> {
-  await mm(game, size, table).testHooks({ wait: 100, room: { ratePerSec: 1000, timeScale: SCALE, emoteChance: 0, ...room } } as never);
+  await mm(game, size, table).testHooks({ wait: 100, room: { ratePerSec: 1000, timeScale: SCALE, autoStartMs: 5000, emoteChance: 0, ...room } } as never);
   const gs: Guest[] = [];
   for (let k = 0; k < humans; k++) gs.push(await guest());
   const qs: QuickClient[] = [];
