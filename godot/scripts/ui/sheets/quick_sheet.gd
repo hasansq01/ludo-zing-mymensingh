@@ -14,9 +14,10 @@ extends Sheet
 ##   await s.reveal(seats, my_colour)            # then the match
 ##   s.set_error("Online play is down for maintenance.")   # back to the picker with the message
 ##   s.set_tables(server_answer)                 # GET /v1/tables: its unlocked / affordable flags win over ours
-## Table rows (CoinTables.rows): the entry, "Win N" (the prize at this player count: 2 players the pool, 4 players 1st
-## place's 75 %), a lock with "Level N" when locked, greyed out when you can't pay it. A locked row says what unlocks it;
-## an unaffordable one says what it costs, or asks for the broke popup (`broke_requested`) when you have < 100 coins.
+## Table rows (CoinTables.rows): the entry, "Win N" (what 1st place receives at this player count: the prize and the 20 %
+## house bonus, CoinTables.first_total; "Win 228" for the 100 table with 2 players), a lock with "Level N" when locked, greyed out when you can't pay it. A tap on a locked row says what
+## unlocks it, one on an unaffordable row what it costs (a toast, the error haptic and a shake of the row: the sheet
+## doesn't change), or asks for the broke popup (`broke_requested`) when you have < 100 coins.
 ## stage: "pick" | "searching" | "matched" | "found" | "error".
 
 signal find(players: int)
@@ -209,12 +210,12 @@ func _on_row(id: String) -> void:
 		if r.id != id:
 			continue
 		if bool(r.locked):
-			set_note("Reach level %d to play that table." % int(r.level))
+			UIKit.deny(self, "Reach level %d to play that table." % int(r.level), row_of(id))
 		elif not bool(r.affordable):
 			if CoinTables.is_broke(coins):
 				broke_requested.emit()
 			else:
-				set_note("You need %s coins for that table." % Fmt.coins_full(int(r.entry)))
+				UIKit.deny(self, "You need %s coins for that table." % Fmt.coins_full(int(r.entry)), row_of(id))
 		else:
 			select_table(id)
 		return
@@ -229,7 +230,7 @@ func select_table(id: String) -> void:
 		tr.set_on(str(tr.row.id) == id)
 	table_changed.emit(id)
 
-## A line over the picker without leaving it (a table you can't play).
+## A line over the picker (a failed search puts its message here through set_error).
 func set_note(text: String) -> void:
 	note_label.text = text
 	note_label.visible = text != "" and stage in ["pick", "error"]
@@ -428,11 +429,11 @@ class Slot extends VBoxContainer:
 
 
 ## One coin table in the picker: the entry (coin and amount, "Practice" for the free one) and, at the right, the prize
-## ("Win 180"), "Free", or a lock with "Level 3". Selected: the gold ring; locked or unaffordable: greyed out.
+## ("Win 228"), "Free", or a lock with "Level 3". Selected: the gold ring; locked or unaffordable: greyed out.
 class TableRow extends PanelContainer:
 	signal picked
 
-	const PRIZE_W := 124.0                  ## the right column's minimum width: "Level 10", "Win 180"; it grows for "Win 150,000"
+	const PRIZE_W := 124.0                  ## the right column's minimum width: "Level 10", "Win 228"; it grows for "Win 150,000"
 	var row: Dictionary
 	var on := false
 	var title: Label
@@ -457,10 +458,11 @@ class TableRow extends PanelContainer:
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		h.add_child(title)
-		# The right column has one width on every row: the lock sits at its left edge, the text ends at its right edge,
-		# so locks line up and "Free" / "Win N" / "Level N" share one right edge whatever their length.
+		# The right column has one width on every row and its content ends at the right edge: "Free" / "Win N" /
+		# "Level N" share one right edge whatever their length, and the lock sits right before "Level N".
 		var right := UIKit.hbox(UIKit.SPACE.xs)
 		right.custom_minimum_size = Vector2(PRIZE_W, 0)
+		right.alignment = BoxContainer.ALIGNMENT_END
 		right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if bool(row.locked):
 			var lock := UIKit.icon("ic_lock", 18)
@@ -470,10 +472,9 @@ class TableRow extends PanelContainer:
 		elif entry <= 0:
 			prize_label = UIKit.label("Free", UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900))
 		else:
-			prize_label = UIKit.label("Win %s" % Fmt.coins_full(int(row.prize)), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
+			prize_label = UIKit.label("Win %s" % Fmt.coins_full(int(row.get("total", row.prize))), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
 		prize_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		prize_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		prize_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		prize_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		right.add_child(prize_label)
 		h.add_child(right)

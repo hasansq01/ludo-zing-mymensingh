@@ -112,7 +112,7 @@ func _build_card() -> PanelContainer:
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var v := UIKit.vbox(UIKit.SPACE.md)
 	card.add_child(v)
-	var hello := UIKit.title("Welcome to the café!", UIKit.FS.h1)
+	var hello := UIKit.title("Welcome to Ludo Zing!", UIKit.FS.h1)
 	hello.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hello.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hello)
@@ -199,8 +199,8 @@ func _layout() -> void:
 	var px := clampf((inner - (per - 1.0) * UIKit.SPACE.lg) / per - 8.0, 40.0, TILE)
 	for t in _tiles.values():
 		(t as AvatarPick).set_px(px)
-	var lw := clampf(minf(w * 0.72, (h - 560.0) * 1.15), 150.0, 280.0)
-	(_logo.get_parent() as Control).custom_minimum_size = Vector2(lw, lw * 266.0 / 320.0)
+	var lw := clampf(minf(w * 0.72, (h - 600.0) * 1.3), 112.0, 280.0)    # short phones: a smaller logo so the card fits
+	(_logo.get_parent() as Control).custom_minimum_size = Vector2(lw, lw * BrandLogo.VIEW.y / BrandLogo.VIEW.x)
 
 ## The pawns bob around the logo (index.html @keyframes bob, 2.6 s, staggered); the card rises over the keyboard.
 func _process(delta: float) -> void:
@@ -211,10 +211,8 @@ func _process(delta: float) -> void:
 		var ph: float = (_t + float(p.get_meta("delay"))) / 2.6 * TAU
 		p.position = Vector2(s.x * box.size.x, s.y * box.size.y + sin(ph) * 6.0)
 	var kb := 0.0
-	if name_edit and name_edit.has_focus() and DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
-		var win := DisplayServer.window_get_size()
-		if win.y > 0:
-			kb = maxf(0.0, DisplayServer.virtual_keyboard_get_height() * size.y / float(win.y) - safe_bottom)
+	if name_edit and name_edit.has_focus():
+		kb = maxf(0.0, Sheet.keyboard_inset(size.y) - safe_bottom)
 	if absf(kb - _kb) > 1.0:
 		_kb = kb
 		_layout()

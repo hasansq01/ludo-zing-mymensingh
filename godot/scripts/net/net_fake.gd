@@ -19,6 +19,9 @@ extends RefCounted
 ## Quick rooms (Room.quick): no lobby, no host (welcome.host -1), settings / start -> bad_action, seats reserved by
 ## token, the match starts when every matched person has said hello (or start_quick(): the server's 10 s), ghost
 ## seats look exactly like people (players[c] = "human", bot false, online true) and are played by step().
+## "Ask before pairing" (PROTOCOL.md): every room deals each person's own hello.pair_ask to their colour
+## (state.pair_ask_by; a `settings` pair_ask is ignored); ghosts are asked too and answer by ghost_pair_odds() (the
+## server's GHOST_PAIR; Room.ghost_pair forces it: 1 yes, 0 no); a timeout or a bot answers default_pair_answer().
 ## Play on (PROTOCOL.md "Play on after the first finish"): `over` only at the end of the game; after an act (and a
 ## leave) the room sends {k: "end"} when no real person (not a ghost, not left) is left unfinished while one is still
 ## seated, like the server.
@@ -30,8 +33,9 @@ extends RefCounted
 ## Coin tables (ECONOMY_V1.md 3): the queue's `table=` (a Hub / Matchmaker has `coins` and `player_level`; the entry is
 ## taken at hello, `error locked {level}` / `error coins {short}` otherwise, refunded when the entry leaves the queue);
 ## a quick room carries its table (Room.table {tier, entry}) and its `over` has `match_id` and `table {tier, entry,
-## payouts {"<colour>": coins}}` (CoinTables.prize by final place, seats that left get none; Room.on_settle(account,
-## coins) pays the person). mm.tables_msg() is GET /v1/tables' answer for the current level and coins.
+## payouts {"<colour>": coins}, bonus {"<colour>": coins} (1st place only, CoinTables.bonus), refunds {}}`
+## (CoinTables.prize by final place, seats that left get none; Room.on_settle(account, coins) pays the person: the
+## payout plus the bonus). mm.tables_msg() is GET /v1/tables' answer for the current level and coins.
 ## Re-rolls (ECONOMY_V1.md 4): a roll that ends the turn badly (Ludo: need a 6 / stuck; S&L: a snake) of an eligible seat
 ## (Room.rr_free / member.rr {free, gems}: free re-rolls first, else 5 gems) opens an offer: `reroll_offer {n, until,
 ## now, free, gems, cost}` to that person and `hold {c, until}` to everyone; {t: "reroll", n} answers with `rerolled`,
@@ -118,7 +122,8 @@ class Room extends RefCounted:
 	var code := "K7QX2M"
 	var members: Array = []               ## {id, pid, token, name, avatar, frame, level, online, pipe, ghost}
 	var host: Variant = -1                ## member ids are numbers, like the real server's
-	var settings := {teams = false, pair_ask = false, game = "ludo"}
+	var settings := {teams = false, game = "ludo"}
+	var ghost_pair := -1.0                ## tests: a ghost's pair answer (1 yes, 0 no; -1: ghost_pair_odds, like the server)
 	var game := "ludo"                    ## the match's game (settings.game at the start)
 	var quick := false                    ## a quick-match room (see the class notes)
 	var S := {}
@@ -228,8 +233,7 @@ class Room extends RefCounted:
 				else:
 					if m.has("teams"):
 						settings.teams = bool(m.teams)
-					if m.has("pair_ask"):
-						settings.pair_ask = bool(m.pair_ask)
+					# (pair_ask from older clients is ignored: "Ask before pairing" is everyone's own)
 					if m.has("game"):
 						if not str(m.game) in ["ludo", "sl"]:
 							_send(pipe, {t = "error", code = "bad_message", msg = "game"})
@@ -305,6 +309,8 @@ class Room extends RefCounted:
 					(mem.pipe as Pipe).server_close()   # the member's older socket (4001)
 				mem.pipe = pipe
 				mem.online = true
+				if m.get("pair_ask") is bool:
+					mem.pair_ask = m.pair_ask             # dealt to the member's colour at the start
 				for st in seats:
 					if st.id == mem.id:
 						st.online = true
@@ -343,7 +349,7 @@ class Room extends RefCounted:
 		var mem := {id = _ids, pid = str(m.get("pid", "")), token = "tok%d_%d" % [_ids, rng.randi() % 100000],
 			name = str(m.get("name", "Player")).substr(0, 16), avatar = str(m.get("avatar", "")),
 			frame = str(m.get("frame", "")), level = 1, online = true, pipe = pipe, ghost = false,
-			session = str(m.get("session", ""))}
+			session = str(m.get("session", "")), pair_ask = m.get("pair_ask", false) == true}
 		members.append(mem)
 		if int(host) < 0:
 			host = mem.id
@@ -394,7 +400,11 @@ class Room extends RefCounted:
 			var players := ["off", "off", "off", "off"]
 			for k in count:
 				players[cols[k]] = "human"
-			S = LudoRules.new_game(players, bool(settings.teams), {pair_ask = bool(settings.pair_ask)})
+			# "Ask before pairing": each person's own (hello.pair_ask); ghosts are asked and answer like people
+			var by := [false, false, false, false]
+			for k in count:
+				by[cols[k]] = bool(members[k].get("ghost", false)) or members[k].get("pair_ask", false) == true
+			S = LudoRules.new_game(players, bool(settings.teams), {pair_ask = false, pair_ask_by = by})
 			for st in seats:
 				S.names[st.color] = st.name
 		n = 0
@@ -636,7 +646,8 @@ class Room extends RefCounted:
 		_auto(not is_cpu(c))
 		return true
 
-	## The current player's step times out: the server acts for them (roll; auto move or the AI's; pair = yes).
+	## The current player's step times out: the server acts for them (roll; auto move or the AI's; pair: what would
+	## have happened unasked, default_pair_answer).
 	func timeout() -> void:
 		if playing:
 			rr_offer = {}
@@ -653,7 +664,24 @@ class Room extends RefCounted:
 					i = LudoRules.pick_ai(S, LudoRules.units(S).map(func(u): return u.token), rng, "normal" if ghost else "easy")
 				_act({k = "move", c = c, i = i})
 			"pair_ask":
-				_act({k = "pair", c = c, yes = true})
+				var yes := LudoRules.default_pair_answer(S)
+				if ghost:
+					yes = rng.randf() < (ghost_pair if ghost_pair >= 0.0 else ghost_pair_odds(S))
+				_act({k = "pair", c = c, yes = yes})
+
+	## The server's ghostPairOdds (server/src/ghosts.ts GHOST_PAIR): how often a ghost pairs up. A single can't take a
+	## pair and a pair blocks the singles behind it, but it moves half as far on even rolls only.
+	static func ghost_pair_odds(s: Dictionary) -> float:
+		var p: Dictionary = s.get("pending", {}) if s.get("pending") is Dictionary else {}
+		if not p.has("to"):
+			return 0.7
+		var to := int(p.to)
+		if to >= 45:
+			return 0.25                       # near the home lane: it splits there anyway
+		var sq := LudoRules.abs_index(int(p.c), to)
+		if LudoRules.SAFE.has(sq):
+			return 0.3                        # already safe: pairing only slows the pawns
+		return 0.95 if LudoRules.threats_at(s, int(p.c), sq) > 0 else 0.7
 
 	# ---------- re-rolls ----------
 
@@ -793,7 +821,7 @@ class Room extends RefCounted:
 			msg = {t = "over", finished = S.finished.duplicate(), winner = int(S.winner), standings = LudoRules.standings(S)}
 		msg.match_id = match_id()
 		if quick:
-			msg.table = {tier = str(table.tier), entry = int(table.entry), payouts = payouts()}
+			msg.table = {tier = str(table.tier), entry = int(table.entry), payouts = payouts(), bonus = bonuses(), refunds = {}}
 		return msg
 
 	func match_id() -> String:
@@ -819,14 +847,30 @@ class Room extends RefCounted:
 			out[str(int(e.color))] = CoinTables.prize(entry, seats.size(), k)
 		return out
 
-	## Pays the people their payout once, at `over`.
+	## The house bonus ("<colour>": coins): the 1st place among the seats that stayed, at a paid table only.
+	func bonuses() -> Dictionary:
+		var out := {}
+		var entry := int(table.entry)
+		if entry <= 0:
+			return out
+		var pays := payouts()
+		var first := -1
+		for key: String in pays:
+			if int(pays[key]) > 0 and (first < 0 or int(pays[key]) > int(pays[str(first)])):
+				first = int(key)
+		if first >= 0:
+			out[str(first)] = CoinTables.bonus(entry, seats.size())
+		return out
+
+	## Pays the people their payout and the bonus once, at `over`.
 	func _settle() -> void:
 		if settled or not quick:
 			return
 		settled = true
 		var pays := payouts()
+		var bonus := bonuses()
 		for mem in members:
-			var pay := int(pays.get(str(_color(mem.id)), 0))
+			var pay := int(pays.get(str(_color(mem.id)), 0)) + int(bonus.get(str(_color(mem.id)), 0))
 			if pay > 0 and on_settle.is_valid() and str(mem.get("account", "")) != "":
 				on_settle.call(str(mem.account), pay)
 

@@ -58,16 +58,20 @@ func _lobby() -> void:
 	s.update(_lobby_msg(2), true)
 	check("lobby: host with a friend can start", not s.start_button.disabled and s.can_start())
 	var sent := []
-	s.settings_changed.connect(func(t: bool, p: bool): sent.append([t, p]))
-	s.pair_switch.button_pressed = true
-	check("lobby: the host's Ask before pairing goes out", sent == [[false, true]], sent)
+	s.settings_changed.connect(func(t: bool): sent.append(t))
+	s.update(_lobby_msg(2, "m1", false, true), true)      # (an old server's settings.pair_ask: nothing shows it)
+	check("lobby: no Ask before pairing room rule (everyone plays their own Settings choice)",
+		s.find_child("PairAsk", true, false) == null and not ("pair_switch" in s) and sent.is_empty())
+	s.update(_lobby_msg(4), true)
+	s.teams_switch.button_pressed = true
+	check("lobby: the host's Teams goes out", sent == [true], sent)
 	s.update(_lobby_msg(2, "m1", true), true)
 	check("lobby: Teams on with 2: can't start", s.start_button.disabled and not s.teams_switch.disabled)
 	s.update(_lobby_msg(4, "m1", true), true)
 	check("lobby: Teams with 4: can start", not s.start_button.disabled and not s.teams_switch.disabled and s.count_label.text == "4 of 4")
 	s.update(_lobby_msg(3, "m2"), false)
 	check("lobby: guests wait for the host", s.start_button.disabled and s.start_button.text == "Waiting for host…")
-	check("lobby: guests can't change the rules", s.pair_switch.disabled and s.teams_switch.disabled)
+	check("lobby: guests can't change the rules", s.teams_switch.disabled)
 	var halves: Array = s.game_picker.get_children()
 	check("lobby: guests see the game picker as it is (not the grey disabled look), just not tappable",
 		halves.all(func(b): return not b.disabled and b.mouse_filter == Control.MOUSE_FILTER_IGNORE) and s.game_picker.modulate.a == 1.0)
@@ -76,7 +80,7 @@ func _lobby() -> void:
 	(halves[1] as Button).pressed.emit()
 	check("lobby: …and a pick by a guest changes nothing", picked.is_empty() and s.game == "ludo", [picked, s.game])
 	sent.clear()
-	s.pair_switch.button_pressed = not s.pair_switch.button_pressed
+	s.teams_switch.button_pressed = not s.teams_switch.button_pressed
 	check("lobby: …and nothing is sent", sent.is_empty())
 	var started := []
 	s.start_pressed.connect(func(): started.append(1))

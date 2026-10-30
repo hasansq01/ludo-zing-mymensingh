@@ -247,6 +247,29 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
         return d
     }
 
+    // ---------- diagnostics (crash / unexpected-exit reports: Diag.kt, res://scripts/core/crash_watch.gd) ----------
+
+    /**
+     * JSON text: the device and app facts {sdk, release, manufacturer, model, soc, version_code, version_name,
+     * installer, ram_*, low_ram_device, mem_class_mb, ...} and, on Android 11+, `exits`: the last [maxExits]
+     * ApplicationExitInfo records of this app {reason, code, status, importance, importance_name, pss_kb, rss_kb, at,
+     * description, pid, summary?, trace?}. Only the newest ANR / native crash newer than [sinceMs] carries its trace.
+     * Never throws ("{}" at worst).
+     */
+    @UsedByGodot
+    fun diag_info(sinceMs: Long, maxExits: Int): String = try {
+        Diag.info(appContext(), sinceMs, maxExits).toString()
+    } catch (t: Throwable) {
+        Log.w(TAG, "diag_info failed", t)
+        "{}"
+    }
+
+    /** Android 11+: [summary] (the game's session id, <= 128 bytes) comes back with this process's exit record. */
+    @UsedByGodot
+    fun diag_set_state(summary: String) {
+        guard("diag_set_state") { Diag.setSummary(appContext(), summary) }
+    }
+
     // ---------- push (FCM) ----------
 
     /** Initialises Firebase from the four values and fetches the FCM token. -> push_token(token) or push_failed(code). */

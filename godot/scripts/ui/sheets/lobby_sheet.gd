@@ -5,17 +5,18 @@ extends Sheet
 ## the members in join order (avatar, level, name, online dot, the seat colour they will play), the house rules
 ## (Ludo only, one grouped card as in Settings) and the way out. All but the way out scroll; on a phone 4 members and
 ## the rules don't fit, so the sheet shows the scroll_hint chevron while there is more below.
-##   Host:   the game, Teams (2 v 2) (only with exactly 4 players), Ask before pairing, Start game (needs 2 or more).
+##   Host:   the game, Teams (2 v 2) (only with exactly 4 players), Start game (needs 2 or more). ("Ask before
+##           pairing" is not a room rule: everyone plays their own Settings choice.)
 ##   Others: the same choices, read only, and "Waiting for host…".
 ## Leave (and Back) asks first. The sheet has no close button: leaving is a choice, not a dismissal.
 ##
 ##   var s := LobbySheet.new(code, my_member_id)
 ##   s.update(lobby_msg, is_host)               # every `lobby` message
 ##   s.set_status("reconnecting")               # NetClient.status
-##   s.settings_changed.connect(func(teams, pair_ask): ...); s.start_pressed.connect(...); s.leave_pressed.connect(...)
+##   s.settings_changed.connect(func(teams): ...); s.start_pressed.connect(...); s.leave_pressed.connect(...)
 ##   s.game_changed.connect(func(game): ...)    # the host picked "ludo" | "sl"
 
-signal settings_changed(teams: bool, pair_ask: bool)
+signal settings_changed(teams: bool)
 signal game_changed(game: String)
 signal start_pressed
 signal leave_pressed
@@ -28,7 +29,6 @@ var me_id := ""
 var host := false
 var members: Array = []
 var teams := false
-var pair_ask := false
 var game := "ludo"
 
 var code_label: Label
@@ -37,10 +37,8 @@ var share_button: Button
 var start_button: Button
 var leave_button: Button
 var teams_switch: SettingsSheet.Switch
-var pair_switch: SettingsSheet.Switch
 var game_picker: HBoxContainer
 var _rules_cap: Control
-var _pair_row: Control
 var count_label: Label
 var note: Label
 var status_pill: PanelContainer
@@ -74,6 +72,10 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	game_picker.name = "Game"
 	UIKit.fit_segmented(game_picker)                  # "Snakes & Ladders" gets the room it needs before anything shrinks
 	box.add_child(game_picker)
+	game_picker.mouse_filter = Control.MOUSE_FILTER_PASS    # a guest's (untappable) picker still answers a tap
+	game_picker.gui_input.connect(func(e: InputEvent) -> void:
+		if not host and Sheet._is_tap(e):
+			UIKit.deny(self, "Only the host can pick the game.", game_picker))
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	var cap := UIKit.caption("Players")
 	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -91,15 +93,12 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	teams_switch = SettingsSheet.Switch.new(false)
 	teams_switch.name = "Teams"
 	teams_switch.toggled.connect(func(_on: bool): _changed())
+	UIKit.deny_disabled(teams_switch, func() -> String:
+		return "Only the host can change the rules." if not host else "Teams need exactly 4 players.")
 	_teams_row = _rule_row("Teams (2 v 2)", "Red + Yellow vs Green + Blue", teams_switch)
 	_teams_note = _teams_row.find_child("Note", true, false) as Label
 	rules.add_child(_teams_row)
-	rules.add_child(_rule_divider())
-	pair_switch = SettingsSheet.Switch.new(false)
-	pair_switch.name = "PairAsk"
-	pair_switch.toggled.connect(func(_on: bool): _changed())
-	_pair_row = _rule_row("Ask before pairing", "You choose when two pawns meet", pair_switch)
-	rules.add_child(_pair_row)
+	# ("Ask before pairing" is not a room rule: everyone plays their own Settings choice)
 	_rules_card = rules.get_parent() as Control
 	box.add_child(_rules_card)
 	scroll_hint = true                    # 4 players and the rules don't fit a phone: show that the list goes on
@@ -114,6 +113,14 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	start_button.pressed.connect(func():
 		if not start_button.disabled:
 			start_pressed.emit())
+	UIKit.deny_disabled(start_button, func() -> String:         # why the game can't start yet
+		if not host:
+			return "Waiting for the host to start the game."
+		if status_pill.visible:
+			return "Reconnecting. Hold on a moment."
+		if members.size() < 2:
+			return "Wait for a friend to join first."
+		return "Teams need exactly 4 players.")
 	for b: Button in [leave_button, start_button]:
 		UIKit.fit_text(b, 12)
 	var row := add_row([leave_button, start_button])
@@ -308,7 +315,6 @@ func update(msg: Dictionary, you_host: bool) -> void:
 	members = (msg.get("members", []) as Array).duplicate(true) if msg.get("members") is Array else []
 	var s: Dictionary = msg.get("settings", {}) if msg.get("settings") is Dictionary else {}
 	teams = bool(s.get("teams", false))
-	pair_ask = bool(s.get("pair_ask", false))
 	game = str(s.get("game", "ludo")) if str(s.get("game", "ludo")) in ["ludo", "sl"] else "ludo"
 	set_kicker(_kicker_text())
 	_refresh()
@@ -346,14 +352,10 @@ func _refresh() -> void:
 		r.visible = ludo
 	teams_switch.set_pressed_no_signal(teams)
 	teams_switch._set_t(1.0 if teams else 0.0)
-	pair_switch.set_pressed_no_signal(pair_ask)
-	pair_switch._set_t(1.0 if pair_ask else 0.0)
 	_quiet = false
 	var four := members.size() == 4
 	teams_switch.disabled = not host or (not four and not teams)
-	pair_switch.disabled = not host
-	for sw: Button in [teams_switch, pair_switch]:
-		sw.modulate.a = 1.0 if not sw.disabled else 0.5
+	teams_switch.modulate.a = 1.0 if not teams_switch.disabled else 0.5
 	_teams_note.text = "Red + Yellow vs Green + Blue" if four else "Needs exactly 4 players"
 	start_button.disabled = not can_start()
 	start_button.text = "Start game" if host else "Waiting for host…"
@@ -376,8 +378,7 @@ func _changed() -> void:
 	if _quiet or not host:
 		return
 	teams = teams_switch.button_pressed
-	pair_ask = pair_switch.button_pressed
-	settings_changed.emit(teams, pair_ask)
+	settings_changed.emit(teams)
 	_refresh()
 
 func copy_code() -> void:

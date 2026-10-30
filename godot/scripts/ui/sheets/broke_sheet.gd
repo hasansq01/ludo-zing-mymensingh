@@ -46,6 +46,11 @@ func _init(bonus_ := {}) -> void:
 	bonus_button.name = "Bonus"
 	_bonus_text = bonus_button.find_child("Text", true, false) as Label
 	bonus_button.pressed.connect(_claim)
+	UIKit.deny_disabled(bonus_button, func() -> String:           # the daily bonus is used: say when it is back
+		if _busy or bool(bonus.available):
+			return ""
+		var left := int(bonus.next_at) - int(Time.get_unix_time_from_system())
+		return "Daily bonus is back in %s." % Fmt.until(left) if left > 0 else "Daily bonus is back tomorrow.")
 	body.add_child(bonus_button)
 	video_button = UIKit.button_with("Watch a video: +%s coins" % Fmt.coins_full(REFILL), UIKit.icon("coin", 26), "teal", "md")
 	video_button.name = "Video"

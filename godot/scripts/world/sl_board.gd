@@ -227,6 +227,8 @@ func _make() -> void:
 	_pad_lip.visible = false
 	fx = Node3D.new()
 	add_child(fx)
+	_bite = SnakeBite.new()                 # (built with the board, hidden: the first snake doesn't hitch)
+	add_child(_bite)
 
 
 # ---------- squares -> board ----------
@@ -693,8 +695,9 @@ func _process(delta: float) -> void:
 		var g: Node3D = t.node
 		if not t.anim:
 			g.position = g.position.lerp(t.target, k)
-		var s: float = g.scale.x + (float(t.scale) - g.scale.x) * ks
-		g.scale = Vector3(s, s, s)
+		if not t.get("bitten", false):                  # (the snake's gulp scales the pawn itself)
+			var s: float = g.scale.x + (float(t.scale) - g.scale.x) * ks
+			g.scale = Vector3(s, s, s)
 		var on := pi == current
 		t.ring.visible = on
 		t.mat.emission_energy_multiplier = (0.08 + pulse * 0.16) if on else 0.0
@@ -719,6 +722,12 @@ func _stop(t: Dictionary) -> void:
 	t.tw = null
 	if t.has("node") and is_instance_valid(t.node):
 		(t.node as Node3D).rotation = Vector3.ZERO
+	if t.get("bitten", false):                          # cut off mid-gulp: the pawn is back, the snake gone
+		t.bitten = false
+		if is_instance_valid(t.node):
+			(t.node as Node3D).visible = true
+		if _bite:
+			_bite.finish()
 
 func _dur(sec: float, speed: float) -> float:
 	return maxf(0.01, sec * speed * pace)
@@ -807,32 +816,124 @@ func _sparkle(at: Vector3, life: float) -> void:
 	tw.chain().tween_property(mi, "scale", Vector3.ZERO, tl * 0.7).set_ease(Tween.EASE_IN)
 	tw.chain().tween_callback(mi.queue_free)
 
-## Ride down the snake from its head along the body to the tail.
+var reduce_motion := -1                # snakes glide instead of biting: 1 yes, 0 no, -1 as the Reduce motion setting
+var _bite: SnakeBite                    # the snake's head and bulge (built once with the board, reused)
+
+func _reduced() -> bool:
+	return reduce_motion == 1 or (reduce_motion < 0 and LudoBoard._pref("reduce_motion"))
+
+## Down the snake from its head to its tail: the snake eats the pawn (SnakeBite: a head rises at the painted head,
+## gulps the pawn, a bulge runs down the body) and the pawn pops out of the tail onto the tail square. It takes the
+## old slide's time (0.6 s + 0.05 s per square of body) plus SnakeBite.EXTRA, times the speed. Reduce motion: a plain
+## glide down the body.
 func slide(pi: int, head: int, tail: int, speed := 1.0) -> void:
 	var t: Dictionary = pawns[pi]
-	var path := PackedVector3Array([t.node.position])      # then along the painted body, head to tail
+	var g: Node3D = t.node
+	var a := g.position
+	var body := PackedVector3Array()                    # the painted body, head to tail
 	for q in snake_body(head):
-		path.append(grid_to_world(q))
+		body.append(grid_to_world(q))
 	var b := _move_to(pi, tail)
+	var total := a.distance_to(body[0]) + body[body.size() - 1].distance_to(b)
+	for j in range(1, body.size()):
+		total += body[j].distance_to(body[j - 1])
+	if _reduced():
+		await _glide(t, a, body, b, total, speed)
+		return
+	for o in pawns:                                     # (one snake at a time: an older gulp still running ends)
+		if not is_same(o, t) and o.get("bitten", false):
+			_stop(o)
+	t.anim = true
+	var tw := _tween(t)
+	var s := maxf(0.001, speed * pace)
+	var dur := _dur(0.6 + 0.05 * total / C + SnakeBite.EXTRA, speed)
+	var fw := body[0] - body[3]                         # the painted head looks away from the body
+	_bite.start(body, _snake_color(head), str(style.get("snakePattern", "")), _face(body[0], fw), dur / s)
+	t.bitten = true
+	var m := _bite.mouth()
+	var q := _bite.tail()
+	var sc0 := g.scale.x
+	tw.tween_method(func(sec: float):
+		var u := sec / s
+		_bite.pose(u)
+		_gulp_pose(t, u, a, m, q, b, sc0), 0.0, dur, dur)
+	await tw.finished
+	t.bitten = false
+	_bite.finish()
+	g.visible = true
+	g.position = b
+	g.rotation = Vector3.ZERO
+	g.scale = Vector3.ONE * float(t.scale)
+	t.anim = false
+
+## The pawn's part of the gulp at u (SnakeBite's seconds at speed 1): a startled hop into the open jaws (shrinking),
+## gone while it is swallowed, then out of the tail tip with a hop onto the tail square and a squash on landing.
+func _gulp_pose(t: Dictionary, u: float, a: Vector3, m: Vector3, q: Vector3, b: Vector3, sc0: float) -> void:
+	var g: Node3D = t.node
+	var sc: float = t.scale
+	if u < SnakeBite.CHOMP_AT + SnakeBite.SNAP * 0.5:
+		g.visible = true
+		var k := minf(u / SnakeBite.CHOMP_AT, 1.0)
+		var into := m - Vector3(0, 0.25, 0)
+		var p := a.lerp(into, _ease(k))
+		p.y = lerpf(a.y, into.y, k) + sin(k * PI) * 1.25 + maxf(0.0, (u - SnakeBite.CHOMP_AT)) * -3.0
+		g.position = p
+		g.rotation = Vector3(sin(k * PI) * 0.5, 0, sin(k * TAU) * 0.25)
+		var shrink := lerpf(1.0, 0.48, clampf((k - 0.35) / 0.65, 0.0, 1.0))
+		g.scale = Vector3.ONE * sc0 * shrink
+	elif u < _bite.pop_at:
+		g.visible = false
+	else:
+		g.visible = true
+		var k := clampf((u - _bite.pop_at) / SnakeBite.POP, 0.0, 1.0)
+		var hop := minf(k / 0.75, 1.0)                  # the hop, then a squash on the square
+		var p := Vector3(q.x, TOP - 0.25, q.z).lerp(b, _ease(hop))
+		p.y += sin(hop * PI) * 0.85
+		g.position = p
+		g.rotation = Vector3(0, 0, sin(hop * PI) * -0.35)
+		var grow := 0.35 + 0.65 * minf(hop * 1.6, 1.0) + sin(minf(hop * 1.6, 1.0) * PI) * 0.18
+		var sq := sin(clampf((k - 0.75) / 0.25, 0.0, 1.0) * PI)
+		g.scale = Vector3(1.0 + 0.14 * sq, 1.0 - 0.2 * sq, 1.0 + 0.14 * sq) * sc * grow
+
+## Reduce motion: glide down the painted body, no spin.
+func _glide(t: Dictionary, a: Vector3, body: PackedVector3Array, b: Vector3, total: float, speed: float) -> void:
+	var path := PackedVector3Array([a])
+	path.append_array(body)
 	path.append(b)
 	var lens := PackedFloat32Array([0.0])
 	for j in range(1, path.size()):
 		lens.append(lens[j - 1] + path[j].distance_to(path[j - 1]))
-	var total: float = lens[lens.size() - 1]
 	t.anim = true
 	var tw := _tween(t)
 	var g: Node3D = t.node
 	tw.tween_method(func(k: float):
-		var e := k * k * (3.0 - 2.0 * k)                # ease in and out: a whoosh down the body
-		var d := e * total
+		var d := k * k * (3.0 - 2.0 * k) * total
 		var j := 1
 		while j < path.size() - 1 and lens[j] < d:
 			j += 1
 		var seg := maxf(0.0001, lens[j] - lens[j - 1])
-		g.position = path[j - 1].lerp(path[j], clampf((d - lens[j - 1]) / seg, 0.0, 1.0))
-		var wob := sin(k * PI) * 0.32                   # a dizzy wobble on the way down
-		g.rotation = Vector3(sin(k * TAU * 2.5) * wob * 0.6, k * TAU * 1.0, sin(k * TAU * 3.0) * wob), 0.0, 1.0, _dur(0.6 + 0.05 * total / C, speed))
+		g.position = path[j - 1].lerp(path[j], clampf((d - lens[j - 1]) / seg, 0.0, 1.0)), 0.0, 1.0, _dur(0.6 + 0.05 * total / C, speed))
 	await tw.finished
 	g.position = b
-	g.rotation = Vector3.ZERO
 	t.anim = false
+
+## The colour of the snake with this head (as _paint_snakes paints it).
+func _snake_color(head: int) -> Color:
+	var cols: Array = style.get("snakes", SNAKE_COL)
+	var i: int = SnakesLaddersRules.SNAKES.keys().find(head)
+	return Color(str(cols[maxi(i, 0) % cols.size()]))
+
+## Which way the head looks: the painted head's way (fw) seen from straight above (the top view); the more the camera
+## looks across the board (the 3D view), the more it turns to face it, so its eyes and jaws face the player.
+func _face(at: Vector3, fw: Vector3) -> Vector3:
+	var f := Vector3(fw.x, 0, fw.z).normalized()
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam == null:
+		return f
+	var look := global_transform.basis.inverse() * -cam.global_transform.basis.z
+	var tilt := Vector2(look.x, look.z).length() / maxf(look.length(), 0.001)
+	var to_cam := to_local(cam.global_position) - at
+	to_cam.y = 0
+	if to_cam.length() < 0.01 or tilt < 0.15:
+		return f
+	return (f + to_cam.normalized() * tilt * 4.0).normalized()

@@ -19,7 +19,7 @@ signal start(config: Dictionary)
 const PAIR_NOTE := "Teams: Red + Yellow vs Green + Blue."     ## (old name kept for callers)
 const TEAMS_NOTE := PAIR_NOTE
 const LEVELS := [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]]
-const SWATCH_H := 58.0
+const SWATCH_H := 76.0
 const MAX_NAME := 12                    ## Pass & Play names (they must fit the game's player tiles)
 
 var game := "ludo"
@@ -36,7 +36,6 @@ var _swatches := []
 var names: Array = ["", "", "", ""]     # Pass & Play: what was typed per seat (seat order; "" = the default)
 var _box: VBoxContainer                 # where the options go (body; Pass & Play: a scroll area on short screens)
 var _seat_rows := []                    # Pass & Play: [{row, dot, edit}] per seat
-var _kb := 0.0
 
 
 func _init(game_: String, mode_: String) -> void:
@@ -79,6 +78,7 @@ func _init(game_: String, mode_: String) -> void:
 		var tb := _mode_seg.get_child(1) as Button                # below 4 players: the same look, faded (see _sync)
 		tb.add_theme_stylebox_override("disabled", tb.get_theme_stylebox("normal"))
 		tb.add_theme_color_override("font_disabled_color", Palette.MUTED)
+		UIKit.deny_disabled(tb, func() -> String: return "Teams need 4 players.")
 		_mode_box.add_child(_mode_seg)
 		_box.add_child(_mode_box)
 		if mode == "cpu":
@@ -93,24 +93,6 @@ func _init(game_: String, mode_: String) -> void:
 
 func _ready() -> void:
 	_nudge_modes.call_deferred()   # the Teams ⓘ pulses once the sheet is on screen (while unread)
-	set_process(mode == "local")   # the card rises over the on-screen keyboard while a name is typed
-
-## Pass & Play: while a name field has focus, lift the card above the on-screen keyboard.
-func _process(_dt: float) -> void:
-	var kb := 0.0
-	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD) and _editing():
-		var win := DisplayServer.window_get_size()
-		if win.y > 0:
-			kb = maxf(0.0, DisplayServer.virtual_keyboard_get_height() * size.y / float(win.y))
-	if absf(kb - _kb) > 1.0:
-		_kb = kb
-		(card.get_parent() as Control).offset_bottom = -kb
-
-func _editing() -> bool:
-	for r: Dictionary in _seat_rows:
-		if (r.edit as LineEdit).has_focus():
-			return true
-	return false
 
 
 # ---------- pieces ----------
@@ -144,7 +126,6 @@ func _seat_row(i: int) -> HBoxContainer:
 	e.select_all_on_focus = true
 	e.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
 	e.text_changed.connect(func(t: String): names[i] = t)
-	e.text_submitted.connect(func(_t: String): e.release_focus())
 	e.focus_exited.connect(func():
 		var clean := clean_name(e.text)
 		if clean != e.text:
@@ -358,9 +339,10 @@ class Swatch extends Button:
 		tooltip_text = Palette.NAMES[c]
 		var face: Color = Palette.PLAYER[c]
 		var deep: Color = Palette.PLAYER_DARK[c]
-		var normal := UIKit.box(face, UIKit.R.md, UIKit.BW.line, Color.WHITE)
+		# a light tint of the colour with its colour as the rim, so the real pawn in that colour reads on it
+		var normal := UIKit.box(face.lerp(Color.WHITE, 0.78), UIKit.R.md, UIKit.BW.line, face)
 		normal.border_width_bottom = UIKit.LIP.md
-		normal.border_color = Color.WHITE
+		normal.border_color = face
 		normal.shadow_size = 3
 		normal.shadow_offset = Vector2(0, 3)
 		normal.shadow_color = Color(deep, 0.55)
@@ -375,32 +357,24 @@ class Swatch extends Button:
 		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		button_down.connect(func(): add_theme_stylebox_override("normal", down); add_theme_stylebox_override("pressed", down))
 		button_up.connect(func(): add_theme_stylebox_override("normal", normal); add_theme_stylebox_override("pressed", normal))
-		var row := UIKit.hbox(UIKit.SPACE.xs)
+		# the pawn of this colour over its name (the colour-blind symbol rides on the pawn)
+		var row := UIKit.vbox(0)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		row.offset_bottom = -UIKit.LIP.md
-		if symbols:
-			var sym := UIKit.symbol(c, 18)
-			sym.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			row.add_child(sym)
-		var l := UIKit.label(Palette.NAMES[c], UIKit.FS.label, Color.WHITE, UIKit.font_body(900))
-		l.add_theme_color_override("font_outline_color", deep)
-		l.add_theme_constant_override("outline_size", 4)
-		l.add_theme_color_override("font_shadow_color", Color(deep, 0.6))
-		l.add_theme_constant_override("shadow_offset_y", 2)
-		l.add_theme_constant_override("shadow_offset_x", 0)
+		var pawn := SeatDot.new(symbols)
+		pawn.custom_minimum_size = Vector2(32, 38)
+		pawn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pawn.set_color(c)
+		row.add_child(pawn)
+		var l := UIKit.label(Palette.NAMES[c], UIKit.FS.label, deep, UIKit.font_body(900))
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		l.clip_text = true
 		row.add_child(l)
 		add_child(row)
-		if symbols:                          # too narrow for symbol + name (Yellow at 320 px): the symbol alone, larger
-			resized.connect(func():
-				var widest := UIKit.font_body(900).get_string_size("Yellow", HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.label).x
-				var need := 18.0 + UIKit.SPACE.xs + widest + 12.0     # the same choice on all four (the longest name)
-				l.visible = need <= size.x
-				var sym := row.get_child(0) as Control
-				sym.custom_minimum_size = Vector2(18, 18) if l.visible else Vector2(24, 24))
 		_ring = StyleBoxFlat.new()
 		_ring.draw_center = false
 		_ring.set_border_width_all(UIKit.BW.rim)
@@ -426,21 +400,22 @@ class Swatch extends Button:
 			draw_texture_rect(_check, Rect2(p + Vector2(5, 5), Vector2(d - 10, d - 10)), false, Palette.ON_HONEY)
 
 
-## Pass & Play: a seat's colour, a disc in the player colour with a white rim (and the colour-blind symbol).
+## A seat's colour as the board's pawn in that colour (PawnArt; with the colour-blind symbol on its body when that
+## setting is on). Same size on every row; used by the Pass & Play rows, the colour choices and the lobby.
 class SeatDot extends Control:
 	var c := 0
 	var symbols := false
 	var _sym: TextureRect
+	var rim := Color.TRANSPARENT          ## a white rim for a pawn on its own colour (the colour choices)
 
 	func _init(symbols_ := false) -> void:
 		symbols = symbols_
-		custom_minimum_size = Vector2(40, 40)
+		custom_minimum_size = Vector2(40, 44)
 		size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if symbols:
-			_sym = UIKit.symbol(0, 20)
-			_sym.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-			_sym.offset_left = -10; _sym.offset_top = -12; _sym.offset_right = 10; _sym.offset_bottom = 8
+			_sym = UIKit.symbol(0, 14)
+			_sym.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			add_child(_sym)
 
 	func set_color(c_: int) -> void:
@@ -450,9 +425,11 @@ class SeatDot extends Control:
 			_sym.texture = UIKit.svg("sym_" + str(Palette.SYMBOL[c]))
 		queue_redraw()
 
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_RESIZED and _sym:
+			var d := minf(size.x, size.y) * 0.3
+			_sym.size = Vector2(d, d)
+			_sym.position = Vector2(size.x / 2.0 - d / 2.0, size.y * 0.66 - d / 2.0)
+
 	func _draw() -> void:
-		var m := size / 2.0
-		var r := minf(size.x, size.y) / 2.0 - 1.0
-		draw_circle(m + Vector2(0, 2), r, Palette.PLAYER_DARK[c], true, -1.0, true)
-		draw_circle(m, r, Color.WHITE, true, -1.0, true)
-		draw_circle(m, r - UIKit.BW.rim, Palette.PLAYER[c], true, -1.0, true)
+		PawnArt.draw(self, Rect2(Vector2.ZERO, size).grow(-1.0), c, rim)

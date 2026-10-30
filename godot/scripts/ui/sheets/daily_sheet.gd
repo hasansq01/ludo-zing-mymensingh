@@ -71,6 +71,7 @@ func _build() -> void:
 	for k in 7:
 		var t := Tile.new(k)
 		t.tapped.connect(_claim)
+		t.refused.connect(func(text: String): UIKit.deny(self, text, t))
 		_tiles.append(t)
 		if k < 6:
 			grid.add_child(t)
@@ -85,6 +86,8 @@ func _build() -> void:
 	_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn.clip_text = true
 	_btn.pressed.connect(_claim)
+	UIKit.deny_disabled(_btn, func() -> String:                    # claimed today: the button says when to come back
+		return "" if _busy or _closing else "Come back tomorrow for the next reward.")
 	_btn.resized.connect(_fit_btn)
 	body.add_child(_btn)
 
@@ -380,6 +383,7 @@ static func draw_text_shadowed(ci: CanvasItem, f: Font, pos: Vector2, text: Stri
 ## One day of the calendar (.dtile): header band, art, value and status; the wide one is Day 7.
 class Tile extends Control:
 	signal tapped
+	signal refused(text: String)         ## a tap on a day that isn't today's: why
 	const HEAD := 26.0
 	const RADIUS := 14
 	var k := 0
@@ -416,16 +420,20 @@ class Tile extends Control:
 		status = str(i.status)
 		var today := status == "today"
 		set_process(today and not Sheet.reduce_motion())
-		mouse_filter = Control.MOUSE_FILTER_STOP if today else Control.MOUSE_FILTER_IGNORE
+		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if today else Control.CURSOR_ARROW
 		if was == "today" and status == "claimed":
 			_stamp = 0.0
 		queue_redraw()
 
 	func _gui_input(e: InputEvent) -> void:
-		if status == "today" and Sheet._is_tap(e):
-			accept_event()
-			tapped.emit()
+		if not Sheet._is_tap(e):
+			return
+		accept_event()
+		match status:
+			"today": tapped.emit()
+			"claimed": refused.emit("Day %d is already claimed." % (k + 1))
+			_: refused.emit("Day %d opens %s." % [k + 1, "tomorrow" if tomorrow else "in a few days"])
 
 	func _process(delta: float) -> void:
 		_glow_t += delta

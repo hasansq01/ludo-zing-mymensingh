@@ -528,6 +528,50 @@ static func press_fx(sound := "tap") -> void:
 			return
 	snd.sfx(sound)
 
+## A tap on something locked, disabled, unaffordable or not ready: the error sound and haptic, a short "bad" toast
+## (over the sheet's card when `host` is in a sheet) and a little shake of `shaker`. Nothing changes layout.
+static func deny(host: Node, text: String, shaker: Control = null, sec := 1.8) -> void:
+	sfx("error")
+	Haptics.error()
+	shake(shaker)
+	if host == null or not host.is_inside_tree():
+		return
+	var near: Control = null
+	var n := host
+	while n != null:
+		if n is Sheet:
+			near = (n as Sheet).card
+			break
+		n = n.get_parent()
+	Toast.show(host, text, near, sec, "bad")
+
+## A short side-to-side shake of a control (none with Reduce motion). Its position comes back to where it was.
+static func shake(c: Control) -> void:
+	if c == null or not c.is_inside_tree() or Sheet.reduce_motion():
+		return
+	if c.has_meta("shake_tw"):
+		var old: Variant = c.get_meta("shake_tw")
+		if old is Tween and (old as Tween).is_valid():
+			(old as Tween).kill()
+		c.position.x = float(c.get_meta("shake_x", c.position.x))
+	else:
+		c.set_meta("shake_x", c.position.x)
+	var x0 := c.position.x
+	var tw := c.create_tween()
+	c.set_meta("shake_tw", tw)
+	for dx in [-6.0, 5.0, -4.0, 3.0, -1.5, 0.0]:
+		tw.tween_property(c, "position:x", x0 + dx, 0.05).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(func(): c.remove_meta("shake_tw"))
+
+## A disabled button stays quiet when tapped; this makes the tap say why: `reason` returns the text (empty = say
+## nothing). The button keeps its disabled look and its `disabled` state.
+static func deny_disabled(b: BaseButton, reason: Callable, shaker: Control = null) -> void:
+	b.gui_input.connect(func(e: InputEvent) -> void:
+		if b.disabled and Sheet._is_tap(e):
+			var why := str(reason.call())
+			if why != "":
+				deny(b, why, shaker if shaker else b))
+
 ## Play a sound effect through the Sound autoload when it is there (tests and tools run without it). arg: Sound.sfx's
 ## optional argument (e.g. the coin amount).
 static func sfx(name: String, arg: Variant = null) -> void:

@@ -384,7 +384,8 @@ func _open_socket() -> void:
 func _hello() -> void:
 	var p: Dictionary = profile_fn.call() if profile_fn.is_valid() else _profile()
 	var m := {t = "hello", v = VERSION, pid = ensure_pid(prefs), name = wire_name(str(p.get("name", ""))),
-		avatar = str(p.get("avatar", "")).substr(0, 32), frame = str(p.get("frame", "")).substr(0, 32)}
+		avatar = str(p.get("avatar", "")).substr(0, 32), frame = str(p.get("frame", "")).substr(0, 32),
+		pair_ask = bool(prefs.get("pair_ask", true))}   # your "Ask before pairing" (quick rooms deal it to your colour)
 	if token != "":
 		m.token = token
 	var sess := session()

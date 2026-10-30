@@ -155,7 +155,6 @@ func _host_lobby() -> void:
 	_friend("Tanvir", "ch-tanvir")
 	await _sleep(0.5)
 	main.online.lobby_sheet.teams_switch.button_pressed = true
-	main.online.lobby_sheet.pair_switch.button_pressed = true
 	await _sleep(0.8)
 	await shot("lobby_host_four_teams")
 	main.online.lobby_sheet.share()
@@ -186,7 +185,8 @@ func _guest_and_match() -> void:
 	await shot("lobby_guest")
 	var third := _friend("Mitu", "ch-mim")
 	await _sleep(0.4)
-	room.settings.pair_ask = true
+	for mem in room.members:
+		mem.pair_ask = true                   # everyone's own "Ask before pairing" (as their hellos would say)
 	host.net.send_msg({t = "start"})
 	await _until(func(): return main.screen == "ludo" and main.ludo.online, 5)
 	await _sleep(2.5)

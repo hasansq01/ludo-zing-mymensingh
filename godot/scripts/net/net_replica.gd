@@ -31,8 +31,8 @@ var gaps := 0
 ## What an online match pays (ONLINE_V2.md "Economy decisions", the server's econ ONLINE_REWARDS): by game and
 ## outcome, [coins, xp]. "left" (you left, or a bot was playing your seat at the end) pays nothing.
 const ONLINE_REWARDS := {
-	ludo = {win = [150, 100], finish = [20, 40]},
-	sl = {win = [100, 60], finish = [10, 25]},
+	ludo = {win = [300, 100], finish = [50, 40]},
+	sl = {win = [200, 60], finish = [25, 25]},
 }
 ## Quick match at the Practice table pays coins win 50 / finish 10 (ECONOMY_V1.md 3; XP as above).
 const PRACTICE_COINS := {win = 50, finish = 10}
@@ -51,7 +51,8 @@ static func online_reward(g: String, outcome: String) -> Dictionary:
 	return {coins = int(v[0]), xp = int(v[1])}
 
 ## The coin table of a quick match's `over` for your colour: {} for a friend room, else {tier, entry, payout (coins the
-## server paid you; 0 when you lost or watched), match_id}. A Practice table has entry 0.
+## server paid you; 0 when you lost or watched), bonus (the 1st place's house bonus, on top of payout), refund (the entry
+## given back instead of a prize), ended ("away" when the server ended a match nobody was connected to; else ""), match_id}. A Practice table has entry 0.
 static func table_result(over: Dictionary, me: int) -> Dictionary:
 	var t: Variant = over.get("table")
 	if not t is Dictionary:
@@ -60,7 +61,15 @@ static func table_result(over: Dictionary, me: int) -> Dictionary:
 	var pay := 0
 	if me >= 0 and pays is Dictionary:
 		pay = int(pays.get(str(me), pays.get(me, 0)))
-	return {tier = str(t.get("tier", "")), entry = int(t.get("entry", 0)), payout = maxi(0, pay), match_id = str(over.get("match_id", ""))}
+	return {tier = str(t.get("tier", "")), entry = int(t.get("entry", 0)), payout = maxi(0, pay),
+		bonus = _mine(t.get("bonus"), me), refund = _mine(t.get("refunds"), me), ended = str(over.get("ended", "")),
+		match_id = str(over.get("match_id", ""))}
+
+## Colour `me`'s coins in a {"<colour>": coins} dictionary (0 when missing, malformed or watching).
+static func _mine(d: Variant, me: int) -> int:
+	if me < 0 or not d is Dictionary:
+		return 0
+	return maxi(0, int(d.get(str(me), d.get(me, 0))))
 
 ## Coins an online match grants outside a paid table: friends' rooms ONLINE_REWARDS, Practice PRACTICE_COINS. A coin
 ## table pays its payout instead (table_result), never this.

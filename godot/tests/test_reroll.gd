@@ -23,6 +23,7 @@ func run() -> void:
 	_table_over()
 	await _live_ludo()
 	await _live_sl()
+	await _live_sl_head()
 	await _live_table_result()
 
 
@@ -616,6 +617,55 @@ func _live_sl() -> void:
 	await _live_end(h)
 
 
+## The S&L offer shows when the pawn reaches the snake's head (the gulp still to play), not after the slide.
+func _live_sl_head() -> void:
+	for tap in [true, false]:
+		var d := await _live("sl")
+		var app: LiveApp = d.app
+		var room: NetFake.Room = d.room
+		var c: NetClient = d.c
+		var S: SLMatch = app.sl
+		var tag := "live sl head (%s)" % ("tap" if tap else "expiry")
+		var ok := await _until(func(): return S.online and S._net_ready and not S._busy and S.ns != null and S.ns.my_turn())
+		check(tag + ": match is up", ok)
+		if not ok:
+			await _live_end(d)
+			continue
+		app.speed = 1.0                              # real animation lengths (the live app runs at 0.05)
+		room.window_ms = 3000 if tap else 1900
+		var t0 := Time.get_ticks_msec()
+		var me := S.ns.me
+		room.force_bad_roll(me, 3)                   # 44 -> 47, the snake's head
+		await _until(func(): return S.ns.state_hash() == room.state_hash() and S.ns.my_turn() and not S._busy)
+		S._on_dice()
+		var seen := await _until(func(): return S.reroll_button.visible)
+		var pi := S.ns.index_of(me) if S.ns.has_method("index_of") else 0
+		var t: Dictionary = S.board.pawns[pi]
+		check(tag + ": the offer is up while the move is still playing, on the head", seen and S._net_pumping and S._rr_head, [seen, S._net_pumping, S._rr_head])
+		check(tag + ": its countdown comes from the server's window", S.reroll_button.left_ms > 0.0 and S.reroll_button.left_ms <= float(room.window_ms) + 1.0, S.reroll_button.left_ms)
+		var n_at := S.ns.n
+		if tap:
+			var bitten := await _until(func(): return t.get("bitten", false), 3.0)
+			check(tag + ": the gulp is running", bitten)
+			S.reroll_button.tap()
+			var done := await _until(func(): return _got(c, "rerolled").size() == 1 and _rest_sl(S, room))
+			check(tag + ": rerolled + sync: the replica matches the server", done and S.ns.mismatches == 0 and _sent(c, "sync_req").is_empty(), [S.ns.n, room.n])
+			t = S.board.pawns[pi]                        # (the resync re-lays the board: new pawn nodes)
+			check(tag + ": no stuck snake head, the pawn is visible", not t.get("bitten", false) and not S.board._bite.visible and (t.node as Node3D).visible)
+			var pos_now: int = int(S.G.players[pi].pos)
+			check(tag + ": the pawn stands on the square the server says", S.board.pawns[pi].pos == pos_now, [S.board.pawns[pi].pos, pos_now])
+			check(tag + ": button gone", not S.reroll_button.visible)
+		else:
+			var gone := await _until(func(): return not S.reroll_button.visible, 3.0)
+			var gulping: bool = t.get("bitten", false)
+			check(tag + ": the offer expires on the server's clock, mid-gulp", gone and gulping and S._net_pumping, [gone, gulping])
+			var rest := await _until(func(): return _rest_sl(S, room), 12.0)
+			var tail := int(S.G.players[pi].pos)
+			check(tag + ": the gulp finishes: tail square, no snake head", rest and tail != 47 and S.board.pawns[pi].pos == tail and not t.get("bitten", false)
+				and not S.board._bite.visible and (t.node as Node3D).visible and S.ns.n == n_at and _got(c, "rerolled").is_empty(), [rest, tail])
+		await _live_end(d)
+
+
 # ---------- the coin table's result ----------
 
 func _table_over() -> void:
@@ -641,21 +691,22 @@ func _table_over() -> void:
 		var over := room._over_msg()
 		var other: int = int(room.seats[1].color)
 		check(tag + "table: over carries match_id and table {tier, entry, payouts by colour}", str(over.match_id) == "QM%s-1" % room.code.substr(2) and over.table.tier == "t100" and over.table.entry == 100
-			and over.table.payouts[str(ns.me)] == 180 and over.table.payouts[str(other)] == 0, over)
-		check(tag + "table: the winner's payout reaches their coins once (5000 - 100 + 180)", hub.mm.coins == 5080)
+			and over.table.payouts[str(ns.me)] == 190 and over.table.payouts[str(other)] == 0
+			and over.table.bonus == {str(ns.me): 38} and over.table.refunds == {}, over)
+		check(tag + "table: the winner's payout and bonus reach their coins once (5000 - 100 + 190 + 38)", hub.mm.coins == 5128)
 		room._over_msg()
-		check(tag + "table: asking for `over` again pays nothing more", hub.mm.coins == 5080)
+		check(tag + "table: asking for `over` again pays nothing more", hub.mm.coins == 5128)
 		var tr := NetReplica.table_result(JSON.parse_string(JSON.stringify(over)), ns.me)
-		check(tag + "table_result: your payout, the entry, the match id (JSON round trip)", tr.payout == 180 and tr.entry == 100 and tr.tier == "t100" and tr.match_id == over.match_id)
-		check(tag + "table_result: the loser's is 0", NetReplica.table_result(over, other).payout == 0)
+		check(tag + "table_result: your payout, the entry, the match id (JSON round trip)", tr.payout == 190 and tr.bonus == 38 and tr.refund == 0 and tr.ended == "" and tr.entry == 100 and tr.tier == "t100" and tr.match_id == over.match_id)
+		check(tag + "table_result: the loser's is 0", NetReplica.table_result(over, other).payout == 0 and NetReplica.table_result(over, other).bonus == 0)
 		check(tag + "table_result: a friends' room has none; watching gets 0", NetReplica.table_result({t = "over"}, 0).is_empty() and NetReplica.table_result(over, -1).payout == 0)
 		d.q.free()
 		d.c.free()
 	check("coins: Practice grants win 50 / finish 10 (XP as before); a paid table none here; friends' rooms as before",
 		NetReplica.online_coins("ludo", "win", {tier = "practice", entry = 0}) == 50 and NetReplica.online_coins("sl", "finish", {tier = "practice", entry = 0}) == 10
-		and NetReplica.online_coins("ludo", "win", {tier = "t100", entry = 100}) == 0 and NetReplica.online_coins("ludo", "win", {}) == 150
+		and NetReplica.online_coins("ludo", "win", {tier = "t100", entry = 100}) == 0 and NetReplica.online_coins("ludo", "win", {}) == 300
 		and NetReplica.online_coins("ludo", "left", {tier = "practice", entry = 0}) == 0)
-	# a 4-player table pays 1st and 2nd
+	# a 4-player table pays three places
 	var room := NetFake.Room.new("QMTEST", 3)
 	room.quick = true
 	room.table = {tier = "t500", entry = 500}
@@ -667,7 +718,8 @@ func _table_over() -> void:
 	room.S.winner = 0
 	room.S.finished = [0]
 	var pays := room.payouts()
-	check("table: 4 players: 1st 1,350, 2nd 450, the seat that left gets none even ahead", pays["0"] == 1350 and pays["1"] == 450 and pays["2"] == 0 and pays["3"] == 0, pays)
+	check("table: 4 players: 1st 1,140, 2nd 570, 3rd 190 (the seat that left gets none even ahead), the bonus 380 for 1st", pays["0"] == 1140 and pays["1"] == 570 and pays["2"] == 0 and pays["3"] == 190
+		and room.bonuses() == {"0": 380}, pays)
 
 func _live_table_result() -> void:
 	Account.set_instance(Account.new())
@@ -702,10 +754,10 @@ func _live_table_result() -> void:
 	check("live table: the match ended with a result", ok and got.size() == 1, got.size())
 	if not got.is_empty():
 		var r: Dictionary = got[0]
-		check("live table: the result carries the table {tier, entry, payout 180, match_id} and the prize as the coins reward", r.table.tier == "t100" and r.table.entry == 100
-			and r.table.payout == 180 and r.reward == 180 and str(r.table.match_id) == room.match_id() and r.online, [r.get("table"), r.get("reward")])
+		check("live table: the result carries the table {tier, entry, payout 190, bonus 38, match_id} and the prize with the bonus as the coins reward", r.table.tier == "t100" and r.table.entry == 100
+			and r.table.payout == 190 and r.table.bonus == 38 and r.reward == 228 and str(r.table.match_id) == room.match_id() and r.online, [r.get("table"), r.get("reward")])
 		var screen := ResultScreen.new(r.merged({ads = true, host = true}))
-		check("live table: …as a result card with the prize and the double button", screen.is_coin_table() and screen.table_payout() == 180 and screen.double_button != null)
+		check("live table: …as a result card with the prize and the double button", screen.is_coin_table() and screen.table_payout() == 190 and screen.double_button != null)
 		screen.free()
 	await _live_end(d)
 	Account.set_instance(null)

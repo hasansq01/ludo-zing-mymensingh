@@ -306,6 +306,8 @@ func _build_account() -> VBoxContainer:
 	_acct_button.name = "GoogleSignIn"
 	UIKit.fit_text(_acct_button, 13)
 	_acct_button.pressed.connect(_sign_in_google)
+	UIKit.deny_disabled(_acct_button, func() -> String:
+		return "You’re offline. Connect to sign in." if account_state() == "offline" else "")
 	v.add_child(_acct_button)
 	return v
 
@@ -505,6 +507,9 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	top.add_child(txt)
 	var p := UIKit.list_row(top)
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
+	p.gui_input.connect(func(e: InputEvent) -> void:        # a tap on one not earned yet says what it asks for
+		if Sheet._is_tap(e) and not bool(Collection.ach_progress(id, Save.profile).get("done", false)):
+			UIKit.deny(self, "%s: %s" % [a.name, str(a.desc).trim_suffix(".")], p, 2.2))
 
 	_ach_updaters.append(func():
 		var pr := Collection.ach_progress(id, Save.profile)

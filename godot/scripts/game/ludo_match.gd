@@ -1469,7 +1469,7 @@ func _net_game_over() -> void:
 	var xp_after := xp_before
 	var reward := 0
 	if NetReplica.server_rewards():
-		reward = int(table.payout) if int(table.get("entry", 0)) > 0 else NetReplica.online_coins("ludo", outcome, table)
+		reward = int(table.payout) + int(table.get("bonus", 0)) if int(table.get("entry", 0)) > 0 else NetReplica.online_coins("ludo", outcome, table)
 		xp_after = xp_before + int(rw.xp)
 	elif int(rw.xp) > 0:
 		Save.profile.xp = xp_before + int(rw.xp)

@@ -6,7 +6,9 @@ extends SceneTree
 ##
 ## Games mix 2 / 3 / 4 seats (mostly the online layouts, sometimes any layout), all-human tables (so pair_ask
 ## questions come up) and tables with computers (levels easy / normal / hard), teams on / off, pair_ask on / off,
-## random legal choices (either pawn of a pair; pair answers yes / no), some 6-heavy dice, "mode" switches of a seat
+## some with "Ask before pairing" per colour (opts.pair_ask_by, as quick matches deal it; drawn from a second generator
+## so the other games stay as they were), random legal choices (either pawn of a pair; pair answers yes / no), some
+## 6-heavy dice, "mode" switches of a seat
 ## between human and cpu at any moment, and a few refused actions (wrong phase, a pawn that can't move). Play on: games
 ## run past the first finish (several "finished" events, then game_over), some are ended early by the server's
 ## {k: "end"} once a side has finished (and a few get a refused "end" after the game is over).
@@ -18,7 +20,7 @@ extends SceneTree
 ## k / c / val: the protocol action ({k: "roll", c, v: val} | {k: "move", c, i: val} | {k: "pair", c, yes: val} |
 ## {k: "mode", c, mode: val} | {k: "end"} (stored as ["end", -1, 0])); ev_index: the events the rules returned; hash: StateHash.of() after the action;
 ## diff: the top-level state keys whose value changed (full values, except tok: only the changed rows, as
-## [[colour, row], ...]), so applying the diffs in order to s0 rebuilds the full state after every step exactly; extra: {auto, units} after some of the rolls that reached phase "choose". end (game over):
+## [[colour, row], ...]), so applying the diffs in order to s0 rebuilds the full state after every step exactly; extra: {auto, units} after some of the rolls that reached phase "choose", {pair_default} (default_pair_answer) after every step that reached phase "pair_ask". end (game over):
 ## {standings, winners, win_reward, play_reward}.
 
 const Ludo := preload("res://scripts/core/ludo_rules.gd")
@@ -105,6 +107,13 @@ func play_game(seed_: int) -> Dictionary:
 		players[c] = "human" if all_human or rng.randf() < 0.5 else "cpu"
 	var teams := rng.randf() < (0.6 if seats.size() == 4 else 0.15)   # (fewer than 4: new_game turns it off)
 	var opts := {pair_ask = rng.randf() < 0.6}
+	var rng_by := RandomNumberGenerator.new()          # (its own generator: the games without it are unchanged)
+	rng_by.seed = seed_ * 31 + 7
+	if rng_by.randf() < 0.25:
+		var by := []
+		for c in 4:
+			by.append(rng_by.randf() < 0.5)
+		opts.pair_ask_by = by
 	var levels := []
 	for c in 4:
 		levels.append(Ludo.LEVELS[rng.randi_range(0, 2)])
@@ -191,6 +200,8 @@ func play_game(seed_: int) -> Dictionary:
 		var step := [a[0], a[1], a[2], intern_events(ev), h, diff(prev, s)]
 		if a[0] == "roll" and s.phase == "choose" and not ev.is_empty() and rng.randf() < 0.15:
 			step.append({auto = Ludo.auto_move_token(s), units = Ludo.units(s)})
+		elif s.phase == "pair_ask":
+			step.append({pair_default = Ludo.default_pair_answer(s)})   # the timeout's / a bot's answer
 		rec.steps.append(step)
 		prev = s.duplicate(true)
 	if s.phase == "over" and rng.randf() < 0.3:

@@ -190,7 +190,7 @@ func _open_lobby() -> void:
 		return
 	var g := str((net.last_lobby.get("settings", {}) as Dictionary).get("game", game)) if net.last_lobby.get("settings") is Dictionary else game
 	lobby_sheet = LobbySheet.new(net.code, net.member_id, g)
-	lobby_sheet.settings_changed.connect(func(t: bool, p: bool): net.send_msg({t = "settings", teams = t, pair_ask = p}))
+	lobby_sheet.settings_changed.connect(func(t: bool): net.send_msg({t = "settings", teams = t}))
 	lobby_sheet.game_changed.connect(func(g2: String): net.send_msg({t = "settings", game = g2}))
 	lobby_sheet.start_pressed.connect(func(): net.send_msg({t = "start"}))
 	lobby_sheet.leave_pressed.connect(_ask_leave_lobby)
@@ -410,12 +410,11 @@ func _on_lobby(m: Dictionary) -> void:
 	match state:
 		"joining":
 			_set_state("lobby")
-			if _created and net.is_host():       # a new room starts from the host's choices: the game, the house rule
-				_created = false
-				var want := bool(net.prefs.get("pair_ask", true))
+			if _created and net.is_host():       # a new room starts from the host's choice of game ("Ask before
+				_created = false                 # pairing" is everyone's own: each hello carries it)
 				var st: Dictionary = m.get("settings", {}) if m.get("settings") is Dictionary else {}
-				if bool(st.get("pair_ask", false)) != want or str(st.get("game", "ludo")) != _friends_game:
-					net.send_msg({t = "settings", teams = false, pair_ask = want, game = _friends_game})
+				if str(st.get("game", "ludo")) != _friends_game:
+					net.send_msg({t = "settings", teams = false, game = _friends_game})
 			_open_lobby()
 		"resuming":
 			await get_tree().create_timer(0.4).timeout   # a match in progress sends its sync right behind

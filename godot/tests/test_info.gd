@@ -229,8 +229,8 @@ func _run_rules() -> void:
 	var dice_r := {"dice": "crema", "or": 400}
 	check("…an owned dice is swapped for coins", Rewards.grant_of({dice_owned = ["classic", "crema"]}, dice_r).coins == 400 and Rewards.grant_of({dice_owned = ["classic"]}, dice_r).dice == "crema")
 	t = text("scenes")
-	check("scenes text: Jungle Clearing is free, the others cost coins", t.contains("Jungle Clearing is free") and SLScenes.LIST[0].name == "Jungle Clearing" and SLScenes.LIST[0].price == 0
-		and SLScenes.LIST.slice(1).all(func(x): return x.price > 0))
+	check("scenes text: the free scenes are named, the others cost coins", t.contains("Jungle Clearing and Enchanted Jungle are free") and SLScenes.LIST[0].name == "Jungle Clearing"
+		and SLScenes.LIST.all(func(x): return (x.price == 0) == SLScenes.FREE.has(x.id)))
 	check("camera texts name both views (Settings: 3D / Top)", text("cam").contains("3D:") and text("cam").contains("Top:") and text("slcam").contains("Top:"))
 
 func _bubbles() -> int:

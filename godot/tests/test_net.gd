@@ -113,7 +113,7 @@ func _flow() -> void:
 	check("start by a guest: not_host", last(b, "error").get("code") == "not_host")
 	a.send_msg({t = "settings", pair_ask = true})
 	pump([a, b])
-	check("settings reach everyone", bool(last(b, "lobby").settings.pair_ask))
+	check("settings: an old client's pair_ask is ignored (Ask before pairing is everyone's own)", not last(b, "lobby").settings.has("pair_ask"), last(b, "lobby").settings)
 	a.send_msg({t = "settings", teams = true})
 	a.send_msg({t = "start"})
 	pump([a, b])
@@ -262,10 +262,11 @@ func _full_game(count: int, teams: bool, pair_ask: bool, seed_: int) -> void:
 	var cs := []
 	for k in count:
 		var c := client(room, ["Ana", "Bo", "Cy", "Di"][k])
+		c.prefs.pair_ask = pair_ask                # everyone's own "Ask before pairing" (their hello)
 		c.join(room.code)
 		pump(cs + [c])
 		cs.append(c)
-	cs[0].send_msg({t = "settings", teams = teams, pair_ask = pair_ask})
+	cs[0].send_msg({t = "settings", teams = teams})
 	cs[0].send_msg({t = "start"})
 	pump(cs)
 	var res := _play_out(room, cs, [], 4000)

@@ -161,7 +161,7 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 			return _ok({ok = true, profile = _prof(), gems = PACKS[pk][0], coins = PACKS[pk][1]})
 		"/v1/tables":
 			var tl := []
-			for t in [["practice", 0, 1], ["t100", 100, 1], ["t500", 500, 3], ["t2k", 2000, 6], ["t10k", 10000, 10], ["t50k", 50000, 15]]:
+			for t in [["practice", 0, 1], ["t100", 100, 1], ["t500", 500, 1], ["t2k", 2000, 6], ["t10k", 10000, 10], ["t50k", 50000, 15]]:
 				tl.append({id = t[0], entry = t[1], level = t[2], unlocked = int(t[2]) <= 3, affordable = int(profile.coins) >= int(t[1])})
 			return _ok({tables = tl, fee_pct = 10, level = 3, broke = int(profile.coins) < 100,
 				broke_bonus = {available = int(profile.coins) < 100 and not broke_taken, next_at = 1793000000, amount = 300}})

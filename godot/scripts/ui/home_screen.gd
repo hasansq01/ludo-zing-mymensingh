@@ -794,11 +794,12 @@ func _layout() -> void:
 	# than TABLE_MIN px (a tall safe area, the Continue pill)
 	var ly := roundf(y_bar + UIKit.SPACE.md)
 	var lw := minf(208.0, cw)
-	var lh := lw * 266.0 / 320.0
-	var max_h := clampf(minf(0.185 * h, band_bottom - ly - TABLE_MIN), 100.0, 180.0)
+	var lh := lw * BrandLogo.VIEW.y / BrandLogo.VIEW.x
+	# short phones (320 x 568) may shrink it to 64 px, so the table keeps its band and the logo never meets the pill
+	var max_h := clampf(minf(0.185 * h, band_bottom - ly - TABLE_MIN), 64.0, 180.0)
 	if lh > max_h:
 		lh = max_h
-		lw = lh * 320.0 / 266.0
+		lw = lh * BrandLogo.VIEW.x / BrandLogo.VIEW.y
 	logo.size = Vector2(roundf(lw), roundf(lh))
 	logo.position = Vector2(roundf((w - lw) / 2.0), ly)
 	_band = Vector2(logo.position.y + logo.size.y, band_bottom)

@@ -72,7 +72,7 @@ func _initialize() -> void:
 func _client(name: String) -> Dictionary:
 	var n := NetClient.new()
 	n.use_save = false
-	n.prefs = {net_pid = "e2e_conline_%s_v1" % name.to_lower()}
+	n.prefs = {net_pid = "e2e_conline_%s_v1" % name.to_lower(), pair_ask = ask}   # (--ask: everyone's own setting)
 	n.url_base = url
 	n.profile_fn = func() -> Dictionary: return {name = name, avatar = "pawn-green", frame = "classic"}
 	if hub:
@@ -193,7 +193,7 @@ func _run_room() -> void:
 		clients[1].net.send_msg({t = "start"})
 		if not await _until(func(): return _has(clients[1], "error"), 5.0) or _last(clients[1], "error").get("code") != "not_host":
 			_fail("a guest's start was not refused with not_host")
-	a.net.send_msg({t = "settings", teams = teams, pair_ask = ask, game = game})
+	a.net.send_msg({t = "settings", teams = teams, game = game})
 	if not await _until(func(): return str((_last(a, "lobby").get("settings", {}) as Dictionary).get("game", "")) == game, 5.0):
 		_fail("the lobby never said game %s: %s" % [game, str(_last(a, "lobby").get("settings"))])
 	a.net.send_msg({t = "start"})

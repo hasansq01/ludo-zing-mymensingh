@@ -30,7 +30,7 @@ func _run() -> void:
 
 	# ---- catalogue ----
 	check("the six web scenes in shop order", SLScenes.LIST.map(func(s): return s.id) == ["jungle", "frost", "candy", "desert", "cloud", "enchanted"])
-	check("scene prices match the web", SLScenes.LIST.map(func(s): return s.price) == [0, 20000, 22000, 25000, 25000, 25000])
+	check("scene prices (Enchanted Jungle free since 2026-10-30)", SLScenes.LIST.map(func(s): return s.price) == [0, 20000, 22000, 25000, 25000, 0])
 	check("every scene has a world config", SLScenes.LIST.all(func(s): return SLScenes.SCENES.has(s.id)))
 	check("every scene has a card gradient", SLScenes.LIST.all(func(s): return (s.g as Array).size() == 2))
 	check("info(unknown) is empty", SLScenes.info("volcano").is_empty())
@@ -39,8 +39,9 @@ func _run() -> void:
 	p = use(fresh(0))
 	check("Jungle owned without a scenes list", SLScenes.owns_scene("jungle") and SLScenes.owned_ids() == ["jungle"])
 	check("scene in use falls back to Jungle", SLScenes.scene_in_use() == "jungle")
-	check("paid scenes not owned by default", not SLScenes.owns_scene("frost") and not SLScenes.owns_scene("enchanted"))
-	check("owned scenes lists Jungle", SLScenes.owned_scenes().map(func(s): return s.id) == ["jungle"])
+	check("paid scenes not owned by default", not SLScenes.owns_scene("frost") and not SLScenes.owns_scene("cloud"))
+	check("free scenes owned by everyone", SLScenes.owns_scene("jungle") and SLScenes.owns_scene("enchanted"))
+	check("owned scenes lists the free ones", SLScenes.owned_scenes().map(func(s): return s.id) == ["jungle", "enchanted"])
 	err = SLScenes.buy_scene("jungle")
 	check("Jungle can't be bought (already owned)", err != "" and p.coins == 0 and writes == 0, err)
 	check("equipping Jungle works with no coins and adds the fields", SLScenes.equip_scene("jungle") and p.scene == "jungle" and p.scenes == ["jungle"] and writes == 1, p)

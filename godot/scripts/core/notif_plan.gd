@@ -36,11 +36,11 @@ const COMEBACK := {
 	1: [["Your table is waiting", "Come back for a quick game of Ludo Zing."],
 		["Ready for a game?", "Your pawns are lined up. Roll the dice!"],
 		["Ludo Zing misses you", "One quick game before bed?"]],
-	3: [["It's been a few days", "Your friends and the café are waiting. Fancy a game?"],
+	3: [["It's been a few days", "Your friends are waiting at the table. Fancy a game?"],
 		["Time for a rematch?", "Jump back into Ludo Zing and roll a six."],
 		["Free coins are stacking up", "Come back and spend them on something nice."]],
 	7: [["We saved your seat", "It's been a week. Come back and play a round of Ludo Zing."],
-		["A week without Ludo Zing?", "Your café is open. Come and roll the dice."],
+		["A week without Ludo Zing?", "Your table is ready. Come and roll the dice."],
 		["Still your favourite game?", "Come back for a game and a daily reward."]],
 }
 

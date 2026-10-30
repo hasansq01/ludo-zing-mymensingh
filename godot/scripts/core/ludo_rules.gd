@@ -10,7 +10,8 @@ extends RefCounted
 ## the presentation layer animates those events and writes the status messages.
 ##
 ## State: { players[4] ("human" | "cpu" | "off"), names[4], view, tok[4][4], pairs [{c, a, b}], turn, dice, sixes,
-##   phase, pick ("" | "single" | "pair"), winner, teams, free[4], pending, pair_ask, finished [colours] }
+##   phase, pick ("" | "single" | "pair"), winner, teams, free[4], pending, pair_ask, finished [colours],
+##   pair_ask_by[4] (optional: per colour, see asks_pair) }
 ## Phases: "roll" -> "choose" (every legal unit may be tapped: see units()) -> "pair_ask" (only with the house rule
 ## pair_ask, for a human: make a pair?) -> ... "over". apply_roll no longer produces "pick" (the old Single / Pair
 ## step); choose_pick / picked still work for old callers. s.finished lists the colours in the order they got all
@@ -43,7 +44,8 @@ const PLAY_REWARD := 20               # coins for finishing a game you lost agai
 # ---------- setup ----------
 
 ## opts: {pair_ask: bool} - the "Ask before pairing" house rule (default false: a single landing on a loose pawn of
-## its own colour off a safe square pairs up by itself, for humans and computers alike).
+## its own colour off a safe square pairs up by itself, for humans and computers alike). {pair_ask_by: [4 bools]}
+## sets it per colour instead (online quick matches: each person's own Settings choice; see asks_pair).
 static func new_game(players: Array, teams := false, opts := {}) -> Dictionary:
 	teams = teams and players.all(func(p): return p != "off")   # Pair Mode needs all four seats
 	var humans := players.count("human")
@@ -58,13 +60,16 @@ static func new_game(players: Array, teams := false, opts := {}) -> Dictionary:
 		else:
 			names.append("You" if humans == 1 else COLOR_NAMES[c])
 	var h := players.find("human")
-	return {
+	var s := {
 		players = players.duplicate(), names = names, view = h if h >= 0 else 0,
 		tok = [[-1, -1, -1, -1], [-1, -1, -1, -1], [-1, -1, -1, -1], [-1, -1, -1, -1]], pairs = [],
 		turn = players.find_custom(func(p): return p != "off"), dice = 0, sixes = 0, phase = "roll", pick = "",
 		winner = -1, teams = teams, free = [false, false, false, false], pending = {},
 		pair_ask = bool(opts.get("pair_ask", false)), finished = [],
 	}
+	if opts.get("pair_ask_by") is Array and (opts.pair_ask_by as Array).size() == 4:
+		s.pair_ask_by = (opts.pair_ask_by as Array).map(func(x): return bool(x))
+	return s
 
 
 # ---------- board helpers ----------
@@ -77,6 +82,16 @@ static func active(s: Dictionary, c: int) -> bool:
 
 static func is_human(s: Dictionary, c: int) -> bool:
 	return s.players[c] == "human"
+
+## "Ask before pairing" for colour c's moves: only a human seat is asked; s.pair_ask_by[c] when the state has it
+## (per colour), else the table's s.pair_ask.
+static func asks_pair(s: Dictionary, c: int) -> bool:
+	if not is_human(s, c):
+		return false
+	var by: Variant = s.get("pair_ask_by")
+	if by is Array and (by as Array).size() == 4:
+		return bool(by[c])
+	return bool(s.get("pair_ask", false))
 
 static func pname(s: Dictionary, c: int) -> String:
 	return s.names[c] if s.names[c] != "" else COLOR_NAMES[c]
@@ -448,16 +463,27 @@ static func move(s: Dictionary, i: int) -> Array:
 	var pend := {c = c, i = i, to = to, extra = extra}
 	var partner := pair_partner(s, c, i)
 	if partner >= 0:
-		if is_human(s, roller) and bool(s.get("pair_ask", false)):
+		if asks_pair(s, roller):
 			pend["partner"] = partner
 			s.pending = pend
 			s.phase = "pair_ask"
 			ev.append({type = "pair_offer", c = c, a = i, b = partner})
 			return ev
-		if not SAFE.has(abs_index(c, to)):
+		if _pairs_by_itself(c, to):
 			_form_pair(s, c, i, partner, ev)
 	_finish_move(s, pend, ev)
 	return ev
+
+## Where nobody is asked, a landing on a loose own pawn pairs up by itself only off the safe squares.
+static func _pairs_by_itself(c: int, to: int) -> bool:
+	return not SAFE.has(abs_index(c, to))
+
+## The answer "make a pair?" gets when nobody gives one (online: the pair timer runs out, or a bot holds the seat):
+## what would have happened if the player hadn't been asked (yes off the safe squares). false outside "pair_ask".
+static func default_pair_answer(s: Dictionary) -> bool:
+	if s.phase != "pair_ask" or not s.pending is Dictionary or not (s.pending as Dictionary).has("to"):
+		return false
+	return _pairs_by_itself(int(s.pending.c), int(s.pending.to))
 
 ## Human only: the answer to "make a pair?" (phase "pair_ask").
 static func answer_pair(s: Dictionary, yes: bool) -> Array:

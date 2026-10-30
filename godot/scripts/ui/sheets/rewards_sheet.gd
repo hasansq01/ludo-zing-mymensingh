@@ -146,7 +146,7 @@ func _watch(kind: String) -> void:
 		return
 	var vr: VideoRow = _vrows[kind]
 	if int(_left.get(kind, 1)) <= 0:
-		Toast.show(self, Account.error_text("cap"), card, 2.0, "bad")
+		UIKit.deny(self, Account.error_text("cap"), vr, 2.0)
 		return
 	vr.set_busy(true)
 	flow.watch(kind)

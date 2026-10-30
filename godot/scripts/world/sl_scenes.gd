@@ -15,16 +15,17 @@ extends Node3D
 
 signal scene_built(id: String)
 
-## The shop list (SL_SCENES): Jungle is free and always owned.
+## The shop list (SL_SCENES): Jungle and Enchanted Jungle are free and always owned (FREE).
 const LIST := [
 	{id = "jungle", name = "Jungle Clearing", price = 0, desc = "The classic sunny jungle.", g = [Color("#c8ee9c"), Color("#6aa84a")]},
 	{id = "frost", name = "Frosty Wonderland", price = 20000, desc = "Snowy pines, a frozen pond, lanterns, falling snow.", g = [Color("#eef8ff"), Color("#9fc4e6")]},
 	{id = "candy", name = "Candy Kingdom", price = 22000, desc = "Lollipops, gumdrops and candy-cane ladders.", g = [Color("#ffe3f1"), Color("#f59ccb")]},
 	{id = "desert", name = "Desert Temple", price = 25000, desc = "Sandstone ruins, palms, an oasis, golden trim.", g = [Color("#ffe4ad"), Color("#e9a35a")]},
 	{id = "cloud", name = "Cloud Kingdom", price = 25000, desc = "Floating islands, rainbows, a pearl-white table.", g = [Color("#e3f3ff"), Color("#9fcfff")]},
-	{id = "enchanted", name = "Enchanted Jungle", price = 25000, desc = "Glowing mushrooms, fireflies, golden snakes.", g = [Color("#8f6bb8"), Color("#2b4a5c")]},
+	{id = "enchanted", name = "Enchanted Jungle", price = 0, desc = "Glowing mushrooms, fireflies, golden snakes.", g = [Color("#8f6bb8"), Color("#2b4a5c")]},
 ]
 const DEFAULT := "jungle"
+const FREE := [DEFAULT, "enchanted"]     # owned by everyone (owner 2026-10-30: Enchanted Jungle is free)
 
 const K := 15.0 / 4.8                    # web units -> Godot units (the board face is 4.8 there, 15 here)
 const TT := -0.31                        # table top in Godot units (TableWorld.TT)
@@ -271,7 +272,7 @@ static func owned_ids() -> Array:
 static func owns_scene(id: String) -> bool:
 	if info(id).is_empty():
 		return false
-	return id == DEFAULT or owned_ids().has(id)
+	return FREE.has(id) or owned_ids().has(id)
 
 ## The equipped scene (only an owned one counts; Jungle otherwise).
 static func scene_in_use() -> String:

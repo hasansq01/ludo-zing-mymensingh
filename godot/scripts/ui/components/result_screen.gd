@@ -26,8 +26,10 @@ extends Control
 ## Online (data.online = true, data.host = you host the room): rows carry the friends' own avatars (e.avatar,
 ## e.frame); Play again is the host's rematch (the screen stays until the server starts it: the app closes it),
 ## for everyone else a disabled "Waiting for host…" (set_host() when the host changes).
-## A coin-table match (data.table = {tier, entry, payout, match_id}, entry > 0; ECONOMY_V1.md 3): `reward` is the payout
-## (the Coins tile reads "Prize +180"); a payout of 0 says "Entry 100 lost"; a payout > 0 with a video available offers
+## A coin-table match (data.table = {tier, entry, payout, bonus, refund, ended, match_id}, entry > 0; ECONOMY_V1.md 3):
+## `reward` is what you received, the payout plus the 1st place's house bonus (the Coins tile reads "Prize +228" and a
+## line says "Includes +38 house bonus"); a refund says "Entry 100 refunded"; a payout of 0 without a refund says
+## "Entry 100 lost"; ended = "away" adds "The match ended while everyone was away: places by progress."; a payout > 0 with a video available offers
 ## "Double it with a video" (AdFlow "double", ref = match_id; the server grants the same payout again) and toasts the
 ## extra coins. Tests and previews: data.ads (bool) replaces AdFlow.available(), flow (an AdFlow) a new AdFlow.
 
@@ -49,7 +51,9 @@ var content: VBoxContainer
 var again_button: Button
 var home_button: Button
 var double_button: Button                ## coin table, prize > 0, a video can run: "Double it with a video"
-var table_note: Label                    ## coin table, no prize: "Entry 100 lost"
+var table_note: Label                    ## coin table, no prize: "Entry 100 lost" / "Entry 100 refunded"
+var bonus_note: Label                    ## coin table, bonus > 0: "Includes +38 house bonus"
+var away_note: Label                     ## the server ended the match while nobody was connected
 var flow: AdFlow
 var coins: CoinAmount
 var xp_meter: Meter
@@ -349,6 +353,12 @@ func is_coin_table() -> bool:
 func table_payout() -> int:
 	return int(table().get("payout", 0))
 
+func table_bonus() -> int:
+	return int(table().get("bonus", 0))
+
+func table_refund() -> int:
+	return int(table().get("refund", 0))
+
 ## A video can run here (data.ads overrides AdFlow.available(): tests, previews).
 func _ads_ok() -> bool:
 	return bool(data.ads) if data.has("ads") else AdFlow.available()
@@ -357,23 +367,38 @@ func _ads_ok() -> bool:
 func _build_table(parent: VBoxContainer) -> void:
 	if not is_coin_table():
 		return
+	if str(table().get("ended", "")) == "away":
+		away_note = _quiet_line(CoinTables.AWAY_TEXT, "AwayNote")
+		parent.add_child(away_note)
 	if table_payout() <= 0:
+		var refunded := table_refund() > 0
 		var row := UIKit.hbox(UIKit.SPACE.xs)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(UIKit.icon("coin", 20))
-		table_note = UIKit.label(CoinTables.lost_text(int(table().entry)), UIKit.FS.body_l, Palette.MUTED, UIKit.font_body(900))
+		var text := CoinTables.refund_text(table_refund()) if refunded else CoinTables.lost_text(int(table().entry))
+		table_note = UIKit.label(text, UIKit.FS.body_l, Palette.MUTED, UIKit.font_body(900))
 		table_note.name = "TableNote"
 		table_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(table_note)
 		parent.add_child(row)
 		return
+	if table_bonus() > 0:
+		bonus_note = _quiet_line(CoinTables.bonus_text(table_bonus()), "BonusNote")
+		parent.add_child(bonus_note)
 	if not _ads_ok():
 		return
 	double_button = UIKit.btn("Double it with a video", "teal", "md")
 	double_button.name = "Double"
 	double_button.pressed.connect(_double)
 	parent.add_child(double_button)
+
+func _quiet_line(text: String, node_name: String) -> Label:
+	var l := UIKit.label(text, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	l.name = node_name
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
 
 ## The "double" video: AdFlow does the ad and the server grants the extra coins (never from this side's word).
 func _double() -> void:

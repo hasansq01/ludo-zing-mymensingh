@@ -163,6 +163,13 @@ func _s_rewards() -> void:
 	await _sleep(0.3)
 	await sheet_shot(func(): main._on_tab("spin"), "spin")
 	await sheet_shot(func(): main._on_tab("daily"), "daily")
+	main._on_tab("daily")
+	await _sleep(0.9)
+	var dsh := main._top_sheet() as DailySheet     # a later day's tile: why it can't be claimed
+	if dsh:
+		dsh._tiles[4].refused.emit("Day 5 opens in a few days.")
+		await _sleep(0.4)
+		await shot("daily_locked_toast")
 
 func _s_profile() -> void:
 	main._on_tab("profile")
@@ -239,6 +246,15 @@ func _s_shop() -> void:
 	for t in ["rooms", "avatars"]:
 		await sheet_shot(func(): _open_shop(t, true), "shop_owned_" + t)
 	await sheet_shot(func(): main._on_tab("inventory"), "inventory")
+	var ls := _open_shop("avatars")                # a locked card: what unlocks it
+	await _sleep(0.8)
+	for c: Control in ls._cards:
+		if str(c.get_meta("item", "")) == "robot":
+			c.gui_input.emit(_tap())
+	await _sleep(0.4)
+	await shot("shop_locked_toast")
+	main.close_all_sheets()
+	await _sleep(0.3)
 	await sheet_shot(func(): CollectionSheet.new("frames").open(main.sheet_layer), "collection_frames")
 	# Shop -> Preview (a room's View)
 	var s := _open_shop("rooms")
@@ -368,6 +384,32 @@ func _s_setup() -> void:
 	await _sleep(0.3)
 	await sheet_shot(func(): main._open_setup("sl", "cpu"), "setup_sl_cpu")
 	await sheet_shot(func(): main._open_setup("sl", "local"), "setup_sl_local")
+	# the on-screen keyboard: simulated at 42% of the window (grey), Name2 focused; the field and Start stay above it
+	for g in [["ludo", "setup_kb_ludo_local"], ["sl", "setup_kb_sl_local"]]:
+		var sk: Sheet = await _top_after(func(): main._open_setup(g[0], "local"), 0.8)
+		var ed := sk.find_child("Name2", true, false) as LineEdit if sk else null
+		if ed:
+			Sheet.kb_debug_px = float(get_window().size.y) * 0.42
+			var kl := CanvasLayer.new()
+			kl.layer = 100
+			var kr := ColorRect.new()
+			kr.color = Color(0.45, 0.45, 0.48, 1.0)
+			var vs := get_viewport().get_visible_rect().size
+			kr.position = Vector2(0, vs.y * 0.58)
+			kr.size = Vector2(vs.x, vs.y * 0.42)
+			kl.add_child(kr)
+			get_tree().root.add_child(kl)
+			ed.grab_focus()
+			await _sleep(0.7)
+			await shot(g[1])
+			print("kb lift ", sk._kb, " card ", sk.card.get_global_rect(), " vp ", get_viewport().get_visible_rect().size)
+			ed.text_submitted.emit(ed.text)       # Enter: on to Name3
+			await _sleep(0.3)
+			print("after enter focus owner: ", get_viewport().gui_get_focus_owner().name)
+			kl.queue_free()
+			Sheet.kb_debug_px = -1.0
+		main.close_all_sheets()
+		await _sleep(0.4)
 
 func _s_online() -> void:
 	main.home.select_game("ludo")
@@ -377,6 +419,10 @@ func _s_online() -> void:
 	await shot("quick_picker_2p")
 	var qs: QuickSheet = main.online.quick_sheet
 	if qs:
+		qs._on_row("t10k")                     # a locked table: a toast, the sheet doesn't change
+		await _sleep(0.4)
+		await shot("quick_locked_toast")
+		await _sleep(2.0)
 		qs.players = 4
 		qs._refresh_rows()
 		(qs.picker.get_child(1) as Button).button_pressed = true
@@ -387,6 +433,10 @@ func _s_online() -> void:
 		qs._refresh_rows()
 		await _sleep(0.3)
 		await shot("quick_picker_800_coins")
+		qs._on_row("t2k")                      # a table you can't pay: a toast too
+		await _sleep(0.4)
+		await shot("quick_unaffordable_toast")
+		await _sleep(2.0)
 		qs.find.emit(4)
 		await _sleep(2.2)
 		await shot("quick_searching_4")
@@ -419,6 +469,9 @@ func _s_online() -> void:
 		{id = "m1", name = "Shihab", avatar = "pawn-red", level = 7, online = true, color = 1}]}, false)
 	await _sleep(0.6)
 	await shot("lobby_guest_sl")
+	ls.start_button.gui_input.emit(_tap())    # a guest's disabled Start says why
+	await _sleep(0.4)
+	await shot("lobby_guest_start_toast")
 
 func _s_ludo() -> void:
 	main.speed = 0.5
@@ -613,3 +666,11 @@ func _until(f: Callable, timeout: float) -> void:
 	var t0 := Time.get_ticks_msec()
 	while not f.call() and (Time.get_ticks_msec() - t0) / 1000.0 < timeout:
 		await get_tree().process_frame
+
+
+## A left-button press (what a disabled button's gui_input sees).
+func _tap() -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = true
+	return e

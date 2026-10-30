@@ -46,6 +46,17 @@ Play Store build: `tools/android-release.sh` makes the signed App Bundle `build/
 (Gradle; the Android build template is unpacked in `godot/android/build/`, not tracked). The upload key is kept
 outside the repo in `~/.android/ludo-zing-release/` (created 2026-10-24; back it up: every update must be signed
 with it, or reset it through Play App Signing). Bump `version/code` before each upload.
+Native debug symbols for Play's Crashes & ANRs: `tools/android-symbols.sh --abi arm64-v8a` (full, 180 MB; or
+`--symtab` for both ABIs, names only, 54 MB; Play refuses files over ~300 MB) makes
+`build/android/native-debug-symbols-<code>.zip` from Godot's published symbols for this template version (the
+template's `libgodot_android.so` is stripped, so Gradle's `debugSymbolLevel` can't make them); upload it to each
+bundle in Play Console (App bundle explorer > Downloads > Native debug symbols).
+
+Crash reports: `scripts/core/crash_watch.gd` keeps a small breadcrumb record in `user://diag/` (never in save.json) and,
+when a run dies (no quit / background, or Android 11+'s exit reason says crash, native crash, ANR or a foreground
+low-memory kill), sends one report to `POST /v1/diag/crash` with the previous run's `user://logs` tail (file logging
+is on for phones). Exit reasons and native tombstones come from the notifications plugin (`Diag.kt`). Reports are in
+the admin console's Crashes page. Editor runs record nothing unless started with `--diag`.
 
 Debug soak test on a device: `adb shell "run-as com.flipfold.ludozing sh -c 'echo all > files/autoplay.txt'"`, restart
 the app: it plays Ludo, Pair Mode and Snakes & Ladders games back to back and logs `[ludo]` / `[sl]` results.

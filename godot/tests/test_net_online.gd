@@ -677,10 +677,10 @@ func _raw_ws() -> void:
 # ---------- rewards, Home, copy ----------
 
 func _rewards() -> void:
-	check("rewards: Ludo win 150 + 100 XP, finish 20 + 40", NetReplica.online_reward("ludo", "win") == {coins = 150, xp = 100}
-		and NetReplica.online_reward("ludo", "finish") == {coins = 20, xp = 40})
-	check("rewards: S&L win 100 + 60 XP, finish 10 + 25", NetReplica.online_reward("sl", "win") == {coins = 100, xp = 60}
-		and NetReplica.online_reward("sl", "finish") == {coins = 10, xp = 25})
+	check("rewards: Ludo win 300 + 100 XP, finish 50 + 40", NetReplica.online_reward("ludo", "win") == {coins = 300, xp = 100}
+		and NetReplica.online_reward("ludo", "finish") == {coins = 50, xp = 40})
+	check("rewards: S&L win 200 + 60 XP, finish 25 + 25", NetReplica.online_reward("sl", "win") == {coins = 200, xp = 60}
+		and NetReplica.online_reward("sl", "finish") == {coins = 25, xp = 25})
 	check("rewards: left (or watching) pays nothing", NetReplica.online_reward("ludo", "left") == {coins = 0, xp = 0}
 		and NetReplica.online_reward("sl", "") == {coins = 0, xp = 0})
 

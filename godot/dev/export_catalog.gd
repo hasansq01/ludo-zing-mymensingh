@@ -47,7 +47,7 @@ static func build() -> Dictionary:
 	for r: Dictionary in Rooms.LIST:
 		items.append(_item("room", r, int(r.price) > 0, Catalog.FREE_ROOMS.has(r.id), r.id == Rooms.DEFAULT))
 	for s: Dictionary in SLScenes.LIST:
-		items.append(_item("scene", s, int(s.price) > 0, s.id == SLScenes.DEFAULT, s.id == SLScenes.DEFAULT))
+		items.append(_item("scene", s, int(s.price) > 0, SLScenes.FREE.has(s.id), s.id == SLScenes.DEFAULT))
 	for c: Dictionary in Collection.CHARS:
 		items.append(_item("char", c, int(c.price) > 0, int(c.price) <= 0, false))
 	for a: Dictionary in Collection.AVATARS:

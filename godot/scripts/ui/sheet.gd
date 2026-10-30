@@ -81,6 +81,14 @@ var _fit_wired := false
 var _scroll_wrap: Control
 var _fade: TextureRect
 var _more_hint: MoreHint
+var _center: CenterContainer
+var _kb := 0.0                           # logical px of the on-screen keyboard the card is lifted over (0: none)
+var _edit: LineEdit                      # the focused LineEdit inside this sheet (null: none)
+var _kb_wired := false
+
+## Dev / tests: pretend the on-screen keyboard is this tall (PHYSICAL px, like DisplayServer's); < 0 uses the real one.
+static var kb_debug_px := -1.0
+const KB_MARGIN := 12.0                  # air kept between the card and the keyboard
 
 
 func _init(title_text := "", width: float = UIKit.W.form, closable := true, look := LOOK_CARD) -> void:
@@ -99,6 +107,7 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_center = center
 	add_child(center)
 	card = PanelContainer.new()
 	card.name = "Card"
@@ -613,6 +622,8 @@ func fit_now() -> void:
 		_check_wide.call_deferred()          # after the frame's rebuilds settle: only real overflow warns
 	if _fit_on and scroll_box:
 		var cap := vp.y * _fit_max
+		if _kb > 0.0:                           # the keyboard is up: what is left above it (the buttons stay in view)
+			cap = minf(cap, vp.y - _kb - _safe_top() - KB_MARGIN * 2.0)
 		if sheet_look == LOOK_PM and ribbon:
 			cap += RIBBON_TOP                   # the ribbon stands above the card
 		var other := card.get_combined_minimum_size().y - _scroll_wrap.get_combined_minimum_size().y
@@ -652,6 +663,7 @@ func _wire_fit() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_READY:
+		_wire_keyboard()
 		if _fit_on or not has_method("_fit"):
 			_wire_fit()
 			fit_now()
@@ -665,6 +677,106 @@ static func fit_card(c: Control, sc: ScrollContainer, inner: Control, width: flo
 	var h := minf(want, maxf(160.0, vp.y * 0.88 - other))
 	if absf(sc.custom_minimum_size.y - h) > 0.5:
 		sc.custom_minimum_size.y = h
+
+
+# =====================================================================================================================
+# On-screen keyboard (one approach for every sheet with a LineEdit; Welcome uses keyboard_inset() too)
+# =====================================================================================================================
+
+## The keyboard's height in the viewport's logical px (the window's physical px scaled by viewport / window height); 0
+## when it is not showing. kb_debug_px stands in for it in dev runs and tests.
+static func keyboard_inset(view_h: float) -> float:
+	var px := kb_debug_px
+	if px < 0.0:
+		if not DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+			return 0.0
+		px = float(DisplayServer.virtual_keyboard_get_height())
+	var win := DisplayServer.window_get_size()
+	if px <= 0.0 or win.y <= 0:
+		return 0.0
+	return px * view_h / float(win.y)
+
+func _wire_keyboard() -> void:
+	if _kb_wired or not is_inside_tree():
+		return
+	_kb_wired = true
+	get_viewport().gui_focus_changed.connect(_on_focus_changed)
+	tree_exiting.connect(func():
+		if _edit and DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+			DisplayServer.virtual_keyboard_hide())
+	_on_focus_changed(get_viewport().gui_get_focus_owner())
+
+func _on_focus_changed(n: Control) -> void:
+	var e := n as LineEdit
+	if e != null and not is_ancestor_of(e):
+		e = null
+	if e == _edit:
+		return
+	_edit = e
+	var tick := get_tree().process_frame
+	if e:
+		if not e.has_meta("_kb_next"):          # Enter / Done: on to the next field, from the last one close the keyboard
+			e.set_meta("_kb_next", true)
+			e.keep_editing_on_text_submit = true
+			e.text_submitted.connect(func(_t: String): _next_field(e))
+		if not tick.is_connected(_kb_tick):
+			tick.connect(_kb_tick)
+		_kb_scroll_to(e)
+	elif tick.is_connected(_kb_tick):
+		tick.disconnect(_kb_tick)
+		_kb_apply(0.0)
+
+## The next visible LineEdit after e in the sheet (tree order), or release focus and hide the keyboard.
+func _next_field(e: LineEdit) -> void:
+	var all: Array[LineEdit] = []
+	_collect_edits(card, all)
+	var i := all.find(e)
+	if i >= 0 and i + 1 < all.size():
+		all[i + 1].grab_focus()
+		return
+	e.release_focus()
+	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		DisplayServer.virtual_keyboard_hide()
+
+func _collect_edits(n: Node, out: Array[LineEdit]) -> void:
+	for c in n.get_children():
+		if c is LineEdit and (c as LineEdit).is_visible_in_tree() and (c as LineEdit).editable:
+			out.append(c)
+		else:
+			_collect_edits(c, out)
+
+func _kb_tick() -> void:
+	_kb_apply(keyboard_inset(get_viewport_rect().size.y) if _edit else 0.0)
+
+## Lift the card over the keyboard kb px tall: the card area ends above it, fit_now() shrinks the scroll body to what
+## is left (the primary buttons under it stay on screen) and the focused field is scrolled into view.
+func _kb_apply(kb: float) -> void:
+	if absf(kb - _kb) <= 1.0:
+		return
+	_kb = kb
+	_center.offset_bottom = -kb
+	_center.offset_top = _safe_top() if kb > 0.0 else 0.0     # the card stays under the status bar
+	fit_now()
+	if _edit:
+		_kb_scroll_to(_edit)
+
+## The top safe-area inset (Main.safe_top), found up the tree; 0 when there is none.
+func _safe_top() -> float:
+	var n := get_parent()
+	while n:
+		if "safe_top" in n:
+			return float(n.get("safe_top"))
+		n = n.get_parent()
+	return 0.0
+
+func _kb_scroll_to(e: Control) -> void:
+	if scroll_box == null or not scroll_box.is_ancestor_of(e):
+		return
+	for k in 2:                                 # after the card has been resized
+		await get_tree().process_frame
+		if not is_instance_valid(e) or not e.has_focus() or not is_inside_tree():
+			return
+		scroll_box.ensure_control_visible(e)
 
 
 # =====================================================================================================================

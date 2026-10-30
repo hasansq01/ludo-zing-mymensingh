@@ -34,6 +34,7 @@ var account: Account                    # the server account, wallet and claims 
 var notifications: Notifications        # reminders, push and the permission question (scripts/net/notifications.gd)
 var ads: Ads                            # rewarded ads + the consent form (scripts/net/ads.gd; AdFlow shows them)
 var gem_store: GemStore                 # the gem packs: Play Billing + server verification (scripts/net/gem_store.gd)
+var crash_watch: CrashWatch             # breadcrumbs + the report of an unexpected exit (scripts/core/crash_watch.gd)
 var screen := "splash"                  # splash | welcome | home | ludo | sl
 var paused := false
 var speed := 1.0
@@ -58,6 +59,11 @@ var _sl_seen := false                   # the S&L scene has been on screen (its 
 
 
 func _ready() -> void:
+	crash_watch = CrashWatch.new()           # first: a crash while loading still leaves a record
+	crash_watch.name = "CrashWatch"
+	crash_watch.enabled = CrashWatch.should_run(OS.get_cmdline_user_args())
+	crash_watch.context_fn = diag_context
+	add_child(crash_watch)
 	BootTrace.mark("main ready (%s tier)" % Quality.tier())
 	BootTrace.watch_frames(self)
 	var seeded := ShaderSeed.plant()          # first launch: no shader modes compiled that are never drawn
@@ -118,7 +124,9 @@ func _ready() -> void:
 	sheet_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(sheet_layer)
 	sheet_layer.z_index = 10                 # above anything a screen raises (the level star, z 1); CoinFly flies at 50
-	sheet_layer.child_entered_tree.connect(func(_n: Node): boost(0.8))
+	sheet_layer.child_entered_tree.connect(func(n: Node):
+		crash_watch.note("sheet", str(n.get_script().get_global_name()) if n.get_script() else str(n.name))
+		boost(0.8))
 	var splash := Splash.new()
 	_splash = splash
 	splash.z_index = 20
@@ -153,6 +161,7 @@ func _ready() -> void:
 	_splash = null
 	BootTrace.end("splash gone")
 	_start_account()
+	crash_watch.check_previous.call_deferred()   # did the last run die? (one report, sent a few seconds later)
 	if ShaderCensus.requested():                # debug: draw every material once, list the shader cache
 		home.visible = true
 		_set_screen("home")
@@ -378,6 +387,7 @@ func _set_screen(s: String) -> void:
 	sl_board.set_process(not cafe)
 	home.set_process(home.visible)
 	_apply_fps()
+	crash_watch.set_screen(s)
 
 func _apply_fps() -> void:
 	var game := screen in ["ludo", "sl", "splash"]
@@ -604,7 +614,9 @@ func _open_setup(game: String, mode: String) -> void:
 		if game == "ludo":
 			online.open_friends()
 		else:
-			_home_toast("Coming soon for Snakes & Ladders")
+			_home_toast("Coming soon for Snakes & Ladders", "bad")
+			Haptics.error()
+			Sound.sfx("error")
 		return
 	if game == "ludo" and not Tutorial.done():
 		start_ludo(Tutorial.config(mode))       # the guided first match (mode: where "Play a real game" leads)
@@ -795,10 +807,11 @@ func _claim_free() -> void:
 	var left := Rewards.free_left_sec(Save.profile)
 	var from := _home_side("free")
 	if left > 0:
-		_home_toast("Free coins in %s" % Fmt.until(left))
+		_home_toast("Free coins in %s" % Fmt.until(left), "bad")
 		if from and from.has_method("shake"):
 			from.call("shake")
 		Haptics.error()
+		Sound.sfx("error")
 		return
 	var before := int(Save.profile.coins)
 	var n := 0
@@ -1240,10 +1253,28 @@ func _back() -> void:
 			get_tree().quit()
 
 func _confirm_quit() -> void:
-	if await Sheet.confirm(self, "Leave the café?", "Your progress is saved.", "Quit", "Stay", true):
+	if await Sheet.confirm(self, "Quit Ludo Zing?", "Your progress is saved.", "Quit", "Stay", true):
 		notifications.schedule_now()
 		Save.flush()
+		crash_watch.mark_ended("quit")
 		get_tree().quit()
+
+## What CrashWatch records with each sample: the screen and, in a game, {game, mode, minutes, resumed}. mode: cpu |
+## local (Pass & Play) | tutorial | friends (a friend room) | quick:<table> (quick match: practice, t100 ...).
+func diag_context() -> Dictionary:
+	var m := {}
+	if screen in ["ludo", "sl"]:
+		var mode := ""
+		if _online_match():
+			mode = ("quick:" + str(online.quick_cfg.get("table", "practice"))) if online.in_quick() else "friends"
+		elif screen == "ludo" and bool(last_ludo.get("tutorial", false)):
+			mode = "tutorial"
+		else:
+			var lp: Variant = Save.prefs.get("last_played")
+			mode = str((lp as Dictionary).get("mode", "")) if lp is Dictionary else ""
+		m = {game = screen, mode = mode, minutes = snappedf((Time.get_ticks_msec() - _match_ms) / 60000.0, 0.1),
+			resumed = _resumed}
+	return {screen = screen, match = m, paused = paused}
 
 func _notification(what: int) -> void:
 	match what:

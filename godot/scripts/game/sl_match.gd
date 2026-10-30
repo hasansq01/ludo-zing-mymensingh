@@ -99,6 +99,7 @@ var rr := RerollFlow.new()                # online: the re-roll offer and hold
 var reroll_button: RerollButton           # online: "Roll again", above the dice
 var hold_note: HoldNote                   # online: "Rafi may roll again…" under the tiles
 var _rr_wait := false                     # online: a re-roll was paid: the dice sleep until the new roll's act
+var _rr_head := false                    # online: the pawn is on the snake's head (gulp running): the offer may show now
 var aborts := 0                           # online: animations ended by a mid-turn `sync` (tests, debugging)
 var _over_msg := {}                       # online: the server's `over` (match_id, the coin table's payouts)
 
@@ -621,12 +622,15 @@ func _walk(id: int, p: Dictionary, pi: int, e: Dictionary, v: int) -> void:
 		else:
 			top.say("Snake! %s slid down to %d." % [_who(p), e.to], 1.8, "event")
 		Sound.sfx("snake", {soft = soft})
+		_rr_head = online                      # the offer's 3 s run from the server's clock: show it now, not after the gulp
+		_net_reroll_show()
 		if _human(p):
 			Haptics.medium()
 		_pop("Down to %d" % e.to, board.pawn_top(pi), Palette.CORAL, 30)
 		if not online and emotes:
 			emotes.react_snake(int(p.c))
 		await board.slide(pi, e.via, e.to, _spd())
+		_rr_head = false
 	if not live(id):
 		return
 	board.place(_positions())
@@ -814,6 +818,7 @@ func start_online(msg: Dictionary, net_: Object) -> void:
 	_ended = false
 	_over_msg = {}
 	_rr_wait = false
+	_rr_head = false
 	rr.clear()
 	await _open()
 
@@ -830,6 +835,7 @@ func _offline() -> void:
 	_net_ready = false
 	rr.clear()
 	_rr_wait = false
+	_rr_head = false
 	if reroll_button:
 		reroll_button.hide_offer()
 	if hold_note:
@@ -869,6 +875,7 @@ func net_push(msg: Dictionary) -> void:
 func _net_abort() -> void:
 	aborts += 1
 	_id += 1
+	_rr_head = false
 	_net_pumping = false
 	_busy = false
 	dice.finish_roll()
@@ -1041,13 +1048,13 @@ func net_reroll_offer(msg: Dictionary) -> void:
 	if not online or ns == null:
 		return
 	rr.on_offer(msg)
-	if not _net_pumping:
+	if not _net_pumping or _rr_head:
 		_net_reroll_show()
 
 func _net_reroll_show() -> void:
 	if not online or ns == null or G.is_empty() or reroll_button == null:
 		return
-	if G.phase == "over" or _net_pumping or not rr.offer_open(ns.n) or reroll_button.visible:
+	if G.phase == "over" or (_net_pumping and not _rr_head) or not rr.offer_open(ns.n) or reroll_button.visible:
 		return
 	reroll_button.show_offer(rr.offer_left_ms(), float(rr.offer.total), rr.is_free(), int(rr.offer.cost))
 	_layout()
@@ -1257,7 +1264,7 @@ func _net_game_over(w: Dictionary) -> void:
 	var xp_after := xp_before
 	var reward := 0
 	if NetReplica.server_rewards():
-		reward = int(table.payout) if int(table.get("entry", 0)) > 0 else NetReplica.online_coins("sl", outcome, table)
+		reward = int(table.payout) + int(table.get("bonus", 0)) if int(table.get("entry", 0)) > 0 else NetReplica.online_coins("sl", outcome, table)
 		xp_after = xp_before + int(rw.xp)
 	elif int(rw.xp) > 0:                       # no account (old builds, dev): the XP stays local, no coins
 		Save.profile.xp = xp_before + int(rw.xp)
