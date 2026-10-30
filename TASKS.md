@@ -121,6 +121,12 @@ Last reviewed: 2026-10-30.
           the app review. Until approval the ad unit answers "Cannot determine request type" (error 1), so no rewarded video
           has loaded and `ad_rewards` is empty. When it loads: watch "+2 gems", confirm the `ad_rewards` row is granted via
           the SSV callback. This is the last open item of the Economy v1 goal.
+  - [ ] **Crash reporting** (2026-10-31, a tester's Infinix Hot 16 Pro+ "crashes mid game", nothing in Play's
+        Crashes & ANRs): built, not deployed. Game: `CrashWatch` breadcrumbs in `user://diag/`, file logging on phones,
+        exit reasons + native tombstones from the notifications plugin (`Diag.kt`), one report per dead run to
+        `POST /v1/diag/crash`; server: migration 0006 `crash_reports`, 90-day retention, admin Crashes page; privacy page
+        line. Native debug symbols: `tools/android-symbols.sh`. To ship: apply 0006 to remote D1, deploy, new build
+        (version code 9), upload its symbols, then read the tester's report in the admin console.
   - [ ] Step 5: Play Store release. Internal testing is live (Oclasp org account, testers TeamDD, v5 0.2.0); store
         listing, content rating, data safety and policy pages are done. Production after Economy v1 is verified.
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
