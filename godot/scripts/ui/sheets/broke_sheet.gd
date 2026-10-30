@@ -42,22 +42,15 @@ func _init(bonus_ := {}) -> void:
 	var intro := UIKit.paragraph("", UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	intro.name = "Intro"
 	body.add_child(intro)
-	bonus_button = UIKit.button_with("", UIKit.icon("coin", 28), "honey", "lg")
+	bonus_button = UIKit.button_with("Daily bonus +%d" % BONUS, UIKit.icon("coin", 28), "honey", "lg")
 	bonus_button.name = "Bonus"
-	_bonus_text = UIKit.label("", UIKit.FS.h1, Palette.ON_HONEY, UIKit.font_display())
-	_bonus_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_bonus_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	(bonus_button.find_child("Content", true, false) as Control).add_child(_bonus_text)
+	_bonus_text = bonus_button.find_child("Text", true, false) as Label
 	bonus_button.pressed.connect(_claim)
 	body.add_child(bonus_button)
-	video_button = UIKit.button_with("", UIKit.icon("coin", 26), "teal", "md")
+	video_button = UIKit.button_with("Watch a video: +%s coins" % Fmt.coins_full(REFILL), UIKit.icon("coin", 26), "teal", "md")
 	video_button.name = "Video"
-	var vl := UIKit.label("Watch a video: +%s coins" % Fmt.coins_full(REFILL), UIKit.FS.body_l, Color.WHITE, UIKit.font_body(900))
-	vl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	vl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vl.add_theme_color_override("font_outline_color", Palette.TEAL_OUTLINE)
-	vl.add_theme_constant_override("outline_size", 4)
-	(video_button.find_child("Content", true, false) as Control).add_child(vl)
+	narrow_changed.connect(func(narrow: bool):      # the long video line shrinks to fit a 320 px card
+		(video_button.find_child("Text", true, false) as Label).add_theme_font_size_override("font_size", 15 if narrow else UIKit.BTN.md.fs))
 	video_button.pressed.connect(_watch)
 	body.add_child(video_button)
 	note_label = UIKit.paragraph("", UIKit.FS.body, Palette.DANGER, HORIZONTAL_ALIGNMENT_CENTER)
@@ -115,6 +108,7 @@ func refresh() -> void:
 	intro.text = "You have %s coins. Tables start at %d. Top up, or play Practice for free." % [Fmt.coins_full(balance()), CoinTables.BROKE_BELOW]
 	var avail := bool(bonus.available)
 	bonus_button.disabled = _busy or not avail
+	_bonus_kind("honey" if avail else "off")
 	if avail:
 		_bonus_text.text = "Daily bonus +%d" % int(bonus.amount)
 	else:
@@ -123,6 +117,15 @@ func refresh() -> void:
 	video_button.visible = _ads()
 	video_button.disabled = _busy
 	practice_button.disabled = _busy
+
+## The bonus button's kind with its text colours (button_with's label keeps the colours it was made with).
+func _bonus_kind(kind: String) -> void:
+	if bonus_button.get_meta("kit_kind", "") == kind:
+		return
+	UIKit.set_kind(bonus_button, kind)
+	var k: Array = UIKit.KINDS[kind]
+	_bonus_text.add_theme_color_override("font_color", k[2])
+	_bonus_text.add_theme_color_override("font_outline_color", k[3])
 
 func _process(d: float) -> void:
 	_tick += d

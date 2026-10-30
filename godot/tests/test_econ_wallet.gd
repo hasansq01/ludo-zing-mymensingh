@@ -416,7 +416,7 @@ func _store_sheet() -> void:
 	check("store sheet: four packs with titles and the Play prices", tx.has("80 gems") and tx.has("1,200 gems") and tx.has("৳120.00") and tx.has("৳1,200.00"), tx)
 	var btn: Button = sheet._pack_buttons["gems_80"]
 	check("store sheet: a pack button is a 48 px target", btn.get_combined_minimum_size().y >= 40.0 and not btn.disabled, btn.get_combined_minimum_size())
-	check("store sheet: the three swaps (10 -> 1,000 ...)", tx.has("1,000") and tx.has("5,500") and tx.has("14,000"), tx)
+	check("store sheet: the three swaps (10 -> 1K ...)", tx.has("1K") and tx.has("5.5K") and tx.has("14K"), tx)
 	check("store sheet: with 10 gems only the first swap is on", sheet._swap_buttons[0].text == "Swap" and sheet._swap_buttons[1].text == "Need 40" and sheet._swap_buttons[2].text == "Need 110", [sheet._swap_buttons[0].text, sheet._swap_buttons[1].text])
 	check("store sheet: no pending card without a pending payment", not sheet._pending.visible)
 	# buy: the toast text goes through and the balance follows
@@ -429,7 +429,7 @@ func _store_sheet() -> void:
 	check("store sheet: with 90 gems two swaps are on", sheet._swap_buttons[1].text == "Swap" and sheet._swap_buttons[2].text == "Need 30")
 	# swapping through the account (the sheet's confirm is tested by the Shop's pattern; the call is the same)
 	var r: Dictionary = await acc.exchange(0)
-	check("store sheet: a swap moves the balances", r.ok and sheet.gems_chip.text() == "80" and sheet.coins_chip.text() == "1,700", [sheet.gems_chip.text(), sheet.coins_chip.text()])
+	check("store sheet: a swap moves the balances", r.ok and sheet.gems_chip.text() == "80" and sheet.coins_chip.text() == "1.7K", [sheet.gems_chip.text(), sheet.coins_chip.text()])
 	# too few gems for a swap: says how many, charges nothing
 	var calls: int = f.count("/v1/gems/exchange")
 	Save.profile.gems = 3

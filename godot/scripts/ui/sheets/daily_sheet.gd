@@ -34,7 +34,7 @@ var auto_close := true                ## close AUTO_CLOSE_SEC after a successful
 
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
-func _init(p: Dictionary = {}, today := "", width := 366.0) -> void:
+func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
 	super("", width, true, LOOK_PM)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
@@ -519,7 +519,10 @@ class Tile extends Control:
 				fs -= 1
 			var vy := HEAD + 6 + 46 + 8 + fd.get_ascent(18)
 			draw_string(fd, Vector2(0, vy), label, HORIZONTAL_ALIGNMENT_CENTER, w, fs, Color(Palette.INK, a))
-			draw_string(status_font(), Vector2(0, vy + 19), st_text, HORIZONTAL_ALIGNMENT_CENTER, w, UIKit.FS.small, st_col)
+			var sfs: int = UIKit.FS.small              # "TOMORROW" shrinks on a narrow tile instead of being cut
+			while sfs > 10 and status_font().get_string_size(st_text, HORIZONTAL_ALIGNMENT_LEFT, -1, sfs).x > w - 6.0:
+				sfs -= 1
+			draw_string(status_font(), Vector2(0, vy + 19), st_text, HORIZONTAL_ALIGNMENT_CENTER, w, sfs, st_col)
 			if claimed:
 				_draw_check(icon_c)
 		draw_set_transform(Vector2.ZERO)

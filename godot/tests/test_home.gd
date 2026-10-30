@@ -281,6 +281,14 @@ func _rewards_sheet() -> void:
 	for c in s.scroll_body.get_children():
 		rows.append(str(c.name))
 	check("rewards sheet: Free spin, Daily reward, Free coins", rows == ["Spin", "Daily", "Free"], rows)
+	var gc := RewardsSheet.new("Get coins", true)
+	holder.add_child(gc)
+	var gc_rows := []
+	for c in gc.scroll_body.get_children():
+		gc_rows.append(str(c.name))
+	check("get coins: the same rows as Rewards plus the win info row", gc_rows == ["Spin", "Daily", "Free", "Wins"] and gc.title_label.text == "Get coins", gc_rows)
+	check("get coins: the same state as Rewards (one shared row)", (gc.row("spin") as RewardsSheet.Row).go.visible == (s.row("spin") as RewardsSheet.Row).go.visible
+		and (gc.row("free") as RewardsSheet.Row).wait_label.text == (s.row("free") as RewardsSheet.Row).wait_label.text)
 	var spin: RewardsSheet.Row = s.row("spin")
 	var daily: RewardsSheet.Row = s.row("daily")
 	var free: RewardsSheet.Row = s.row("free")

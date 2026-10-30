@@ -3,7 +3,8 @@ extends Sheet
 ## A friends room before the match (PROTOCOL.md `lobby`): the big room code with Copy and Share (Share copies an
 ## invite line; Android has no share intent from here), the game (Ludo / Snakes & Ladders: lobby.settings.game),
 ## the members in join order (avatar, level, name, online dot, the seat colour they will play), the house rules
-## (Ludo only) and the way out.
+## (Ludo only, one grouped card as in Settings) and the way out. All but the way out scroll; on a phone 4 members and
+## the rules don't fit, so the sheet shows the scroll_hint chevron while there is more below.
 ##   Host:   the game, Teams (2 v 2) (only with exactly 4 players), Ask before pairing, Start game (needs 2 or more).
 ##   Others: the same choices, read only, and "Waiting for host…".
 ## Leave (and Back) asks first. The sheet has no close button: leaving is a choice, not a dismissal.
@@ -19,7 +20,6 @@ signal game_changed(game: String)
 signal start_pressed
 signal leave_pressed
 
-const ROW_H := 50.0
 const AVA := 40.0
 const MAX := 4
 
@@ -46,6 +46,7 @@ var note: Label
 var status_pill: PanelContainer
 var _list: VBoxContainer
 var _teams_row: Control
+var _rules_card: Control
 var _teams_note: Label
 var _quiet := false                       # setting the switches from a lobby message: don't echo it back
 
@@ -61,8 +62,8 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	status_pill = _status_pill()
 	body.add_child(status_pill)
-	body.add_child(_code_card())
 	var box := add_scroll_body(UIKit.SPACE.sm)
+	box.add_child(UIKit.margin(_code_card(), 0, 0, 0, UIKit.SPACE.xs))   # scrolls away on a short screen (LO-03)
 	box.add_child(UIKit.caption("Game"))
 	game_picker = UIKit.segmented([["ludo", "Ludo"], ["sl", "Snakes & Ladders"]], game, func(v):
 		if _quiet or not host or str(v) == game:
@@ -71,6 +72,7 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 		game_changed.emit(game)
 		_refresh(), "sm")
 	game_picker.name = "Game"
+	UIKit.fit_segmented(game_picker)                  # "Snakes & Ladders" gets the room it needs before anything shrinks
 	box.add_child(game_picker)
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	var cap := UIKit.caption("Players")
@@ -80,24 +82,30 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	count_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(count_label)
 	box.add_child(head)
-	_list = UIKit.vbox(UIKit.SPACE.xs + 2)
+	_list = UIKit.vbox(UIKit.SPACE.sm)
 	box.add_child(_list)
-	_rules_cap = UIKit.margin(UIKit.caption("House rules"), 0, UIKit.SPACE.xs, 0, 0)
+	_rules_cap = UIKit.caption("House rules")
 	box.add_child(_rules_cap)
+	# one grouped card with a divider, as Settings' House rules
+	var rules := _rules_group()
 	teams_switch = SettingsSheet.Switch.new(false)
 	teams_switch.name = "Teams"
 	teams_switch.toggled.connect(func(_on: bool): _changed())
 	_teams_row = _rule_row("Teams (2 v 2)", "Red + Yellow vs Green + Blue", teams_switch)
 	_teams_note = _teams_row.find_child("Note", true, false) as Label
-	box.add_child(_teams_row)
+	rules.add_child(_teams_row)
+	rules.add_child(_rule_divider())
 	pair_switch = SettingsSheet.Switch.new(false)
 	pair_switch.name = "PairAsk"
 	pair_switch.toggled.connect(func(_on: bool): _changed())
 	_pair_row = _rule_row("Ask before pairing", "You choose when two pawns meet", pair_switch)
-	box.add_child(_pair_row)
+	rules.add_child(_pair_row)
+	_rules_card = rules.get_parent() as Control
+	box.add_child(_rules_card)
+	scroll_hint = true                    # 4 players and the rules don't fit a phone: show that the list goes on
 	note = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	note.name = "Note"
-	body.add_child(note)
+	body.add_child(UIKit.margin(note, 0, UIKit.SPACE.xs, 0, 0))   # clear of the scroll fade above it
 	leave_button = UIKit.btn("Leave", "ghost", "md")
 	leave_button.name = "Leave"
 	leave_button.pressed.connect(func(): leave_pressed.emit())
@@ -107,44 +115,57 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 		if not start_button.disabled:
 			start_pressed.emit())
 	for b: Button in [leave_button, start_button]:
-		UIKit.fit_text(b, 14)
+		UIKit.fit_text(b, 12)
 	var row := add_row([leave_button, start_button])
 	leave_button.size_flags_stretch_ratio = 0.7
 	row.name = "Actions"
-	fit()
+	fit(0.92)
 	_refresh()
 
 
 # ---------- pieces ----------
 
-## The room code in big letters ("K7Q X2M") with Copy and Share under it.
+## The room code in big letters ("K7Q X2M") with Copy and Share beside it, one row.
 func _code_card() -> Control:
 	var p := PanelContainer.new()
 	var st := UIKit.box(Palette.PANE, UIKit.R.lg, UIKit.BW.line, Palette.ROW_EDGE)
 	UIKit.pad(st, UIKit.PAD.pane, UIKit.SPACE.sm)
 	p.add_theme_stylebox_override("panel", st)
-	var col := UIKit.vbox(UIKit.SPACE.xs)
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	var cap := UIKit.eyebrow("Room code")
-	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(cap)
-	code_label = UIKit.label(spaced(code), UIKit.FS.hero + 4, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	var h := UIKit.hbox(UIKit.SPACE.sm)
+	var col := UIKit.vbox(0)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_child(UIKit.eyebrow("Room code"))
+	code_label = UIKit.label(spaced(code), UIKit.FS.title, Palette.INK, UIKit.font_display())
 	code_label.name = "Code"
 	code_label.add_theme_constant_override("outline_size", 0)
 	col.add_child(code_label)
-	var row := UIKit.hbox(UIKit.SPACE.sm)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_child(col)
+	var btns := UIKit.hbox(UIKit.SPACE.sm)
+	btns.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	copy_button = UIKit.button("Copy", "white", "sm")
 	copy_button.name = "Copy"
 	copy_button.pressed.connect(copy_code)
-	share_button = UIKit.button("Share invite", "teal", "sm")
+	share_button = UIKit.button("Share", "teal", "sm")
 	share_button.name = "Share"
 	share_button.pressed.connect(share)
 	for b: Button in [copy_button, share_button]:
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(b)
-	col.add_child(row)
-	p.add_child(col)
+		btns.add_child(b)
+	var stack := UIKit.vbox(UIKit.SPACE.xs)
+	stack.add_child(h)
+	p.add_child(stack)
+	# beside the code on a normal card, under it on a narrow one (< 340 px: they don't fit in one row)
+	var place := func(narrow: bool):
+		var to: Control = stack if narrow else h
+		if btns.get_parent() != to:
+			if btns.get_parent():
+				btns.get_parent().remove_child(btns)
+			to.add_child(btns)
+		for b: Button in [copy_button, share_button]:
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL if narrow else Control.SIZE_FILL
+	var tree := Engine.get_main_loop() as SceneTree       # the card isn't in the tree yet: ask the screen
+	place.call(tree != null and minf(UIKit.W.form, tree.root.get_visible_rect().size.x - 2.0 * UIKit.GUTTER) < NARROW_W)
+	narrow_changed.connect(place)
 	return p
 
 ## "K7QX2M" -> "K7Q X2M" (easier to read out and to type).
@@ -168,44 +189,53 @@ func _status_pill() -> PanelContainer:
 	p.visible = false
 	return p
 
-func _rule_row(title_: String, sub: String, sw: Button) -> Control:
+## The house rules' row card (Settings' grouped look: one card, the lines split by a divider); returns its column.
+func _rules_group() -> VBoxContainer:
+	var st := UIKit.surface("row").duplicate() as StyleBoxFlat
+	st.content_margin_top = 0
+	st.content_margin_bottom = UIKit.LIP.md - UIKit.BW.line
+	st.content_margin_left = 14
+	st.content_margin_right = 10
 	var p := PanelContainer.new()
-	var st := UIKit.box(Palette.ROW, UIKit.R.md, UIKit.BW.line, Palette.ROW_EDGE)
-	UIKit.pad(st, UIKit.PAD.row, UIKit.SPACE.xxs)
+	p.name = "Rules"
 	p.add_theme_stylebox_override("panel", st)
-	var h := UIKit.hbox(UIKit.SPACE.sm)
-	var v := UIKit.vbox(0)
+	var col := UIKit.vbox(0)
+	p.add_child(col)
+	return col
+
+func _rule_divider() -> ColorRect:
+	var d := ColorRect.new()
+	d.color = Palette.ROW_EDGE
+	d.custom_minimum_size = Vector2(0, 2)
+	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return d
+
+## One rule line (as SettingsSheet._line): the title and its note left, the switch right, 56 px tall.
+func _rule_row(title_: String, sub: String, sw: Button) -> Control:
+	var h := UIKit.hbox(UIKit.SPACE.md)
+	h.custom_minimum_size.y = SettingsSheet.ROW_H
+	var v := UIKit.vbox(1)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	v.add_child(UIKit.label(title_, UIKit.FS.body_l, Palette.INK, UIKit.font_body(800)))
-	var n := UIKit.label(sub, UIKit.FS.small, Palette.SUB, UIKit.font_body(700))
+	var n := UIKit.paragraph(sub, UIKit.FS.small, Palette.SUB)          # wraps: never widens the card
 	n.name = "Note"
 	v.add_child(n)
 	h.add_child(v)
 	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(sw)
-	p.add_child(h)
-	return p
+	return UIKit.margin(h, 0, 6, 0, 6)
 
 ## One member (or an open seat when m is empty).
 func _member_row(m: Dictionary, index: int) -> Control:
-	var p := PanelContainer.new()
 	var empty := m.is_empty()
 	var mine := not empty and NetClient.id_str(m.get("id", "")) == me_id
 	var c := int(m.get("color", -1)) if not empty else -1
 	if c < 0 and not empty:
 		var cols := NetFake.Room.seat_colors(game, maxi(2, members.size()))
 		c = cols[index] if index < cols.size() else -1
-	var st := UIKit.box(Color.WHITE if not empty else Color(Palette.CHIP, 0.55), UIKit.R.md, UIKit.BW.line,
-		Palette.PLAYER[c] if mine and c >= 0 else Palette.ROW_EDGE)
-	UIKit.pad(st, UIKit.SPACE.sm, UIKit.SPACE.xs)
-	if empty:
-		st.draw_center = true
-		st.border_color = Palette.LINE_STRONG
-	p.add_theme_stylebox_override("panel", st)
-	p.custom_minimum_size.y = ROW_H
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	p.add_child(row)
+	var p := UIKit.list_row(row, "empty" if empty else ("you" if mine else ""), Palette.PLAYER[c] if mine and c >= 0 else Color.TRANSPARENT)
 	if empty:
 		var ph := Control.new()
 		ph.custom_minimum_size = Vector2(AVA, AVA)
@@ -216,6 +246,9 @@ func _member_row(m: Dictionary, index: int) -> Control:
 		row.add_child(ph)
 		var more := MAX - members.size()
 		var t := UIKit.label("Waiting for friends to join…" if more > 1 else "Waiting for one more friend…", UIKit.FS.body, Palette.MUTED, UIKit.font_body(800))
+		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		t.clip_text = true
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(t)
 		return p
@@ -230,7 +263,7 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	av.add_child(dot)
 	var lv := LevelBadge.new(maxi(1, int(m.get("level", 1))), "xs")
 	lv.name = "Level"
-	lv.position = Vector2(-8.0, AVA - lv.px + 6.0)
+	lv.position = Vector2(-2.0, AVA - lv.px + 2.0)       # inside the avatar's box, bottom left
 	lv.size = Vector2(lv.px, lv.px)
 	av.add_child(lv)
 	row.add_child(av)
@@ -309,7 +342,7 @@ func _refresh() -> void:
 		b.mouse_filter = Control.MOUSE_FILTER_STOP if host else Control.MOUSE_FILTER_IGNORE
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if host else Control.CURSOR_ARROW
 	var ludo := game == "ludo"
-	for r: Control in [_rules_cap, _teams_row, _pair_row]:
+	for r: Control in [_rules_cap, _rules_card]:
 		r.visible = ludo
 	teams_switch.set_pressed_no_signal(teams)
 	teams_switch._set_t(1.0 if teams else 0.0)
@@ -325,6 +358,7 @@ func _refresh() -> void:
 	start_button.disabled = not can_start()
 	start_button.text = "Start game" if host else "Waiting for host…"
 	UIKit.set_kind(start_button, "honey" if host else "off")
+	UIKit.refit_text(start_button)            # after set_kind (it resets the size): the guest's text fits at 320 px too
 	if host:
 		start_button.disabled = not can_start()
 	else:

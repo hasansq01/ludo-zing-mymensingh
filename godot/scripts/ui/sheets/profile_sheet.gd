@@ -4,7 +4,7 @@ extends Sheet
 ## the only dismiss control. Folder tabs Me / Achievements (the Achievements tab carries a red count of rewards
 ## waiting to be claimed) over one framed pane; the card keeps one size for both tabs and only the pane scrolls.
 ##   Profile: the identity card (the equipped avatar in its frame, the name on its nameplate with the badge, level +
-##     XP meter, coins, a "Customise look" button that opens the Shop on Avatars with the Owned filter; the player ID
+##     XP meter, coins, an "Inventory" button that opens the Inventory on Avatars; the player ID
 ##     lives in Settings as the Support ID, nothing uses it offline); the name (1-14 characters, trimmed, inner spaces collapsed; Save shows once it changed); the
 ##     stats in tiles (Ludo vs computer, Snakes & Ladders, Overall).
 ##   Achievements: a summary (earned count + coins), then every achievement with its medal, a teal progress meter
@@ -42,12 +42,13 @@ var _err: Label
 var _stats_note: Label
 var _stat_vals := {}                  # stat key -> value Label (or CoinAmount for coinsEarned)
 var _ach_earned: Label
-var _ach_coins: CoinAmount
+var _ach_coins: CoinAmount            # coins waiting to be claimed
+var _ach_claim: Control
 var _ach_updaters: Array[Callable] = []
 var _claim_btns := {}                 # achievement id -> its Claim button
 var _flying := 0                      # coin flights still landing (the counter counts up on its own meanwhile)
 var _desat: Shader
-var _acct_box: PanelContainer
+var _acct_box: Control                 # the whole Account section (heading + card)
 var _acct_title: Label
 var _acct_note: Label
 var _acct_synced: Control
@@ -85,9 +86,9 @@ func _init(width := 360.0) -> void:
 	fit(0.88, FIXED_H)
 
 	_profile_pane = UIKit.vbox(UIKit.SPACE.md)
-	_profile_pane.add_child(UIKit.panel("row", _build_identity()))
-	_profile_pane.add_child(UIKit.panel("row", _build_name()))
-	_acct_box = UIKit.panel("row", _build_account())
+	_profile_pane.add_child(UIKit.list_row(_build_identity()))
+	_profile_pane.add_child(_section("Your name", _build_name()))
+	_acct_box = _section("Account", _build_account())
 	_acct_box.name = "AccountBox"
 	_profile_pane.add_child(_acct_box)
 	_profile_pane.add_child(_build_stats())
@@ -137,7 +138,7 @@ func _on_narrow(nar: bool) -> void:
 
 
 # =====================================================================================================================
-# Customise look: the Shop on Avatars, Owned filter (decision 4); the old Collection while the Shop can't filter yet
+# Inventory: the Shop on Avatars, owned items only (decision 4); the old Collection while the Shop can't filter yet
 # =====================================================================================================================
 
 func _customise() -> void:
@@ -169,6 +170,8 @@ func _on_look_changed() -> void:
 static func _make_shop() -> Sheet:
 	var sc := load(SHOP_SCRIPT) as GDScript
 	if sc and sc.can_instantiate() and _init_arity(sc) >= 3:
+		if _init_arity(sc) >= 4:                         # the Inventory variant: ribbon "Inventory", no All | Owned row
+			return sc.new("avatars", float(UIKit.W.catalog), true, true) as Sheet
 		return sc.new("avatars", float(UIKit.W.catalog), true) as Sheet
 	var col := load(COLLECTION_SCRIPT) as GDScript
 	if col and col.can_instantiate():
@@ -193,8 +196,8 @@ func _app() -> Node:
 # Profile pane
 # =====================================================================================================================
 
-## The avatar in its frame; beside it the name on its plate (+ badge), level + XP and coins. Then Customise look and
-## the player ID with Copy.
+## The avatar in its frame; beside it the name on its plate (+ badge), level + XP and coins. Then Leaderboard and
+## Inventory (one name for that place: the nav, this button and the sheet's ribbon).
 func _build_identity() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.md)
 	var head := UIKit.hbox(UIKit.SPACE.md)
@@ -211,30 +214,39 @@ func _build_identity() -> VBoxContainer:
 	_level = LevelBadge.new(1, "md")
 	_xp = Meter.new("xp", 20, true, "XP")
 	right.add_child(LevelBadge.row(_level, _xp))
-	_level.z_index = 0                       # row()'s z 1 drew the star over sheets stacked above (the Shop's tabs):
-	_xp.show_behind_parent = true            # the star stays over the bar by draw order instead
+	_xp.show_behind_parent = true            # the star stays over the bar by draw order
 	_coins = CoinAmount.new(0, "md", "plain")
 	_coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	right.add_child(_coins)
 	v.add_child(head)
 
-	var look := UIKit.button_with("Customise look", UIKit.icon("cat_avatars", 22), "honey", "sm")
-	look.name = "Customise"
-	look.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	look.pressed.connect(_customise)
-	v.add_child(look)
-	var ranks := UIKit.button_with("Leaderboard", UIKit.icon("ic_trophy", 22), "white", "sm")
+	var btns := UIKit.hbox(UIKit.SPACE.sm)         # Leaderboard (secondary) left, Inventory (primary) right
+	var ranks := UIKit.btn("Leaderboard", "white", "sm")
 	ranks.name = "Leaderboard"
 	ranks.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UIKit.fit_text(ranks, 13)
 	ranks.pressed.connect(_open_leaderboard)
-	v.add_child(ranks)
+	btns.add_child(ranks)
+	var look := UIKit.btn("Inventory", "honey", "sm")
+	look.name = "Inventory"
+	look.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UIKit.fit_text(look, 13)
+	look.pressed.connect(_customise)
+	btns.add_child(look)
+	v.add_child(btns)
 
+	return v
+
+## A section: its heading above (outside) the row card that holds `content`.
+func _section(title: String, content: Control) -> VBoxContainer:
+	var v := UIKit.vbox(UIKit.SPACE.sm)
+	v.add_child(_heading(title))
+	v.add_child(UIKit.list_row(content))
 	return v
 
 ## The name field; Save appears once the name differs from the saved one; the inline error line.
 func _build_name() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
-	v.add_child(_heading("Your name"))
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	_name_edit = LineEdit.new()
 	_name_edit.max_length = MAX_NAME
@@ -271,7 +283,6 @@ func _open_leaderboard() -> void:
 ## Only shown where an Account exists (the game; not previews).
 func _build_account() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
-	v.add_child(_heading("Account"))
 	var head := UIKit.hbox(UIKit.SPACE.sm)
 	_acct_title = UIKit.label("Guest", UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	_acct_title.name = "AccountTitle"
@@ -421,9 +432,13 @@ func _build_ach() -> void:
 	_ach_earned.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_ach_earned.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	sum.add_child(_ach_earned)
+	_ach_claim = UIKit.hbox(UIKit.SPACE.sm)               # the rewards still to claim (not the wallet)
+	_ach_claim.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_ach_claim.add_child(UIKit.label("To claim", UIKit.FS.small, Palette.SUB, UIKit.font_body(800)))
 	_ach_coins = CoinAmount.new(0, "sm", "chip")
 	_ach_coins.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	sum.add_child(_ach_coins)
+	_ach_claim.add_child(_ach_coins)
+	sum.add_child(_ach_claim)
 	_ach_pane.add_child(sum)
 	for a: Dictionary in Collection.ACH:
 		_ach_pane.add_child(_ach_card(a))
@@ -477,7 +492,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 		amt_gems.name = "Gems"
 		amt_gems.set_color(Palette.ON_HONEY)
 		amt.add_child(amt_gems)
-	var claim := UIKit.button_with("Claim", amt, "gold", "sm")
+	var claim := UIKit.button_with("Claim", amt, "honey", "sm")
 	claim.name = "Claim"
 	claim.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	claim.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -488,7 +503,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	foot.add_child(claim)
 	txt.add_child(UIKit.margin(foot, 0, UIKit.SPACE.xs, 0, 0))
 	top.add_child(txt)
-	var p := UIKit.panel("row", top)
+	var p := UIKit.list_row(top)
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	_ach_updaters.append(func():
@@ -504,7 +519,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 		bar.visible = not claim.visible           # a ready reward: the Claim button takes the row
 		reward.visible = not done
 		claimed.visible = got
-		UIKit.set_on(p, "row", done and not got))
+		UIKit.set_row_state(p, "on" if done and not got else ""))
 	return p
 
 ## "Claim" first, then the coin amount (button_with puts its child before the text).
@@ -590,10 +605,9 @@ func _claim(id: String) -> void:
 	_refresh()
 	profile_changed.emit()
 
-## The counter the coins fly to: the summary chip on the Achievements tab, the identity card's on the Profile tab.
+## The counter the coins fly to: the identity card's on the Profile tab (none on Achievements: a toast instead).
 func _coin_target() -> Control:
-	var t: Control = _ach_coins if pane == "ach" else _coins
-	return t if t and t.is_visible_in_tree() else null
+	return _coins if _coins and _coins.is_visible_in_tree() else null
 
 
 # =====================================================================================================================
@@ -612,7 +626,6 @@ func _refresh() -> void:
 	var coins := int(p.get("coins", 0))
 	if _flying == 0:
 		_coins.set_amount(coins)
-		_ach_coins.set_amount(coins)
 	var st: Dictionary = p.get("stats", {}) if p.get("stats") is Dictionary else {}
 	var played := int(st.get("played", 0))
 	var sl_played := int(st.get("slPlayed", 0))
@@ -634,9 +647,14 @@ func _refresh() -> void:
 		lab.add_theme_color_override("font_color", Palette.MUTED if text == Fmt.EMPTY else Palette.INK)
 	_stats_note.visible = played == 0 and sl_played == 0 and int(st.get("ppGames", 0)) == 0
 	var earned := 0
+	var waiting := 0
 	for a: Dictionary in Collection.ACH:
 		if Collection.ach_done(a.id, p):
 			earned += 1
+			if not bool(Collection.ach_progress(a.id, p).get("claimed", false)):
+				waiting += int(a.reward)
+	_ach_coins.set_amount(waiting)
+	_ach_claim.visible = waiting > 0
 	_ach_earned.text = "%d of %d earned" % [earned, Collection.ACH.size()]
 	for u in _ach_updaters:
 		u.call()

@@ -2,7 +2,9 @@ class_name LevelBadge
 extends Control
 ## The player level as a gold star (assets/ui/ic_star.svg) with the number on it (web .lvstar). Replaces the
 ## "star 2" text chips and the profile's honey disc. Sizes: "xs" 24, "sm" 28, "md" 36, "lg" 48, "xl" 64 (or a px number).
-## The number is Nunito 900 with tabular figures in INK, at least 12 px; it shrinks to fit 3 digits.
+## The number is Nunito 900 with tabular figures in INK, at least 12 px; it shrinks to fit 3 digits. From level 10 the
+## star is never smaller than "sm" (28 px): two digits don't fit the 24 px star's body. A light rim keeps the digits
+## readable on the star at every size.
 ##
 ##   var lvl := LevelBadge.new(Save.level, "sm")
 ##   lvl.set_level(3, true)                     # pop when the player levels up
@@ -12,14 +14,15 @@ const SIZES := {xs = 24.0, sm = 28.0, md = 36.0, lg = 48.0, xl = 64.0}
 
 var level := 1
 var px := 28.0
+var _base_px := 28.0
 var _star: Texture2D
 var _tw: Tween
 
 
 func _init(level_ := 1, size_: Variant = "sm") -> void:
 	level = level_
-	px = float(SIZES.get(size_, 28.0)) if size_ is String else float(size_)
-	custom_minimum_size = Vector2(px, px)
+	_base_px = float(SIZES.get(size_, 28.0)) if size_ is String else float(size_)
+	_apply_size()
 	size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -30,6 +33,7 @@ func _init(level_ := 1, size_: Variant = "sm") -> void:
 ## Show a level. animate: a springy pop (level up).
 func set_level(n: int, animate := false) -> void:
 	level = n
+	_apply_size()
 	queue_redraw()
 	if not animate or not is_inside_tree():
 		return
@@ -43,6 +47,16 @@ func set_level(n: int, animate := false) -> void:
 	_tw.tween_property(self, "rotation", 0.0, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## The star's px for a requested size: at least MIN_TWO_DIGITS from level 10.
+static func size_for(level_: int, base: float) -> float:
+	return maxf(base, SIZES.sm) if level_ >= 10 else base
+
+
+func _apply_size() -> void:
+	px = size_for(level, _base_px)
+	custom_minimum_size = Vector2(px, px)
+
+
 ## The number's font size at this badge size (>= 12).
 func number_size() -> int:
 	var digits := str(level).length()
@@ -51,14 +65,15 @@ func number_size() -> int:
 
 
 ## A row with `badge` overlapping the left end of `meter` (web .lvl: the star sits over the bar's start). The meter
-## gets inset_left so its fill starts beside the star. Returns an HBoxContainer (meter expands).
+## gets inset_left = the covered length: its fill starts behind the star and comes out past it. Returns an
+## HBoxContainer (meter expands).
 static func row(badge: LevelBadge, meter: Meter) -> HBoxContainer:
 	var r := HBoxContainer.new()
 	var overlap := roundf(badge.px * 0.45)
 	r.add_theme_constant_override("separation", -int(overlap))
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.z_index = 1
-	meter.inset_left = overlap * 0.6
+	meter.inset_left = overlap
+	meter.show_behind_parent = true            # the star is drawn over the bar's start by draw order (no z_index)
 	r.add_child(badge)
 	r.add_child(meter)
 	return r
@@ -78,6 +93,6 @@ func _draw() -> void:
 	# the star's body sits a little below the box centre (its points reach the top)
 	var cy := r.position.y + s * 0.56
 	var pos := Vector2(r.position.x + (s - tw) / 2.0, cy - font.get_height(fs) / 2.0 + font.get_ascent(fs))
-	if s >= 36.0:                                   # big stars: a soft light rim keeps the digits off the outline
-		draw_string_outline(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, maxi(2, int(s / 12.0)), Color(Palette.HONEY_RIM, 0.9))
+	# a soft light rim keeps the digits off the star's dark outline (1 px on the small stars)
+	draw_string_outline(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, maxi(2, int(s / 12.0)) if s >= 36.0 else 1, Color(Palette.HONEY_RIM, 0.9))
 	draw_string(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.INK)

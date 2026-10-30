@@ -136,17 +136,22 @@ func _replay_card() -> PanelContainer:
 	var v := UIKit.vbox(2)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(UIKit.label(REPLAY_TITLE, UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
+	var t := UIKit.label(REPLAY_TITLE, UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t.custom_minimum_size.x = 40          # (a wrapping label with no width yet asks for one glyph per line)
+	v.add_child(t)
 	var p := UIKit.paragraph(REPLAY_TEXT, UIKit.FS.small, Palette.SUB)
 	v.add_child(p)
 	h.add_child(v)
+	# icon + text on one line, the full-width button under it
+	var col := UIKit.vbox(UIKit.SPACE.sm)
+	col.add_child(h)
 	replay_button = UIKit.btn(REPLAY_BUTTON, "honey", "sm")
 	replay_button.name = "ReplayTutorial"
-	replay_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	replay_button.custom_minimum_size.y = maxf(replay_button.custom_minimum_size.y, UIKit.TAP)
+	UIKit.fit_text(replay_button, 13)
 	replay_button.pressed.connect(replay_tutorial)
-	h.add_child(replay_button)
-	return UIKit.panel("row", h)
+	col.add_child(replay_button)
+	return UIKit.list_row(col)
 
 ## Every rules card in order, with the house rules applied (Save.prefs.pair_ask, sl_need_one).
 static func sections() -> Array:
@@ -206,7 +211,7 @@ func _section(title_text: String, colour: int, lines: Array, icon := "") -> Pane
 	v.add_child(UIKit.margin(head, 0, 0, 0, UIKit.SPACE.xxs))
 	for line: String in lines:
 		v.add_child(_bullet(line))
-	return UIKit.panel("row", v)
+	return UIKit.list_row(v)
 
 ## The fair-dice promise: a honey-tinted card with the star icon.
 func _fair_card(skill_line := true) -> PanelContainer:

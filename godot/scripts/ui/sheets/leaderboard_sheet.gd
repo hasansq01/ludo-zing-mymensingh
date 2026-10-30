@@ -11,7 +11,7 @@ extends Sheet
 ## Tests: set fetch_fn (board, period) -> {ok, top, me, min_matches | error} (a coroutine) and auto_load false.
 
 const ROW_H := 60.0
-const ME_NOTE_W := 96.0                 # the pinned bar's note: wraps inside at least this width
+const ME_NOTE_W := 40.0                 # the pinned bar's note: wraps inside at least this width
 const AVA_PX := 40.0
 const CACHE_SEC := 30.0
 const PULL_PX := 90.0
@@ -54,10 +54,10 @@ func _init(width: float = UIKit.W.catalog) -> void:
 	refresh_button.pressed.connect(func(): load_board(true))
 	bar.add_child(refresh_button)
 	body.add_child(bar)
-	_list = add_scroll_body(UIKit.SPACE.xs + 2)
+	_list = add_scroll_body(UIKit.SPACE.sm)
 	fit(0.88, FIXED_H)
 	scroll_box.gui_input.connect(_on_scroll_input)
-	_me_bar = UIKit.panel("row")
+	_me_bar = UIKit.list_row(null, "you")
 	_me_bar.name = "MeBar"
 	_me_box = UIKit.hbox(UIKit.SPACE.sm)
 	_me_bar.add_child(_me_box)
@@ -198,17 +198,18 @@ func _render(r: Dictionary) -> void:
 		state = "list"
 		_clear()
 		var shown := 0
+		var mine := _my_rank(r)
 		for e: Variant in top:
 			if not e is Dictionary or shown >= 50:
 				continue
-			_list.add_child(_row(e, board))
+			_list.add_child(_row(e, board, mine))
 			shown += 1
 		rows_shown = shown
 	_render_me(r)
 
-func _row(e: Dictionary, board_: String) -> Control:
+func _row(e: Dictionary, board_: String, mine := 0) -> Control:
 	var rank := int(e.get("rank", 0))
-	var h := UIKit.hbox(UIKit.SPACE.sm + 2)
+	var h := UIKit.hbox(UIKit.SPACE.sm)
 	h.custom_minimum_size.y = AVA_PX
 	h.add_child(_rank_cell(rank))
 	var ava := Collection.make_avatar_of(str(e.get("avatar", "pawn-red")), str(e.get("frame", "classic")), AVA_PX)
@@ -230,9 +231,16 @@ func _row(e: Dictionary, board_: String) -> Control:
 	val.name = "Value"
 	val.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(val)
-	var p := UIKit.panel("row", h, rank == 1)
+	var p := UIKit.list_row(h, "you" if rank > 0 and rank == mine else "")   # rank 1 has its medal: no gold rim
 	p.name = "Row%d" % rank
 	return p
+
+## Your rank on this board (0: not listed).
+static func _my_rank(r: Dictionary) -> int:
+	var me: Variant = r.get("me")
+	if me is Dictionary and bool((me as Dictionary).get("listed", true)) and (me as Dictionary).get("rank") != null:
+		return int((me as Dictionary).get("rank", 0))
+	return 0
 
 ## 1 to 3 a medal (the result screen's place badges), then the number.
 func _rank_cell(rank: int) -> Control:
@@ -299,7 +307,7 @@ func _render_me(r: Dictionary) -> void:
 		sub = "Connect to see your rank"
 	var rl := UIKit.label(rank_text, UIKit.FS.h2, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
 	rl.name = "YouRank"
-	rl.custom_minimum_size.x = 40
+	rl.custom_minimum_size.x = 34
 	rl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	rl.visible = rank_text != ""
 	_me_box.add_child(rl)
@@ -315,7 +323,6 @@ func _render_me(r: Dictionary) -> void:
 		vl.name = "YouValue"
 		vl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_me_box.add_child(vl)
-	UIKit.set_on(_me_bar, "row", true)
 	_me_bar.visible = true
 	_fit_me_bar.call_deferred()
 

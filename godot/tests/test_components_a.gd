@@ -76,7 +76,7 @@ func run() -> void:
 	check("tabs: every tab has an icon (cat_ fallback)", t._tex.all(func(x) -> bool: return x != null))
 	var bad_start := TabStrip.new(items, "missing", "folder")
 	check("tabs: missing start key selects the first; folder look", bad_start.selected == "rooms" and bad_start.look == "folder")
-	check("tabs: pane styles", TabStrip.pane_style("folder") is StyleBoxFlat and TabStrip.pane_style("gtabs") is StyleBoxEmpty)
+	check("tabs: pane styles", TabStrip.pane_style("folder") is TabStrip.FolderPaneStyle and TabStrip.pane_style("gtabs") is StyleBoxEmpty)
 	var seven := TabStrip.new([{key = "rooms", text = "Rooms"}, {key = "scenes", text = "Scenes"}, {key = "dice", text = "Dice"},
 		{key = "avatars", text = "Avatars"}, {key = "frames", text = "Frames"}, {key = "plates", text = "Plates"},
 		{key = "badges", text = "Badges"}], "dice")

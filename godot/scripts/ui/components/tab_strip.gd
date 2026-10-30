@@ -7,15 +7,17 @@ extends Control
 ##            goes above a smaller label (14 -> 12 px); if even that doesn't fit, the strip scrolls sideways (drag).
 ##   "folder" web .ftabs: folder tabs with a 3 px PANE_EDGE outline joined to the pane below (pane_style("folder")).
 ##            The active tab is PANE cream and opens into the pane, the others are tan and stop above its top line.
-##            The pane draws that top line itself (a full rounded box); the strip sits over it (z 1), lets the active tab
-##            cover the line and, via bind_pane(), squares the pane's top corner that the active tab joins.
+##            The tab row is inset from the pane's rounded corners (R.lg) on both sides, so a tab never sits on a corner
+##            and the pane keeps both top corners and its outline. No z_index: the pane (pane_style("folder"), a
+##            FolderPaneStyle) leaves its top line open under the active tab, filling it with the pane colour, and the
+##            strip draws only above the pane. bind_pane() tells the pane where the active tab is.
 ## Every tab shows an icon AND a label (no icon-only tabs). A red count badge can sit on any tab (set_count).
 ## The whole strip height is the touch target (>= 48 px); taps give UIKit.press_fx feedback.
 ##
 ##   var tabs := TabStrip.new([{key = "rooms", text = "Rooms", cat = "rooms"}, ...], "rooms")
 ##   tabs.picked.connect(show_tab)
 ##   pane.add_theme_stylebox_override("panel", TabStrip.pane_style("folder"))
-##   tabs.bind_pane(pane)                 # folder look: the pane's top corners follow the active tab
+##   tabs.bind_pane(pane)                 # folder look: the pane opens its top line under the active tab
 ##
 ## items: [{key: String, text: String, icon: String (assets/ui name or res:// path) or Texture2D (optional,
 ## default "cat_<cat>" / "cat_<key>"), cat: String (a Palette.CAT key; gtabs colour, default = key)}].
@@ -34,6 +36,7 @@ const F_GAP := 8.0                   ## folder gap between tabs
 const F_H := 48.0                    ## folder strip height (active tab height)
 const F_OFF_TOP := 8.0               ## folder inactive tabs start this far down
 const F_EDGE := 3.0                  ## folder outline width (= the pane's border)
+const FADE_W := 30.0                 ## gtabs scroll hint: width of the fade (and of the chevron's room) at a scrolling edge
 const DRAG := 8.0                    ## px a press must move before it scrolls instead of tapping
 
 var look := "gtabs"
@@ -55,9 +58,12 @@ var _rects: Array = []               # Rect2 per tab, in content space (before t
 var _column := false                 # gtabs: icon above the label
 var _fs := 15
 var _ic := 22.0
+var _igap := 6.0                     # folder: the gap between the icon and the label
 var _content_w := 0.0
-var _shown_once := false
+var _settled := false                # a first draw happened, or the player moved the strip: stop re-centring on resize
 var _pane: Control = null            # folder: the pane under the strip (bind_pane)
+var _in_l := 0.0                     # folder: the tab row's left / right inset from the pane's corners
+var _in_r := 0.0
 
 
 func _init(items_: Array = [], selected_ := "", look_ := "gtabs") -> void:
@@ -67,8 +73,6 @@ func _init(items_: Array = [], selected_ := "", look_ := "gtabs") -> void:
 	clip_contents = look == "gtabs"
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	custom_minimum_size = Vector2(0, H_ON if look == "gtabs" else F_H - F_EDGE)     # folder: the pane's top line is the last F_EDGE
-	if look == "folder":
-		z_index = 1                          # above the pane: the active tab covers the pane's top line
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	set_items(items_, selected_)
 
@@ -124,15 +128,15 @@ func scrolls() -> bool:
 ## A fresh copy: change its margins freely.
 static func pane_style(look_ := "gtabs") -> StyleBox:
 	if look_ == "folder":
-		return UIKit.surface("pane").duplicate()
+		return FolderPaneStyle.new()
 	var e := StyleBoxEmpty.new()
 	e.content_margin_top = UIKit.SPACE.md
 	e.content_margin_bottom = 14
 	return e
 
 
-## Folder look: the pane (a PanelContainer with pane_style("folder")) under this strip. Its top corners are rounded
-## like the bottom ones, except where the active tab joins its edge (that corner stays square so the tab opens into it).
+## Folder look: the pane (a PanelContainer with pane_style("folder")) under this strip. Both top corners stay rounded;
+## the pane's top line is left open under the active tab so the tab opens into it.
 func bind_pane(pane: Control) -> void:
 	_pane = pane
 	if not pane.resized.is_connected(_sync_pane):
@@ -145,24 +149,51 @@ func bind_pane(pane: Control) -> void:
 func _sync_pane() -> void:
 	if _pane == null or not is_instance_valid(_pane) or look != "folder":
 		return
-	var st := _pane.get_theme_stylebox("panel") as StyleBoxFlat
+	var st := _pane.get_theme_stylebox("panel") as FolderPaneStyle
 	if st == null:
 		return
 	_layout()
-	var left_joined := false
-	var right_joined := false
+	var from := 0.0
+	var to := 0.0
 	for i in items.size():
-		if str(items[i].get("key", "")) != selected:
-			continue
-		var r: Rect2 = _rects[i]
-		left_joined = absf(global_position.x + r.position.x - _pane.global_position.x) < 2.0
-		right_joined = absf(global_position.x + r.end.x - (_pane.global_position.x + _pane.size.x)) < 2.0
-	var rl := 0 if left_joined else int(UIKit.R.lg)
-	var rr := 0 if right_joined else int(UIKit.R.lg)
-	if st.corner_radius_top_left != rl:
-		st.corner_radius_top_left = rl
-	if st.corner_radius_top_right != rr:
-		st.corner_radius_top_right = rr
+		if str(items[i].get("key", "")) == selected and i < _rects.size():
+			var r: Rect2 = _rects[i]
+			from = _dx_to_pane() + r.position.x
+			to = from + r.size.x
+	if not is_equal_approx(st.gap_from, from) or not is_equal_approx(st.gap_to, to):
+		st.gap_from = from
+		st.gap_to = to
+		_pane.queue_redraw()
+
+
+## The pane's left edge to this strip's left edge, in the strip's own px (the sheet's pop animation scales both).
+func _dx_to_pane() -> float:
+	if _pane == null or not is_inside_tree() or not _pane.is_inside_tree():
+		return 0.0
+	var k := maxf(0.001, get_global_transform().get_scale().x)
+	return (global_position.x - _pane.global_position.x) / k
+
+
+## The folder pane's frame: the .pm-inner box (PANE, 3 px PANE_EDGE, R.lg on all four corners) whose top line is
+## open between gap_from and gap_to (pane-local x of the active tab), filled with PANE so the tab runs into the pane.
+## bind_pane() keeps the gap on the active tab. The margins are the caller's (content_margin_*).
+class FolderPaneStyle extends StyleBox:
+	var face: StyleBoxFlat
+	var gap_from := 0.0
+	var gap_to := 0.0
+
+	func _init() -> void:
+		face = UIKit.surface("pane").duplicate() as StyleBoxFlat
+		for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+			set_content_margin(side, face.get_margin(side))
+
+	func _draw(to_canvas_item: RID, rect: Rect2) -> void:
+		face.draw(to_canvas_item, rect)
+		if gap_to - gap_from > 2.0 * F_EDGE:
+			var x0 := rect.position.x + gap_from + F_EDGE
+			var w := gap_to - gap_from - 2.0 * F_EDGE
+			# the border row plus a pixel of the pane face under it (same colour: no seam where the AA edge ends)
+			RenderingServer.canvas_item_add_rect(to_canvas_item, Rect2(x0, rect.position.y, w, F_EDGE + 1.0), Palette.PANE)
 
 
 ## The colour pair [face, bar] of an item (Palette.CAT, honey for unknown categories).
@@ -198,9 +229,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_lay_w = -1.0
 		_layout()
-		if not _shown_once and size.x > 0.0:
-			_shown_once = true
-			_scroll_into_view(_index(selected))       # a sheet opening on a later tab shows it
+		if not _settled and size.x > 0.0:             # a sheet opening on a later tab shows it, centred, at the final width
+			_scroll_into_view(_index(selected), true)
 		_clamp_scroll()
 		queue_redraw()
 
@@ -210,8 +240,17 @@ func _label_w(t: String, fs: int) -> float:
 
 
 func _layout() -> void:
-	if is_equal_approx(_lay_w, size.x) and _rects.size() == items.size():
+	var il := 0.0
+	var ir := 0.0
+	if look == "folder":                              # the tab row stays clear of the pane's rounded corners
+		var dx := _dx_to_pane() if _pane else 0.0
+		var dr := (_pane.size.x - dx - size.x) if _pane and is_instance_valid(_pane) else 0.0
+		il = maxf(0.0, UIKit.R.lg - dx)
+		ir = maxf(0.0, UIKit.R.lg - dr)
+	if is_equal_approx(_lay_w, size.x) and _rects.size() == items.size() and is_equal_approx(il, _in_l) and is_equal_approx(ir, _in_r):
 		return
+	_in_l = il
+	_in_r = ir
 	_lay_w = size.x
 	_rects.clear()
 	var n := items.size()
@@ -219,21 +258,45 @@ func _layout() -> void:
 		_content_w = 0.0
 		return
 	if look == "folder":
-		var fw := (size.x - F_GAP * (n - 1)) / n
+		var room := size.x - il - ir - F_GAP * (n - 1)
 		_fs = 17 if size.x >= 300.0 else 15
 		_ic = 20.0
-		# labels shrink (to 13) before they would overflow a narrow tab
-		var widest := 0.0
-		for it in items:
-			widest = maxf(widest, _label_w(str(it.get("text", "")), _fs))
-		while _fs > 13 and _ic + 6.0 + widest + 20.0 > fw:
-			_fs -= 1
-			widest = 0.0
+		_igap = 6.0
+		var pad := 16.0
+		# equal tabs while every label fits; else each tab gets what its label needs plus an equal share of the rest
+		# (a short "Me" leaves room for "Achievements"). Still too long: the label shrinks to 14, then the icon and
+		# its gap get smaller, then the label goes to 13 (the floor: readable at 320 px)
+		var ws: Array[float] = []
+		while true:
+			var need: Array[float] = []
+			var total := 0.0
 			for it in items:
-				widest = maxf(widest, _label_w(str(it.get("text", "")), _fs))
+				need.append(_ic + _igap + _label_w(str(it.get("text", "")), _fs) + pad)
+				total += need[-1]
+			ws.clear()
+			if need.max() <= room / n:
+				for i in n:
+					ws.append(room / n)
+				break
+			if total <= room or _fs <= 13:
+				var extra := maxf(0.0, room - total) / n
+				var k := minf(1.0, room / total)
+				for i in n:
+					ws.append(need[i] * k + extra)
+				break
+			if _fs > 14:
+				_fs -= 1
+			elif _ic > 16.0:
+				_ic = 16.0
+				_igap = 4.0
+				pad = 10.0
+			else:
+				_fs -= 1
+		var x := il
 		for i in n:
 			var on: bool = str(items[i].get("key", "")) == selected
-			_rects.append(Rect2(i * (fw + F_GAP), 0.0 if on else F_OFF_TOP, fw, F_H if on else F_H - F_OFF_TOP - F_EDGE))
+			_rects.append(Rect2(x, 0.0 if on else F_OFF_TOP, ws[i], F_H - F_EDGE if on else F_H - F_OFF_TOP - F_EDGE))
+			x += ws[i] + F_GAP
 		_content_w = size.x
 		return
 	var w := minf(MAX_W, (size.x - GAP * (n - 1)) / n)
@@ -259,11 +322,12 @@ func _layout() -> void:
 					break
 			if fits:
 				break
-	# 3) still too long: every tab gets the width of the longest label and the strip scrolls
+	# 3) still too long: every tab gets the width of the longest label (14 px: readable) and the strip scrolls
 	if not fits:
+		_fs = 14
 		var need := 0.0
 		for it in items:
-			need = maxf(need, _label_w(str(it.get("text", "")), _fs) + 12.0)
+			need = maxf(need, _label_w(str(it.get("text", "")), _fs) + 16.0)
 		w = need
 	for i in n:
 		_rects.append(Rect2(i * (w + GAP), 0.0, w, H_ON))
@@ -275,19 +339,22 @@ func _clamp_scroll() -> void:
 	_scroll = clampf(_scroll, 0.0, maxf(0.0, _content_w - size.x))
 
 
-func _scroll_into_view(i: int) -> void:
+## Bring tab i into view. center: always centre it (a strip opening on a later tab); else only when it isn't fully
+## visible clear of the edge fades, and then centred too (never pinned against the rim).
+func _scroll_into_view(i: int, center := false) -> void:
 	if i < 0 or i >= _rects.size() or _content_w <= size.x:
 		return
 	var r: Rect2 = _rects[i]
-	if r.position.x - _scroll < 0.0:
-		_scroll = r.position.x - GAP
-	elif r.end.x - _scroll > size.x:
-		_scroll = r.end.x - size.x + GAP
+	if center or r.position.x - _scroll < FADE_W or r.end.x - _scroll > size.x - FADE_W:
+		_scroll = r.get_center().x - size.x / 2.0
 	_clamp_scroll()
 
 
 func _draw() -> void:
 	_layout()
+	if not _settled and size.x > 0.0 and is_inside_tree():
+		_settled = true
+		_scroll_into_view(_index(selected), true)
 	if look == "folder":
 		_draw_folder()
 	else:
@@ -335,16 +402,23 @@ func _draw_gtabs() -> void:
 		_draw_count(str(it.get("key", "")), Vector2(r.end.x - 10.0, maxf(r.position.y + 1.0, 10.0)))
 	# scroll hints: a soft fade at an edge with more tabs behind it
 	if _content_w > size.x + 0.5:
-		var fw := 22.0
 		if _scroll < _content_w - size.x - 0.5:
-			_fade(Rect2(size.x - fw, 0, fw, size.y - BASE), false)
+			_fade(Rect2(size.x - FADE_W, 0, FADE_W, size.y - BASE), false)
+			_chevron(Vector2(size.x - 13.0, (size.y - BASE) / 2.0 + 2.0), 1.0)
 		if _scroll > 0.5:
-			_fade(Rect2(0, 0, fw, size.y - BASE), true)
+			_fade(Rect2(0, 0, FADE_W, size.y - BASE), true)
+			_chevron(Vector2(13.0, (size.y - BASE) / 2.0 + 2.0), -1.0)
+
+
+## A small ">" (dir 1) or "<" (dir -1) at c: more tabs this way.
+func _chevron(c: Vector2, dir: float) -> void:
+	var pts := PackedVector2Array([c + Vector2(-3.0 * dir, -6.0), c + Vector2(3.0 * dir, 0.0), c + Vector2(-3.0 * dir, 6.0)])
+	draw_polyline(pts, Palette.INK_DEEP, 2.5, true)
 
 
 func _fade(r: Rect2, left: bool) -> void:
 	var c0 := Color(fade_color, 0.0)
-	var c1 := Color(fade_color, 0.95)
+	var c1 := Color(fade_color, 1.0)
 	var pts := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
 	var a := c1 if left else c0
 	var b := c0 if left else c1
@@ -359,7 +433,7 @@ func _draw_folder() -> void:
 		var it: Dictionary = items[i]
 		var on: bool = str(it.get("key", "")) == selected
 		var r: Rect2 = _rects[i]
-		r = Rect2(r.position.x, top + (0.0 if on else F_OFF_TOP), r.size.x, F_H if on else F_H - F_OFF_TOP - F_EDGE)   # active: runs F_EDGE over the pane's line
+		r = Rect2(r.position.x, top + (0.0 if on else F_OFF_TOP), r.size.x, F_H - F_EDGE if on else F_H - F_OFF_TOP - F_EDGE)   # both end at the pane's top line
 		var pressed := _press == i and not on
 		if pressed:
 			r.position.y += 1.0
@@ -371,13 +445,13 @@ func _draw_folder() -> void:
 		var text := str(it.get("text", ""))
 		var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs).x
 		var tex: Texture2D = _tex[i]
-		var total := (_ic + 6.0 if tex else 0.0) + tw
+		var total := (_ic + _igap if tex else 0.0) + tw
 		var cx := r.position.x + (r.size.x - total) / 2.0
 		var cy := r.position.y + F_EDGE + (r.size.y - F_EDGE) / 2.0
 		var col := Palette.INK if on else Palette.SUB
 		if tex:
 			draw_texture_rect(tex, Rect2(cx, cy - _ic / 2.0, _ic, _ic), false, Color(1, 1, 1, 1.0 if on else 0.75))
-			cx += _ic + 6.0
+			cx += _ic + _igap
 		draw_string(font, Vector2(cx, cy + _fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs, col)
 		_draw_count(str(it.get("key", "")), Vector2(r.end.x - 14.0, r.position.y + 2.0))
 
@@ -432,6 +506,7 @@ func _gui_input(e: InputEvent) -> void:
 		var dx: float = e.position.x - _press_x
 		if not _dragging and absf(dx) > DRAG and scrolls():
 			_dragging = true
+			_settled = true
 		if _dragging:
 			_scroll = _scroll0 - dx
 			_clamp_scroll()

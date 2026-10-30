@@ -1,8 +1,9 @@
 class_name ShopSheet
 extends Sheet
 ## The one Shop (PLAN decision 4: Shop + Inventory + Collection merged). Everything the player can buy, earn or put
-## in use lives here, in eight category tabs (TabStrip "gtabs"): Rooms / Scenes / Dice / Avatars (the illustrated
-## characters first, then the classic avatars) / Frames / Plates / Badges. An "All | Owned" switch filters the grid
+## in use lives here, in five category tabs (TabStrip "gtabs"): Rooms / Scenes / Dice / Emotes / Look. Look holds
+## Avatars (the illustrated characters first, then the classic avatars) / Frames / Plates / Badges behind a segmented
+## filter under the tabs (`tab` is the category, "frames" etc.). An "All | Owned" switch filters the grid
 ## to what the player owns, for equipping (InventorySheet and CollectionSheet open the Shop that way).
 ##
 ## The PM look (the ribbon sheet family): the "Shop" ribbon and the close X; under it one row with All | Owned and the
@@ -21,8 +22,8 @@ extends Sheet
 ## shortfall, and "Open Store". Gems only exist on the server: offline it says "Connect to the internet to buy".
 ## Buying always asks first (Sheet.confirm), then goes through Catalog / SLScenes / Collection (coins checked, never
 ## charged twice, rolled back when the save fails), puts the item in use and says "<Item> is yours!".
-## Coins come from the Get coins sheet (EarnSheet below): Daily reward, Daily spin and Free coins with their live
-## state, each opening its own sheet from Main.
+## Coins come from the Get coins sheet: the Rewards sheet (RewardsSheet.new("Get coins", true)), the same rows as
+## Home's gift: Daily spin, Daily reward and Free coins with their live state, each opening its own sheet from Main.
 ##
 ##   var s := ShopSheet.new("dice")                 # all items, Dice tab
 ##   var s := ShopSheet.new("avatars", 400, true)   # owned only (equip)
@@ -41,13 +42,12 @@ const TABS := [
 	{key = "scenes", text = "Scenes"},
 	{key = "dice", text = "Dice"},
 	{key = "emotes", text = "Emotes"},
-	{key = "avatars", text = "Avatars"},
-	{key = "frames", text = "Frames"},
-	{key = "plates", text = "Plates"},
-	{key = "badges", text = "Badges"},
+	{key = "look", text = "Look", icon = "cat_avatars", cat = "avatars"},
 ]
+## What the Look tab holds, as a segmented filter under the tabs (the item categories behind `tab`).
+const LOOK := [["avatars", "Avatars"], ["frames", "Frames"], ["plates", "Plates"], ["badges", "Badges"]]
 ## Old tab names (Collection, the Coins tab, Inventory) -> the merged tabs.
-const TAB_ALIAS := {chars = "avatars", characters = "avatars", nameplates = "plates", coins = "rooms"}
+const TAB_ALIAS := {chars = "avatars", characters = "avatars", nameplates = "plates", coins = "rooms", look = "avatars"}
 const MAX_H := 680.0                     ## one card height for every tab (web .shop-card min(100%, 680px))
 const ART_RATIO := 0.75                  ## card art height / width (the 4:3 thumbnails)
 const SIDE_PAD := 14                     ## card side padding (the seven tabs need the width)
@@ -59,6 +59,7 @@ var tab := "rooms"
 var owned_only := false
 var inventory := false                   ## the nav's Inventory: owned items only, no filter / balance row
 var _tabs: TabStrip
+var _look: HBoxContainer                 # the Look tab's Avatars | Frames | Plates | Badges filter
 var _filter: HBoxContainer
 var _balance: CoinAmount
 var _earn_btn: Button
@@ -88,11 +89,16 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	row.visible = not inventory               # the inventory lists what you own: nothing to filter or buy
 	body.add_child(row)
 	# the tabs reach the card's rim (seven icon + label tabs need the width)
-	_tabs = TabStrip.new(TABS.duplicate(true), tab, "gtabs")
+	_tabs = TabStrip.new(TABS.duplicate(true), strip_key(tab), "gtabs")
 	_tabs.picked.connect(show_tab)
 	_bleed = UIKit.margin(_tabs, -_bleed_px(), 0, -_bleed_px(), 0)
 	body.add_child(_bleed)
+	_look = UIKit.segmented(LOOK, "avatars", show_tab, "sm")
+	_look.name = "LookFilter"
+	body.add_child(UIKit.margin(_look, 0, UIKit.SPACE.sm, 0, 0))
+	_look.get_parent().visible = false
 	add_scroll_body(UIKit.SPACE.md)
+	scroll_box.resized.connect(_center_owned)
 	fit(0.9, MAX_H)
 	narrow_changed.connect(_on_narrow)
 
@@ -109,14 +115,34 @@ static func _norm_tab(key: String) -> String:
 	for t: Dictionary in TABS:
 		if t.key == key:
 			return key
+	for l: Array in LOOK:
+		if l[0] == key:
+			return key
 	return "rooms"
+
+## The strip tab a category sits under ("frames" -> "look").
+static func strip_key(category: String) -> String:
+	for l: Array in LOOK:
+		if l[0] == category:
+			return "look"
+	return category
 
 
 ## Switch to a category and list its cards from the top.
 func show_tab(key: String) -> void:
-	tab = _norm_tab(key)
-	_tabs.select(tab)
+	tab = _norm_tab(key if key != "look" else str(_look_pick()))
+	_tabs.select(strip_key(tab))
+	var is_look := strip_key(tab) == "look"
+	_look.get_parent().visible = is_look
+	if is_look:
+		for b in _look.get_children():
+			if b is Button:
+				(b as Button).set_pressed_no_signal(b.get_meta("value", "") == tab)
 	_build()
+
+## The category the Look tab opens on: the one shown last (Avatars at first).
+func _look_pick() -> String:
+	return tab if strip_key(tab) == "look" else "avatars"
 
 ## Show everything, or only what the player owns.
 func set_owned_only(on: bool) -> void:
@@ -163,7 +189,14 @@ func _build() -> void:
 	elif owned_only and total > shown:
 		scroll_body.add_child(_more_row(total - shown))  # the Owned filter: the rest is one tap away
 	scroll_box.scroll_vertical = 0
+	_center_owned()
 	refresh()
+
+## The Owned filter with a few items: the grid and its "more in the shop" link sit in the middle of the card, not
+## stuck to the top over an empty half.
+func _center_owned() -> void:
+	scroll_body.alignment = BoxContainer.ALIGNMENT_CENTER if owned_only else BoxContainer.ALIGNMENT_BEGIN
+	scroll_body.custom_minimum_size.y = scroll_box.size.y if owned_only else 0.0
 
 ## Re-read the profile: the balance and every card's state.
 func refresh() -> void:
@@ -329,8 +362,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if kind == "room" or kind == "scene" or kind == "emotes":
 		art.add_child(_view_button(kind, id))
-	if kind != "emotes":                     # an emote card's price is on its Buy button (the icons fill the art)
-		art.add_child(tag)
+	art.add_child(tag)
 	tag.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 6)
 	tag.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	v.add_child(art)
@@ -378,7 +410,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	# the gem option: reserved on every card that has a price, so the cards of a row stay one height
 	var gem_row: Button = null
 	if price > 0:
-		gem_row = _gem_option(Catalog.gem_price(price))
+		gem_row = gem_option(Catalog.gem_price(price))
 		gem_row.pressed.connect(func(): _on_buy_gems(kind, id, it.name))
 		v.add_child(gem_row)
 	_cards.append(p)
@@ -386,10 +418,9 @@ func _card(it: Dictionary) -> PanelContainer:
 		var owned := _owned(kind, id)
 		var on := owned and _in_use(kind, id)
 		var for_sale := not owned and price > 0
-		var cheap := kind == "emotes"
 		p.add_theme_stylebox_override("panel", UIKit.surface("item", on, is_narrow))
 		buy.visible = for_sale
-		tag.visible = for_sale and not cheap
+		tag.visible = for_sale
 		use.visible = owned and not on
 		on_pill.visible = on
 		lock_row.visible = not owned and not for_sale
@@ -399,13 +430,13 @@ func _card(it: Dictionary) -> PanelContainer:
 		(view.get_meta("art", view) as CanvasItem).modulate.a = 0.55 if lock_row.visible else 1.0
 		if for_sale:
 			var short := price - Catalog.coins()
-			buy.text = ("Buy" if not cheap else "Buy  %s" % Fmt.coins(price)) if short <= 0 else Fmt.shortfall(short)
+			buy.text = "Buy" if short <= 0 else Fmt.shortfall(short)
 			if buy.get_meta("kit_kind", "") != ("gold" if short <= 0 else "off"):
 				UIKit.set_kind(buy, "gold" if short <= 0 else "off"))
 	return p
 
 ## The "or [gem] 30" line of a card: one flat 34 px button (the whole line is the tap).
-func _gem_option(gems: int) -> Button:
+static func gem_option(gems: int) -> Button:
 	var b := Button.new()
 	b.name = "GemBuy"
 	b.flat = true
@@ -678,7 +709,7 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 ## The purchase itself: "" when bought, else the reason to show. With an Account (the game) the server sells and the
 ## local profile is replaced by its answer; offline there is no local granting ("Connect to the internet to buy").
 ## Without one (previews, tests) the local rules apply.
-func _purchase(kind: String, id: String, currency := "coins") -> String:
+static func _purchase(kind: String, id: String, currency := "coins") -> String:
 	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
 		var r: Dictionary = await Account.instance().buy(kind, id, currency)
 		if r.get("ok", false):
@@ -704,57 +735,63 @@ static func gems_need_text(short: int) -> String:
 func _on_buy_gems(kind: String, id: String, name_: String) -> void:
 	if _busy or _closing:
 		return
+	_busy = true
+	var r: String = await buy_with_gems(self, kind, id, name_)
+	_busy = false
+	if not is_instance_valid(self) or _closing:
+		return
+	match r:
+		"store":
+			store_requested.emit()
+		"bought":
+			_announce(kind, id)
+			refresh()
+		"failed":
+			refresh()
+
+## The gems purchase flow, shared with the Preview: checks the wallet, asks first, buys through _purchase and says so
+## on `host` (its toasts and confirms). Returns "" (nothing happened), "store" (not enough gems and "Open Store" was
+## chosen), "bought" or "failed".
+static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) -> String:
 	var price := _price(kind, id)
 	var gems := Catalog.gem_price(price)
 	if gems <= 0:
-		return
+		return ""
 	var have := int(Save.profile.get("gems", 0))
 	var title := _title(kind, name_)
 	if not (Account.wallet_active() and is_same(Collection.profile(), Save.profile)):
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")      # gems live on the server
-		return
+		Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")      # gems live on the server
+		return ""
 	if gems > have:
 		Sound.sfx("error")
 		Haptics.error()
-		_busy = true
-		var open_store: bool = await Sheet.confirm(self, "Not enough gems", "You need %s more gems for %s. You have %s." % [Fmt.coins_full(gems - have), title, Fmt.coins_full(have)], "Open Store", "Not now")
-		_busy = false
-		if open_store and is_instance_valid(self) and not _closing:
-			store_requested.emit()
-		return
-	_busy = true
+		var open_store: bool = await Sheet.confirm(host, "Not enough gems", "You need %s more gems for %s. You have %s." % [Fmt.coins_full(gems - have), title, Fmt.coins_full(have)], "Open Store", "Not now")
+		return "store" if open_store and is_instance_valid(host) and not host._closing else ""
 	var online: bool = await Account.instance().ensure_session()
-	_busy = false
-	if not is_instance_valid(self) or _closing:
-		return
+	if not is_instance_valid(host) or host._closing:
+		return ""
 	if not online:
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
-		return
-	_busy = true
-	var yes: bool = await Sheet.confirm(self, "Buy %s?" % title, "%s gems. You’ll have %s left." % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], "Buy")
-	_busy = false
-	if not yes or not is_instance_valid(self) or _closing:
-		return
-	_busy = true
+		Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")
+		return ""
+	var yes: bool = await Sheet.confirm(host, "Buy %s?" % title, "%s gems. You’ll have %s left." % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], "Buy")
+	if not yes or not is_instance_valid(host) or host._closing:
+		return ""
 	var err: String = await _purchase(kind, id, "gems")
-	_busy = false
-	if not is_instance_valid(self) or _closing:
-		return
+	if not is_instance_valid(host) or host._closing:
+		return ""
 	if err != "":
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, err, card, 2.2, "bad")
-		refresh()
-		return
+		Toast.show(host, err, host.card, 2.2, "bad")
+		return "failed"
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(self, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], card, 1.8, "good")
-	_announce(kind, id)
-	refresh()
+	Toast.show(host, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], host.card, 1.8, "good")
+	return "bought"
 
 ## Use: put an owned item in use. Through the server when there is an Account (the look is part of the profile it
 ## keeps); offline: "Connect to the internet to change your look".
@@ -809,12 +846,10 @@ func _on_view(kind: String, id: String) -> void:
 			emotes_changed.emit()
 			changed.emit()
 			refresh())
+		es.store_requested.connect(func(): store_requested.emit())
 		es.closed.connect(func():
 			if is_instance_valid(self) and not _closing:
-				visible = true
-				refresh()
-				UIKit.pop_in(card))
-		visible = false
+				refresh())
 		es.open(get_parent())
 		return
 	var pv := PreviewSheet.new(id, kind)
@@ -825,19 +860,17 @@ func _on_view(kind: String, id: String) -> void:
 		scene_changed.emit(sid)
 		changed.emit())
 	pv.bought.connect(func(_rid: String): refresh())
+	pv.store_requested.connect(func(): store_requested.emit())
 	pv.closed.connect(func():
 		if is_instance_valid(self) and not _closing:
-			visible = true
-			refresh()
-			UIKit.pop_in(card))
-	visible = false
+			refresh())
 	pv.open(get_parent())
 
 ## The Get coins sheet over the Shop.
 func open_earn() -> void:
 	if get_parent() == null or _closing:
 		return
-	var e := EarnSheet.new()
+	var e := make_earn()
 	e.closed.connect(func():
 		if is_instance_valid(self):
 			refresh())
@@ -845,7 +878,7 @@ func open_earn() -> void:
 
 ## The Get coins sheet on its own (e.g. from the home coin chip): ShopSheet.make_earn().open(layer).
 static func make_earn() -> Sheet:
-	return EarnSheet.new()
+	return RewardsSheet.new("Get coins", true)       # the Rewards sheet's rows, one experience; taps go to Main
 
 
 # =====================================================================================================================
@@ -939,121 +972,6 @@ class ArtBox extends Control:
 		var want := roundf(size.x * ratio)
 		if size.x > 0.0 and absf(custom_minimum_size.y - want) > 0.5:
 			custom_minimum_size.y = want
-
-
-## Get coins (web Coins tab -> an Earn hub with live actions): Daily reward, Daily spin and Free coins with their
-## state now ("Day 3 reward is ready", "Next spin in 13h 20m", "Next in 3:53:10"), each button opening its own sheet
-## through Main._on_tab; plus what a win pays. Updates every second and on Save.changed.
-class EarnSheet extends Sheet:
-	var _rows := {}                      # key -> {status: Label, button: Button}
-	var _tick: Timer
-
-	func _init() -> void:
-		super("Get coins", UIKit.W.form, true, LOOK_PM)
-		var list := add_scroll_body(UIKit.SPACE.sm)
-		_rows.daily = _row(list, "side_gift", "Daily reward", "daily")
-		_rows.spin = _row(list, "side_spin", "Daily spin", "spin")
-		_rows.free = _row(list, "side_coins", "Free coins", "free")
-		var win := UIKit.panel("row")
-		var h := UIKit.hbox(UIKit.SPACE.md)
-		var ic := UIKit.icon("ic_trophy", 44)
-		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		h.add_child(ic)
-		var v := UIKit.vbox(0)
-		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		v.alignment = BoxContainer.ALIGNMENT_CENTER
-		v.add_child(_title_label("Win vs computer"))
-		var note := UIKit.paragraph("%s coins in Ludo, %s in Snakes & Ladders" % [Fmt.gain(LudoRules.WIN_REWARD), Fmt.gain(SnakesLaddersRules.REWARD)], UIKit.FS.body, Palette.SUB)
-		v.add_child(note)
-		h.add_child(v)
-		win.add_child(h)
-		list.add_child(win)
-		fit()
-
-	func _ready() -> void:
-		Save.changed.connect(refresh)
-		_tick = Timer.new()
-		_tick.wait_time = 1.0
-		_tick.timeout.connect(refresh)
-		add_child(_tick)
-		_tick.start()
-		refresh()
-
-	static func _title_label(t: String) -> Label:
-		var l := UIKit.label(t, UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART     # no minimum width: the row fits narrow cards
-		l.add_theme_constant_override("line_spacing", -3)
-		return l
-
-	func _row(list: VBoxContainer, icon_name: String, title_text: String, key: String) -> Dictionary:
-		var p := UIKit.panel("row")
-		var h := UIKit.hbox(UIKit.SPACE.md)
-		var ic := UIKit.icon(icon_name, 44)
-		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		h.add_child(ic)
-		var v := UIKit.vbox(0)
-		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		v.alignment = BoxContainer.ALIGNMENT_CENTER
-		v.add_child(_title_label(title_text))
-		var st := UIKit.paragraph("", UIKit.FS.body, Palette.SUB)
-		v.add_child(st)
-		h.add_child(v)
-		var b := UIKit.btn("Open", "honey", "sm")
-		b.name = key.capitalize()
-		b.custom_minimum_size.x = 88
-		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		UIKit.fit_text(b, 13)
-		b.pressed.connect(func(): _go(key))
-		h.add_child(b)
-		p.add_child(h)
-		list.add_child(p)
-		return {status = st, button = b}
-
-	## Live state of the three rows.
-	func refresh() -> void:
-		var p: Dictionary = Save.profile
-		var midnight := Fmt.until(Rewards.sec_to_midnight())
-		var d := Rewards.daily_state(p)
-		if d.claimable:
-			_show_row(_rows.daily, "Day %d reward is ready" % int(d.day), "Claim", "honey")
-		else:
-			_show_row(_rows.daily, "Next reward in %s" % midnight, "View", "white")
-		if Rewards.can_spin(p):
-			_show_row(_rows.spin, "Win up to %s coins" % Fmt.coins_full(Rewards.PRIZES.max()), "Spin", "honey")
-		else:
-			_show_row(_rows.spin, "Next spin in %s" % midnight, "View", "white")
-		var left := Rewards.free_left_sec(p)
-		if left <= 0:
-			_show_row(_rows.free, "%s coins, ready now" % Fmt.gain(Rewards.FREE_AMOUNT), "Claim", "honey")
-		else:
-			_show_row(_rows.free, "Next %s in %s" % [Fmt.gain(Rewards.FREE_AMOUNT), Fmt.clock(left)], "Claim", "off", true)
-
-	func _show_row(row: Dictionary, status: String, label: String, kind: String, disabled := false) -> void:
-		(row.status as Label).text = status
-		var b: Button = row.button
-		b.text = label
-		b.disabled = disabled
-		if b.get_meta("kit_kind", "") != kind:
-			UIKit.set_kind(b, kind)
-
-	## Open the reward's own sheet (Main._on_tab); without Main (previews) open it here.
-	func _go(key: String) -> void:
-		if _closing:
-			return
-		var main := get_tree().root.get_node_or_null("Main")
-		if main and main.has_method("_on_tab"):
-			main.call("_on_tab", key)
-		elif key == "free":
-			var n := Rewards.claim_free(Save.profile)
-			if n > 0:
-				Sound.sfx("coin", n)
-				Toast.show(self, "%s coins" % Fmt.gain(n), card, 1.8, "coin")
-		else:
-			var path := "res://scripts/ui/sheets/%s_sheet.gd" % key
-			if ResourceLoader.exists(path) and get_parent():
-				var s: Sheet = load(path).new()
-				s.open(get_parent())
-		refresh.call_deferred()
 
 
 ## "No badge": a dashed medal outline the size of a medal (the Badges tab's first card).

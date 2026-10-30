@@ -82,26 +82,29 @@ func _init(game_ := "ludo", players_ := 2, table_ := "practice") -> void:
 func _build_pick() -> void:
 	_pick_box = UIKit.vbox(UIKit.SPACE.md)
 	_pick_box.name = "Pick"
+	body.add_child(_pick_box)
+	# the intro, players and tables scroll on a short screen (320x568); Find players stays under them
+	var list := add_scroll_body(UIKit.SPACE.md)
+	_scroll_wrap.reparent(_pick_box)
 	var intro := UIKit.paragraph("Play people online. Pick a table and we’ll seat you in a few seconds.",
 		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
-	_pick_box.add_child(intro)
-	_pick_box.add_child(UIKit.caption("Players"))
+	list.add_child(intro)
+	list.add_child(UIKit.caption("Players"))
 	picker = UIKit.segmented([[2, "2 players"], [4, "4 players"]], players, func(v):
 		players = int(v)
 		_refresh_rows())
 	picker.name = "Players"
-	_pick_box.add_child(picker)
-	_pick_box.add_child(UIKit.caption("Table"))
-	_table_box = UIKit.vbox(UIKit.SPACE.xs + 2)
+	list.add_child(picker)
+	list.add_child(UIKit.caption("Table"))
+	_table_box = UIKit.vbox(UIKit.SPACE.sm)            # the list-row gap
 	_table_box.name = "Tables"
-	_pick_box.add_child(_table_box)
+	list.add_child(_table_box)
 	find_button = UIKit.button_with("Find players", UIKit.icon("perk_friends", 30), "honey", "lg")
 	find_button.name = "Find"
 	find_button.pressed.connect(func():
 		if stage in ["pick", "error"] and _table_ok(table):
 			find.emit(players))
 	_pick_box.add_child(find_button)
-	body.add_child(_pick_box)
 
 func _build_search() -> void:
 	_search_box = UIKit.vbox(UIKit.SPACE.sm)
@@ -296,6 +299,7 @@ func on_back() -> void:
 
 func _build_slots() -> void:
 	for s in slots:
+		slots_row.remove_child(s)                      # out of the row now: queue_free alone leaves it until the frame ends
 		(s as Node).queue_free()
 	slots = []
 	for k in players:
@@ -305,7 +309,7 @@ func _build_slots() -> void:
 	(slots[0] as Slot).fill_you(Save.level_info(int(Save.profile.get("xp", 0))).level if _has_save() else 1)
 
 func _slot_px() -> float:
-	return 64.0 if players <= 2 else 52.0
+	return 64.0 if players <= 2 else (48.0 if is_narrow else 52.0)
 
 func _has_save() -> bool:
 	return Engine.get_main_loop() is SceneTree and (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Save") != null
@@ -388,7 +392,7 @@ class Slot extends VBoxContainer:
 		if _badge == null:
 			_badge = LevelBadge.new(level_, "xs" if px < 60.0 else "sm")
 			ring.add_child(_badge)
-		_badge.set_level(level_)
+		_badge.set_level(level_)                      # size_for may grow the star for two digits: place it after
 		_badge.position = Vector2(px + 8.0 - _badge.px + 2.0, px + 8.0 - _badge.px + 2.0)
 		_badge.size = Vector2(_badge.px, _badge.px)
 		name_label.text = nm
@@ -438,7 +442,7 @@ class TableRow extends PanelContainer:
 		row = row_
 		on = on_
 		name = "Table_" + str(row.id)
-		custom_minimum_size = Vector2(0, UIKit.TAP + 6)
+		custom_minimum_size = Vector2(0, UIKit.TAP + 8)
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		var h := UIKit.hbox(UIKit.SPACE.sm)
 		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -448,8 +452,7 @@ class TableRow extends PanelContainer:
 			h.add_child(UIKit.icon("coin", 26))
 		else:
 			h.add_child(UIKit.icon("pawn_icon", 26))
-		title = UIKit.label("Practice" if entry <= 0 else Fmt.coins_full(entry), UIKit.FS.h2,
-			Palette.INK, UIKit.font_display() if entry > 0 else UIKit.font_body(900))
+		title = UIKit.label("Practice" if entry <= 0 else Fmt.coins_full(entry), UIKit.FS.h2, Palette.INK, UIKit.font_display())
 		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -474,15 +477,14 @@ class TableRow extends PanelContainer:
 		prize_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		right.add_child(prize_label)
 		h.add_child(right)
-		var pad := UIKit.margin(h, UIKit.SPACE.md, 0, UIKit.SPACE.md, 0)    # room between the text and the rounded corners
-		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(pad)
+		add_child(h)                                  # the shared row style brings its own padding
+		set_meta("kit_surface", "row")
 		set_on(on)
 		modulate.a = 1.0 if bool(row.ok) else 0.5
 
 	func set_on(v: bool) -> void:
 		on = v
-		add_theme_stylebox_override("panel", UIKit.surface("item", on, true))
+		UIKit.set_row_state(self, "on" if on else "")
 
 	func _gui_input(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT):

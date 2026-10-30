@@ -350,6 +350,7 @@ func _graphics_line() -> Control:
 	var seg := UIKit.segmented(opts, Quality.saved_pref(), _on_quality, "sm")
 	seg.name = "QualitySeg"
 	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UIKit.fit_segmented(seg)                      # the four labels share one size; "Auto (Medium)" gets the room it needs
 	v.add_child(seg)
 	_gfx_hint(Quality.saved_pref())
 	return row

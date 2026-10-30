@@ -47,7 +47,7 @@ func _init(game_: String, mode_: String) -> void:
 	_load_last()
 	super(("Play vs computer" if mode == "cpu" else "Pass & Play"), UIKit.W.form, true, Sheet.LOOK_PM)
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
-	_box = body if mode == "cpu" else add_scroll_body(UIKit.SPACE.sm)   # 4 name rows: scrolls on short screens
+	_box = add_scroll_body(UIKit.SPACE.sm)   # grows with its content; scrolls only on short screens (4 name rows, 320x568)
 	set_kicker("Snakes & Ladders" if game == "sl" else "Ludo")
 	if mode == "cpu":
 		_section("Your colour")

@@ -24,7 +24,7 @@ const JACKPOT := 5
 var profile: Dictionary
 var rng := RandomNumberGenerator.new()
 var _day_override := ""
-var _width := 360.0
+var _width := float(UIKit.W.form)
 var wheel: Wheel
 var _note: Label
 var _go: Button
@@ -34,7 +34,7 @@ var _ticks := 0
 
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
-func _init(p: Dictionary = {}, today := "", width := 360.0) -> void:
+func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
 	super("Daily spin", width, true, LOOK_PM)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today

@@ -298,7 +298,7 @@ func _build() -> void:
 	_sub = UIKit.label(sub_text(), UIKit.FS.body_l, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(_sub)
-	var list := UIKit.vbox(UIKit.SPACE.xs + 2)
+	var list := UIKit.vbox(UIKit.SPACE.sm)            # the list-row gap
 	list.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(list)
 	var teams := is_teams()
@@ -568,10 +568,9 @@ func _rewards_row() -> Control:
 		v.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var cap := UIKit.eyebrow("Prize" if is_coin_table() else "Coins")
-		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(cap)
+		v.add_child(cap)                          # left-aligned, the value under it (like the Experience tile)
 		coins = CoinAmount.new(0, "lg", "plain", "+")
-		coins.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		v.add_child(coins)
 		tile.add_child(v)
 		row.add_child(tile)
@@ -591,6 +590,15 @@ func _rewards_row() -> Control:
 	var cap2 := UIKit.eyebrow("Experience")
 	cap2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(cap2)
+	# "Level up!" takes the caption's place in the head row (inside the tile): no sticker straddling the border
+	_level_up = UIKit.tag("Level up!", "gold", UIKit.FS.label)
+	_level_up.visible = false
+	_level_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_level_up.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_level_up.set_meta("caption", cap2)
+	head.add_child(_level_up)
+	head.move_child(_level_up, 1)
+	head.custom_minimum_size.y = _level_up.get_combined_minimum_size().y      # the row doesn't grow when it shows
 	var gain := UIKit.label("+%d XP" % xp_gain(), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900, true))
 	head.add_child(gain)
 	xv.add_child(head)
@@ -602,10 +610,6 @@ func _rewards_row() -> Control:
 	xv.add_child(LevelBadge.row(level_badge, xp_meter))
 	xt.add_child(xv)
 	row.add_child(xt)
-	_level_up = UIKit.tag("Level up!", "gold", UIKit.FS.label)
-	_level_up.visible = false
-	_level_up.top_level = false
-	xt.add_child(_level_up)
 	return wrap
 
 func _reward_tile() -> PanelContainer:
@@ -630,16 +634,23 @@ func _levels() -> Vector2i:
 
 func _layout() -> void:
 	var vp := size if size.x > 0 else get_viewport_rect().size
-	var cw := minf(CARD_W, vp.x - 2.0 * UIKit.SCREEN_GUTTER)
+	var room := vp.x - 2.0 * UIKit.SCREEN_GUTTER
+	var cw := minf(CARD_W, room)
 	card.custom_minimum_size.x = cw
 	_buttons.custom_minimum_size.x = cw - 20.0
 	_hero.custom_minimum_size.x = cw
 	content.size = Vector2(cw, 0)
 	var need := content.get_combined_minimum_size()
+	if need.x > cw + 0.5:                    # the rows want more than the screen (320 px): lay out at that width, scale down
+		cw = need.x
+		card.custom_minimum_size.x = cw
+		_buttons.custom_minimum_size.x = cw - 20.0
+		_hero.custom_minimum_size.x = cw
+		need = content.get_combined_minimum_size()
 	var safe_top := float(data.get("safe_top", 0.0))
 	var safe_bottom := float(data.get("safe_bottom", 0.0))
 	var avail := vp.y - safe_top - safe_bottom - 24.0
-	var k := minf(1.0, avail / maxf(need.y, 1.0))
+	var k := minf(1.0, minf(avail / maxf(need.y, 1.0), room / maxf(cw, 1.0)))
 	content.scale = Vector2(k, k)
 	content.size = Vector2(cw, need.y)
 	content.position = Vector2((vp.x - cw * k) / 2.0, safe_top + 12.0 + maxf(0.0, (avail - need.y * k) / 2.0))
@@ -659,8 +670,6 @@ func _place_ribbon() -> void:
 	var top := content.position + card.position * content.scale
 	rt.position = top + Vector2((card.size.x * content.scale.x - rt.size.x * rt.scale.x) / 2.0, -RibbonTitle.H * 0.5 * content.scale.y)
 	rt.modulate = card.modulate
-	if _level_up.visible:
-		_level_up.position = Vector2(_level_up.get_parent_control().size.x - _level_up.size.x - 6, -14)
 
 func _process(_d: float) -> void:
 	_place_ribbon()
@@ -743,10 +752,13 @@ func _count_rewards() -> void:
 		if not _alive():
 			return
 		level_badge.set_level(lv.y, true)
+		var cap_label := _level_up.get_meta("caption", null) as Control
+		if cap_label:
+			cap_label.visible = false
 		_level_up.visible = true
-		_level_up.size = _level_up.get_combined_minimum_size()
-		_place_ribbon()
+		_level_up.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		UIKit.pop_in(_level_up, 0.3)
+		_level_up.pivot_offset = _level_up.get_combined_minimum_size() / 2.0
 		Haptics.medium()
 		UIKit.sfx("six")
 		xp_meter.set_value(0.0, float(after.need))

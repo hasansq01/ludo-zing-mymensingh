@@ -27,10 +27,10 @@ var _busy := false
 func _init(store_: GemStore = null) -> void:
 	super("Store", UIKit.W.form, true, LOOK_PM)
 	store = store_ if store_ != null else GemStore.instance()
-	var list := add_scroll_body(UIKit.SPACE.sm + 2)
+	var list := add_scroll_body(UIKit.SPACE.sm)
 	# your balances
 	var bal := UIKit.hbox(UIKit.SPACE.sm)
-	coins_chip = CoinAmount.new(int(Save.profile.get("coins", 0)), "md", "chip", "", true)
+	coins_chip = CoinAmount.new(int(Save.profile.get("coins", 0)), "md", "chip")      # short form, as Home and the Shop
 	coins_chip.name = "Coins"
 	gems_chip = CoinAmount.gems(int(Save.profile.get("gems", 0)), "md", "chip")
 	gems_chip.name = "Gems"
@@ -43,8 +43,8 @@ func _init(store_: GemStore = null) -> void:
 	_pending = _pending_card()
 	list.add_child(_pending)
 	# the gem packs
-	list.add_child(UIKit.margin(UIKit.caption("Gem packs"), 4, UIKit.SPACE.xs, 0, 0))
-	_pack_box = UIKit.vbox(UIKit.SPACE.sm + 2)
+	list.add_child(UIKit.margin(UIKit.caption("Gem packs"), 4, UIKit.SPACE.sm, 0, 0))
+	_pack_box = UIKit.vbox(UIKit.SPACE.sm)
 	_pack_box.name = "Packs"
 	list.add_child(_pack_box)
 	# gems -> coins
@@ -78,6 +78,7 @@ func refresh() -> void:
 		var b := _swap_buttons[i]
 		var need := int(PACKS[i][0]) - have
 		b.text = "Swap" if need <= 0 else "Need %d" % need
+		b.resized.emit()                         # re-fit the label (fit_text)
 		var kind := "teal" if need <= 0 else "off"
 		if b.get_meta("kit_kind", "") != kind:
 			UIKit.set_kind(b, kind)
@@ -142,7 +143,7 @@ func _pack_row(id: String, gems: int, price: String) -> Control:
 	row.add_child(col)
 	row.add_child(b)
 	_pack_buttons[id] = b
-	var p := UIKit.panel("row", row)
+	var p := UIKit.list_row(row)
 	p.name = "Pack_" + id
 	p.custom_minimum_size.y = ROW_H
 	return p
@@ -181,7 +182,7 @@ func _pending_card() -> PanelContainer:
 func _note_card(text: String) -> Control:
 	var l := UIKit.paragraph(text, UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	l.name = "Note"
-	var p := UIKit.panel("row", l)
+	var p := UIKit.list_row(l)
 	p.custom_minimum_size.y = ROW_H
 	return p
 
@@ -195,7 +196,7 @@ func _swap_row(i: int) -> Control:
 	row.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var col := HBoxContainer.new()
-	col.add_theme_constant_override("separation", UIKit.SPACE.sm)
+	col.add_theme_constant_override("separation", UIKit.SPACE.xs)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
 	var g := CoinAmount.gems(gems, "sm", "plain")
@@ -204,18 +205,19 @@ func _swap_row(i: int) -> Control:
 	var arrow := UIKit.label("→", UIKit.FS.h3, Palette.SUB, UIKit.font_body(900))
 	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(arrow)
-	col.add_child(CoinAmount.new(coins, "sm", "plain", "", true))
+	col.add_child(CoinAmount.new(coins, "sm", "plain"))
 	row.add_child(col)
 	var b := UIKit.btn("Swap", "teal", "sm")
 	b.name = "Swap%d" % i
-	b.custom_minimum_size.x = 96
+	b.custom_minimum_size.x = 88
+	UIKit.fit_text(b, 13)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(func(): _on_swap(i))
 	row.add_child(b)
 	_swap_buttons.append(b)
-	var p := UIKit.panel("row", row)
+	var p := UIKit.list_row(row)
 	p.name = "SwapRow%d" % i
-	p.custom_minimum_size.y = ROW_H - 8.0
+	p.custom_minimum_size.y = ROW_H
 	return p
 
 ## Swap: too few gems -> says how many are missing; else confirm -> POST /v1/gems/exchange -> "+1,000 coins".

@@ -139,3 +139,5 @@ func _refresh() -> void:
 	if cl:
 		cl.text = "Creating…" if _busy == "create" else "Create room"
 	join_button.text = "Joining…" if _busy == "join" else "Join room"
+	var join_off := join_button.disabled and _busy == ""        # can't be pressed yet: the off kind, not a faded teal
+	UIKit.set_kind(join_button, "off" if join_off else "teal")

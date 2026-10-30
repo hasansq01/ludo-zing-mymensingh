@@ -1,14 +1,15 @@
 class_name Meter
 extends Control
-## A progress bar drawn in code: a rounded track with a rounded fill. Never an empty dark slab: at 0 the fill still
-## shows a thin sliver, so the bar reads as "a bar with no progress yet". Looks:
+## A progress bar drawn in code: a rounded track with a rounded fill. At 0 no fill is drawn (the bare light track reads
+## as "no progress yet"); any progress shows at least a round dot as wide as the bar is tall. Looks:
 ##   "xp"     GOLD_FILL (glossy) on the light TRACK         (XP on cream cards: profile, result screen)
 ##   "night"  GOLD_FILL (glossy) on a dark INK track, inset (web .pxp / .xpbar: the home top bar)
 ##   "track"  PEACH on TRACK                                (neutral progress: steps, collection counts)
 ##   "teal"   TEAL_SOFT on TRACK                            (achievements, collection progress)
 ## Optional centred numbers ("45 / 150 XP", Nunito 900, 12-14 px with an outline so they read on fill and track);
 ## numbers need a bar of at least 16 px (the height grows to 16 when they're on).
-## inset_left: room at the left end for an overlapping LevelBadge (LevelBadge.row does this); the fill starts there.
+## inset_left: the length of the left end an overlapping LevelBadge covers (LevelBadge.row sets it). The fill starts
+## behind the badge and the fraction counts on the part after it, so any progress comes out from under the star.
 ##
 ##   var xp := Meter.new("night", 12)              # home: no numbers
 ##   var xp2 := Meter.new("xp", 20, true, "XP")    # profile: "45 / 150 XP"
@@ -16,7 +17,6 @@ extends Control
 
 const LOOKS := ["xp", "night", "track", "teal"]
 const SEC := 0.5
-const MIN_SLIVER := 4.0
 
 var look := "xp"
 var value := 0.0                     ## the value (clamped to 0..max_value)
@@ -125,28 +125,31 @@ func _draw() -> void:
 	shade.border_color = Color(0, 0, 0, 0.32) if night else Color(Palette.SHADOW, 0.12)
 	shade.border_blend = true
 	draw_style_box(shade, track)
-	var inner := Rect2(track.position + Vector2(pad + inset_left, pad), track.size - Vector2(2.0 * pad + inset_left, 2.0 * pad))
-	if inner.size.x <= 0.0 or inner.size.y <= 0.0:
+	var inner := Rect2(track.position + Vector2(pad, pad), track.size - Vector2(2.0 * pad, 2.0 * pad))
+	var vis := inner.size.x - inset_left               # the part of the bar after the badge
+	if vis <= 0.0 or inner.size.y <= 0.0:
 		return
-	var sliver := maxf(MIN_SLIVER, minf(inner.size.y * 0.5, 8.0))
-	var w := clampf(inner.size.x * _shown, sliver, inner.size.x)
+	var w: float
+	if inset_left > 0.0:                               # from behind the badge: at least half a dot shows past it
+		w = inset_left + clampf(vis * _shown, minf(inner.size.y * 0.5, vis), vis)
+	else:
+		w = clampf(inner.size.x * _shown, minf(inner.size.y, inner.size.x), inner.size.x)   # never narrower than a round dot
 	var fill := Rect2(inner.position, Vector2(w, inner.size.y))
 	var fill_col: Color
 	match look:
 		"xp", "night": fill_col = Palette.GOLD_FILL
 		"track": fill_col = Palette.PEACH
 		_: fill_col = Palette.TEAL_SOFT
-	if _shown <= 0.0:
-		fill_col = Color(fill_col, 0.75)            # the empty sliver: a quieter tint
 	var fb := _box("fill_" + look, fill_col)
 	fb.bg_color = fill_col
 	if not night:
 		# a hairline darker rim so the fill reads on the light track
 		fb.border_width_bottom = 1 if inner.size.y >= 8.0 else 0
 		fb.border_color = fill_col.darkened(0.18)
-	draw_style_box(fb, fill)
+	if _shown > 0.001:
+		draw_style_box(fb, fill)
 	# gloss: a soft white band over the top half (web linear-gradient(gold-hi, gold))
-	if fill.size.y >= 6.0 and fill.size.x >= 6.0:
+	if _shown > 0.001 and fill.size.y >= 6.0 and fill.size.x >= 6.0:
 		var g := _box("gloss", Palette.GLOSS)
 		var gh := roundf(fill.size.y * 0.42)
 		var gr := Rect2(fill.position + Vector2(minf(3.0, fill.size.x * 0.25), 1.0), Vector2(maxf(0.0, fill.size.x - 2.0 * minf(3.0, fill.size.x * 0.25)), gh))

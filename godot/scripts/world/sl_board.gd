@@ -47,6 +47,7 @@ var style := {}                         # SLScenes board style (apply_style); em
 var _lip: MeshInstance3D
 var _pad: MeshInstance3D
 var _pad_lip: MeshInstance3D
+var _pad_n := 0                         # pawns the pad is sized for
 static var _phases := {}                # head square -> wave phase chosen for that snake
 
 
@@ -619,11 +620,61 @@ func _relayout() -> void:
 		t.target = p
 	_refresh_pad()
 
-## The start pad shows while a pawn is waiting on it.
+## A flat pill-shaped slab (w x d from above, h tall, fully round ends): MeshKit.rbox can't round its plan corners
+## more than its height allows.
+static func _slab(w: float, h: float, d: float) -> ArrayMesh:
+	var r := d / 2.0
+	var pts := PackedVector2Array()
+	var seg := 10
+	for k in seg + 1:                               # right end, then the left end, round the plan
+		var a := -PI / 2.0 + PI * k / seg
+		pts.append(Vector2(w / 2.0 - r, 0) + Vector2.from_angle(a) * r)
+	for k in seg + 1:
+		var a := PI / 2.0 + PI * k / seg
+		pts.append(Vector2(-w / 2.0 + r, 0) + Vector2.from_angle(a) * r)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := pts.size()
+	for i in n:
+		var a := pts[i]
+		var b := pts[(i + 1) % n]
+		var top := [Vector3(0, h / 2.0, 0), Vector3(a.x, h / 2.0, a.y), Vector3(b.x, h / 2.0, b.y)]
+		_tri(st, top, Vector3.UP, Vector3.UP, Vector3.UP)
+		var na := Vector3(a.x - clampf(a.x, -w / 2.0 + r, w / 2.0 - r), 0, a.y).normalized()
+		var nb := Vector3(b.x - clampf(b.x, -w / 2.0 + r, w / 2.0 - r), 0, b.y).normalized()
+		var v := [Vector3(a.x, h / 2.0, a.y), Vector3(a.x, -h / 2.0, a.y), Vector3(b.x, -h / 2.0, b.y), Vector3(b.x, h / 2.0, b.y)]
+		_tri(st, [v[0], v[1], v[2]], na, na, nb)
+		_tri(st, [v[0], v[2], v[3]], na, nb, nb)
+	return st.commit()
+
+## One triangle with the given vertex normals, wound so it faces along the first normal.
+static func _tri(st: SurfaceTool, v: Array, n0: Vector3, n1: Vector3, n2: Vector3) -> void:
+	var face: Vector3 = (v[1] - v[0]).cross(v[2] - v[0])
+	var ns := [n0, n1, n2]
+	var order := [0, 1, 2]
+	if face.dot(n0 + n1 + n2) > 0.0:                 # Godot's front faces are clockwise
+		order = [0, 2, 1]
+	for i: int in order:
+		st.set_normal(ns[i])
+		st.add_vertex(v[i])
+
+## The start pad shows while a pawn is waiting on it, as wide as the pawns waiting (a rounded pill from square 1's
+## side), so it shrinks as they enter the board.
 func _refresh_pad() -> void:
-	if _pad:
-		_pad.visible = pawns.any(func(t): return int(t.pos) <= 0)
-		_pad_lip.visible = _pad.visible
+	if not _pad:
+		return
+	var n := pawns.filter(func(t): return int(t.pos) <= 0).size()
+	_pad.visible = n > 0
+	_pad_lip.visible = _pad.visible
+	if n == 0 or n == _pad_n:
+		return
+	_pad_n = n
+	var w := (n - 1) * WAIT_GAP + 1.44
+	var cx := PAD_X0 + w / 2.0
+	_pad.mesh = _slab(w, PAD_H, PAD_D)
+	_pad.position.x = cx
+	_pad_lip.mesh = _slab(w + 0.3, PAD_H * 0.6, PAD_D + 0.3)
+	_pad_lip.position.x = cx
 
 ## Where pawn pi's head is now, in global coordinates (for pops over it).
 func pawn_top(pi: int) -> Vector3:

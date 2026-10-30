@@ -1,11 +1,14 @@
 class_name RewardsSheet
 extends Sheet
-## Home's gift: Free spin / Daily reward / Free coins in one small PM sheet ("Rewards" ribbon, the X). Each row is
+## Home's gift: Daily spin / Daily reward / Free coins in one small PM sheet ("Rewards" ribbon, the X). Each row is
 ## one button: the reward's icon, its name and what it gives, and on the right its state: a honey Spin / Claim
 ## while it is ready, else the countdown (to midnight for the spin and the daily reward, the clock for the free
 ## coins). A tap does what the reward's own button does (main._on_tab via `picked`): the spin sheet, the daily
 ## calendar, or the free coins claimed (they fly from the row into Home's counter). The states come from
 ## HomeScreen.reward_states (the gift's red count reads the same) and tick once per second.
+##
+## The Shop's "Get coins" is this same sheet (RewardsSheet.new("Get coins", true)): same rows, names, countdowns and
+## taps, plus a "Win vs computer" info row under them (what a win pays).
 ##
 ## Economy v1: under them a "Free with a video" section (only where AdFlow.available(): Android with the AdMob plugin):
 ## "Free re-roll" (kind reroll) and "+2 gems" (kind gems), each with "N left today" (GET /v1/ads/today). A tap runs
@@ -16,7 +19,7 @@ extends Sheet
 signal picked(id: String)                ## a row was tapped: "spin" | "daily" | "free"
 
 const ROWS := [
-	["spin", "Free spin", "spin", "Spin"],
+	["spin", "Daily spin", "spin", "Spin"],
 	["daily", "Daily reward", "gift", "Claim"],
 	["free", "Free coins", "coins", "Claim"],
 ]
@@ -30,6 +33,7 @@ const VIDEO_ROWS := [
 ]
 
 var flow: AdFlow
+var wins_row := false                    ## the Get coins variant: a "Win vs computer" info row after the rewards
 var _rows := {}                          # id -> Row
 var _vrows := {}                         # ad kind -> VideoRow
 var _left := {}                          # ad kind -> videos left today (empty until GET /v1/ads/today answers)
@@ -37,18 +41,21 @@ var _video_box: VBoxContainer
 var _tick: Timer
 
 
-func _init() -> void:
-	super("Rewards", UIKit.W.form, true, LOOK_PM)
-	var list := add_scroll_body(UIKit.SPACE.sm + 2)
+func _init(title_ := "Rewards", wins_row_ := false) -> void:
+	super(title_, UIKit.W.form, true, LOOK_PM)
+	wins_row = wins_row_
+	var list := add_scroll_body(UIKit.SPACE.sm)
 	for r in ROWS:
 		var row := Row.new(r[0], r[1], HomeScreen.HI % r[2], r[3], _note(r[0]))
 		row.pressed.connect(_go.bind(str(r[0])))
 		list.add_child(row)
 		_rows[r[0]] = row
+	if wins_row:
+		list.add_child(_wins_row())
 	if videos_shown():
-		_video_box = UIKit.vbox(UIKit.SPACE.sm + 2)
+		_video_box = UIKit.vbox(UIKit.SPACE.sm)
 		_video_box.name = "Videos"
-		_video_box.add_child(UIKit.margin(UIKit.caption("Free with a video"), 4, UIKit.SPACE.xs, 0, 0))
+		_video_box.add_child(UIKit.margin(UIKit.caption("Free with a video"), 4, UIKit.SPACE.sm, 0, 0))
 		for v in VIDEO_ROWS:
 			var vr := VideoRow.new(v[0], v[1], v[2], v[3])
 			vr.pressed.connect(_watch.bind(str(v[0])))
@@ -164,11 +171,70 @@ func _on_watched(ok: bool, info: Dictionary) -> void:
 	await load_today()
 
 
+## What a win pays: an info row (not a button), the same row card.
+func _wins_row() -> Control:
+	var h := UIKit.hbox(UIKit.SPACE.md)
+	var ic := UIKit.icon("ic_trophy", 44)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(ic)
+	var col := UIKit.vbox(-1)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(UIKit.label("Win vs computer", UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
+	var n := UIKit.paragraph("%s in Ludo, %s in Snakes & Ladders" % [Fmt.gain(LudoRules.WIN_REWARD), Fmt.gain(SnakesLaddersRules.REWARD)],
+			UIKit.FS.small + 1, Palette.SUB)
+	col.add_child(n)
+	h.add_child(col)
+	var p := UIKit.list_row(h)
+	p.name = "Wins"
+	return p
+
+
+## A row's title and note: one line each, clipped with an ellipsis; on a narrow card (a row under 280 px) the icon is
+## dropped so "Win up to 1,000 coins" still reads whole.
+static func _fit_text(title: Label, note: Label, icon: Control, row: Control) -> void:
+	for l: Label in [title, note]:
+		l.clip_text = true
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	row.resized.connect(func(): icon.visible = row.size.x >= 280.0 or row.size.x <= 0.0)
+
+
+## The row card of a Row / VideoRow button: the shared list-row look (the gold rim = ready), pressed a touch darker.
+static func _row_look(b: Button, on: bool) -> void:
+	var st := UIKit.row_style("on" if on else "")
+	var pr := st.duplicate() as StyleBoxFlat
+	pr.bg_color = Palette.ROW.darkened(0.04)
+	pr.border_width_bottom = 2
+	for k in ["normal", "hover", "disabled"]:
+		b.add_theme_stylebox_override(k, st)
+	for k in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(k, pr)
+
+
 func _go(id: String) -> void:
 	if _closing:
 		return
+	if picked.get_connections().is_empty():          # no Main (previews): do what the row does here
+		_local(id)
 	picked.emit(id)
 	refresh.call_deferred()
+
+
+## Without Main: the free coins are claimed here, the spin / daily sheets open over this one.
+func _local(id: String) -> void:
+	var main := get_tree().root.get_node_or_null("Main")
+	if main and main.has_method("_on_tab"):
+		main.call("_on_tab", id)
+	elif id == "free":
+		var n := Rewards.claim_free(Save.profile)
+		if n > 0:
+			Sound.sfx("coin", n)
+			Toast.show(self, "%s coins" % Fmt.gain(n), card, 1.8, "coin")
+	else:
+		var path := "res://scripts/ui/sheets/%s_sheet.gd" % id
+		if ResourceLoader.exists(path) and get_parent():
+			var s: Sheet = load(path).new()
+			s.open(get_parent())
 
 
 ## A reward row: one button (cream row card with a lip); the action on the right is drawn, not tappable itself.
@@ -179,20 +245,14 @@ class Row extends Button:
 	var wait_label: Label
 	var _content: HBoxContainer
 	var _shake_tw: Tween
+	var _lit := false                    # wearing the gold rim (ready)
 
 	func _init(id_: String, title: String, icon_path: String, action: String, note: String) -> void:
 		id = id_
 		name = id_.capitalize()
 		focus_mode = Control.FOCUS_NONE
 		custom_minimum_size = Vector2(0, 72)
-		var st := UIKit.surface("row").duplicate() as StyleBoxFlat
-		var pr := st.duplicate() as StyleBoxFlat
-		pr.bg_color = Palette.ROW.darkened(0.04)
-		pr.border_width_bottom = 2
-		for k in ["normal", "hover", "disabled"]:
-			add_theme_stylebox_override(k, st)
-		for k in ["pressed", "hover_pressed"]:
-			add_theme_stylebox_override(k, pr)
+		RewardsSheet._row_look(self, false)
 		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		UIKit.wire_press(self)
 		_content = UIKit.hbox(UIKit.SPACE.md)
@@ -209,18 +269,15 @@ class Row extends Button:
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_content.add_child(col)
 		var t := UIKit.label(title, UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
-		t.clip_text = true
-		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		col.add_child(t)
 		var n := UIKit.label(note, UIKit.FS.small + 1, Palette.SUB, UIKit.font_body(800))
-		n.clip_text = true
-		n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		col.add_child(n)
+		RewardsSheet._fit_text(t, n, ic, self)
 		go = UIKit.button(action, "honey", "sm")
 		go.name = "Go"
 		go.mouse_filter = Control.MOUSE_FILTER_IGNORE         # the whole row is the button
 		go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		go.custom_minimum_size.x = 84
+		go.custom_minimum_size.x = 76
 		_content.add_child(go)
 		wait = PanelContainer.new()
 		wait.name = "Wait"
@@ -229,7 +286,7 @@ class Row extends Button:
 		wait.add_theme_stylebox_override("panel", ws)
 		wait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		wait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		wait.custom_minimum_size.x = 84
+		wait.custom_minimum_size.x = 76
 		wait_label = UIKit.label("", UIKit.FS.label, Palette.SUB, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
 		wait.add_child(wait_label)
 		_content.add_child(wait)
@@ -237,6 +294,9 @@ class Row extends Button:
 
 	## Ready: the Spin / Claim button; else the countdown ("in 13h 20m", "in 3:53:09").
 	func set_state(is_ready: bool, countdown: String) -> void:
+		if is_ready != _lit:
+			_lit = is_ready
+			RewardsSheet._row_look(self, is_ready)
 		go.visible = is_ready
 		wait.visible = not is_ready
 		var t := "in " + countdown if countdown != "" else ""
@@ -270,14 +330,7 @@ class VideoRow extends Button:
 		name = "Video_" + kind_
 		focus_mode = Control.FOCUS_NONE
 		custom_minimum_size = Vector2(0, 72)
-		var st := UIKit.surface("row").duplicate() as StyleBoxFlat
-		var pr := st.duplicate() as StyleBoxFlat
-		pr.bg_color = Palette.ROW.darkened(0.04)
-		pr.border_width_bottom = 2
-		for k in ["normal", "hover", "disabled"]:
-			add_theme_stylebox_override(k, st)
-		for k in ["pressed", "hover_pressed"]:
-			add_theme_stylebox_override(k, pr)
+		RewardsSheet._row_look(self, false)
 		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		UIKit.wire_press(self)
 		var content := UIKit.hbox(UIKit.SPACE.md)
@@ -294,19 +347,16 @@ class VideoRow extends Button:
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		content.add_child(col)
 		var t := UIKit.label(title, UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
-		t.clip_text = true
-		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		col.add_child(t)
 		note = UIKit.label(note_, UIKit.FS.small + 1, Palette.SUB, UIKit.font_body(800))
 		note.name = "Note"
-		note.clip_text = true
-		note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		col.add_child(note)
+		RewardsSheet._fit_text(t, note, ic, self)
 		go = UIKit.button("Watch", "honey", "sm")
 		go.name = "Go"
 		go.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		go.custom_minimum_size.x = 84
+		go.custom_minimum_size.x = 76
 		content.add_child(go)
 		wait = PanelContainer.new()
 		wait.name = "Wait"
@@ -315,7 +365,7 @@ class VideoRow extends Button:
 		wait.add_theme_stylebox_override("panel", ws)
 		wait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		wait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		wait.custom_minimum_size.x = 84
+		wait.custom_minimum_size.x = 76
 		wait_label = UIKit.label("", UIKit.FS.label, Palette.SUB, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
 		wait.add_child(wait_label)
 		content.add_child(wait)

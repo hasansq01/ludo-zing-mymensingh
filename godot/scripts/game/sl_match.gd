@@ -547,15 +547,15 @@ func _play_roll(id: int, p: Dictionary, pi: int, v: int, ev: Array) -> void:
 				await wait(HOLD_WAIT)
 			"wait":
 				if p.you:
-					top.say("You rolled a %d. You need a 1 to start." % v, 1.6)
+					top.say("You need a 1 to start.", 1.6)             # one line in the status pill (the die shows the roll)
 				else:
-					top.say("%s rolled a %d and needs a 1 to start." % [_who(p), v], 1.6)
+					top.say("%s needs a 1 to start." % _who(p), 1.6)
 				await wait(HOLD_WAIT)
 			"over":
 				if p.you:
-					top.say("You rolled a %d. You need exactly %d to finish." % [v, e.need], 1.8)
+					top.say("You need exactly %d to finish." % e.need, 1.8)
 				else:
-					top.say("%s rolled a %d and needs exactly %d to finish." % [_who(p), v, e.need], 1.8)
+					top.say("%s needs exactly %d to finish." % [_who(p), e.need], 1.8)
 				await wait(HOLD_WAIT)
 			"move":
 				await _walk(id, p, pi, e, v)
@@ -575,7 +575,7 @@ func _play_roll(id: int, p: Dictionary, pi: int, v: int, ev: Array) -> void:
 					if p.you:
 						top.say("You rolled a 6. Roll again!", 1.6, "event")
 					else:
-						top.say("%s rolled a 6 and rolls again." % _who(p), 1.6, "event")
+						top.say("%s rolls again (a 6)." % _who(p), 1.6, "event")
 					Sound.sfx("six", {soft = soft})
 					_pop("Roll again!", board.pawn_top(pi), Palette.HONEY, 26)
 				_save()

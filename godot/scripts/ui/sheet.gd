@@ -4,6 +4,11 @@ extends Control
 ## close button on the card's top-right corner, which is then the ONLY dismiss control of the sheet (no Done / Close /
 ## Got it buttons; a sheet may still have one primary action). Sheets stack; Android's Back and Escape call
 ## on_back() on the top one (default: close it when dismissable); a tap on the backdrop closes a dismissable sheet.
+## Stacking: open() covers the layer's top sheet and close() (or a sheet leaving without it) uncovers the new top. A
+## pm sheet shows alone: the one under it fades and shrinks to COVER_SCALE, then hides, and comes back as it was
+## (scroll, tab, state). A card dialog (a confirm) sits over the sheet, whose card stays under the dialog's scrim.
+## Only the top sheet dims the game (the backdrops crossfade: one SCRIM at every frame) and shows its close button;
+## the ones under it are inert.
 ##
 ## Looks (index.html):
 ##   "card"  .card: the cream CARD face, 2 px white border, shadow-lg, the title in Lilita inside the card.
@@ -39,6 +44,10 @@ const PM_CONTENT_TOP := 42.0
 const KICKER_H := 18.0
 const IN_SEC := 0.22
 const OUT_SEC := 0.14
+const COVER_SEC := 0.18
+const COVER_SCALE := 0.94
+## z_index step between stacked sheets: a child's own z (a raised badge) stays under the sheet above.
+const Z_STEP := 10
 
 var card: PanelContainer
 var body: VBoxContainer
@@ -54,19 +63,27 @@ var back_action := Callable()            ## when valid, Back calls this instead 
 var is_narrow := false
 var scroll_box: ScrollContainer          ## add_scroll_body()'s scroll area
 var scroll_body: VBoxContainer           ## add_scroll_body()'s content
+var scroll_hint := false                 ## add_scroll_body(): a round "more below" chevron on the fade while the content
+                                         ## goes on below (tap: scroll down). For sheets whose cut can fall between rows
+var _clampbox: ClampBox                     # holds body: the card is never wider than fit() says (SH-04)
 var backdrop: ColorRect
 
 var _closing := false
-var _sheet_w := 360.0
+var _cover := ""                         # "" on top; "dim" under a card dialog; "hide" under a pm sheet
+var _card_tw: Tween                      # the card's pop in, cover or uncover
+var _scrim_tw: Tween                     # the backdrop's fade in
+var _scrim_by: Sheet                     # the sheet whose fade sets this backdrop now (null: at rest)
+var _sheet_w: float = UIKit.W.form
 var _fit_on := false                     # fit() was called
 var _fit_max := 0.88
 var _fit_fixed := 0.0
 var _fit_wired := false
 var _scroll_wrap: Control
 var _fade: TextureRect
+var _more_hint: MoreHint
 
 
-func _init(title_text := "", width := 360.0, closable := true, look := LOOK_CARD) -> void:
+func _init(title_text := "", width: float = UIKit.W.form, closable := true, look := LOOK_CARD) -> void:
 	sheet_look = LOOK_PM if look == LOOK_PM else LOOK_CARD
 	_sheet_w = width
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -88,8 +105,11 @@ func _init(title_text := "", width := 360.0, closable := true, look := LOOK_CARD
 	card.add_theme_stylebox_override("panel", _pm_style() if sheet_look == LOOK_PM else _card_style())
 	card.custom_minimum_size = Vector2(width, 0)
 	center.add_child(card)
+	_clampbox = ClampBox.new()
+	_clampbox.name = "Clamp"
+	card.add_child(_clampbox)
 	body = UIKit.vbox(UIKit.SPACE.md)
-	card.add_child(body)
+	_clampbox.add_child(body)
 	header = Control.new()
 	header.name = "Header"
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -186,61 +206,156 @@ class PMStyle extends StyleBox:
 # Open / close / back
 # =====================================================================================================================
 
-## Show the sheet on top of `layer` (the app's sheet layer). Coroutine (callers may ignore it).
+## Show the sheet on top of `layer` (the app's sheet layer), covering the sheet that was on top. Coroutine (callers
+## may ignore it).
 func open(layer: Control) -> Sheet:
+	var below := top_sheet(layer)
 	card.modulate.a = 0.0                     # nothing shows until the pop starts (no full-size first frame)
 	backdrop.modulate.a = 0.0
+	_scrim_by = self
+	if below:
+		below._scrim_by = self                # its backdrop fades out as this one's fades in
 	layer.add_child(self)
-	_show_top_close(layer)
-	tree_exited.connect(_show_top_close.bind(layer), CONNECT_ONE_SHOT)
+	tree_exited.connect(_restack.bind(layer), CONNECT_ONE_SHOT)
+	_restack(layer)
 	if not is_inside_tree():
 		card.modulate.a = 1.0
-		backdrop.modulate.a = 1.0
 		return self
 	await get_tree().process_frame
 	if not is_instance_valid(card) or _closing:
 		return self
 	_place_chrome()
 	var reduced := reduce_motion()
-	var bt := create_tween()
-	bt.tween_property(backdrop, "modulate:a", 1.0, 0.12 if reduced else 0.18)
+	_scrim_tw = create_tween()
+	_scrim_tw.tween_method(_scrim_step.bind(below), 0.0, 1.0, 0.12 if reduced else 0.18)
+	_scrim_tw.finished.connect(_release.bind(layer))
+	if _cover == "hide":
+		return self                           # a pm sheet opened over this one in the same frame
 	if reduced:
 		card.scale = Vector2.ONE
-		var tw := card.create_tween()
-		tw.tween_property(card, "modulate:a", 1.0, 0.12)
+		_card_tw = card.create_tween()
+		_card_tw.tween_property(card, "modulate:a", 1.0, 0.12)
 	else:
-		UIKit.pop_in(card, IN_SEC)
+		_card_tw = UIKit.pop_in(card, IN_SEC)
 	return self
 
-## Fade the sheet out (140 ms), then emit `closed` and free it. Safe to call twice.
+## Fade the sheet out (140 ms), then emit `closed` and free it. The sheet under it is uncovered at once. Safe to call
+## twice.
 func close() -> void:
 	if _closing:
 		return
+	var layer := get_parent()
+	var was_top := layer != null and top_sheet(layer) == self
 	_closing = true
+	if close_btn:
+		close_btn.visible = false                # the uncovered sheet's X shows at once; two X's never overlap
+	var next: Sheet = top_sheet(layer) if was_top else null   # its backdrop takes the scrim over as this one fades
+	if next:
+		next._scrim_by = self
+	for tw: Tween in [_card_tw, _scrim_tw]:
+		if tw:
+			tw.kill()
 	var shield := Control.new()              # swallow taps while fading out (no double "Start game")
 	shield.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shield.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(shield)
+	if layer:
+		_restack(layer)
 	if is_inside_tree():
 		var tw := create_tween().set_parallel(true)
-		tw.tween_property(self, "modulate:a", 0.0, OUT_SEC)
+		tw.tween_method(_out_step.bind(next), 1.0, 0.0, OUT_SEC)
 		if not reduce_motion() and is_instance_valid(card):
 			card.pivot_offset = card.size / 2
 			tw.tween_property(card, "scale", Vector2(0.96, 0.96), OUT_SEC).set_ease(Tween.EASE_IN)
 		await tw.finished
-	if get_parent():
-		_show_top_close(get_parent())
+	_release(layer)
 	closed.emit()
 	queue_free()
 
-## Only the top sheet of a layer shows its close button (web .pm[inert] > .x-btn): the ones under it hide theirs.
-static func _show_top_close(layer: Node) -> void:
+## Lay `layer` out after a sheet opened, closed or left: the top sheet is uncovered and shows its close button (web
+## .pm[inert] > .x-btn: the ones under it hide theirs); each sheet below is covered, "hide" under a pm sheet, else
+## "dim". A backdrop no fade is setting rests at full (the top sheet) or at none (the others).
+static func _restack(layer: Node) -> void:
 	if not is_instance_valid(layer):
 		return
-	var top := top_sheet(layer)
+	var live := layer.is_inside_tree()
+	var stack: Array[Sheet] = []
+	for c in layer.get_children():          # (a sheet leaving the tree is still a child while tree_exited runs)
+		if c is Sheet and not c.is_queued_for_deletion() and not (c as Sheet)._closing and (c.is_inside_tree() or not live):
+			stack.append(c)
+	var under_pm := false
+	for k in range(stack.size() - 1, -1, -1):
+		var s := stack[k]
+		var top := k == stack.size() - 1
+		s.z_index = k * Z_STEP                   # a stray child z_index can't climb over the sheet above (SH-01)
+		s._set_cover("" if top else ("hide" if under_pm else "dim"))
+		under_pm = under_pm or s.sheet_look == LOOK_PM
+		if s.close_btn:
+			s.close_btn.visible = top
+		var d := s._scrim_by
+		if not (is_instance_valid(d) and d.is_inside_tree() and not d.is_queued_for_deletion()):
+			s._scrim_by = null
+			s.backdrop.modulate.a = 1.0 if top else 0.0
+
+## Cover ("dim" / "hide") or uncover (""): inert while covered; "hide" fades and shrinks the card, then hides it
+## (the backdrop is the scrim handover's), and uncovering brings it back (with Reduce motion a quick fade only).
+func _set_cover(mode: String) -> void:
+	if mode == _cover:
+		return
+	var was := _cover
+	_cover = mode
+	mouse_behavior_recursive = MOUSE_BEHAVIOR_INHERITED if mode == "" else MOUSE_BEHAVIOR_DISABLED
+	focus_behavior_recursive = FOCUS_BEHAVIOR_INHERITED if mode == "" else FOCUS_BEHAVIOR_DISABLED
+	if mode != "hide" and was != "hide":
+		return                                # "" <-> "dim": the card stays as it is
+	var hiding := mode == "hide"
+	var reduced := reduce_motion()
+	if _card_tw:
+		_card_tw.kill()
+	card.visible = true
+	card.pivot_offset = card.size / 2
+	var to := Vector2.ONE * (COVER_SCALE if hiding and not reduced else 1.0)
+	if not is_inside_tree():
+		card.modulate.a = 0.0 if hiding else 1.0
+		card.scale = to
+		card.visible = not hiding
+		return
+	if reduced:
+		card.scale = Vector2.ONE
+	_card_tw = card.create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_card_tw.tween_property(card, "modulate:a", 0.0 if hiding else 1.0, 0.1 if reduced else COVER_SEC)
+	if not reduced:
+		_card_tw.tween_property(card, "scale", to, COVER_SEC)
+	if hiding:
+		_card_tw.chain().tween_callback(card.hide)
+
+## The open fade's step (x: this backdrop 0 -> 1); the sheet below fades the other way.
+func _scrim_step(x: float, below: Sheet) -> void:
+	if _scrim_by == self:
+		backdrop.modulate.a = x
+	if is_instance_valid(below) and below._scrim_by == self:
+		below.backdrop.modulate.a = minf(below.backdrop.modulate.a, _partner(x))
+
+## The close fade's step (k: this sheet 1 -> 0); the uncovered sheet's backdrop comes up as this one goes.
+func _out_step(k: float, next: Sheet) -> void:
+	modulate.a = k
+	if is_instance_valid(next) and next._scrim_by == self:
+		next.backdrop.modulate.a = maxf(next.backdrop.modulate.a, _partner(k * backdrop.modulate.a))
+
+## The backdrop alpha that, with another one at x over the same game, keeps the dim at one SCRIM:
+## 1 - (1 - s a)(1 - s x) = s.
+static func _partner(x: float) -> float:
+	var s := Palette.SCRIM.a
+	return clampf((1.0 - (1.0 - s) / (1.0 - s * x)) / s, 0.0, 1.0)
+
+## This sheet's fade is done: the backdrops it was setting rest (_restack).
+func _release(layer: Node) -> void:
+	if not is_instance_valid(layer):
+		return
 	for c in layer.get_children():
-		if c is Sheet and (c as Sheet).close_btn:
-			(c as Sheet).close_btn.visible = c == top
+		if c is Sheet and (c as Sheet)._scrim_by == self:
+			(c as Sheet)._scrim_by = null
+	_restack(layer)
 
 ## Back / Escape on the top sheet. Default: back_action when set, else close when dismissable. Override for a custom
 ## Back (call super.on_back() for the default). Returns nothing; the caller has handled Back either way.
@@ -317,13 +432,15 @@ func set_kicker(text: String) -> Label:
 		kicker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		kicker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		header.add_child(kicker)
-		kicker.set_anchors_preset(Control.PRESET_BOTTOM_WIDE if sheet_look == LOOK_PM else Control.PRESET_TOP_WIDE)
+		kicker.set_anchors_preset(Control.PRESET_TOP_WIDE)
 		kicker.offset_left = 30.0
 		kicker.offset_right = -30.0
 		if sheet_look == LOOK_PM:
-			header.custom_minimum_size.y += KICKER_H
-			kicker.offset_top = -KICKER_H
-			kicker.offset_bottom = 0.0
+			# a fixed gap under the ribbon's bottom edge (SPACE.sm), whatever the card's centring
+			var top_m := (card.get_theme_stylebox("panel") as StyleBox).content_margin_top
+			kicker.offset_top = RIBBON_TOP + RibbonTitle.H + UIKit.SPACE.sm - top_m
+			kicker.offset_bottom = kicker.offset_top + KICKER_H
+			header.custom_minimum_size.y = maxf(header.custom_minimum_size.y, kicker.offset_bottom)
 		else:
 			kicker.offset_top = 0.0
 			kicker.offset_bottom = KICKER_H
@@ -375,6 +492,13 @@ func add_scroll_body(gap: int = UIKit.SPACE.md) -> VBoxContainer:
 	_fade.texture = gt
 	_fade.visible = false
 	wrap.add_child(_fade)
+	_more_hint = MoreHint.new()
+	_more_hint.visible = false
+	_more_hint.pressed.connect(func():
+		var bar := scroll_box.get_v_scroll_bar()
+		var to := minf(bar.max_value - bar.page, bar.value + bar.page * 0.75)
+		create_tween().tween_property(scroll_box, "scroll_vertical", int(to), 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT))
+	wrap.add_child(_more_hint)
 	_scroll_wrap = wrap
 	body.add_child(wrap)
 	scroll_box.get_v_scroll_bar().value_changed.connect(func(_v: float): _update_fade())
@@ -388,6 +512,66 @@ func _update_fade() -> void:
 		return
 	var bar := scroll_box.get_v_scroll_bar()
 	_fade.visible = bar.max_value - bar.page > 1.0 and bar.value < bar.max_value - bar.page - 2.0
+	if _more_hint:
+		_more_hint.visible = scroll_hint and _fade.visible
+
+
+## scroll_hint's chip: a small white disc with a down chevron, centred on the scroll area's bottom edge (half of it
+## hangs into the gap below, so it covers as little of the content as it can).
+class MoreHint extends Button:
+	const D := 26.0
+
+	func _init() -> void:
+		name = "MoreHint"
+		flat = true
+		focus_mode = Control.FOCUS_NONE
+		custom_minimum_size = Vector2(D + 22.0, D)       # a wider touch area than the disc
+		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		size_flags_vertical = Control.SIZE_SHRINK_END
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+			add_theme_stylebox_override(st, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var c := Vector2(size.x / 2.0, size.y)
+		draw_circle(c + Vector2(0, 2), D / 2.0, Palette.shadow(0.18), true, -1.0, true)
+		draw_circle(c, D / 2.0, Color.WHITE, true, -1.0, true)
+		draw_arc(c, D / 2.0 - 1.0, 0.0, TAU, 40, Palette.ROW_EDGE, 2.0, true)
+		var k := 4.5
+		draw_polyline(PackedVector2Array([c + Vector2(-k, -k * 0.4), c + Vector2(0, k * 0.6), c + Vector2(k, -k * 0.4)]), Palette.SUB, 2.5, true)
+
+
+## Holds the sheet's body inside the card. Its minimum width is 0 and the body is laid out in the width fit() allows,
+## so content with a wide minimum can't stretch the card past the screen gutter (it overflows the card instead, and
+## fit_now() warns in debug builds). Height still follows the body.
+class ClampBox extends Container:
+	var avail_w := 0.0                       ## 0: no clamp yet (the body's own width wins)
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func body_min_w() -> float:
+		var m := 0.0
+		for c in get_children():
+			if c is Control and (c as Control).visible:
+				m = maxf(m, (c as Control).get_combined_minimum_size().x)
+		return m
+
+	func _get_minimum_size() -> Vector2:
+		var m := Vector2.ZERO
+		for c in get_children():
+			if c is Control and (c as Control).visible:
+				var cm := (c as Control).get_combined_minimum_size()
+				m.y = maxf(m.y, cm.y)
+				if avail_w <= 0.0:
+					m.x = maxf(m.x, cm.x)
+		return m
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_SORT_CHILDREN:
+			for c in get_children():
+				if c is Control and (c as Control).visible:
+					fit_child_in_rect(c, Rect2(Vector2.ZERO, size))
 
 
 # =====================================================================================================================
@@ -415,12 +599,18 @@ func fit_now() -> void:
 	var w := minf(_sheet_w, vp.x - 2.0 * UIKit.GUTTER)
 	if absf(card.custom_minimum_size.x - w) > 0.5:
 		card.custom_minimum_size.x = w
+	if absf(_clampbox.avail_w - (w - _card_pad_x())) > 0.5:
+		_clampbox.avail_w = w - _card_pad_x()
+		_clampbox.update_minimum_size()
+	# flip is_narrow first: the narrow_changed layouts are what the width check below must measure
 	var nar := w < NARROW_W
 	if nar != is_narrow:
 		is_narrow = nar
 		if sheet_look == LOOK_CARD and title_label and title_label.get_parent() == header:
 			title_label.add_theme_font_size_override("font_size", UIKit.FS.title_sm if nar else UIKit.FS.title)
 		narrow_changed.emit(nar)
+	if OS.is_debug_build() and not has_meta("_warned_wide"):
+		_check_wide.call_deferred()          # after the frame's rebuilds settle: only real overflow warns
 	if _fit_on and scroll_box:
 		var cap := vp.y * _fit_max
 		if sheet_look == LOOK_PM and ribbon:
@@ -435,6 +625,21 @@ func fit_now() -> void:
 		if absf(scroll_box.custom_minimum_size.y - h) > 0.5:
 			scroll_box.custom_minimum_size.y = h
 		_update_fade.call_deferred()
+
+## Debug: warn once when the body's minimum width is wider than the card allows (it overflows the card).
+func _check_wide() -> void:
+	if not is_inside_tree() or card == null or has_meta("_warned_wide"):
+		return
+	var w := minf(_sheet_w, get_viewport_rect().size.x - 2.0 * UIKit.GUTTER)
+	var want := _clampbox.body_min_w() + _card_pad_x()
+	if want > w + 0.5:
+		set_meta("_warned_wide", true)
+		push_warning("Sheet %s: content wants %d px but the card is held to %d px" % [get_script().resource_path.get_file(), int(want), int(w)])
+
+## The card's left + right content margins.
+func _card_pad_x() -> float:
+	var st := card.get_theme_stylebox("panel")
+	return st.content_margin_left + st.content_margin_right
 
 func _wire_fit() -> void:
 	if _fit_wired:
@@ -469,7 +674,7 @@ static func fit_card(c: Control, sc: ScrollContainer, inner: Control, width: flo
 func _place_chrome() -> void:
 	if card == null or header == null:
 		return
-	var origin := body.position + header.position      # the header's top-left in card space
+	var origin := _clampbox.position + body.position + header.position      # the header's top-left in card space
 	if close_btn:
 		var s := close_btn.size
 		close_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)

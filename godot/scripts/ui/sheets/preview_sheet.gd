@@ -23,6 +23,7 @@ extends Sheet
 signal room_changed(id: String)          ## room: Buy or Use, the room is in use now
 signal scene_changed(id: String)         ## scene: Buy or Use, the scene is in use now
 signal bought(id: String)                ## Buy: the item is owned now
+signal store_requested                   ## "Open Store" after "not enough gems" (the Shop passes it on to Main)
 
 ## Orbit limits, ray-checked on the web in all five rooms so no furniture comes between the camera and the table.
 const LIM := {az = [0.3, 0.9], el = [0.0, 0.62], zoom = [0.45, 1.0]}
@@ -76,6 +77,8 @@ var _buy: Button
 var _need: Button
 var _use: Button
 var _on_pill: PanelContainer
+var _gem: Button                         # "or [gem] N": the same second price as the Shop card
+var _busy_gems := false
 var _pts := {}                           # pointer id -> last position (touch index, or MOUSE for the mouse)
 const MOUSE := 1000
 
@@ -246,8 +249,9 @@ func _build_view() -> Control:
 func _build_panel() -> Control:
 	_info = UIKit.vbox(UIKit.SPACE.xs)
 	_kind_l = UIKit.eyebrow(KIND_TEXT[kind])
+	_kind_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_info.add_child(UIKit.margin(_kind_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
-	_desc_l = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED)
+	_desc_l = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	_info.add_child(UIKit.margin(_desc_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
 	var slot := MarginContainer.new()
 	slot.custom_minimum_size.y = UIKit.TAP + 4
@@ -268,6 +272,10 @@ func _build_panel() -> Control:
 	_on_pill.custom_minimum_size.y = UIKit.H.md
 	slot.add_child(_on_pill)
 	_info.add_child(slot)
+	if price > 0:                            # the Shop card's "or [gem] N" line
+		_gem = ShopSheet.gem_option(Catalog.gem_price(price))
+		_gem.pressed.connect(_on_gems)
+		_info.add_child(_gem)
 	return _info
 
 
@@ -325,9 +333,31 @@ func _panel() -> void:
 	_need.text = Fmt.shortfall(short)
 	_use.visible = own and not on
 	_on_pill.visible = on
+	if _gem:
+		_gem.visible = not own
 	_act = _buy if _buy.visible else _need if _need.visible else _use if _use.visible else null
 	for b: Button in [_buy, _use]:
 		b.disabled = _loading and kind == "room"   # no room switch while the preview is still building this one
+
+## Buy with gems: the Shop's flow (wallet checks, confirm, purchase, toast).
+func _on_gems() -> void:
+	var r := _item()
+	if r.is_empty() or _busy_gems or _asking or _closing or _owns():
+		return
+	_busy_gems = true
+	_asking = true
+	var res: String = await ShopSheet.buy_with_gems(self, "scene" if kind == "scene" else "room", room_id, str(r.name))
+	_asking = false
+	_busy_gems = false
+	if not is_instance_valid(self) or _closing:
+		return
+	if res == "store":
+		store_requested.emit()
+	elif res == "bought":
+		bought.emit(room_id)
+		_changed()
+	_panel()
+	_fit()
 
 func _on_act() -> void:
 	var r := _item()

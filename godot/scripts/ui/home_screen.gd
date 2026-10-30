@@ -211,8 +211,7 @@ func _build_top_bar() -> void:
 	_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	av.add_child(_avatar)
 	_level = LevelBadge.new(1, "sm")
-	_level.position = Vector2(AVATAR - _level.px + 9.0, AVATAR - _level.px + 4.0)
-	_level.size = Vector2(_level.px, _level.px)
+	_place_level()
 	av.add_child(_level)
 	var col := UIKit.vbox(3)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -623,6 +622,11 @@ func _pulse(on: bool) -> void:
 	_badge_tw.tween_interval(1.0)
 
 
+## The level star on the avatar's bottom-right corner, placed from its real px (two-digit levels never drop below 28).
+func _place_level() -> void:
+	_level.position = Vector2(AVATAR - _level.px + 9.0, AVATAR - _level.px + 4.0)
+	_level.size = Vector2(_level.px, _level.px)
+
 func refresh() -> void:
 	if not is_inside_tree():
 		return
@@ -632,6 +636,7 @@ func refresh() -> void:
 		_avatar.refresh()
 	var li := Save.level_info(int(p.get("xp", 0)))
 	_level.set_level(int(li.level))
+	_place_level()
 	_xp.set_value(float(li.into), float(li.need))
 	if not _coins_busy():
 		coin_amount.set_amount(int(p.get("coins", 0)))

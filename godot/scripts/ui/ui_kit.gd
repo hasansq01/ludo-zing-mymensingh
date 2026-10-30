@@ -4,6 +4,9 @@ extends RefCounted
 ## (index.html: Lilita One for display text, Nunito for body text; cozy rounded panels; glossy buttons with a 3D
 ## "lip" that presses down; the .x-btn close button; the .seg segmented control).
 ##
+## Lists use ONE row card: UIKit.list_row(child, state) (states "", "on", "you", "empty"; see its doc). Fixed-height pm
+## sheets use UIKit.H_SHEET. Sheet widths: W.form (single column) or W.catalog (grids, long lists).
+##
 ## Colours come from Palette. Every button made here plays the "tap" sound and a light haptic when pressed
 ## (wire_press), unless the caller's own handler already played a sound in the same moment (like the web's global
 ## click handler). Styleboxes returned by surface() are SHARED and cached: duplicate() one before changing it.
@@ -187,7 +190,7 @@ static func glass(radius := 16) -> StyleBoxFlat:
 
 ## A cached, SHARED surface style (duplicate() before changing it). kinds:
 ##   "card" sheet card (CARD, r xl, white 2 px, shadow lg, pad 20)
-##   "row" cream row card (ROW, ROW_EDGE, lip 4)        "tile" white stat tile (ROW_EDGE, lip 4)
+##   "row" cream row card (ROW, ROW_EDGE, lip 4; use list_row())   "tile" white stat tile (ROW_EDGE, lip 4)
 ##   "pane" .pm-inner pane (PANE, PANE_EDGE 3 px)       "pane_open_top" the same with an open top (under tabs)
 ##   "item" catalog tile (SURFACE_2, LINE; on: GOLD rim + gold glow)   "bubble" info bubble card
 ##   "glass" HUD glass   "night" lobby dark glass   "chip" CHIP well   "well" dimmed CHIP_DIM well
@@ -261,6 +264,58 @@ static func panel(kind: String, child: Control = null, on := false) -> PanelCont
 	if child:
 		p.add_child(child)
 	return p
+
+## THE list row (rewards, store, leaderboard, lobby members, quick-match rows, tables, achievements, credits): the cream
+## ROW card, 2 px ROW_EDGE border, 4 px lip, radius 16, padding 12 (PAD.row). Put rows 8 px apart (SPACE.sm) in a
+## vbox(SPACE.sm). state:
+##   ""       the normal row (ROW / ROW_EDGE / lip 4)
+##   "on"     gold rim: selected, in use, ready to claim
+##   "you"    a player-colour rim, 3 px: you in a list (pass `rim`, default Palette.TEAL)
+##   "empty"  an empty seat / slot: CHIP at 55%, LINE_STRONG border, no lip, 12 px content margin all round
+## Returns a PanelContainer holding `child` (an HBox, usually: icon 40-44, title h3 + note, trailing sm button or pill).
+## Switch the state later with set_row_state(). Don't build a white / SURFACE_2 box of your own for a list row.
+##   list.add_child(UIKit.list_row(row_hbox))
+##   list.add_child(UIKit.list_row(row_hbox, "you", Palette.CAT.coins[0]))
+static func list_row(child: Control = null, state := "", rim := Color.TRANSPARENT) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.set_meta("kit_surface", "row")
+	p.add_theme_stylebox_override("panel", row_style(state, rim))
+	if child:
+		p.add_child(child)
+	return p
+
+## The list_row() look of a state, cached (SHARED: duplicate() before changing it).
+static func row_style(state := "", rim := Color.TRANSPARENT) -> StyleBoxFlat:
+	match state:
+		"on":
+			return surface("row", true)
+		"you":
+			var c := rim if rim.a > 0.0 else Palette.TEAL
+			var key := "row_you|%s" % c.to_html()
+			if not _surf.has(key):
+				var s := surface("row").duplicate() as StyleBoxFlat
+				s.border_color = c
+				for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT]:
+					s.set_border_width(side, BW.rim)
+				s.border_width_bottom = LIP.md
+				s.content_margin_left += 1; s.content_margin_right += 1; s.content_margin_top += 1
+				_surf[key] = s
+			return _surf[key]
+		"empty":
+			if not _surf.has("row_empty"):
+				var s := box(Color(Palette.CHIP, 0.55), R.lg - 2, BW.line, Palette.LINE_STRONG)
+				pad(s, PAD.row)
+				_surf["row_empty"] = s
+			return _surf["row_empty"]
+		_:
+			return surface("row")
+
+## Switch a list_row() to another state.
+static func set_row_state(p: PanelContainer, state: String, rim := Color.TRANSPARENT) -> void:
+	p.add_theme_stylebox_override("panel", row_style(state, rim))
+
+## Full height of the fixed-height pm sheets (Profile, Shop, Leaderboard, How to play): one token.
+const H_SHEET := 680
 
 ## Switch a panel() between its normal and on look (cached styleboxes, no allocation).
 static func set_on(p: PanelContainer, kind: String, on: bool) -> void:
@@ -429,14 +484,15 @@ static func scroll() -> ScrollContainer:
 	TouchScroll.attach(sc)          # drags scroll even when they start on a button, toggle or slider
 	return sc
 
-## Fade + pop a control in (sheets, cards, toasts).
-static func pop_in(c: Control, sec := 0.22) -> void:
+## Fade + pop a control in (sheets, cards, toasts). Returns the tween (a sheet stops it when it is covered).
+static func pop_in(c: Control, sec := 0.22) -> Tween:
 	c.pivot_offset = c.size / 2
 	c.modulate.a = 0.0
 	c.scale = Vector2(0.92, 0.92)
 	var tw := c.create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(c, "modulate:a", 1.0, sec * 0.8)
 	tw.tween_property(c, "scale", Vector2.ONE, sec)
+	return tw
 
 
 # =====================================================================================================================
@@ -680,6 +736,55 @@ static func fit_text(b: Button, min_fs := 12) -> void:
 			b.add_theme_font_size_override("font_size", fs)
 	b.clip_text = true
 	b.resized.connect(fit)
+	b.set_meta("_fit_text", fit)
+
+## Re-run fit_text() after the button's text changed (it only re-fits by itself on a resize).
+static func refit_text(b: Button) -> void:
+	if b.has_meta("_fit_text"):
+		(b.get_meta("_fit_text") as Callable).call()
+
+## A segmented() row on a narrow card: equal widths while every label fits; else every option is as wide as its label
+## needs (plus a share of the rest) and all the labels take one size, the largest that fits them all (min_fs at the least, then they clip). Fitting each button on
+## its own gave four sizes in one row and still cut "Medium".
+static func fit_segmented(seg: HBoxContainer, min_fs := 11) -> void:
+	var btns: Array[Button] = []
+	for c in seg.get_children():
+		if c is Button:
+			btns.append(c)
+	if btns.is_empty():
+		return
+	var full := btns[0].get_theme_font_size("font_size")
+	var fit := func():
+		var font := btns[0].get_theme_font("font")
+		var sep := float(seg.get_theme_constant("separation"))
+		var pad := func(b: Button) -> float:
+			var st := b.get_theme_stylebox("normal")
+			return st.get_margin(SIDE_LEFT) + st.get_margin(SIDE_RIGHT)
+		var share := (seg.size.x - sep * (btns.size() - 1)) / btns.size()
+		var even := true
+		for b in btns:
+			even = even and font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, full).x + pad.call(b) <= share
+		if even:                                          # room for all at full size: equal widths, as everywhere
+			for b in btns:
+				b.size_flags_stretch_ratio = 1.0
+				if b.get_theme_font_size("font_size") != full:
+					b.add_theme_font_size_override("font_size", full)
+			return
+		var fs := full
+		while fs > min_fs:
+			var need := sep * (btns.size() - 1)
+			for b in btns:
+				need += font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + pad.call(b)
+			if need <= seg.size.x:
+				break
+			fs -= 1
+		for b in btns:
+			b.size_flags_stretch_ratio = maxf(1.0, font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + pad.call(b))
+			if fs != b.get_theme_font_size("font_size"):
+				b.add_theme_font_size_override("font_size", fs)
+	for b in btns:
+		b.clip_text = true
+	seg.resized.connect(fit)
 
 ## The square icon button (pause, settings, back, zoom). icon: an assets/ui name ("ic_gear") or a res:// path.
 ## look "glass" (cream glass over the 3D room, web .icon-btn) or "night" (dark glass on the lobby). Scales to 0.94

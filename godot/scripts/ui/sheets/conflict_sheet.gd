@@ -26,14 +26,10 @@ var _cards: Array[Control] = []
 
 
 func _init(info: Dictionary = {}, acc: Account = null) -> void:
-	super("", UIKit.W.catalog, true, LOOK_PM)
+	super("Keep which progress?" if str(info.get("kind", "conflict")) == "conflict" else "Other Google account", UIKit.W.catalog, true, LOOK_PM)
 	_info = info
 	account_node = acc
 	kind = str(info.get("kind", "conflict"))
-	ribbon = RibbonTitle.new("Keep which progress?" if kind == "conflict" else "Another Google account")
-	ribbon.name = "Ribbon"
-	header.add_child(ribbon)
-	title_label = ribbon.label
 	var list := add_scroll_body(UIKit.SPACE.md)
 	var intro := UIKit.paragraph(intro_text(kind), UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	list.add_child(intro)
@@ -81,9 +77,10 @@ static func there_text(k: String, has_account: bool) -> String:
 ## empty: the Google player has no account yet ("New account · starts at level 1").
 static func summary_card(s: Dictionary, caption: String, empty := false) -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
-	var cap := UIKit.caption(caption)
-	cap.name = "Caption"
-	v.add_child(cap)
+	if caption != "":
+		var cap := UIKit.caption(caption)
+		cap.name = "Caption"
+		v.add_child(cap)
 	var row := UIKit.hbox(UIKit.SPACE.md)
 	var ava := Collection.make_avatar_of(str(s.get("avatar", "pawn-red")) if not empty else "pawn-red", str(s.get("frame", "classic")), 56.0)
 	ava.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -114,14 +111,19 @@ static func summary_card(s: Dictionary, caption: String, empty := false) -> Cont
 
 func _option(s: Dictionary, caption: String, consequence: String, button: Button, empty := false) -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
-	v.add_child(summary_card(s, caption, empty))
+	v.add_child(summary_card(s, "", empty))
 	var note := UIKit.paragraph(consequence, UIKit.FS.small, Palette.SUB)
 	note.name = "Consequence"
 	v.add_child(note)
 	v.add_child(button)
-	var p := UIKit.panel("row", v)
+	var p := UIKit.list_row(v)
 	_cards.append(p)
-	return p
+	var cap := UIKit.caption(caption)                    # the heading sits above its card
+	cap.name = "Caption"
+	var out := UIKit.vbox(UIKit.SPACE.sm)
+	out.add_child(cap)
+	out.add_child(p)
+	return out
 
 func _pick(keep: String) -> void:
 	if _busy or _closing:

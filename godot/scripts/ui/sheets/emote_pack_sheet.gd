@@ -7,6 +7,7 @@ extends Sheet
 ##   var s := EmotePackSheet.new("pawns"); s.changed.connect(refresh_shop); s.open(layer)
 
 signal changed                           ## the pack was bought or put in use
+signal store_requested                   ## "Open Store" after "not enough gems" (the Shop passes it on to Main)
 
 const SEAMLESS := ["happy", "party", "cheer"]
 const PAUSE_SEC := 0.9                   ## held on the last frame between two plays of a non-looping emote
@@ -17,6 +18,7 @@ var _buy: Button
 var _need: Button
 var _use: Button
 var _on_pill: PanelContainer
+var _gem: Button                         # "or [gem] N": the same second price as the Shop card
 var _cells: Array[EmoteCell] = []
 var _busy := false
 
@@ -54,6 +56,10 @@ func _init(pack_id_ := "starter") -> void:
 	_on_pill.custom_minimum_size.y = UIKit.H.md
 	slot.add_child(_on_pill)
 	body.add_child(slot)
+	if int(pk.get("price", 0)) > 0:
+		_gem = ShopSheet.gem_option(Catalog.gem_price(int(pk.price)))
+		_gem.pressed.connect(_on_gems)
+		body.add_child(_gem)
 	fit(0.92)
 
 
@@ -75,6 +81,24 @@ func refresh() -> void:
 	_need.text = Fmt.shortfall(short)
 	_use.visible = own and not on
 	_on_pill.visible = on
+	if _gem:
+		_gem.visible = not own
+
+
+## Buy with gems: the Shop's flow.
+func _on_gems() -> void:
+	if _busy or _closing or Catalog.owns_emotes(pack_id):
+		return
+	_busy = true
+	var res: String = await ShopSheet.buy_with_gems(self, "emotes", pack_id, str(Emotes.pack(pack_id).get("name", "")))
+	_busy = false
+	if not is_instance_valid(self) or _closing:
+		return
+	if res == "store":
+		store_requested.emit()
+	elif res == "bought":
+		changed.emit()
+	refresh()
 
 
 func _on_act() -> void:
