@@ -3,6 +3,8 @@
 // GET /v1/ads/ssv when the ad was watched. The callback is checked against Google's published ECDSA keys and grants
 // the reward once (transaction_id is unique); the game polls GET /v1/ads/status?nonce=. Nothing is granted on the
 // game's word. Day caps per kind and in total (Bangladesh day), checked at start and again at the callback.
+// LevelPlay (the primary network) does the same through GET /v1/ads/levelplay: its MD5 signature with the private key
+// (secret LEVELPLAY_S2S_KEY), the nonce and account id as custom parameters, eventId once. Both grant via grantAd().
 import { type AccEnv, type Authed, type Step, BadRequest, authedJson, json, mutate, readBody } from "./accounts";
 import { ECON_V1, addCoins, type Profile } from "./econ";
 import { econDay, econDayStartMs } from "./wallet";
@@ -224,29 +226,26 @@ function applyReward(p: Profile, kind: AdKind, double: number): [Profile, number
   }
 }
 
+/** What a verified callback did: granted, or why nothing was granted. All are final: the network must not retry. */
+export type GrantResult = "granted" | "duplicate" | "ignored" | "expired" | "cap" | "not_eligible" | "unknown";
+
 /**
- * GET /v1/ads/ssv?ad_network=&ad_unit=&custom_data=&key_id=&reward_amount=&reward_item=&timestamp=&transaction_id=
- * &user_id=&signature=&key_id= (AdMob). 200 for a granted, duplicate or refused-by-the-rules callback (AdMob only
- * retries on errors); 400 for a bad signature or unknown nonce.
+ * The reward for one verified callback, shared by AdMob (/v1/ads/ssv) and LevelPlay (/v1/ads/levelplay): `nonce` must
+ * be an ad of `user` (else "ignored"), `tx` (the network's transaction / event id, namespaced per network) counts at
+ * most once, the nonce must not be expired and the day caps are checked again. Grants once.
  */
-export async function adsSsv(req: Request, env: AccEnv, now: number): Promise<Response> {
-  if (req.method !== "GET") return json({ error: "method" }, 405);
-  const url = new URL(req.url);
-  if (!(await verifySsv(env, url).catch((e) => (console.error("SSV verify failed:", e), false)))) return json({ error: "signature" }, 400);
-  const nonce = url.searchParams.get("custom_data") ?? "";
-  const user = url.searchParams.get("user_id") ?? "";
-  const tx = (url.searchParams.get("transaction_id") ?? "").slice(0, 128);
-  // a signed callback that matches no pending ad (AdMob's "Verify URL" test sends none) grants nothing: 200 so
-  // AdMob doesn't retry it
-  if (!NONCE_RE.test(nonce) || !tx) return json({ ok: true, result: "ignored" });
+export async function grantAd(env: AccEnv, nonce: string, user: string, tx: string, now: number): Promise<GrantResult> {
+  if (!NONCE_RE.test(nonce) || !tx) return "ignored";
   const db = env.DB;
   const ad = await db.prepare("SELECT * FROM ad_rewards WHERE nonce = ?").bind(nonce).first<{ account_id: string; kind: AdKind; ref: string | null; status: string; created_at: number }>();
-  if (!ad || ad.account_id !== user) return json({ ok: true, result: "ignored" });
-  if (ad.status !== "pending") return json({ ok: true, duplicate: true });
-  const r = await mutate(env, ad.account_id, now, async (_row, p): Promise<Step<string>> => {
+  if (!ad || ad.account_id !== user) return "ignored";
+  if (ad.status !== "pending") return "duplicate";
+  // one event never pays twice, not even for another nonce (tx_id is UNIQUE too: this keeps it a clean answer)
+  if (await db.prepare("SELECT 1 AS x FROM ad_rewards WHERE tx_id = ?").bind(tx).first()) return "duplicate";
+  const r = await mutate(env, ad.account_id, now, async (_row, p): Promise<Step<GrantResult>> => {
     const cur = await db.prepare("SELECT status FROM ad_rewards WHERE nonce = ?").bind(nonce).first<{ status: string }>();
     if (cur?.status !== "pending") return { result: "duplicate" };
-    const reject = (why: string): Step<string> => ({
+    const reject = (why: GrantResult): Step<GrantResult> => ({
       result: why,
       write: { extra: () => [db.prepare("UPDATE ad_rewards SET status = 'rejected', tx_id = ?, granted_at = ? WHERE nonce = ? AND status = 'pending'").bind(tx, now, nonce)] },
     });
@@ -271,5 +270,71 @@ export async function adsSsv(req: Request, env: AccEnv, now: number): Promise<Re
       },
     };
   });
-  return json({ ok: true, result: r ?? "unknown" });
+  return r ?? "unknown";
+}
+
+/**
+ * GET /v1/ads/ssv?ad_network=&ad_unit=&custom_data=&key_id=&reward_amount=&reward_item=&timestamp=&transaction_id=
+ * &user_id=&signature=&key_id= (AdMob). 200 for a granted, duplicate or refused-by-the-rules callback (AdMob only
+ * retries on errors); 400 for a bad signature or unknown nonce.
+ */
+export async function adsSsv(req: Request, env: AccEnv, now: number): Promise<Response> {
+  if (req.method !== "GET") return json({ error: "method" }, 405);
+  const url = new URL(req.url);
+  if (!(await verifySsv(env, url).catch((e) => (console.error("SSV verify failed:", e), false)))) return json({ error: "signature" }, 400);
+  const nonce = url.searchParams.get("custom_data") ?? "";
+  const user = url.searchParams.get("user_id") ?? "";
+  const tx = (url.searchParams.get("transaction_id") ?? "").slice(0, 128);
+  // a signed callback that matches no pending ad (AdMob's "Verify URL" test sends none) grants nothing: 200 so
+  // AdMob doesn't retry it
+  const r = await grantAd(env, nonce, user, tx, now);
+  return json(r === "duplicate" ? { ok: true, duplicate: true } : { ok: true, result: r });
+}
+
+// ---------- LevelPlay (ironSource) server-to-server callback ----------
+
+async function md5Hex(s: string): Promise<string> {
+  const d = new Uint8Array(await crypto.subtle.digest("MD5", new TextEncoder().encode(s)));
+  return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Same text, compared without stopping at the first difference. */
+function sameText(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * LevelPlay's callback signature: md5(timestamp + eventId + userId + rewards + private key) in hex, with the
+ * URL-decoded userId (docs.unity.com/grow/levelplay/platform/settings/event-handlers). The custom_ parameters are
+ * not signed; the nonce they carry is secret and single-use, and an eventId pays at most once.
+ */
+export async function levelPlaySignature(key: string, p: URLSearchParams): Promise<string> {
+  return md5Hex(`${p.get("timestamp") ?? ""}${p.get("eventId") ?? ""}${p.get("userId") ?? ""}${p.get("rewards") ?? ""}${key}`);
+}
+
+/**
+ * GET /v1/ads/levelplay?userId=[USER_ID]&rewards=[REWARDS]&eventId=[EVENT_ID]&itemName=[ITEM_NAME]
+ * &placement=[PLACEMENT_NAME] (+ timestamp and signature, which LevelPlay adds; + custom_nonce and custom_uid, the
+ * /v1/ads/start nonce and the account id the game sets as LevelPlay_Rewarded_Server_Params before the ad shows).
+ * LevelPlay retries until a 200 whose body contains "<eventId>:OK", so every final answer (granted, duplicate,
+ * ignored, refused by the rules) is that, plus the result. A bad signature is a 400; an unset secret
+ * (LEVELPLAY_S2S_KEY) a 503, so a callback that comes before the secret is set is retried and still pays.
+ */
+export async function adsLevelPlay(req: Request, env: AccEnv, now: number): Promise<Response> {
+  if (req.method !== "GET" && req.method !== "POST") return json({ error: "method" }, 405);
+  const key = env.LEVELPLAY_S2S_KEY ?? "";
+  if (!key) return json({ error: "unconfigured" }, 503);
+  const p = new URL(req.url).searchParams;
+  if (req.method === "POST" && (req.headers.get("Content-Type") ?? "").includes("application/x-www-form-urlencoded")) {
+    for (const [k, v] of new URLSearchParams(await req.text())) if (!p.has(k)) p.set(k, v);
+  }
+  const eventId = (p.get("eventId") ?? "").slice(0, 128);
+  const sig = (p.get("signature") ?? "").toLowerCase();
+  if (!eventId || !sig || !sameText(sig, await levelPlaySignature(key, p))) return json({ error: "signature" }, 400);
+  // the dashboard's "Callback test" carries no nonce: acknowledged, nothing granted
+  const r = await grantAd(env, p.get("custom_nonce") ?? "", p.get("custom_uid") ?? "", `lp:${eventId}`, now);
+  return new Response(`${eventId}:OK ${r}`, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }

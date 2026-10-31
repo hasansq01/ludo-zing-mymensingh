@@ -24,6 +24,8 @@ day, turn timers). Data in D1 `ludo-zing-admin` (`migrations/`); console files i
 
 - Deploy setup (once): `tools/cf.sh d1 migrations apply ludo-zing-admin --remote`, then
   `tools/cf.sh secret put ADMIN_PASSWORD`, then `tools/cf.sh deploy`. Without the secret the API answers 503.
+- Rewarded ads via LevelPlay: `tools/cf.sh secret put LEVELPLAY_S2S_KEY` (the private key of the app's S2S callback
+  in the LevelPlay dashboard). Without it `/v1/ads/levelplay` answers 503 and LevelPlay retries (ECONOMY_V1.md §2).
 - Local: `cp .dev.vars.example .dev.vars` (git-ignored; `ADMIN_PASSWORD=dev-password-change-me`),
   `npx wrangler d1 migrations apply ludo-zing-admin --local`, `npx wrangler dev --port 8787`, open
   `http://localhost:8787/admin` (use `localhost`, not a LAN IP: the session cookie is `Secure`).

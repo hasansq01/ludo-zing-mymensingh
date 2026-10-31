@@ -65,6 +65,7 @@ All need `Authorization: Bearer <session>`; errors as in ONLINE_V2.md. Every suc
 | POST | `/v1/ads/start` | `{kind, ref?}` (`ref` = match id for `double`) → `{ok, nonce, user_id, custom_data, left}` · 409 `cap` (+`next_at`) · 409 `not_eligible` (refill while not broke; double for a match you didn't win at a coin table, older than 15 min, or already doubled) |
 | GET | `/v1/ads/status?nonce=` | → `{status: "pending" \| "granted" \| "expired" \| "rejected", kind, amount?, profile?}` |
 | GET | `/v1/ads/ssv?...` | AdMob server-side verification callback (no session; signature-checked). 200 on success / duplicate, 400 bad signature |
+| GET | `/v1/ads/levelplay?...` | LevelPlay server-to-server reward callback (no session; MD5 signature with the private key `LEVELPLAY_S2S_KEY`). 200 `<eventId>:OK <result>` for every final answer, 400 bad signature, 503 secret not set |
 | GET | `/v1/ads/today` | → `{left: {reroll, refill, double, gems}, total_left}` |
 | POST | `/v1/iap/verify` | `{product_id, token}` → `{ok, profile, gems}` (also for a token granted before: `duplicate: true`) · 409 `pending` (not paid yet) · 409 `invalid` · 503 `unavailable` (Play API down: retry) |
 | GET | `/v1/iap/products` | → `{products: [{id, gems}]}` |
@@ -73,7 +74,9 @@ All need `Authorization: Bearer <session>`; errors as in ONLINE_V2.md. Every suc
 `custom_data = nonce`. AdMob calls `/v1/ads/ssv`; the server checks the ECDSA signature against Google's keys
 (`https://www.gstatic.com/admob/reward/verifier-keys.json`, cached 24 h), matches `custom_data` to a pending
 nonce of that `user_id` (not expired: 30 min), checks the day cap again, and grants once (`transaction_id` is
-unique). The game polls `/v1/ads/status` (every 1.5 s, up to 20 s) after the ad closes with the reward earned,
+unique). With LevelPlay the game sets `custom_nonce` / `custom_uid` instead and LevelPlay calls `/v1/ads/levelplay`
+(MD5 signature, `eventId` unique, then the same checks and grant). The game polls `/v1/ads/status` (every 1.5 s, up
+to 20 s) after the ad closes with the reward earned,
 then shows the reward. **Nothing is ever granted from the game's word alone.**
 
 Gem purchases: the game buys with Google Play Billing, then sends `{product_id, token}`. The server calls the
@@ -153,13 +156,19 @@ gems of refunded purchases back (`iap_void`; the balance can't go below 0, any s
 
 ## 5. Rewarded ads (game)
 
-- Google Mobile Ads SDK (AdMob), rewarded ads only, never shown without a tap. UMP consent form at first launch
-  where required (EEA / UK), and a "Privacy choices" entry in Settings when the form says so.
-- Android plugin `godot/android/plugins/admob` (Kotlin AAR, v2 plugin like `notifications`), GDScript wrapper
-  `scripts/net/ads.gd` (`Ads`): `init()`, `consent()`, `load_rewarded()`, `show_rewarded(user_id, custom_data)`,
-  signals `loaded`, `failed(code)`, `earned`, `closed`. A safe stub off Android.
-- Ad unit ids in `project.godot` `[ludo_zing] ads/app_id`, `ads/rewarded_unit` (Google's test ids until the owner's
-  AdMob account exists).
+- Unity LevelPlay (ironSource Ads only for now) is the primary network; Google Mobile Ads (AdMob) is the fallback.
+  Rewarded ads only, never shown without a tap. UMP consent form at first launch where required (EEA / UK), and a
+  "Privacy choices" entry in Settings when the form says so (LevelPlay reads UMP's consent strings itself).
+- Android plugins `godot/android/plugins/levelplay` and `godot/android/plugins/admob` (Kotlin AARs, v2 plugins like
+  `notifications`, the same methods and signals), GDScript wrapper `scripts/net/ads.gd` (`Ads`): `request_consent()`,
+  `load_rewarded()`, `show_rewarded(user_id, custom_data)`, signals `loaded`, `failed(code)`, `earned`, `closed`.
+  It drives LevelPlay when that plugin is in the build, else AdMob (`[ludo_zing] ads/provider` forces one). A safe
+  stub off Android.
+- Ids in `project.godot` `[ludo_zing]`: LevelPlay `ads/levelplay_app_key`, `ads/levelplay_rewarded_unit`; AdMob
+  `ads/app_id`, `ads/rewarded_unit`.
+- LevelPlay S2S: the game sets the nonce and the account id as custom parameters (`custom_nonce`, `custom_uid`);
+  LevelPlay calls `/v1/ads/levelplay`, checked with the MD5 signature and the private key (secret
+  `LEVELPLAY_S2S_KEY`), `eventId` counted once; the same grant as AdMob's callback.
 - Where ads appear: Rewards sheet (`gems` ad, `reroll` ad), the broke popup (`refill`), the coin-table result card
   (`double`). Each shows "N left today".
 

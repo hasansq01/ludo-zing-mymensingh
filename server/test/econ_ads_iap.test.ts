@@ -1,10 +1,12 @@
 // Rewarded ads and gem purchases (ECONOMY_V1.md §2): the AdMob callback's ECDSA signature (keys generated here and
 // served as Google's), nonces, grants once per transaction, the day caps, the eligibility rules (refill, double),
-// expiry; the Play purchase check (a fake Play Developer API), gems granted once per token, pending / canceled /
+// expiry; the LevelPlay callback (MD5 signature with the private key, eventId once, unknown nonces, the cap at
+// callback time, no secret); the Play purchase check (a fake Play Developer API), gems granted once per token, pending / canceled /
 // foreign purchases refused, consume, and refunds voided by the cron.
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { derToRaw, resetAdKeys } from "../src/ads";
+import type { AccEnv } from "../src/accounts";
+import { adsLevelPlay, derToRaw, levelPlaySignature, resetAdKeys } from "../src/ads";
 import { ECON_V1 } from "../src/econ";
 import { setGoogleFetcher } from "../src/gauth";
 import { setIapServiceAccount, voidRefunded } from "../src/iap";
@@ -210,6 +212,121 @@ describe("ad kinds and caps", () => {
     const g = await guest();
     expect((await call("ads/start", g, { body: { kind: "coins" } })).status).toBe(400);
     expect((await call("ads/status?nonce=nope", g)).status).toBe(400);
+  });
+});
+
+// ---------- LevelPlay ----------
+
+const LP_KEY = "test-levelplay-key"; // vitest.config.ts binds it as LEVELPLAY_S2S_KEY
+
+async function md5(s: string): Promise<string> {
+  const d = new Uint8Array(await crypto.subtle.digest("MD5", new TextEncoder().encode(s)));
+  return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** A LevelPlay S2S callback URL (the dashboard's placeholders filled in, as LevelPlay sends it), signed or tampered. */
+async function lpUrl(o: { nonce?: string; user?: string; event: string; key?: string; tamper?: boolean; upper?: boolean }): Promise<string> {
+  const p: Record<string, string> = {
+    userId: "a1b2c3@lp", // LevelPlay's own user id: signed URL-decoded
+    rewards: "1",
+    eventId: o.event,
+    itemName: "Reward",
+    placement: "DefaultRewardedVideo",
+    timestamp: "202610311755",
+  };
+  let sig = await md5(`${p.timestamp}${p.eventId}${p.userId}${p.rewards}${o.key ?? LP_KEY}`);
+  if (o.upper) sig = sig.toUpperCase();
+  if (o.tamper) p.rewards = "100";
+  const q = new URLSearchParams({ ...p, signature: sig });
+  if (o.nonce !== undefined) q.set("custom_nonce", o.nonce);
+  if (o.user !== undefined) q.set("custom_uid", o.user);
+  return `https://x/v1/ads/levelplay?${q}`;
+}
+
+async function lp(url: string): Promise<{ status: number; text: string }> {
+  const r = await SELF.fetch(url);
+  return { status: r.status, text: await r.text() };
+}
+
+describe("the LevelPlay callback", () => {
+  it("the signature is md5(timestamp eventId userId rewards key) in hex", async () => {
+    expect(await levelPlaySignature("", new URLSearchParams())).toBe("d41d8cd98f00b204e9800998ecf8427e");
+    expect(await levelPlaySignature("c", new URLSearchParams({ timestamp: "a", eventId: "b" }))).toBe("900150983cd24fb0d6963f7d28e17f72");
+  });
+
+  it("a good signature grants once and answers <eventId>:OK", async () => {
+    const g = await guest();
+    const s = await call("ads/start", g, { body: { kind: "gems" } });
+    const r = await lp(await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-good-1", upper: true }));
+    expect(r).toEqual({ status: 200, text: "ev-good-1:OK granted" });
+    expect((await acc(g.account)).gems).toBe(ECON_V1.ads.gems.amount);
+    expect((await call(`ads/status?nonce=${s.body.nonce}`, g)).body).toMatchObject({ status: "granted", kind: "gems", amount: 2 });
+    expect(await rows<Msg>("SELECT tx_id FROM ad_rewards WHERE nonce = ?", s.body.nonce)).toEqual([{ tx_id: "lp:ev-good-1" }]);
+    // POST with a form body works the same
+    const s2 = await call("ads/start", g, { body: { kind: "reroll" } });
+    const u = new URL(await lpUrl({ nonce: s2.body.nonce, user: g.account, event: "ev-post-1" }));
+    const pr = await SELF.fetch(`https://x/v1/ads/levelplay`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: u.searchParams.toString() });
+    expect(await pr.text()).toBe("ev-post-1:OK granted");
+    expect((await acc(g.account)).rerolls).toBe(1);
+  });
+
+  it("a bad signature is a 400 and grants nothing", async () => {
+    const g = await guest();
+    const s = await call("ads/start", g, { body: { kind: "gems" } });
+    expect((await lp(await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-bad-1", key: "wrong-key" }))).status).toBe(400);
+    expect((await lp(await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-bad-2", tamper: true }))).status).toBe(400);
+    expect((await lp(`https://x/v1/ads/levelplay?eventId=ev-bad-3&custom_nonce=${s.body.nonce}&custom_uid=${g.account}`)).status).toBe(400);
+    // a session doesn't help
+    const h = await SELF.fetch(`https://x/v1/ads/levelplay?eventId=ev-bad-4&signature=00&custom_nonce=${s.body.nonce}&custom_uid=${g.account}`, { headers: { Authorization: `Bearer ${g.session}` } });
+    expect(h.status).toBe(400);
+    expect((await acc(g.account)).gems).toBe(0);
+    expect((await call(`ads/status?nonce=${s.body.nonce}`, g)).body.status).toBe("pending");
+  });
+
+  it("a replayed eventId never grants twice, not even for another nonce", async () => {
+    const g = await guest();
+    const s = await call("ads/start", g, { body: { kind: "reroll" } });
+    const url = await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-replay-1" });
+    expect((await lp(url)).text).toBe("ev-replay-1:OK granted");
+    expect(await lp(url)).toEqual({ status: 200, text: "ev-replay-1:OK duplicate" });
+    const s2 = await call("ads/start", g, { body: { kind: "reroll" } });
+    expect((await lp(await lpUrl({ nonce: s2.body.nonce, user: g.account, event: "ev-replay-1" }))).text).toBe("ev-replay-1:OK duplicate");
+    expect((await acc(g.account)).rerolls).toBe(1);
+    expect((await call(`ads/status?nonce=${s2.body.nonce}`, g)).body.status).toBe("pending");
+    expect(await rows<Msg>("SELECT nonce FROM ad_rewards WHERE account_id = ? AND status = 'granted'", g.account)).toEqual([{ nonce: s.body.nonce }]);
+  });
+
+  it("an unknown nonce, another account's nonce or the dashboard's test callback: acknowledged, nothing granted", async () => {
+    const g = await guest();
+    const other = await guest();
+    const s = await call("ads/start", g, { body: { kind: "gems" } });
+    expect(await lp(await lpUrl({ event: "ev-test-1" }))).toEqual({ status: 200, text: "ev-test-1:OK ignored" });
+    expect((await lp(await lpUrl({ nonce: "ad_aaaaaaaaaaaaaaaaaaaaaaaa", user: g.account, event: "ev-unk-1" }))).text).toBe("ev-unk-1:OK ignored");
+    expect((await lp(await lpUrl({ nonce: s.body.nonce, user: other.account, event: "ev-unk-2" }))).text).toBe("ev-unk-2:OK ignored");
+    expect((await lp(await lpUrl({ nonce: s.body.nonce, event: "ev-unk-3" }))).text).toBe("ev-unk-3:OK ignored");
+    expect((await acc(g.account)).gems).toBe(0);
+    expect((await acc(other.account)).gems).toBe(0);
+    expect((await call(`ads/status?nonce=${s.body.nonce}`, g)).body.status).toBe("pending");
+  });
+
+  it("over the day cap at callback time: acknowledged, rejected, nothing granted", async () => {
+    const g = await guest();
+    const s = await call("ads/start", g, { body: { kind: "gems" } });
+    expect(s.status).toBe(200);
+    // another gems ad was granted while this one played (the gems cap is 1 a day)
+    const day = Date.now();
+    await DB.prepare("INSERT INTO ad_rewards (nonce, account_id, kind, created_at, status, tx_id, granted_at, amount) VALUES (?, ?, 'gems', ?, 'granted', ?, ?, 2)").bind(`ad_capseed${g.account.slice(4, 18)}`, g.account, day, `capseed${g.account}`, day).run();
+    expect((await lp(await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-cap-1" }))).text).toBe("ev-cap-1:OK cap");
+    expect((await acc(g.account)).gems).toBe(0);
+    expect((await call(`ads/status?nonce=${s.body.nonce}`, g)).body.status).toBe("rejected");
+  });
+
+  it("without the secret it answers 503 (LevelPlay retries later), never a grant", async () => {
+    const g = await guest();
+    const s = await call("ads/start", g, { body: { kind: "gems" } });
+    const r = await adsLevelPlay(new Request(await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-nokey-1" })), { ...env, LEVELPLAY_S2S_KEY: undefined } as AccEnv, Date.now());
+    expect(r.status).toBe(503);
+    expect((await acc(g.account)).gems).toBe(0);
   });
 });
 

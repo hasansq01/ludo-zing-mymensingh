@@ -32,6 +32,8 @@ import type { Env } from "./room";
 export interface AccEnv extends Env, GoogleEnv {
   /** HMAC key of the player sessions (a secret; locally .dev.vars; tests: a vitest binding). Unset: accounts are off. */
   SESSION_KEY?: string;
+  /** The private key of LevelPlay's server-to-server reward callbacks (a secret; tests: a vitest binding). Unset: 503. */
+  LEVELPLAY_S2S_KEY?: string;
 }
 
 // ---------- rows ----------

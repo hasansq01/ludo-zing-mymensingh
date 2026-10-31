@@ -103,6 +103,8 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
         return m === "POST" ? await P.postOpened(req, env, now) : json({ error: "method" }, 405);
       case "ads/ssv":
         return await Ads.adsSsv(req, env, now); // AdMob's callback: no session, signature-checked
+      case "ads/levelplay":
+        return await Ads.adsLevelPlay(req, env, now); // LevelPlay's callback: the same, with its private key
       case "ads/today":
       case "ads/status":
       case "iap/products": {
