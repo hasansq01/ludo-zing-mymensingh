@@ -13,7 +13,9 @@ func _enter_tree() -> void:
 	for key in ExportPlugin.DEFAULTS:
 		if not ProjectSettings.has_setting(key):
 			ProjectSettings.set_setting(key, ExportPlugin.DEFAULTS[key])
-		ProjectSettings.set_initial_value(key, ExportPlugin.DEFAULTS[key])
+		# initial = empty, not the default: an export leaves out every setting equal to its initial value, and the
+		# game reads the unit id at runtime
+		ProjectSettings.set_initial_value(key, "")
 		ProjectSettings.add_property_info({name = key, type = TYPE_STRING})
 		ProjectSettings.set_as_basic(key, true)
 	_export = ExportPlugin.new()

@@ -14,7 +14,9 @@ func _enter_tree() -> void:
 		var v: Variant = ExportPlugin.DEFAULTS[key]
 		if not ProjectSettings.has_setting(key):
 			ProjectSettings.set_setting(key, v)
-		ProjectSettings.set_initial_value(key, v)
+		# initial = empty / false, not the default: an export leaves out every setting equal to its initial value, and
+		# the game reads them at runtime
+		ProjectSettings.set_initial_value(key, type_convert(null, typeof(v)))
 		var info := {name = key, type = typeof(v)}
 		if key == ExportPlugin.PROVIDER_SETTING:
 			info.hint = PROPERTY_HINT_ENUM

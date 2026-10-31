@@ -73,6 +73,11 @@ and `Android Release` have `plugins/levelplay=true`; `Android Emulator` has it `
 commit the AARs. Changing a version: update `build.gradle` and the `*_DEPENDENCY` constants in
 `godot/addons/levelplay/export_plugin.gd`. The SDK pulls `adquality-sdk` (Maven Central) by itself.
 
+Check an export: `aapt2 dump xmltree --file AndroidManifest.xml <apk>` shows `org.godotengine.plugin.v2.LevelPlay` and
+the `APP_KEY` meta-data; `unzip -p <apk> assets/project.binary | strings | grep -A1 ludo_zing/ads` shows the unit
+ids. (The editor plugins register these settings with an empty initial value: an export leaves out every setting
+equal to its initial value, which once left both unit ids out of the APK.)
+
 ## Testing
 
 - Turn `ludo_zing/ads/levelplay_test_suite` on locally (don't commit it) and build with the `Android` preset: the

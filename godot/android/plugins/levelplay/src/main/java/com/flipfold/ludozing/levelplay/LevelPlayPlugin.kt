@@ -249,6 +249,7 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
                 loaded && ad?.adUnitId == unit_id -> emitSignal(SIG_LOADED.name)
                 init == Init.READY -> loadNow(unit_id)
                 else -> {
+                    Log.i(TAG, "load_rewarded: waiting for init")
                     pendingUnit = unit_id
                     startSdk()
                 }
@@ -261,6 +262,7 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
             ?: LevelPlayRewardedAd(unit).also { it.setListener(listener); ad = it }
         loading = true
         loaded = false
+        Log.i(TAG, "loading rewarded ad $unit")
         current.loadAd()
     }
 
@@ -268,13 +270,15 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
         override fun onAdLoaded(adInfo: LevelPlayAdInfo) {
             loading = false
             loaded = true
+            Log.i(TAG, "rewarded ad loaded (${adInfo.adNetwork})")
             emitSignal(SIG_LOADED.name)
         }
 
         override fun onAdLoadFailed(error: LevelPlayAdError) {
             loading = false
             loaded = false
-            emitSignal(SIG_FAILED.name, error.getErrorCode(), error.getErrorMessage())
+            Log.i(TAG, "rewarded ad load failed: ${error.errorCode} ${error.errorMessage}")
+            emitSignal(SIG_FAILED.name, error.errorCode, error.errorMessage)
         }
 
         override fun onAdDisplayed(adInfo: LevelPlayAdInfo) {
@@ -289,7 +293,8 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
 
         override fun onAdDisplayFailed(error: LevelPlayAdError, adInfo: LevelPlayAdInfo) {
             showing = false
-            emitSignal(SIG_SHOW_FAILED.name, error.getErrorCode(), error.getErrorMessage())
+            Log.i(TAG, "rewarded ad show failed: ${error.errorCode} ${error.errorMessage}")
+            emitSignal(SIG_SHOW_FAILED.name, error.errorCode, error.errorMessage)
         }
 
         override fun onAdClosed(adInfo: LevelPlayAdInfo) {
