@@ -1,7 +1,7 @@
 class_name ShopSheet
 extends Sheet
 ## The one Shop (PLAN decision 4: Shop + Inventory + Collection merged). Everything the player can buy, earn or put
-## in use lives here, in five category tabs (TabStrip "gtabs"): Rooms / Scenes / Dice / Emotes / Look. Look holds
+## in use lives here, in six category tabs (TabStrip "gtabs"): Rooms / Scenes / Dice / Pawns / Emotes / Look. Look holds
 ## Avatars (the illustrated characters first, then the classic avatars) / Frames / Plates / Badges behind a segmented
 ## filter under the tabs (`tab` is the category, "frames" etc.). An "All | Owned" switch filters the grid
 ## to what the player owns, for equipping (InventorySheet and CollectionSheet open the Shop that way).
@@ -15,7 +15,9 @@ extends Sheet
 ##   owned        Use (teal)
 ##   in use       an "In use" pill, and the card wears the gold rim
 ##   locked       lock + what unlocks it ("Reach level 5", "Win 3 games in a row"), the art faded
-## Rooms and scenes: tapping the picture (the "View" chip) opens the live 3D PreviewSheet in place of the Shop.
+## Rooms and scenes: tapping the picture (the "View" chip) opens the live 3D PreviewSheet in place of the Shop; pawn
+## skins open PawnSheet (the skin in all four seat colours, turning).
+## Pawn skins (Catalog.PAWNS) sold for gems only: the price tag and the Buy button say gems, there is no "or" line.
 ## Owned filter: a "3 more in the shop · Show all" link row under the grid; a single owned item is centred.
 ## Economy v1: every paid item can also be bought with gems (ceil(price / 100), Catalog.gem_price): a second line under
 ## the state row, "or [gem] 30", tapping it buys with gems (confirm first). Too few gems: "Not enough gems", the
@@ -41,6 +43,7 @@ const TABS := [
 	{key = "rooms", text = "Rooms"},
 	{key = "scenes", text = "Scenes"},
 	{key = "dice", text = "Dice"},
+	{key = "pawns", text = "Pawns"},
 	{key = "emotes", text = "Emotes"},
 	{key = "look", text = "Look", icon = "cat_avatars", cat = "avatars"},
 ]
@@ -262,6 +265,8 @@ static func _sections(key: String) -> Array:
 			return [["", SLScenes.LIST.map(func(s: Dictionary) -> Dictionary: return {kind = "scene", id = s.id, name = s.name})]]
 		"dice":
 			return [["", Catalog.DICE.map(func(d: Dictionary) -> Dictionary: return {kind = "dice", id = d.id, name = d.name})]]
+		"pawns":
+			return [["", Catalog.PAWNS.map(func(d: Dictionary) -> Dictionary: return {kind = "pawn", id = d.id, name = d.name})]]
 		"emotes":
 			return [["", Emotes.packs().map(func(e: Dictionary) -> Dictionary: return {kind = "emotes", id = e.id, name = e.name})]]
 		"avatars":
@@ -300,6 +305,7 @@ static func _owned(kind: String, id: String) -> bool:
 		"room": return Catalog.owns_room(id)
 		"scene": return SLScenes.owns_scene(id)
 		"dice": return Catalog.owns_dice(id)
+		"pawn": return Catalog.owns_pawn(id)
 		"emotes": return Catalog.owns_emotes(id)
 	return Collection.is_unlocked(kind, id)
 
@@ -308,6 +314,7 @@ static func _in_use(kind: String, id: String) -> bool:
 		"room": return Catalog.room_in_use() == id
 		"scene": return SLScenes.scene_in_use() == id
 		"dice": return Catalog.dice_in_use() == id
+		"pawn": return Catalog.pawn_in_use() == id
 		"emotes": return Catalog.emotes_in_use() == id
 		"char": return Collection.is_equipped("avatar", id)
 	return Collection.is_equipped(kind, id)
@@ -317,13 +324,28 @@ static func _price(kind: String, id: String) -> int:
 		"room": return int(Catalog.room(id).get("price", 0))
 		"scene": return int(SLScenes.info(id).get("price", 0))
 		"dice": return int(Catalog.dice(id).get("price", 0))
+		"pawn": return int(Catalog.pawn(id).get("price", 0))
 		"emotes": return int(Catalog.emote_pack(id).get("price", 0))
 		"char": return int(Collection.character(id).get("price", 0))
 	return 0
 
-## The name in sentences: "Royal Gold dice", "Pastel Dream Room".
+## The gem price: ceil(coins / 100) (Catalog.gem_price), or a gem-only pawn skin's own; 0 when not sold.
+static func _gems(kind: String, id: String) -> int:
+	return Catalog.pawn_gems(id) if kind == "pawn" else Catalog.gem_price(_price(kind, id))
+
+## Sold for gems only (a premium pawn skin): no coin price, the card's Buy pays gems.
+static func _gems_only(kind: String, id: String) -> bool:
+	return kind == "pawn" and Catalog.pawn_gems_only(id)
+
+## The name in sentences: "Royal Gold dice", "Marble pawns", "Pastel Dream Room".
 static func _title(kind: String, name_: String) -> String:
+	if kind == "pawn":
+		return name_ + " pawns"
 	return name_ + " dice" if kind == "dice" else name_
+
+## "are" for the plural titles (dice, pawns), else "is": "<Item> are yours!".
+static func _verb(kind: String) -> String:
+	return "are" if kind == "dice" or kind == "pawn" else "is"
 
 ## What unlocks a level / achievement item, as the thing to do: "Reach level 5", "Win 3 games in a row".
 static func _unlock_note(kind: String, id: String) -> String:
@@ -357,10 +379,11 @@ func _card(it: Dictionary) -> PanelContainer:
 	art.add_child(view)
 	view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var price := _price(kind, id)
-	var tag := CoinAmount.new(price, "sm", "price")
+	var gems_only := _gems_only(kind, id)
+	var tag := CoinAmount.gems(_gems(kind, id), "sm", "price") if gems_only else CoinAmount.new(price, "sm", "price")
 	tag.name = "Price"
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if kind == "room" or kind == "scene" or kind == "emotes":
+	if kind == "room" or kind == "scene" or kind == "emotes" or kind == "pawn":
 		art.add_child(_view_button(kind, id))
 	art.add_child(tag)
 	tag.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 6)
@@ -383,7 +406,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	var buy := UIKit.btn("Buy", "gold", "sm")
 	buy.name = "Buy"
 	UIKit.fit_text(buy, 13)
-	buy.pressed.connect(func(): _on_buy(kind, id, it.name))
+	buy.pressed.connect(func(): _on_buy_gems(kind, id, it.name) if gems_only else _on_buy(kind, id, it.name))
 	slot.add_child(buy)
 	var use := UIKit.btn("Use", "teal", "sm")
 	use.name = "Use"
@@ -407,10 +430,11 @@ func _card(it: Dictionary) -> PanelContainer:
 	ll.add_theme_constant_override("line_spacing", -3)
 	lock_row.add_child(ll)
 	slot.add_child(lock_row)
-	# the gem option: reserved on every card that has a price, so the cards of a row stay one height
+	# the gem option: reserved on every card that has a price, so the cards of a row stay one height (a gem-only
+	# card keeps the space empty: its Buy already pays gems)
 	var gem_row: Button = null
-	if price > 0:
-		gem_row = gem_option(Catalog.gem_price(price))
+	if price > 0 or gems_only:
+		gem_row = gem_option(_gems(kind, id))
 		gem_row.pressed.connect(func(): _on_buy_gems(kind, id, it.name))
 		v.add_child(gem_row)
 	p.gui_input.connect(func(e: InputEvent) -> void:          # a tap on a locked card says what unlocks it
@@ -420,7 +444,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	_updaters.append(func():
 		var owned := _owned(kind, id)
 		var on := owned and _in_use(kind, id)
-		var for_sale := not owned and price > 0
+		var for_sale := not owned and (price > 0 or gems_only)
 		p.add_theme_stylebox_override("panel", UIKit.surface("item", on, is_narrow))
 		buy.visible = for_sale
 		tag.visible = for_sale
@@ -428,10 +452,11 @@ func _card(it: Dictionary) -> PanelContainer:
 		on_pill.visible = on
 		lock_row.visible = not owned and not for_sale
 		if gem_row:
-			gem_row.modulate.a = 1.0 if for_sale else 0.0         # (keeps its height; not tappable while hidden)
-			gem_row.disabled = not for_sale
+			var gem_line := for_sale and not gems_only
+			gem_row.modulate.a = 1.0 if gem_line else 0.0         # (keeps its height; not tappable while hidden)
+			gem_row.disabled = not gem_line
 		(view.get_meta("art", view) as CanvasItem).modulate.a = 0.55 if lock_row.visible else 1.0
-		if for_sale:
+		if for_sale and not gems_only:
 			var short := price - Catalog.coins()
 			buy.text = "Buy" if short <= 0 else Fmt.shortfall(short)
 			if buy.get_meta("kit_kind", "") != ("gold" if short <= 0 else "off"):
@@ -483,6 +508,14 @@ func _art(kind: String, id: String) -> Control:
 			var die := Thumbnailer.dice_art(id, 84)        # the baked die (a live Dice3D only without a bake)
 			c.add_child(die)
 			well.set_meta("art", die)
+		"pawn":
+			var pawn := Thumbnailer.pawn_art(id)           # the baked pair of pawns (a live PawnStage only without a bake)
+			well.remove_child(c)
+			c.queue_free()
+			well.add_child(pawn)
+			pawn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			well.set_meta("art", pawn)
+			return well
 		"avatar", "char":
 			c.add_child(Collection.make_avatar_of(id, Collection.equipped("frame"), 74))
 		"frame":
@@ -531,7 +564,7 @@ func _emote_art(id: String) -> Control:
 
 ## A rounded well tinted with the tab's colour (Palette.CAT), behind dice / avatars / frames / plates / badges.
 func _well(kind: String) -> Control:
-	var cat: String = {dice = "dice", emotes = "emotes", avatar = "avatars", char = "avatars", frame = "frames", plate = "plates", badge = "badges"}.get(kind, "rooms")
+	var cat: String = {dice = "dice", pawn = "pawns", emotes = "emotes", avatar = "avatars", char = "avatars", frame = "frames", plate = "plates", badge = "badges"}.get(kind, "rooms")
 	var p := PanelContainer.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
@@ -705,7 +738,7 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 		return
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(self, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], card, 1.8, "good")
+	Toast.show(self, "%s %s yours!" % [title, _verb(kind)], card, 1.8, "good")
 	_announce(kind, id)
 	refresh()
 
@@ -725,6 +758,7 @@ static func _purchase(kind: String, id: String, currency := "coins") -> String:
 	match kind:
 		"room": return Catalog.buy_room(id)
 		"dice": return Catalog.buy_dice(id)
+		"pawn": return Catalog.buy_pawn(id)
 		"scene": return SLScenes.buy_scene(id)
 		"emotes": return Catalog.buy_emotes(id)
 		"char": return Collection.buy_char(id, true)
@@ -756,8 +790,7 @@ func _on_buy_gems(kind: String, id: String, name_: String) -> void:
 ## on `host` (its toasts and confirms). Returns "" (nothing happened), "store" (not enough gems and "Open Store" was
 ## chosen), "bought" or "failed".
 static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) -> String:
-	var price := _price(kind, id)
-	var gems := Catalog.gem_price(price)
+	var gems := _gems(kind, id)
 	if gems <= 0:
 		return ""
 	var have := int(Save.profile.get("gems", 0))
@@ -793,7 +826,7 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		return "failed"
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(host, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], host.card, 1.8, "good")
+	Toast.show(host, "%s %s yours!" % [title, _verb(kind)], host.card, 1.8, "good")
 	return "bought"
 
 ## Use: put an owned item in use. Through the server when there is an Account (the look is part of the profile it
@@ -816,6 +849,7 @@ func _on_use(kind: String, id: String) -> void:
 		match kind:
 			"room": ok = Catalog.equip_room(id)
 			"dice": ok = Catalog.equip_dice(id)
+			"pawn": ok = Catalog.equip_pawn(id)
 			"scene": ok = SLScenes.equip_scene(id)
 			"emotes": ok = Catalog.equip_emotes(id)
 			"char": ok = Collection.equip("avatar", id)
@@ -854,6 +888,17 @@ func _on_view(kind: String, id: String) -> void:
 			if is_instance_valid(self) and not _closing:
 				refresh())
 		es.open(get_parent())
+		return
+	if kind == "pawn":
+		var ps := PawnSheet.new(id)
+		ps.changed.connect(func():
+			changed.emit()
+			refresh())
+		ps.store_requested.connect(func(): store_requested.emit())
+		ps.closed.connect(func():
+			if is_instance_valid(self) and not _closing:
+				refresh())
+		ps.open(get_parent())
 		return
 	var pv := PreviewSheet.new(id, kind)
 	pv.room_changed.connect(func(rid: String):

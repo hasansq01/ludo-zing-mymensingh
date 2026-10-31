@@ -4,9 +4,10 @@ extends Node
 ##   rooms   res://assets/thumbs/room_<id>.webp    Thumbnailer's corner camera, 720 x 540
 ##   scenes  res://assets/thumbs/scene_<id>.webp   the scene's landing view (sign shrunk like the Shop's), 720 x 540
 ##   dice    res://assets/thumbs/dice_<id>.webp    a Dice3D at rest on face 5, its padded rect, 3x an 84 px die
-## Rooms and scenes render at 2x the picture size with 4x MSAA and are scaled down (Lanczos): clean edges. Lossy WebP
-## (quality QUALITY) with a matching .import (lossy, no mipmaps, never VRAM-compressed: crisp UI, small download).
-##   godot --path . res://dev/bake_thumbs.tscn [-- room|scene|dice ...]     (needs a GPU: not --headless)
+##   pawns   res://assets/thumbs/pawn_<id>.webp    PawnStage's CARD pair (a red and a blue pawn in the skin), 360 x 270
+## Rooms, scenes and pawns render at 2x the picture size with 4x MSAA and are scaled down (Lanczos): clean edges. Lossy
+## WebP (quality QUALITY) with a matching .import (lossy, no mipmaps, never VRAM-compressed: crisp UI, small download).
+##   godot --path . res://dev/bake_thumbs.tscn [-- room|scene|dice|pawn ...]     (needs a GPU: not --headless)
 ## then `godot --headless --import` (tools/godot-test.sh does it) so the new files get imported.
 ## The real save is never written (the flush timer is unhooked; the file is restored at the end anyway).
 
@@ -57,6 +58,11 @@ func _ready() -> void:
 			var img := await _render_die(id)
 			if img:
 				total += _save(img, "dice", id)
+	if "pawn" in want:
+		for id: String in Thumbnailer.ids("pawn"):
+			var img := await _render_pawn(id)
+			if img:
+				total += _save(img, "pawn", id)
 	print("bake_thumbs: %d KB in %s (%.1f s)" % [total / 1024, Thumbnailer.BAKED_DIR, (Time.get_ticks_msec() - t0) / 1000.0])
 	_restore()
 	for i in 3:                              # let the freed worlds go before quitting
@@ -96,6 +102,26 @@ func _render_die(id: String) -> Image:
 		push_error("bake_thumbs: dice %s failed" % id)
 		return null
 	img.convert(Image.FORMAT_RGBA8)
+	return img
+
+## A PawnStage CARD (transparent background) rendered at SUPERSAMPLE x Thumbnailer.PAWN_SIZE, read back from its own
+## viewport and scaled down.
+func _render_pawn(id: String) -> Image:
+	var st := PawnStage.new(id, PawnStage.CARD)
+	st.keep_drawing = true
+	st.size = Vector2(Thumbnailer.PAWN_SIZE * SUPERSAMPLE)
+	st.viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(st)
+	st.size = Vector2(Thumbnailer.PAWN_SIZE * SUPERSAMPLE)
+	for i in Thumbnailer.SETTLE_FRAMES + 2:
+		await RenderingServer.frame_post_draw
+	var img := st.viewport.get_texture().get_image()
+	st.queue_free()
+	if img == null or img.is_empty():
+		push_error("bake_thumbs: pawn %s failed" % id)
+		return null
+	img.convert(Image.FORMAT_RGBA8)
+	img.resize(Thumbnailer.PAWN_SIZE.x, Thumbnailer.PAWN_SIZE.y, Image.INTERPOLATE_LANCZOS)
 	return img
 
 ## Writes the WebP and its .import (lossy, no mipmaps, no VRAM compression). Returns the file size in bytes.

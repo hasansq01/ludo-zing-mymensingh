@@ -1,8 +1,8 @@
 class_name Thumbnailer
 extends Node
-## Thumbnails of the café rooms (Rooms), the Snakes & Ladders scenes (SLScenes) and the dice skins (Catalog.DICE) for
-## the Shop cards and the PreviewSheet's first frame, instead of gradient swatches (index.html Rooms.thumb /
-## Jungle.thumb).
+## Thumbnails of the café rooms (Rooms), the Snakes & Ladders scenes (SLScenes), the dice skins (Catalog.DICE) and
+## the pawn skins (Catalog.PAWNS) for the Shop cards and the PreviewSheet's first frame, instead of gradient swatches
+## (index.html Rooms.thumb / Jungle.thumb).
 ##
 ## Pre-baked first: every catalogue item ships a picture in res://assets/thumbs/<kind>_<id>.webp (made by the dev
 ## tool `godot --path . res://dev/bake_thumbs.tscn`; tests/test_thumbs.gd fails when an item has none). baked() loads
@@ -31,6 +31,8 @@ extends Node
 ##                                                   is ready, then fading it in
 ##   Thumbnailer.dice_art(id, size := 84) -> Control a die at rest on face 5, exactly where a Dice3D of that size
 ##                                                   draws it (the baked picture; a live Dice3D when there's no bake)
+##   Thumbnailer.pawn_art(id) -> Control              a red and a blue pawn in that skin filling the control (the
+##                                                   baked picture; a live PawnStage when there's no bake)
 ##   Thumbnailer.prewarm()                            queue every missing live thumbnail (e.g. after the splash)
 ##   Thumbnailer.is_ready(kind, id), has_disk(kind, id), clear(disk := false)
 
@@ -40,11 +42,13 @@ const VERSION := 1
 const SIZE := Vector2i(480, 360)
 const DIR := "user://thumbs/"
 const KINDS := ["room", "scene"]          # rendered live when there's no bake
-const BAKED_KINDS := ["room", "scene", "dice"]
+const BAKED_KINDS := ["room", "scene", "dice", "pawn"]
 const BAKED_DIR := "res://assets/thumbs/"
 ## Baked picture sizes: 2x the largest on-screen size in UI px (the PreviewSheet's ~360 px wide view; Shop cards are
-## ~170 px). Dice: the Dice3D's padded drawing rect (Dice3D.PAD) for an 84 px die, at 3x.
+## ~170 px). Dice: the Dice3D's padded drawing rect (Dice3D.PAD) for an 84 px die, at 3x. Pawns: a Shop card's art
+## (4:3, PawnStage's card pair) at 2x.
 const BAKE_SIZE := Vector2i(720, 540)
+const PAWN_SIZE := Vector2i(360, 270)
 const DICE_SIZE := 84.0
 const DICE_SCALE := 3.0
 const DICE_FACE := 5
@@ -167,10 +171,10 @@ static func has_disk(kind: String, id: String) -> bool:
 static func disk_path(kind: String, id: String) -> String:
 	return dir + "%s_%s_v%d.png" % [kind, id.validate_filename(), VERSION]
 
-## Every room, scene or dice id, in shop order.
+## Every room, scene, dice or pawn skin id, in shop order.
 static func ids(kind: String) -> Array:
 	var out := []
-	var list: Array = Rooms.LIST if kind == "room" else (SLScenes.LIST if kind == "scene" else Catalog.DICE)
+	var list: Array = {room = Rooms.LIST, scene = SLScenes.LIST, pawn = Catalog.PAWNS}.get(kind, Catalog.DICE)
 	for r: Dictionary in list:
 		out.append(str(r.id))
 	return out
@@ -271,6 +275,22 @@ static func dice_art(id: String, size: float = DICE_SIZE) -> Control:
 	r.size = Vector2(size * (1.0 + pad.x + pad.z), size * (1.0 + pad.y + pad.w))
 	c.add_child(r)
 	return c
+
+
+## A pawn skin's Shop picture filling its parent (anchors): the baked picture when there is one (no SubViewport, nothing
+## per frame), else a live PawnStage of the same pair (PawnStage.CARD).
+static func pawn_art(id: String) -> Control:
+	var t := baked("pawn", id)
+	if t == null:
+		var st := PawnStage.new(id, PawnStage.CARD)
+		st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return st
+	var r := TextureRect.new()
+	r.texture = t
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
 
 
 # =====================================================================================================================

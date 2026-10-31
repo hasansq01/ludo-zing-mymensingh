@@ -140,7 +140,7 @@ func _hello() -> void:
 	var pid := NetClient.ensure_pid(net.prefs) if net else ""
 	var m := {t = "hello", v = NetClient.VERSION, session = _session, pid = pid,
 		name = NetClient.wire_name(str(p.get("name", ""))), avatar = str(p.get("avatar", "")).substr(0, 32),
-		frame = str(p.get("frame", "")).substr(0, 32)}
+		frame = str(p.get("frame", "")).substr(0, 32), pawn = str(p.get("pawn", "")).substr(0, 32)}
 	_hello_sent = true
 	_send(m)
 

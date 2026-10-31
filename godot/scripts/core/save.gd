@@ -68,6 +68,13 @@ func _ensure() -> void:
 	p.dice_owned = dice
 	if not p.get("dice") is String or not dice.has(p.dice):
 		p.dice = "classic"
+	# pawn skins (Catalog.PAWNS): owned ids (Classic always, first), the equipped skin
+	var pawns: Array = p.get("pawns_owned", []) if p.get("pawns_owned") is Array else []
+	if not pawns.has("classic"):
+		pawns.insert(0, "classic")
+	p.pawns_owned = pawns
+	if not p.get("pawn") is String or not pawns.has(p.pawn):
+		p.pawn = "classic"
 	# emote packs (Catalog.EMOTE_PACKS): owned ids (Starter always, first), the equipped pack
 	var emo: Array = p.get("emote_sets", []) if p.get("emote_sets") is Array else []
 	if not emo.has("starter"):

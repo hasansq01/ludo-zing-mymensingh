@@ -17,7 +17,8 @@ const PAIR_SIDE := 0.2                 # pair tokens stand side by side, this fa
 const PAWN_PROFILE := [[0,0],[.37,0],[.38,.05],[.33,.1],[.23,.16],[.17,.3],[.13,.47],[.24,.51],[.24,.56],[.12,.6],[0,.6]]
 
 var top_mesh: MeshInstance3D
-var toks := []                         # toks[c][i] = {node, mat, ring, pair_ring, target, scale, anim, paired}
+var toks := []                         # toks[c][i] = {node, mat, ring, pair_ring, target, scale, anim, paired, skin ...}
+var skins := ["classic", "classic", "classic", "classic"]   ## the pawn skin of each colour (set_skins)
 var movable := {}                      # c * 4 + i -> true: glowing pawns the player may tap
 var speed := 1.0                       # animation speed factor (Settings: Relaxed 1 / Fast 0.55)
 var fx: Node3D
@@ -31,6 +32,7 @@ func _ready() -> void:
 	top_mesh = MeshKit.put(self, MeshKit.plane(15, 15), MeshKit.mat(Color("#fffaf3"), 0.55), Vector3(0, TOP + 0.002, 0), Vector3.ZERO, Vector3.ONE, false)
 	fx = Node3D.new()
 	add_child(fx)
+	PawnSkins.warm_swatch(self, Vector3(0, 0.0, 0))  # inside the frame: never seen, keeps the finish shader compiled
 	_build_pawns()
 	relayout(null)
 
@@ -131,11 +133,6 @@ const LEAVE_SEC := 0.22                # the hop out of the base (× speed)
 const FLY_SEC := 0.55                  # a captured pawn's arc back to its base (× speed)
 
 func _build_pawns() -> void:
-	var prof := PackedVector2Array()
-	for p in PAWN_PROFILE:
-		prof.append(Vector2(p[0], p[1]))
-	var body_mesh := MeshKit.lathe(prof, 36)
-	var head_mesh := MeshKit.sphere(0.19, 28, 18)
 	var ring_mesh := MeshKit.torus(0.56, 0.12, 48, 10)
 	var halo_mesh := MeshKit.plane(HALO_W, HALO_W)     # x pawn scale: about 2.2 squares across in either view
 	var pair_mesh := MeshKit.torus(0.4, 0.07, 40, 10)
@@ -153,12 +150,10 @@ func _build_pawns() -> void:
 	for c in 4:
 		var row := []
 		for i in 4:
-			var m := pawn_material(Palette.PLAYER[c])   # one per pawn: each glows / dims on its own
 			var g := Node3D.new()
 			g.name = "Pawn%d_%d" % [c, i]
 			add_child(g)
-			var body := MeshKit.put(g, body_mesh, m, Vector3.ZERO)
-			var head := MeshKit.put(g, head_mesh, m, Vector3(0, 0.74, 0))
+			var look := PawnSkins.dress(g, skins[c], Palette.PLAYER[c])   # its own materials: each glows / dims on its own
 			var halo := MeshKit.put(g, halo_mesh, halo_mat.duplicate(), Vector3(0, 0.02, 0), Vector3.ZERO, Vector3.ONE, false)
 			halo.visible = false
 			var ring := MeshKit.put(g, ring_mesh, ring_mat.duplicate(), Vector3(0, 0.04, 0), Vector3.ZERO, Vector3.ONE, false)
@@ -191,10 +186,11 @@ func _build_pawns() -> void:
 			sym.visible = false
 			g.add_child(sym)
 			var sh := MeshKit.contact_shadow(self, 1.0, 1.0, t_shadow_pos(to_world(grid_of(c, -1, i))), PAWN_SHADOW)
-			var t := {c = c, i = i, node = g, mat = m, ring = ring, halo = halo, pair_ring = pr, sym = sym, arrow = arrow, shadow = sh,
-				body = body, head = head, badge = badge, mate = {}, cell = to_world(grid_of(c, -1, i)), fan = Vector2.ZERO,
+			var t := {c = c, i = i, node = g, ring = ring, halo = halo, pair_ring = pr, sym = sym, arrow = arrow, shadow = sh,
+				badge = badge, mate = {}, cell = to_world(grid_of(c, -1, i)), fan = Vector2.ZERO,
 				target = to_world(grid_of(c, -1, i)), scale = 1.0, anim = false, paired = false,
-				pos = Vector3.ZERO, dim = 0.0, squash = 0.0, cur_scale = 1.0, base = Palette.PLAYER[c]}
+				pos = Vector3.ZERO, dim = 0.0, squash = 0.0, cur_scale = 1.0}
+			_wear(t, skins[c], look)
 			t.pos = t.target
 			g.position = t.target
 			row.append(t)
@@ -206,6 +202,32 @@ func _build_pawns() -> void:
 		q.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		q.visible = false
 		_base_syms.append(q)
+
+## Each colour's pawn skin (Catalog.PAWNS ids; "" or unknown = Classic): ids[c]. Only colours whose skin changed are
+## dressed again; their glow, dim, halo, ring, chevron, pair badge and colour-blind symbol carry on as before.
+func set_skins(ids: Array) -> void:
+	for c in 4:
+		var id := str(ids[c]) if c < ids.size() else ""
+		if Catalog.pawn(id).is_empty():
+			id = Catalog.FREE_PAWN
+		if id == skins[c]:
+			continue
+		skins[c] = id
+		for t: Dictionary in toks[c]:
+			PawnSkins.undress(t.look)
+			_wear(t, id, PawnSkins.dress(t.node, id, Palette.PLAYER[c]))
+
+## Points pawn t at the parts PawnSkins.dress built (its materials, body, head, height).
+func _wear(t: Dictionary, id: String, look: Dictionary) -> void:
+	t.skin = id
+	t.look = look
+	t.mat = look.mat
+	t.base = look.base
+	t.accents = look.accents
+	t.body = look.body
+	t.head = look.head
+	t.over = float(look.top) - PawnSkins.CLASSIC_TOP     # how much taller than Classic (the chevron, the symbol)
+	(t.mat as StandardMaterial3D).emission_energy_multiplier = 0.0
 
 const HALO_W := 1.75                   # the glow under a movable pawn, x the pawn's scale (≈ 2.2 squares)
 const ARROW_W := 1.36                  # the chevron's width in world units (1.6x the old 0.85)
@@ -377,6 +399,7 @@ func _process(delta: float) -> void:
 		for q in _base_syms:
 			q.visible = cb
 	var still := _pref("reduce_motion")
+	var still_skin := not PawnSkins.moving(still)
 	# 3D View (tall pawns) .. Top View (plain), following the camera's elevation
 	var w := get_parent() as TableWorld
 	var top_k := 0.0
@@ -411,8 +434,9 @@ func _process(delta: float) -> void:
 			g.scale = Vector3(gs * (1.0 + sq * 0.7), gs * (1.0 - sq), gs * (1.0 + sq * 0.7))
 			(t.body as Node3D).scale = Vector3(1, ty, 1)
 			(t.head as Node3D).position.y = 0.74 * ty
-			(t.sym as Node3D).position.y = 1.16 * ty
-			var head_top := g.position.y + 0.93 * ty * gs           # world height of the top of the head
+			(t.sym as Node3D).position.y = 1.16 * ty + float(t.over)
+			PawnSkins.face(g, self, cam)                            # the skin's front towards the camera
+			var head_top := g.position.y + (0.93 * ty + float(t.over)) * gs   # world height of the top of the head
 			var sh: MeshInstance3D = t.shadow
 			sh.visible = g.visible
 			if sh.visible:
@@ -459,6 +483,9 @@ func _process(delta: float) -> void:
 			var m: StandardMaterial3D = t.mat
 			m.albedo_color = (t.base as Color).darkened(DIM * t.dim)
 			m.emission_energy_multiplier = (0.22 + pulse * 0.38 + kick * 0.4) if on else 0.0
+			for a: Dictionary in t.accents:                        # a skin's gold / ears / froth dim with it
+				(a.mat as StandardMaterial3D).albedo_color = (a.base as Color).darkened(DIM * t.dim)
+			PawnSkins.animate(m, now, still_skin)
 
 static func _pref(key: String) -> bool:
 	var tree := Engine.get_main_loop() as SceneTree

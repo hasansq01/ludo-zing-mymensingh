@@ -61,7 +61,7 @@ var url_base := ""                       ## ws(s)://host[:port], no trailing sla
 var use_save := true                     ## false: prefs / persist / profile_fn are the caller's (tests, dev)
 var prefs: Dictionary = {}               ## Save.prefs by default
 var persist := Callable()                ## saves prefs (Save.save by default)
-var profile_fn := Callable()             ## () -> {name, avatar, frame} (the Save profile by default)
+var profile_fn := Callable()             ## () -> {name, avatar, frame, pawn} (the Save profile by default)
 var make_transport := Callable()         ## () -> NetTransport (NetTransport.WS by default)
 var http_fn := Callable()                ## (method: int, path: String) -> {status: int, data} (coroutine)
 var session_fn := Callable()             ## () -> String: the account session ("" = none; Account.session() by default)
@@ -385,6 +385,7 @@ func _hello() -> void:
 	var p: Dictionary = profile_fn.call() if profile_fn.is_valid() else _profile()
 	var m := {t = "hello", v = VERSION, pid = ensure_pid(prefs), name = wire_name(str(p.get("name", ""))),
 		avatar = str(p.get("avatar", "")).substr(0, 32), frame = str(p.get("frame", "")).substr(0, 32),
+		pawn = str(p.get("pawn", "")).substr(0, 32),      # your pawn skin (the server seats it only when you own it)
 		pair_ask = bool(prefs.get("pair_ask", true))}   # your "Ask before pairing" (quick rooms deal it to your colour)
 	if token != "":
 		m.token = token
@@ -404,7 +405,15 @@ func _profile() -> Dictionary:
 	var save := _save_node() if use_save else null
 	var p: Dictionary = save.get("profile") if save and save.get("profile") is Dictionary else {}
 	return {name = str(p.get("name", "")), avatar = Collection.equipped("avatar", p) if not p.is_empty() else "",
-		frame = Collection.equipped("frame", p) if not p.is_empty() else ""}
+		frame = Collection.equipped("frame", p) if not p.is_empty() else "", pawn = pawn_of(p)}
+
+## The pawn skin profile p has in use: its saved one when it owns it, else "" (Classic).
+static func pawn_of(p: Dictionary) -> String:
+	var id := str(p.get("pawn", ""))
+	var owned: Variant = p.get("pawns_owned", [])
+	if Catalog.pawn(id).is_empty() or id == Catalog.FREE_PAWN:
+		return ""
+	return id if owned is Array and (owned as Array).has(id) else ""
 
 func _process(delta: float) -> void:
 	if _retry_left >= 0.0:

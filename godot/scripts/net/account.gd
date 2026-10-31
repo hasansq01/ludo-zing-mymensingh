@@ -478,6 +478,8 @@ static func error_text(code: String, action := "claim") -> String:
 			return "You already own that."
 		"gems":
 			return "Not enough gems."
+		"gems_only":
+			return "That’s sold for gems only."
 		"locked":
 			return "That’s still locked."
 		"cap":

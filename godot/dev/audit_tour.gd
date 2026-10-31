@@ -8,7 +8,9 @@ extends Node
 ## --logical=320x568 lays the UI out at that logical size (the project's stretch base is 390x844 with aspect expand,
 ## so a narrow window alone still lays out at >= 390 px). Use it with a --resolution of the same size to see the
 ## narrow (< 340 px) layouts, e.g. --resolution 320x568 ... -- out --logical=320x568.
-## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online ludo sl
+## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online ludo sl pawns
+## (pawns: every pawn skin in the Shop, its View sheet, the setup sheets, on the Ludo board in 3D and Top View, on the
+## Snakes & Ladders board and in the snake's bite; not in the default run, name it with --only)
 ## Online sheets run against the in-process fake server (NetFake.Hub, as dev/econ_shots.gd): no network.
 ## Never writes the real save: Save's debounced flush is unhooked, and the file is backed up and restored at the end.
 
@@ -21,7 +23,9 @@ var only: PackedStringArray = []
 var coins := 5000
 var level := 7
 
-const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "ludo", "sl"]
+const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "ludo", "sl", "pawns"]
+## Sections that only run when --only names them.
+const OPT_IN := ["pawns"]
 
 
 func _ready() -> void:
@@ -87,7 +91,7 @@ func _ready() -> void:
 	get_tree().quit()
 
 func _on(s: String) -> bool:
-	return only.is_empty() or only.has(s)
+	return only.has(s) or (only.is_empty() and not OPT_IN.has(s))
 
 func _fake_net() -> void:
 	hub = NetFake.Hub.new(5)
@@ -616,6 +620,102 @@ func _s_sl() -> void:
 # =====================================================================================================================
 # Helpers
 # =====================================================================================================================
+
+## Pawn skins (Catalog.PAWNS): the Shop tab (and its Owned filter), every skin's View sheet (all four colours), the
+## setup sheets wearing one, then every skin on the boards: Ludo in two games of four skins (mid-game: pawns at base,
+## on the track, a pair, in the home column; the mover's pawns glowing and the others dimmed), 3D View and Top View,
+## once with the colour-blind symbols; Snakes & Ladders with four skins, both views, and the snake's bite (the hop
+## into the jaws and the pop out of the tail) for a few shapes.
+const SKIN_SETS := [["trim", "marble", "kitty", "teacup"], ["glitter", "crown", "knight", "classic"]]
+
+func _s_pawns() -> void:
+	var owned: Array = Save.profile.get("pawns_owned", ["classic"])
+	for id in ["marble", "crown"]:
+		if not owned.has(id):
+			owned.append(id)
+	Save.profile.pawns_owned = owned
+	Save.profile.pawn = "crown"
+	await sheet_shot(func(): _open_shop("pawns"), "pawns_shop", 1.6)
+	var s := _open_shop("pawns")
+	await _sleep(1.4)
+	s.scroll_box.scroll_vertical = 100000
+	await _sleep(0.5)
+	await shot("pawns_shop_scrolled")
+	main.close_all_sheets()
+	await _sleep(0.3)
+	await sheet_shot(func(): _open_shop("pawns", true), "pawns_shop_owned", 1.4)
+	for d: Dictionary in Catalog.PAWNS:
+		await sheet_shot(func(): PawnSheet.new(d.id).open(main.sheet_layer), "pawns_view_" + str(d.id), 1.6)
+	await sheet_shot(func(): main._open_setup("ludo", "cpu"), "pawns_setup_ludo_cpu")
+	await sheet_shot(func(): main._open_setup("ludo", "local"), "pawns_setup_ludo_local")
+	await sheet_shot(func(): main._open_setup("sl", "cpu"), "pawns_setup_sl_cpu")
+	# Ludo: the boards
+	main.speed = 0.5
+	for k in SKIN_SETS.size():
+		var set_: Array = SKIN_SETS[k]
+		main.start_ludo({game = "ludo", players = ["human", "cpu", "cpu", "cpu"], teams = false})
+		await _sleep(2.4)
+		main.ludo._id += 1                            # freeze the match (no more turns)
+		var S: Dictionary = main.ludo.S
+		S.tok = [[-1, 12, 12, 53], [5, -1, 40, 56], [20, 33, -1, 52], [8, 25, 44, -1]]
+		S.turn = 0
+		S.phase = "choose"
+		var board: LudoBoard = main.world.board
+		board.set_skins(set_)
+		board.relayout(S)
+		board.set_movable([1, 3], 0)                   # red: two pawns glow, the other two dim
+		main.hud.update(S, 0)
+		for top in [false, true]:
+			main.world.view_game(int(S.view), top)
+			await _sleep(1.8)
+			await shot("pawns_ludo_%s_%s" % [k + 1, "top" if top else "3d"])
+		if k == 0:
+			Save.prefs.colorblind = true
+			await _sleep(0.4)
+			await shot("pawns_ludo_1_top_colorblind")
+			main.world.view_game(int(S.view), false)
+			await _sleep(1.8)
+			await shot("pawns_ludo_1_3d_colorblind")
+			Save.prefs.colorblind = false
+		main.go_home()
+		await _sleep(1.2)
+	# Snakes & Ladders: four skins a game, both views, then the bite
+	for k in SKIN_SETS.size():
+		var set_: Array = SKIN_SETS[k]
+		main.start_sl({game = "sl", mode = "cpu", n = 4, color = 0})
+		await _sleep(3.0)
+		main.sl._id += 1                              # freeze the game
+		var sb: SLBoard = main.sl.board
+		sb.setup_players([0, 1, 2, 3], set_)
+		sb.place([3, 12, 12, 27] if k == 0 else [44, 58, 7, 0])
+		for top in [false, true]:
+			main.sl.scenes.play(true, "top" if top else "3d")
+			await _sleep(1.8)
+			await shot("pawns_sl_%s_%s" % [k + 1, "top" if top else "3d"])
+		main.sl.scenes.play(true, "3d")
+		await _sleep(1.0)
+		var heads: Array = SnakesLaddersRules.SNAKES.keys()
+		for pi in [1, 2]:
+			var head: int = heads[(pi + k * 2) % heads.size()]
+			sb.place(_bite_spots(pi, head, k))
+			await _sleep(0.6)
+			sb.slide(pi, head, int(SnakesLaddersRules.SNAKES[head]))
+			await _sleep(0.14)
+			await shot("pawns_sl_bite_%s_%s_hop" % [set_[pi], k + 1])
+			await _sleep(0.12)
+			await shot("pawns_sl_bite_%s_%s_jaws" % [set_[pi], k + 1])
+			await _until(func(): return not sb.pawns[pi].get("bitten", false), 8.0)
+			await _sleep(0.6)
+			await shot("pawns_sl_bite_%s_%s_out" % [set_[pi], k + 1])
+		main.go_home()
+		await _sleep(1.2)
+	Save.profile.pawn = "classic"
+
+## Everyone on a square of their own; pawn pi stands on `head` (a snake's head) to be bitten.
+func _bite_spots(pi: int, head: int, k: int) -> Array:
+	var out := [2, 9, 15, 22] if k == 0 else [5, 11, 18, 26]
+	out[pi] = head
+	return out
 
 func _open_shop(t: String, owned := false) -> ShopSheet:
 	var s := ShopSheet.new(t, float(UIKit.W.catalog), owned)

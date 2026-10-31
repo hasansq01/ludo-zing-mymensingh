@@ -278,6 +278,7 @@ func _open(s: Dictionary, fresh: bool) -> void:
 	board.cancel_all()
 	board.speed = _speed()
 	board.set_movable([])
+	board.set_skins(pawn_skins())
 	board.relayout(S)
 	hud.setup(S)
 	_emote_sync()
@@ -307,6 +308,27 @@ func _open(s: Dictionary, fresh: bool) -> void:
 			S.phase = "roll"
 			_begin_turn()
 
+## Each colour's pawn skin (Catalog.PAWNS ids, "" = Classic): online each seat's own (the server only seats a skin its
+## account owns); offline your skin on the first human colour (you, or Pass & Play's first player, who plays on this
+## device's profile), Classic for the computer and the other players.
+func pawn_skins() -> Array:
+	return skins_of(players, ns.seats if online and ns != null else null, Catalog.pawn_in_use())
+
+## pawn_skins() as a pure function: `seats` the online seats (null offline), `mine` this device's skin.
+static func skins_of(players_: Array, seats: Variant, mine: String) -> Array:
+	var out := ["", "", "", ""]
+	if seats is Array:
+		for st: Dictionary in seats:
+			var c := int(st.get("color", -1))
+			if c >= 0 and c < 4:
+				out[c] = str(st.get("pawn", ""))
+		return out
+	for c in mini(4, players_.size()):
+		if players_[c] == "human":
+			out[c] = mine
+			break
+	return out
+
 ## Leaving the game (main: Home, a new game): the saved match goes too.
 func stop() -> void:
 	if not S.is_empty() and tut == null and not online:
@@ -320,6 +342,7 @@ func stop() -> void:
 	hud.cancel_pair()
 	board.cancel_all()
 	board.set_movable([])
+	board.set_skins([])                      # Home's board: the classic pawns
 	_emote_sync()
 	if hud.get("emotes") != null:
 		hud.emotes.clear()

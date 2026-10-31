@@ -113,6 +113,8 @@ func _section(text: String) -> void:
 func _seat_row(i: int) -> HBoxContainer:
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	var dot := SeatDot.new(_colorblind())
+	if i == 0:
+		dot.skin = Catalog.pawn_in_use()      # the first seat plays on this device's profile (LudoMatch.pawn_skins)
 	row.add_child(dot)
 	var e := LineEdit.new()
 	e.name = "Name%d" % (i + 1)
@@ -366,6 +368,7 @@ class Swatch extends Button:
 		var pawn := SeatDot.new(symbols)
 		pawn.custom_minimum_size = Vector2(32, 38)
 		pawn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pawn.skin = Catalog.pawn_in_use()     # whichever colour you pick, your pawns wear your skin
 		pawn.set_color(c)
 		row.add_child(pawn)
 		var l := UIKit.label(Palette.NAMES[c], UIKit.FS.label, deep, UIKit.font_body(900))
@@ -407,6 +410,7 @@ class SeatDot extends Control:
 	var symbols := false
 	var _sym: TextureRect
 	var rim := Color.TRANSPARENT          ## a white rim for a pawn on its own colour (the colour choices)
+	var skin := ""                        ## the pawn skin to draw (Catalog.PAWNS; "" = Classic)
 
 	func _init(symbols_ := false) -> void:
 		symbols = symbols_
@@ -432,4 +436,4 @@ class SeatDot extends Control:
 			_sym.position = Vector2(size.x / 2.0 - d / 2.0, size.y * 0.66 - d / 2.0)
 
 	func _draw() -> void:
-		PawnArt.draw(self, Rect2(Vector2.ZERO, size).grow(-1.0), c, rim)
+		PawnArt.draw(self, Rect2(Vector2.ZERO, size).grow(-1.0), c, rim, skin)

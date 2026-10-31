@@ -47,6 +47,8 @@ extends RefCounted
 
 const GHOST_NAMES := ["Rafi", "Mitu", "Tanvir", "Nusrat", "Sakib", "Ayesha", "Shuvo", "Tania"]
 const GHOST_AVATARS := ["ch-rafi", "ch-mim", "ch-tanvir", "pawn-green", "pawn-blue", "ch-nusrat"]
+## Ghost pawn skins, taken in turn by member id (as the server's ghosts: mostly Classic, some skins).
+const GHOST_PAWNS := ["", "trim", "", "kitty", "", "marble", "crown", ""]
 
 
 ## The client end of one socket.
@@ -181,7 +183,7 @@ class Room extends RefCounted:
 		return {code = code, open = not quick and not playing and members.size() < 4, members = members.size(), started = playing}
 
 	## A quick room: these people (seat order: humans then ghosts, as given) get reserved seats; returns their
-	## tokens by account. humans: [{account, pid, name, avatar, frame, level}]; ghosts: how many seats to fill.
+	## tokens by account. humans: [{account, pid, name, avatar, frame, pawn, level}]; ghosts: how many seats to fill.
 	func init_quick(g: String, humans: Array, ghosts: int) -> Dictionary:
 		quick = true
 		host = -1
@@ -194,8 +196,8 @@ class Room extends RefCounted:
 			_ids += 1
 			var tok := "q%d_%d" % [_ids, rng.randi() % 100000]
 			members.append({id = _ids, pid = str(h.get("pid", "")), token = tok, name = str(h.get("name", "Player")),
-				avatar = str(h.get("avatar", "")), frame = str(h.get("frame", "")), level = int(h.get("level", 1)),
-				online = false, pipe = null, ghost = false, account = str(h.get("account", ""))})
+				avatar = str(h.get("avatar", "")), frame = str(h.get("frame", "")), pawn = str(h.get("pawn", "")),
+				level = int(h.get("level", 1)), online = false, pipe = null, ghost = false, account = str(h.get("account", ""))})
 			tokens[str(h.get("account", ""))] = tok
 		for k in ghosts:
 			_ids += 1
@@ -204,7 +206,8 @@ class Room extends RefCounted:
 				nm = GHOST_NAMES[(GHOST_NAMES.find(nm) + 1) % GHOST_NAMES.size()]
 			taken[nm.to_lower()] = true
 			members.append({id = _ids, pid = "", token = "", name = nm, avatar = GHOST_AVATARS[rng.randi() % GHOST_AVATARS.size()],
-				frame = "classic", level = 1 + rng.randi() % 12, online = true, pipe = null, ghost = true})
+				frame = "classic", pawn = GHOST_PAWNS[_ids % GHOST_PAWNS.size()], level = 1 + rng.randi() % 12,
+				online = true, pipe = null, ghost = true})
 		return tokens
 
 	# ---------- messages ----------
@@ -348,7 +351,7 @@ class Room extends RefCounted:
 		_ids += 1
 		var mem := {id = _ids, pid = str(m.get("pid", "")), token = "tok%d_%d" % [_ids, rng.randi() % 100000],
 			name = str(m.get("name", "Player")).substr(0, 16), avatar = str(m.get("avatar", "")),
-			frame = str(m.get("frame", "")), level = 1, online = true, pipe = pipe, ghost = false,
+			frame = str(m.get("frame", "")), pawn = str(m.get("pawn", "")), level = 1, online = true, pipe = pipe, ghost = false,
 			session = str(m.get("session", "")), pair_ask = m.get("pair_ask", false) == true}
 		members.append(mem)
 		if int(host) < 0:
@@ -385,7 +388,7 @@ class Room extends RefCounted:
 		for k in count:
 			var mem: Dictionary = members[k]
 			var st := {color = cols[k], id = mem.id, name = mem.name, avatar = mem.avatar, frame = mem.frame,
-				level = int(mem.get("level", 1)), bot = false, online = bool(mem.online)}
+				pawn = str(mem.get("pawn", "")), level = int(mem.get("level", 1)), bot = false, online = bool(mem.online)}
 			seats.append(st)
 		if game == "sl":
 			S = SnakesLaddersRules.new_game("local", count, 0, {need_one = false})
@@ -887,7 +890,8 @@ class Room extends RefCounted:
 		var list := []
 		for k in members.size():
 			var mem: Dictionary = members[k]
-			list.append({id = mem.id, name = mem.name, avatar = mem.avatar, frame = mem.frame, level = int(mem.get("level", 1)),
+			list.append({id = mem.id, name = mem.name, avatar = mem.avatar, frame = mem.frame, pawn = str(mem.get("pawn", "")),
+				level = int(mem.get("level", 1)),
 				online = mem.online, color = cols[k] if k < cols.size() else -1})
 		_broadcast({t = "lobby", code = code, host = host, members = list, settings = settings.duplicate(), max = 4,
 			status = "playing" if playing else ("over" if finished_once else "lobby")})
@@ -1030,7 +1034,8 @@ class Matchmaker extends RefCounted:
 		coins -= entry                              # the entry is taken at hello
 		_seq += 1
 		waiting.append({pipe = pipe, account = acc, pid = pid, name = str(m.get("name", "Player")), avatar = str(m.get("avatar", "")),
-			frame = str(m.get("frame", "")), level = player_level, game = g, size = size, table = tid, entry = entry, since = since, seq = _seq})
+			frame = str(m.get("frame", "")), pawn = str(m.get("pawn", "")), level = player_level, game = g, size = size, table = tid,
+			entry = entry, since = since, seq = _seq})
 		waiting.sort_custom(func(a, b): return a.since < b.since or (a.since == b.since and a.seq < b.seq))
 		var q := queue(g, size, tid)
 		if q.size() >= size:
@@ -1072,7 +1077,7 @@ class Matchmaker extends RefCounted:
 		room.on_settle = add_coins
 		var humans := []
 		for e: Dictionary in entries:
-			humans.append({account = e.account, pid = e.pid, name = e.name, avatar = e.avatar, frame = e.frame, level = e.level})
+			humans.append({account = e.account, pid = e.pid, name = e.name, avatar = e.avatar, frame = e.frame, pawn = e.pawn, level = e.level})
 		var tokens := room.init_quick(str(entries[0].game), humans, ghosts)
 		for e: Dictionary in entries:
 			waiting.erase(e)

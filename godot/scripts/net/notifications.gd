@@ -256,8 +256,8 @@ func route(link: String) -> bool:
 
 ## The Shop tab for a link's item kind (room / dice / scene / emotes / avatar ...; unknown: Rooms).
 static func shop_tab(kind: String) -> String:
-	return {room = "rooms", scene = "scenes", dice = "dice", emotes = "emotes", avatar = "avatars", frame = "frames",
-		plate = "plates", badge = "badges", coins = "coins"}.get(kind, "rooms")
+	return {room = "rooms", scene = "scenes", dice = "dice", pawn = "pawns", emotes = "emotes", avatar = "avatars",
+		frame = "frames", plate = "plates", badge = "badges", coins = "coins"}.get(kind, "rooms")
 
 ## A push while the game is in the foreground: a toast (a tap opens its link). Not a "your turn" for the room on screen.
 func _on_push_received(data: Variant) -> void:

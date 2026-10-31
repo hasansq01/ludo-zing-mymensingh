@@ -5,14 +5,16 @@ extends SceneTree
 ## Default out: ../server/src/econ/catalog.json. A relative <out.json> is relative to the project folder (godot/).
 ##
 ## Everything is read from the game's own constants and functions, never retyped here:
-##   items        Catalog.DICE, Rooms.LIST, SLScenes.LIST, Collection.CHARS / AVATARS / FRAMES / PLATES / BADGES
+##   items        Catalog.DICE, Catalog.PAWNS, Rooms.LIST, SLScenes.LIST, Collection.CHARS / AVATARS / FRAMES / PLATES /
+##                BADGES
 ##   achievements Collection.ACH
 ##   defaults     what Save._ensure() gives a brand-new profile (starting coins, free rooms / dice, equipped items)
 ##   rewards      Rewards.DAILY_CYCLES / PRIZES / FREE_* / HISTORY_MAX
 ##   match        LudoRules / SnakesLaddersRules rewards, the XP Save.record_ludo gives, LudoMatch.NET_XP_*
 ##   level        the two numbers of Save.level_info (need = base + step * (level - 1))
 ## Item fields: {kind, id, name, price, buy (sold for coins), free (owned / usable by everyone from the start),
-## default (the fallback of its kind), unlock ({level} | {ach} | null), gems (only items the Shop sells: Catalog.gem_price)}.
+## default (the fallback of its kind), unlock ({level} | {ach} | null), gems (only items the Shop sells: Catalog.gem_price;
+## a pawn skin sold for gems only has its own `gems`, price 0 and buy false)}.
 ## econ_parity_dump.gd embeds build() in its fixture, so the server test notices a stale catalog.json.
 
 const SaveScript := preload("res://scripts/core/save.gd")
@@ -42,6 +44,11 @@ static func build() -> Dictionary:
 	var items := []
 	for d: Dictionary in Catalog.DICE:
 		items.append(_item("dice", d, int(d.price) > 0, d.id == Catalog.FREE_DICE, d.id == Catalog.FREE_DICE))
+	for d: Dictionary in Catalog.PAWNS:
+		var it := _item("pawn", d, int(d.price) > 0, d.id == Catalog.FREE_PAWN, d.id == Catalog.FREE_PAWN)
+		if Catalog.pawn_gems_only(d.id):
+			it["gems"] = Catalog.pawn_gems(d.id)
+		items.append(it)
 	for e: Dictionary in Catalog.EMOTE_PACKS:
 		items.append(_item("emotes", e, int(e.price) > 0, e.id == Catalog.FREE_EMOTES, e.id == Catalog.FREE_EMOTES))
 	for r: Dictionary in Rooms.LIST:
@@ -108,6 +115,7 @@ static func _defaults() -> Dictionary:
 	return {
 		name = p.name, coins = int(p.coins), xp = int(p.xp), stats = stats,
 		rooms = p.rooms, room = p.room, emote_sets = p.emote_sets, emote_set = p.emote_set, dice_owned = p.dice_owned, dice = p.dice,
+		pawns_owned = p.pawns_owned, pawn = p.pawn,
 		scenes = [SLScenes.DEFAULT], scene = SLScenes.DEFAULT,
 		avatar = p.avatar, frame = p.frame, plate = p.plate, badge = p.badge,
 		bot_levels = SaveScript.BOT_LEVELS,
