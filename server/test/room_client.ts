@@ -71,6 +71,8 @@ export class Client {
   session: string | undefined;
   /** Sent as `pair_ask` (the person's "Ask before pairing") in hello when set. */
   pairAsk: boolean | undefined;
+  /** Sent as `vote` in hello: the app answers Play again votes (false: an app from before them, version 9). */
+  vote = true;
   /** The pawn skin the hello asks for (undefined: none sent, like an older client). */
   pawn: string | undefined;
 
@@ -112,11 +114,12 @@ export class Client {
   /** Opens a socket, says hello and waits for welcome. */
   static async join(
     code: string,
-    opts: { pid?: string; name?: string; token?: string; session?: string; pairAsk?: boolean; pawn?: string } = {},
+    opts: { pid?: string; name?: string; token?: string; session?: string; pairAsk?: boolean; pawn?: string; vote?: boolean } = {},
   ): Promise<Client> {
     const c = await Client.open(code, opts.pid ?? newPid(), opts.name ?? "Tester");
     c.session = opts.session;
     c.pairAsk = opts.pairAsk;
+    c.vote = opts.vote ?? true;
     c.pawn = opts.pawn;
     c.hello(opts.token);
     const w = await c.waitFor((m) => m.t === "welcome" || m.t === "error");
@@ -127,6 +130,7 @@ export class Client {
   hello(token?: string): void {
     const m: Msg = { t: "hello", v: 1, pid: this.pid, name: this.name, avatar: "a1", frame: "f1", token, session: this.session };
     if (this.pairAsk !== undefined) m.pair_ask = this.pairAsk;
+    if (this.vote) m.vote = true;
     if (this.pawn !== undefined) m.pawn = this.pawn;
     this.send(m);
   }
@@ -251,12 +255,12 @@ export class Client {
   }
 }
 
-/** A room with k members (first = host), all welcomed and in the lobby; pairAsk[j]: member j's hello.pair_ask. */
-export async function lobbyOf(k: number, hooks: TestHooks = {}, pairAsk: Array<boolean | undefined> = []): Promise<{ code: string; cs: Client[] }> {
+/** A room with k members (first = host), all welcomed and in the lobby; pairAsk[j] / vote[j]: member j's hello.pair_ask / vote. */
+export async function lobbyOf(k: number, hooks: TestHooks = {}, pairAsk: Array<boolean | undefined> = [], vote: boolean[] = []): Promise<{ code: string; cs: Client[] }> {
   const code = await createRoom({ ratePerSec: 1000, ...hooks }); // (the rate-limit test passes its own)
   const cs: Client[] = [];
   for (let j = 0; j < k; j++) {
-    const c = await Client.join(code, { name: `P${j + 1}`, pairAsk: pairAsk[j] });
+    const c = await Client.join(code, { name: `P${j + 1}`, pairAsk: pairAsk[j], vote: vote[j] ?? true });
     await c.waitFor((m) => m.t === "lobby" && m.members.length === j + 1);
     cs.push(c);
   }

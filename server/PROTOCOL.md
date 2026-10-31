@@ -46,7 +46,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 |---|---|---|
 | `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
 | `settings` | `teams?: bool, game?: "ludo" \| "sl"` | host, lobby only (friend rooms). A `pair_ask` from older clients is accepted and ignored |
-| `start` | – | host, lobby; needs ≥ 2 members (teams: exactly 4). After `over` it is a `rematch` (older clients' Play again) |
+| `start` | – | host, lobby; needs ≥ 2 members (teams: exactly 4). After `over` it is a `rematch` (older clients' Play again), or the old instant rematch while someone can't vote |
 | `rematch` | – | friend rooms, after `over`: Play again (or Play on the prompt), you say yes; the first one opens the vote (see "Play again") |
 | `roll` | `n` | your turn, phase `roll` |
 | `move` | `n, i` (token index 0–3, as `LudoRules.move`) | your turn, phase `choose` |
@@ -135,6 +135,11 @@ corners); 3 → Red, Green, Yellow (0, 1, 2); 4 → all. Teams needs 4 (Red + Ye
 After `over` (owner 2026-11-01) anyone in a friend room can ask for the next match; nobody is put into one without
 saying yes. The server keeps the vote, its clock and who is in; clients only show it. Quick rooms have no rematch
 (`rematch` → `bad_action`; Play again = queue again).
+
+Apps from version 10 say `vote: true` in their `hello` (they answer the vote's messages). While anyone in the room
+is on an older app (no `vote`), the old Play again stays: only the host starts the next match, at once with
+everyone (`start` or `rematch` from the host; from anyone else `not_host`), and no vote opens: an older app ignores
+`rematch` messages and would be dropped when the vote closes.
 
 - `{t: "rematch"}` from a member while the room is `over`: they say **yes**. The first one opens the vote: everyone
   else in the room is asked (`vote: "wait"`), and away members get the "Rematch?" push (see "Away and event pushes").

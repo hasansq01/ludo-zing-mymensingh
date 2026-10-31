@@ -12,8 +12,8 @@ const marks = new WeakMap<Client, number>();
 const fresh = (c: Client, t: string): Msg[] => c.log.slice(marks.get(c) ?? 0).filter((m) => m.t === t);
 
 /** A friend room of k that has just played a short match to `over` (autoplay off again, logs skipped). */
-async function afterMatch(k: number, opts: { teams?: boolean; hooks?: TestHooks; scale?: number } = {}): Promise<{ code: string; cs: Client[] }> {
-  const { code, cs } = await lobbyOf(k, { tok: NEAR_GOAL, timeScale: opts.scale });
+async function afterMatch(k: number, opts: { teams?: boolean; hooks?: TestHooks; scale?: number; vote?: boolean[] } = {}): Promise<{ code: string; cs: Client[] }> {
+  const { code, cs } = await lobbyOf(k, { tok: NEAR_GOAL, timeScale: opts.scale }, [], opts.vote ?? []);
   if (opts.teams) {
     cs[0].send({ t: "settings", teams: true });
     await cs[k - 1].waitFor((m) => m.t === "lobby" && m.settings.teams);
@@ -269,5 +269,26 @@ describe("Play again: the vote", () => {
     expect((await roomInfo(code)).body.started).toBe(false);
     b.send({ t: "rematch" });
     await Promise.all(cs.map((x) => x.wait("start")));
+  });
+
+  it("a room with an app from before the vote (version 9) keeps the old Play again: the host starts at once", async () => {
+    const { cs } = await afterMatch(3, { vote: [true, false, true] });
+    const [a, b, c] = cs;
+    c.send({ t: "rematch" }); // not the host: refused, no vote opens
+    expect((await c.wait("error")).code).toBe("not_host");
+    b.send({ t: "start" }); // the older app's Play again: not the host either
+    expect((await b.wait("error")).code).toBe("not_host");
+    a.send({ t: "rematch" }); // the host (a new app): the next match at once, everyone in
+    const starts = await Promise.all(cs.map((x) => x.wait("start")));
+    for (const s of starts) expect(s.seats.length).toBe(3);
+    for (const x of cs) expect(fresh(x, "rematch")).toEqual([]);
+  });
+
+  it("the older app's host starting after over: the old instant rematch when someone can't vote", async () => {
+    const { cs } = await afterMatch(2, { vote: [false, true] });
+    cs[0].send({ t: "start" });
+    const starts = await Promise.all(cs.map((x) => x.wait("start")));
+    for (const s of starts) expect(s.seats.length).toBe(2);
+    for (const x of cs) expect(fresh(x, "rematch")).toEqual([]);
   });
 });

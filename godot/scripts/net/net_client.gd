@@ -390,7 +390,8 @@ func _hello() -> void:
 	var m := {t = "hello", v = VERSION, pid = ensure_pid(prefs), name = wire_name(str(p.get("name", ""))),
 		avatar = str(p.get("avatar", "")).substr(0, 32), frame = str(p.get("frame", "")).substr(0, 32),
 		pawn = str(p.get("pawn", "")).substr(0, 32),      # your pawn skin (the server seats it only when you own it)
-		pair_ask = bool(prefs.get("pair_ask", true))}   # your "Ask before pairing" (quick rooms deal it to your colour)
+		pair_ask = bool(prefs.get("pair_ask", true)),   # your "Ask before pairing" (quick rooms deal it to your colour)
+		vote = true}                                     # this app answers Play again votes (PROTOCOL.md "Play again")
 	if token != "":
 		m.token = token
 	var sess := session()

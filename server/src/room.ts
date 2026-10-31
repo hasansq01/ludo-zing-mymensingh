@@ -164,6 +164,12 @@ interface Member {
    * (state.pair_ask_by), in friend and quick rooms alike. Missing: off (clients before it sent nothing).
    */
   pairAsk?: boolean;
+  /**
+   * The person's app answers Play again votes (`hello.vote`, app version 10 and later). A friend room with anyone
+   * without it keeps the old Play again: the host starts the next match at once (older apps ignore the vote's
+   * `rematch` messages, so they would never answer and be dropped when it closes).
+   */
+  votes?: boolean;
   /** Event pushes sent to this member (epoch ms per kind) and the turn of the last turn push; never sent. */
   pushed?: { turn?: number; joined?: number; rematch?: number; turnKey?: string };
   /** Quick rooms at a coin table: this person's entry (ECONOMY_V1.md §3); never sent. */
@@ -932,8 +938,8 @@ export class Room extends DurableObject<Env> {
         this.settings(ws, mem, msg);
         break;
       case "start": {
-        if (r.status === "over" && !r.quick) {
-          this.rematch(ws, mem); // an older client's Play again: a yes like any other (no instant rematch)
+        if (r.status === "over" && !r.quick && this.votesHere()) {
+          await this.rematch(ws, mem); // an older client's Play again: a yes like any other (no instant rematch)
           break;
         }
         let timers: TurnTimers | undefined;
@@ -947,7 +953,7 @@ export class Room extends DurableObject<Env> {
         break;
       }
       case "rematch":
-        this.rematch(ws, mem);
+        await this.rematch(ws, mem);
         break;
       case "roll":
       case "move":
@@ -1165,6 +1171,7 @@ export class Room extends DurableObject<Env> {
       this.playerSeen(mem, true);
     }
     if (typeof msg.pair_ask === "boolean") mem.pairAsk = msg.pair_ask; // (a match in progress keeps what it was dealt)
+    mem.votes = msg.vote === true; // (each hello says it again: the same person may come back on another app version)
     this.emoSets.delete(mem.id); // the account's packs are read again (a reconnect, or another account taking the seat)
     ws.serializeAttachment({ mid: mem.id } satisfies Att);
     r.emptySince = 0;
@@ -1562,9 +1569,18 @@ export class Room extends DurableObject<Env> {
    * opens the vote (everyone else in the room is asked, "Rematch?" goes to those away); later ones, also at the same
    * moment, just add their yes.
    */
-  private rematch(ws: WebSocket, mem: Member): void {
+  private async rematch(ws: WebSocket, mem: Member): Promise<void> {
     const r = this.room!;
     if (r.quick) return this.error(ws, "bad_action", "quick matches have no rematch: queue again");
+    if (r.status === "over" && !r.vote && !this.votesHere()) {
+      // someone here is on an app without the vote: the old Play again (only the host, at once)
+      if (r.host !== mem.id) return this.error(ws, "not_host", "the host starts the next game");
+      const timers = this.startError(mem) === null ? await this.turnTimers() : undefined;
+      const rr = this.room;
+      const mm = rr?.members.find((x) => x.id === mem.id);
+      if (rr && mm) this.start(ws, mm, timers);
+      return;
+    }
     if (r.status !== "over") return this.error(ws, "bad_action", r.status === "playing" ? "the match is in progress" : "no match to play again: the host starts");
     const now = Date.now();
     let v = r.vote;
@@ -1580,6 +1596,11 @@ export class Room extends DurableObject<Env> {
     }
     r.touched = now;
     this.broadcast(this.voteMsg(v));
+  }
+
+  /** Everyone in the room (people; ghosts never vote) is on an app that answers Play again votes. */
+  private votesHere(): boolean {
+    return this.room!.members.every((m) => m.ghost || m.votes === true);
   }
 
   private voteMsg(v: Vote, result?: "go" | "few", ffa = false): Record<string, unknown> {
