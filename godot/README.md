@@ -75,11 +75,18 @@ the admin console's Crashes page. Editor runs record nothing unless started with
 Debug soak test on a device: `adb shell "run-as com.flipfold.ludozing sh -c 'echo all > files/autoplay.txt'"`, restart
 the app: it plays Ludo, Pair Mode and Snakes & Ladders games back to back and logs `[ludo]` / `[sl]` results.
 
+Friends and invites (server/PROTOCOL.md "Recent players, friends and invites"): `scripts/net/social.gd` (`Social`,
+owned by main) holds the recent and friends lists, the long-press add / remove question, Invite (into the room you
+are in; in none, `Online.create_room` makes one first) and the invites to you (polled on Home and at once on an
+invite push in the foreground; `InviteBanner` with Join / Not now). The Friends sheet has Room / Friends / Recent
+tabs; long-press works on list rows, lobby members, online match tiles and leaderboard rows (`scripts/ui/long_press.gd`).
+`NetFake.SocialServer` is the in-process `/v1/social` for tests and the audit tour (`--only=friends`).
+
 ## Run the tests
 ```bash
 tools/godot-test.sh            # from the repo root; exit code 1 on any failure
 ```
-or `godot --headless --path godot -s res://tests/run_tests.gd`.
+or `godot --headless --path godot -s res://tests/run_tests.gd` (`-- --only=social` runs the suites whose names match).
 
 Not ported yet: the browser tests that check the HTML interface (S&L landing, popups, pause, win card), the
 visual home-screen test, daily rewards, shop preview and info icons. They come back with the Godot screens.

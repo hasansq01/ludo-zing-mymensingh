@@ -70,6 +70,8 @@ export interface AccountRow {
   imported: number;
   /** Completed matches: online matches played to the end + granted offline claims (leaderboards need 3). */
   completed_matches: number;
+  /** The public handle other players know this account by (social.ts; migration 0007). */
+  uid?: string | null;
   version: number;
   rev: string | null;
 }
@@ -165,6 +167,7 @@ export function accountOut(r: AccountRow): Record<string, unknown> {
     online_wins: r.online_wins,
     completed_matches: r.completed_matches ?? 0,
     version: r.version,
+    uid: r.uid ?? null,
   };
 }
 
@@ -722,7 +725,7 @@ function newAccountStmts(db: D1Database, id: string, p: Profile, now: number, im
 }
 
 function insertAccount(db: D1Database, id: string, p: Profile, now: number, extra: Record<string, string | number | null>): D1PreparedStatement {
-  const cols: Record<string, string | number | null> = { id, created_at: now, last_seen: now, ...profileColumns(p), ...extra, version: 0, rev: newRev() };
+  const cols: Record<string, string | number | null> = { id, created_at: now, last_seen: now, ...profileColumns(p), ...extra, version: 0, rev: newRev(), uid: newRev().slice(0, 16) }; // uid: the public handle (16 hex, social.ts)
   const names = Object.keys(cols);
   return db.prepare(`INSERT INTO accounts (${names.join(", ")}) VALUES (${names.map(() => "?").join(", ")})`).bind(...names.map((k) => cols[k]));
 }

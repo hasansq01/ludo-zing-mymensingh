@@ -250,6 +250,9 @@ func route(link: String) -> bool:
 				o.join_code(parts[1])
 			elif o.net.code != NetClient.clean_code(parts[1]):
 				return false
+			var s := Social.instance()
+			if s != null:
+				s.opened_room(NetClient.clean_code(parts[1]))   # an invite push for this room: accepted
 		_:
 			return false
 	return true
@@ -259,13 +262,18 @@ static func shop_tab(kind: String) -> String:
 	return {room = "rooms", scene = "scenes", dice = "dice", pawn = "pawns", emotes = "emotes", avatar = "avatars",
 		frame = "frames", plate = "plates", badge = "badges", coins = "coins"}.get(kind, "rooms")
 
-## A push while the game is in the foreground: a toast (a tap opens its link). Not a "your turn" for the room on screen.
+## A push while the game is in the foreground: a toast (a tap opens its link). Not a "your turn" for the room on screen;
+## an invite goes to Social (its banner).
 func _on_push_received(data: Variant) -> void:
 	if not data is Dictionary:
 		return
 	var d: Dictionary = data
 	last_toast = null
 	var link := str(d.get("link", ""))
+	var social := Social.instance()
+	if str(d.get("kind", "")) == "invite" and social != null:
+		social.on_push(d)                            # the Join / Not now banner instead of a toast
+		return
 	var o := _online()
 	if str(d.get("kind", "")) == "turn" and link.begins_with("room:") and o != null and o.state != "idle" \
 			and o.net.code == NetClient.clean_code(link.substr(5)):

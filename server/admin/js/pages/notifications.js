@@ -27,7 +27,7 @@ const LINK_NAME = { "": "Home", home: "Home", daily: "Daily reward", spin: "Free
 const SHOP_KINDS = [["room", "Room"], ["scene", "Scene"], ["dice", "Dice"], ["emotes", "Emote pack"], ["avatar", "Avatar"], ["frame", "Frame"], ["plate", "Name plate"], ["badge", "Badge"], ["coins", "Coins"]];
 
 const STATUS_TONE = { draft: "muted", scheduled: "info", sending: "warn", sent: "ok", canceled: "muted", failed: "danger" };
-const EVENT_KINDS = { turn: "Your turn", joined: "Friend joined", rematch: "Rematch", weekly: "Weekly result" };
+const EVENT_KINDS = { turn: "Your turn", joined: "Friend joined", rematch: "Rematch", invite: "Game invite", weekly: "Weekly result" };
 
 const toMs = (t) => (t ? (Number(t) < 1e11 ? Number(t) * 1000 : Number(t)) : 0); // the API may use seconds or ms
 const pad = (n) => String(n).padStart(2, "0");
@@ -407,7 +407,7 @@ export default function notificationsPage(root, _params, ctx) {
       const d = by.get(r.day);
       if (d) { d.sent += Number(r.sent) || 0; d.failed += Number(r.failed) || 0; }
     }
-    if (!kinds.size) return replace(eventsBox, emptyState("No event pushes yet", "Turn, friend joined, rematch and weekly pushes are counted here.", "chart"));
+    if (!kinds.size) return replace(eventsBox, emptyState("No event pushes yet", "Turn, friend joined, rematch, invite and weekly pushes are counted here.", "chart"));
     const chart = lineChart({
       title: "Event pushes per day", days,
       series: [{ key: "sent", name: "Sent", tone: 1, values: days.map((d) => by.get(d).sent) }, { key: "failed", name: "Failed", tone: 2, values: days.map((d) => by.get(d).failed) }],

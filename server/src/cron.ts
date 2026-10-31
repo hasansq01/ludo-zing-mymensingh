@@ -7,6 +7,7 @@ import { KEEP_WEEKS } from "./leaderboard";
 import { prunePush, weeklyPushes } from "./push";
 import { sweepEntries, weeklyPrizes } from "./economy";
 import { voidRefunded } from "./iap";
+import { pruneSocial } from "./social";
 import type { AdminSnapshot, Env } from "./room";
 
 /** A rooms row still "live" (lobby / playing / over) but not updated for this long is checked against its Room. */
@@ -31,7 +32,8 @@ export interface CronResult {
  * playing / over untouched for 2 h: a Room that is gone gets its row closed ("gone", its match "abandoned"); a lobby
  * or playing Room is asked to sweepStale(): it deletes itself when no person is connected (ghosts don't count), with
  * reason "stale-sweep" (the Room writes its own closed row). A Room with someone online is left alone. On Monday
- * (Bangladesh time) the weekly-result pushes are queued in the Pusher (push.ts weeklyPushes); push_events rows are
+ * (Bangladesh time) the weekly-result pushes are queued in the Pusher (push.ts weeklyPushes); invites older than 2 days
+ * and unused ghost rows are pruned (social.ts pruneSocial); push_events rows are
  * pruned after 30 days.
  */
 export async function cron(env: Env, now = Date.now()): Promise<CronResult> {
@@ -63,11 +65,12 @@ export async function cron(env: Env, now = Date.now()): Promise<CronResult> {
     return null;
   });
   const pushEvents = await prunePush(env.DB, now).catch(() => 0);
+  const social = await pruneSocial(env.DB, now).catch((e) => (console.error("social prune failed:", e), { invites: 0, ghosts: 0 }));
   const entries = await sweepEntries(env as never, now).catch((e) => (console.error("entry sweep failed:", e), 0));
   const voided = await voidRefunded(env as never, now).catch((e) => (console.error("voided purchases failed:", e), 0));
   const prizes = await weeklyPrizes(env as never, now).catch((e) => (console.error("weekly prizes failed:", e), null));
   console.log(
-    `cron: pruned ${JSON.stringify(pruned)} (incl. ${pruned.crash_reports} crash reports) + ${pushEvents} push_events, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
+    `cron: pruned ${JSON.stringify(pruned)} (incl. ${pruned.crash_reports} crash reports) + ${pushEvents} push_events + ${social.invites} invites + ${social.ghosts} ghost rows, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
   );
   return { pruned, reconciled, swept, weekly, entries, voided, prizes };
 }

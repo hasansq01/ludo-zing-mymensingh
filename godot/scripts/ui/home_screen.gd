@@ -734,17 +734,7 @@ func _show_continue(sub: String) -> void:
 
 
 static func _ago(unix: int) -> String:
-	if unix <= 0:
-		return ""
-	var s := int(Time.get_unix_time_from_system()) - unix
-	if s < 60:
-		return L10n.t("just now")
-	if s < 3600:
-		return L10n.t("%d min ago") % (s / 60)
-	if s < 86400:
-		return L10n.t("%dh ago") % (s / 3600)
-	var d := s / 86400
-	return L10n.t("yesterday") if d == 1 else L10n.t("%d days ago") % d
+	return Fmt.ago(unix)
 
 
 ## Kept for older callers: the short coin form (Fmt.coins).

@@ -7,6 +7,7 @@ import * as D from "./db";
 import { BOARDS, PERIODS, type Board, type PeriodArg, countScores, periodKey, topScores } from "./leaderboard";
 import * as P from "./push";
 import { isCode, type AdminSnapshot, type Env, type Room } from "./room";
+import { eraseStmts } from "./social";
 import { usageReport, type UsageEnv } from "./usage";
 
 const COOKIE = "lz_admin";
@@ -751,7 +752,8 @@ const DELETED_NAME = "Deleted player";
  * Table by table (every table of migrations/*.sql with an account_id / pid / player name):
  *   DELETED  accounts, devices, players (per-pid rows: name, avatar, ban), push_tokens, push_opens, scores, claims
  *            (payload), broke_bonus, weekly_prizes, ad_rewards still `pending`, events (by pid), player_days (by pid),
- *            crash_reports (by account_id)
+ *            crash_reports (by account_id), recent_players / friends (its lists, and its handle on everyone else's),
+ *            invites (sent, received, or to its handle), social_prefs (social.ts eraseStmts)
  *   SCRUBBED matches.players[].name -> "Deleted player" where pid / account_id matches; rooms.host_name likewise
  *            (host_pid matches). pids and account ids stay in the match JSON (pseudonymous).
  *   KEPT     ledger, entries, match_grants, rerolls, purchases, ad_rewards not pending (granted / expired / rejected):
@@ -780,6 +782,8 @@ async function accountErase(c: Ctx, raw: string): Promise<Response> {
   const open = await db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE account_id IN ${IN} AND status IN ('held', 'playing')`).bind(...ids).first<{ n: number }>();
   if ((open?.n ?? 0) > 0) return json({ error: "busy", msg: "the account has a coin-table entry that is still held / playing; try again after the match" }, 409);
 
+  // the public handles, read before the rows go: other people's lists and invites point at them
+  const uids = ((await db.prepare(`SELECT uid FROM accounts WHERE id IN ${IN} AND uid IS NOT NULL`).bind(...ids).all<{ uid: string }>()).results).map((r) => r.uid);
   const PIDS = `(SELECT pid FROM devices WHERE account_id IN ${IN})`;
   const del = (table: string, col: string, ext = "") => db.prepare(`DELETE FROM ${table} WHERE ${col} IN ${IN}${ext}`).bind(...ids);
   const delPid = (table: string) => db.prepare(`DELETE FROM ${table} WHERE pid IN ${PIDS}`).bind(...ids);
@@ -810,12 +814,16 @@ async function accountErase(c: Ctx, raw: string): Promise<Response> {
     del("accounts", "id"),
     del("crash_reports", "account_id"), // after "accounts" (n(13)), so the indices above hold; by account id only: reports sent without a session expire in 90 days
     D.addAudit(db, { ip: c.ip, action: "account.erase", target: id, detail: { reason, merged_accounts: merged.length } }, c.now),
+    ...eraseStmts(db, ids, uids), // n(16) recent_players, n(17) friends, n(18) invites, social_prefs
   ];
   const res = await db.batch(stmts);
   const n = (i: number) => res[i].meta.changes;
   return json({
     ok: true,
-    erased: { accounts: n(13), devices: n(12), players: n(4), claims: n(8), scores: n(7), push_tokens: n(5) },
+    erased: {
+      accounts: n(13), devices: n(12), players: n(4), claims: n(8), scores: n(7), push_tokens: n(5),
+      recent_players: n(16), friends: n(17), invites: n(18),
+    },
     scrubbed: { matches: n(0), rooms: n(1) },
   });
 }

@@ -10,7 +10,7 @@ extends Node
 ## --logical=320x568 lays the UI out at that logical size (the project's stretch base is 390x844 with aspect expand,
 ## so a narrow window alone still lays out at >= 390 px). Use it with a --resolution of the same size to see the
 ## narrow (< 340 px) layouts, e.g. --resolution 320x568 ... -- out --logical=320x568.
-## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online ludo sl lang
+## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online friends ludo sl lang
 ## pawns
 ## (lang: Settings' language switch done live, on Home and over a game's pause menu, then back)
 ## (pawns: every pawn skin in the Shop, its View sheet, the setup sheets, on the Ludo board in 3D and Top View, on the
@@ -35,7 +35,7 @@ const L10N_OK := ["Ludo Zing", "Ludo Zing Mymensingh", "Flipfold Studio", "Googl
 var coins := 5000
 var level := 7
 
-const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "ludo", "sl", "lang",
+const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "friends", "ludo", "sl", "lang",
 	"pawns"]
 ## Sections that only run when --only names them.
 const OPT_IN := ["pawns"]
@@ -572,6 +572,108 @@ func _vote(you: String, tanvir: String, result := "", ffa := false) -> Dictionar
 	if ffa:
 		v.ffa = true
 	return v
+
+## Friends (Social): the Friends and Recent tabs (lists, empty, offline), the long-press add, Invite from no room (a
+## room is made and its lobby opens), the lobby's Invite sheet, the invite banner on Home and Settings' invites switch.
+## Against NetFake.SocialServer (the lists) and the hub (the rooms).
+func _s_friends() -> void:
+	main.home.select_game("ludo")
+	await _sleep(0.5)
+	var social: Social = main.social
+	var fake := NetFake.SocialServer.sample()
+	fake.hub = hub
+	social.http_fn = fake.http
+	social.state = ""
+	main.home.friends_button.pressed.emit()
+	await _sleep(0.9)
+	var fr: FriendsSheet = main.online.friends
+	if fr == null:
+		return
+	fr.show_tab("friends")
+	await _sleep(0.8)
+	await shot("friends_tab_friends")
+	fr.show_tab("recent")
+	await _sleep(0.6)
+	await shot("friends_tab_recent")
+	var rows: Array = (fr.lists.recent as Node).get_children().filter(func(x: Node) -> bool: return x.name.begins_with("Row_"))
+	if rows.size() > 1:
+		LongPress.fire(rows[1])                          # Mitu: not a friend yet
+		await _sleep(0.7)
+		await shot("friends_longpress_add")
+		var q: Sheet = main._top_sheet()
+		var yes: Button = q.find_child("Yes", true, false) if q else null
+		if yes:
+			yes.pressed.emit()
+			await _sleep(0.6)
+			await shot("friends_added_toast")
+	# Invite from no room: a room is made, its lobby opens, the invite goes
+	rows = (fr.lists.recent as Node).get_children().filter(func(x: Node) -> bool: return x.name.begins_with("Row_"))
+	if rows.size() > 2:
+		((rows[2] as Node).find_child("Invite", true, false) as Button).pressed.emit()
+		for k in 30:
+			await _sleep(0.1)
+			if main.online.state == "lobby":
+				break
+		await _sleep(0.5)
+		await shot("invite_sent_lobby")
+		if is_instance_valid(main.online.lobby_sheet):
+			main.online.lobby_sheet.invite_pressed.emit()
+			await _sleep(0.9)
+			await shot("invite_sheet_recent_tab")
+			var inv: Sheet = main._top_sheet()
+			if inv is FriendsSheet:
+				(inv as FriendsSheet).show_tab("recent")
+				await _sleep(0.5)
+				await shot("invite_sheet_invited")
+	main.online.leave()
+	main.close_all_sheets()
+	await _sleep(0.4)
+	# empty lists, offline
+	var empty := NetFake.SocialServer.new()
+	social.http_fn = empty.http
+	social.state = ""
+	await sheet_shot(func():
+		var f := FriendsSheet.new("ludo")
+		f.open(main.sheet_layer)
+		f.show_tab("friends"), "friends_empty_friends")
+	await sheet_shot(func():
+		var f := FriendsSheet.new("ludo")
+		f.open(main.sheet_layer)
+		f.show_tab("recent"), "friends_empty_recent")
+	empty.offline = true
+	social.state = ""
+	await sheet_shot(func():
+		var f := FriendsSheet.new("ludo")
+		f.open(main.sheet_layer)
+		f.show_tab("friends"), "friends_offline")
+	# the invite banner on Home (Rafi's room, Rafi in its lobby)
+	social.http_fn = fake.http
+	social.state = ""
+	var room := hub.add_room("K7QX2M")
+	room.members.append({id = 1, pid = "p-rafi", token = "t", name = "Rafi", avatar = "ch-rafi", frame = "gold", level = 12, online = true, pipe = null})
+	room.host = 1
+	fake.add_invite(NetFake.SocialServer.person("Rafi", "ch-rafi", 12, "gold"), "K7QX2M")
+	social.poll()
+	await _sleep(0.9)
+	await shot("invite_banner_home")
+	if is_instance_valid(social.banner):
+		social.banner.later_pressed.emit()
+	await _sleep(0.5)
+	# Settings: Invites from players, turned off
+	main.open_settings()
+	await _sleep(0.8)
+	var st: Sheet = main._top_sheet()
+	var sw := st.find_child("Invites", true, false) as Button if st else null
+	if sw:
+		st.scroll_box.scroll_vertical = 100000          # (the Friends group, then the rest under it)
+		await _sleep(0.2)
+		st.scroll_box.ensure_control_visible(sw.get_parent().get_parent() as Control)
+		await _sleep(0.3)
+		sw.button_pressed = false
+		await _sleep(0.5)
+		await shot("settings_invites_off")
+		sw.button_pressed = true
+	social.http_fn = Callable()
 
 func _s_ludo() -> void:
 	main.speed = 0.5

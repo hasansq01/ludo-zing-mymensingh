@@ -33,6 +33,8 @@ day, turn timers). Data in D1 `ludo-zing-admin` (`migrations/`); console files i
   days of synthetic history incl. a banned player and events, plays 4 sim games; `--games N`, `--live` keeps a
   lobby and a bot match open until Ctrl-C, `--wipe` empties the local tables, `--no-history`). It only ever runs
   wrangler with `--local`. Note: `wrangler dev` reloads when files change, which drops sockets (sims then time out).
+- Recent players, friends and invites (`/v1/social/*`, `src/social.ts`, migration `0007_social.sql`): PROTOCOL.md
+  "Recent players, friends and invites"; tests `test/social.test.ts`. Deploy: apply the migration before the Worker.
 - Tests: `test/admin_*.test.ts` (D1 migrations applied by `test/setup.ts`; the password binding is in
   `vitest.config.ts`).
 

@@ -1,7 +1,8 @@
 // Ludo Zing online rooms: the Worker routes /v1/... to one Room Durable Object per room code (PROTOCOL.md), the
 // accounts / wallet / leaderboard endpoints (ONLINE_V2.md §1, §2, §4), quick match (/v1/quick/*, quick.ts), serves
 // the admin console at /admin (static files from ./admin) and its API at /admin/api (ADMIN_API.md), and runs the
-// daily cron (D1 pruning, the weekly-result pushes), plus the push endpoints (/v1/push/*, NOTIFICATIONS.md).
+// daily cron (D1 pruning, the weekly-result pushes), plus the push endpoints (/v1/push/*, NOTIFICATIONS.md) and recent
+// players / friends / invites (/v1/social/*, social.ts).
 import * as A from "./accounts";
 import { CSP, handleAdmin } from "./admin";
 import { cron } from "./cron";
@@ -15,6 +16,7 @@ import { handleLeaderboard } from "./leaderboard";
 import * as P from "./push";
 import { handleQuick } from "./quick";
 import { isCode, randomCode, Room, type Env as RoomEnv } from "./room";
+import * as S from "./social";
 import * as W from "./wallet";
 
 export { Room };
@@ -131,6 +133,12 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
         if (path === "tables") return await E.tablesState(env, a, A.rowToProfile(a.row), now);
         return m === "GET" ? await A.getMe(a) : await A.patchMe(req, env, a, now);
       }
+    }
+    if (path === "social" || path.startsWith("social/")) {
+      // recent players, friends, invites (social.ts; its own methods per path, and the invite push in waitUntil)
+      const a = await A.authenticate(req, env, now);
+      if (a instanceof Response) return a;
+      return (await S.handleSocial(req, env, ctx, a, path, now)) ?? json({ error: "not_found" }, 404);
     }
     const h = POST_AUTHED[path];
     if (!h) return null;

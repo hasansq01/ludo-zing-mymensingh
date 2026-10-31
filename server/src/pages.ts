@@ -4,7 +4,7 @@
 // Firebase Messaging, Play Games) collect.
 
 const CONTACT = "Hello@oclasp.com";
-const UPDATED = "26 October 2026";
+const UPDATED = "1 November 2026";
 
 function page(title: string, body: string): Response {
   const html = `<!doctype html>
@@ -48,6 +48,10 @@ Questions: <a href="mailto:${CONTACT}">${CONTACT}</a>.</p>
   reward progress, and a record of each coin and gem change (what it was for and when).</li>
   <li><b>Online matches.</b> Room codes, who played, seat colours, results, places and coin-table entries and payouts.
   Emotes you send are passed to the other players in the room; they are not stored.</li>
+  <li><b>Recent players and friends.</b> The last 30 people you played online with (when, and which game), the
+  players you add to your friends list, game invites you send or get (kept for at most 2 days) and whether you
+  accept invites (Settings). Only you see your lists; adding someone doesn't tell them. Other players know you by a
+  random player code, not your account.</li>
   <li><b>Google sign-in (optional).</b> If you link Google Play Games, its player ID and display name.</li>
   <li><b>Purchases.</b> For gem packs bought on Google Play: the product, the Google Play order ID and purchase token,
   so we can check the purchase with Google and handle refunds. We never see your card or payment details; Google
@@ -69,7 +73,9 @@ communicate only with preset emotes.</p>
   <li>To run the game: your profile, online matches, leaderboards, rewards, coin tables and purchases.</li>
   <li>To keep it fair and safe: one account per player, checking purchases and rewarded videos with Google,
   stopping cheating and abuse, and banning accounts that break the rules.</li>
-  <li>To send notifications you allowed (your turn, a friend joined, reminders, offers).</li>
+  <li>To send notifications you allowed (your turn, a friend joined, a game invite, reminders, offers).</li>
+  <li>To show your recent players and friends, and let them invite you to a game. Only people you played with or who
+  added you can invite you, a few times an hour at most; "Invites from players" in Settings turns invites off.</li>
   <li>To understand how the game's economy is doing, using totals (for example coins created and spent per day).</li>
 </ul>
 <p>We do not sell your data.</p>
@@ -91,7 +97,8 @@ communicate only with preset emotes.</p>
 </ul>
 
 <h2>Leaderboards and other players</h2>
-<p>Other players see your nickname, avatar, frame, level and, on leaderboards, your wins or XP.</p>
+<p>Other players see your nickname, avatar, frame, level and, on leaderboards, your wins or XP. People you played
+with see you in their recent players and can add you to their friends list.</p>
 
 <h2>How long we keep it</h2>
 <p>Your account is kept while you play. Server logs and room records are deleted after 30 days, crash reports after 90 days, weekly leaderboard
@@ -137,6 +144,7 @@ export function deleteAccountPage(): Response {
 <ul>
   <li>Your account: nickname, avatar, Player ID, coins, gems, free re-rolls, XP, statistics, achievements and items.</li>
   <li>The device IDs linked to it, your notification tokens and choices, leaderboard scores and pending rewards.</li>
+  <li>Your recent players, friends list and game invites, and you from other players' lists.</li>
   <li>Your Google Play Games link.</li>
   <li>Your nickname in past match records (replaced by "Deleted player").</li>
 </ul>

@@ -99,7 +99,7 @@ service-account JSON of the Firebase project, whole). Project id from it.
   `https://www.googleapis.com/auth/firebase.messaging`), cached in memory until 5 min before expiry. `POST
   https://fcm.googleapis.com/v1/projects/<id>/messages:send` with `{message: {token | topic, notification: {title,
   body}, data: {link, kind, cid?}, android: {priority: "high" (game) | "normal" (offers), ttl, collapse_key,
-  notification: {channel_id, tag}}}}` (`kind`: `turn` | `joined` | `rematch` | `weekly` | `promo` | `test`).
+  notification: {channel_id, tag}}}}` (`kind`: `turn` | `joined` | `rematch` | `invite` | `weekly` | `promo` | `test`).
   `UNREGISTERED` / `SENDER_ID_MISMATCH`, or `INVALID_ARGUMENT` whose message is about the registration token, on a
   token → that token row is deleted (any other `INVALID_ARGUMENT` is our message: counted failed, token kept); 429 /
   5xx / network errors are retried by the Pusher (after 1 and 2 min, then failed); a 401 renews the access token once.
@@ -139,6 +139,11 @@ service-account JSON of the Firebase project, whole). Project id from it.
     a match ends (`over`, the room back under lobby rules), to each away member while someone is here, and when
     someone opens a Play again vote (PROTOCOL.md "Play again"; the name is theirs); body "<Name> wants a rematch in
     room <CODE>"; at most once per member per 3 minutes. Tapping it within the vote's 30 s still lets them answer.
+  - "Game invite" (`kind: "invite"`, link `room:<CODE>`, added 2026-11-01, PROTOCOL.md "Recent players, friends and
+    invites"): someone invites you into their friend room (`POST /v1/social/invites`). Title "Game invite", body
+    "<Name> invited you to play Ludo in room <CODE>" (or Snakes & Ladders); tag `invite:<CODE>`, TTL 10 min (the
+    invite's life); sent whether the app is open or not (open: the game shows its Join / Not now banner instead of a
+    toast); not sent when "Invites from players" is off, and at most 6 per person per hour.
   - "Weekly result" (`kind: "weekly"`, link `leaderboard`): the daily cron on Monday (Bangladesh time) enqueues one
     push per listed account of last week's XP board top 100 ("You finished #N on last week's board!"), through the
     Pusher. As built: title "Weekly results are in"; one push per device with `prefs_game`; queued once per week

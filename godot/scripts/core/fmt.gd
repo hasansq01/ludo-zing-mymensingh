@@ -50,6 +50,21 @@ static func until(sec: int) -> String:
 	var m := maxi(1, ceili(sec / 60.0))
 	return L10n.t("%dh %dm") % [m / 60, m % 60] if m >= 60 else L10n.t("%dm") % m
 
+## How long ago a unix time was: "just now", "5 min ago", "3h ago", "yesterday", "4 days ago" ("" for 0 or less).
+## now: unix seconds (0 = the system clock).
+static func ago(unix: int, now := 0) -> String:
+	if unix <= 0:
+		return ""
+	var s := (now if now > 0 else int(Time.get_unix_time_from_system())) - unix
+	if s < 60:
+		return L10n.t("just now")
+	if s < 3600:
+		return L10n.t("%d min ago") % (s / 60)
+	if s < 86400:
+		return L10n.t("%dh ago") % (s / 3600)
+	var d := s / 86400
+	return L10n.t("yesterday") if d == 1 else L10n.t("%d days ago") % d
+
 ## A fraction (0..1) as a whole percent: 0.426 -> "43%". Never shows "100%" before it is done (0.996 -> "99%") or
 ## "0%" once something happened (0.001 -> "1%"). Clamped to 0..100.
 static func pct(f: float) -> String:
