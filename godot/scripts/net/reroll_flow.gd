@@ -74,12 +74,12 @@ func is_free() -> bool:
 static func error_text(code: String) -> String:
 	match code:
 		"reroll_used":
-			return "You already rolled again this match."
+			return L10n.t("You already rolled again this match.")
 		"reroll_closed":
-			return "Too late to roll again."
+			return L10n.t("Too late to roll again.")
 		"gems":
-			return "Not enough gems to roll again."
-	return ""
+			return L10n.t("Not enough gems to roll again.")
+	return L10n.t("")
 
 ## The codes the re-roll and the hold answer with.
 static func is_error(code: String) -> bool:

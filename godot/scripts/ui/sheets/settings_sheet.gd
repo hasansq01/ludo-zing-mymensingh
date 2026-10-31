@@ -49,7 +49,7 @@ var _notif_lines: Array[Control] = []    # the four kinds (dimmed while the mast
 
 
 func _init(width: float = UIKit.W.form) -> void:
-	super("Settings", width, true, LOOK_PM)
+	super(L10n.t("Settings"), width, true, LOOK_PM)
 	_width = width
 	_list = add_scroll_body(UIKit.SPACE.sm)
 	_build()
@@ -66,20 +66,20 @@ func _build() -> void:
 	# --- Account (only where there is one): Guest / the Google name, opens the Profile
 	var acc := Account.instance()
 	if acc != null and acc.enabled:
-		_caption("Account")
+		_caption(tr("Account"))
 		_group().add_child(_account_line(acc))
 
 	# --- Language
-	_caption("Language")
+	_caption(tr("Language"))
 	_group().add_child(_language_line())
 
 	# --- Sound
-	_caption("Sound & vibration")
+	_caption(tr("Sound & vibration"))
 	var snd := _group()
 	_switch = Switch.new(sound_on)
 	_switch.toggled.connect(_on_sound)
-	snd.add_child(_line("Sound", "", _switch, _switch))
-	for v: Array in [["music", "Music", Sound.DEFAULT_MUSIC], ["sfx", "Effects", Sound.DEFAULT_EFFECTS]]:
+	snd.add_child(_line(tr("Sound"), "", _switch, _switch))
+	for v: Array in [["music", tr("Music"), Sound.DEFAULT_MUSIC], ["sfx", tr("Effects"), Sound.DEFAULT_EFFECTS]]:
 		var line := _vol_line(v[0], v[1], int(vol.get(v[0], v[2])))
 		_vol_lines.append(line)
 		snd.add_child(_divider())
@@ -87,46 +87,46 @@ func _build() -> void:
 	snd.add_child(_divider())
 	var vib := Switch.new(bool(Save.prefs.get("vibrate", true)))
 	vib.toggled.connect(_on_vibrate)
-	snd.add_child(_line("Vibration", "", vib, vib))
+	snd.add_child(_line(tr("Vibration"), "", vib, vib))
 	_dim_volumes(sound_on)
 
 	# --- Game
-	_caption("Game")
+	_caption(tr("Game"))
 	var g := _group()
-	g.add_child(_line("Game speed", "", _seg([[1.0, "Relaxed"], [0.55, "Fast"]], float(Save.prefs.get("speed", 1.0)),
+	g.add_child(_line(tr("Game speed"), "", _seg([[1.0, tr("Relaxed")], [0.55, tr("Fast")]], float(Save.prefs.get("speed", 1.0)),
 			func(v): _set_pref("speed", v))))
 	g.add_child(_divider())
 	g.add_child(_graphics_line())
 
 	# --- Camera view (one block, one row per game)
-	_caption("Camera view")
+	_caption(tr("Camera view"))
 	var cam := _group()
-	cam.add_child(_line("Ludo", "", _seg([["3d", "3D"], ["top", "Top"]], str(Save.prefs.get("cam", "top")),
+	cam.add_child(_line(tr("Ludo"), "", _seg([["3d", tr("3D")], ["top", tr("Top")]], str(Save.prefs.get("cam", "top")),
 			func(v): _set_pref("cam", v), SEG_W_SHORT)))
 	cam.add_child(_divider())
-	cam.add_child(_line("Snakes & Ladders", "", _seg([["3d", "3D"], ["top", "Top"]], str(Save.prefs.get("sl_cam", "top")),
+	cam.add_child(_line(tr("Snakes & Ladders"), "", _seg([["3d", tr("3D")], ["top", tr("Top")]], str(Save.prefs.get("sl_cam", "top")),
 			func(v): _set_pref("sl_cam", v), SEG_W_SHORT)))
 
 	# --- House rules
-	_caption("House rules")
+	_caption(tr("House rules"))
 	var h := _group()
-	h.add_child(_switch_line("Ask before pairing", "Choose each time your pawns could pair.", "pair_ask"))
+	h.add_child(_switch_line(tr("Ask before pairing"), tr("Choose each time your pawns could pair."), "pair_ask"))
 	h.add_child(_divider())
-	h.add_child(_switch_line("Need a 1 to start", "Snakes & Ladders: only a 1 enters.", "sl_need_one"))
+	h.add_child(_switch_line(tr("Need a 1 to start"), tr("Snakes & Ladders: only a 1 enters."), "sl_need_one"))
 
 	# --- Notifications (the master switch, then what to be told about)
-	_caption("Notifications")
+	_caption(tr("Notifications"))
 	var nt := _group()
 	var master := Switch.new(_notif_shown())
 	_notif_master = master
 	master.toggled.connect(_on_notif)
-	var master_line := _line("Notifications", " ", master, master)
+	var master_line := _line(tr("Notifications"), " ", master, master)
 	_notif_note = master_line.get_child(0).get_child(0).get_child(1) as Label
 	nt.add_child(master_line)
-	for k: Array in [["notif_rewards", "Rewards", "Daily reward, free spin and free coins."],
-			["notif_reminders", "Reminders", "A nudge when you have been away."],
-			["notif_game", "Game alerts", "Your turn and friends joining a room."],
-			["notif_offers", "News & offers", "Gifts and updates from Ludo Zing."]]:
+	for k: Array in [["notif_rewards", tr("Rewards"), tr("Daily reward, free spin and free coins.")],
+			["notif_reminders", tr("Reminders"), tr("A nudge when you have been away.")],
+			["notif_game", tr("Game alerts"), tr("Your turn and friends joining a room.")],
+			["notif_offers", tr("News & offers"), tr("Gifts and updates from Ludo Zing.")]]:
 		nt.add_child(_divider())
 		var line := _switch_line(k[1], k[2], k[0])
 		_notif_lines.append(line)
@@ -137,19 +137,19 @@ func _build() -> void:
 		notifs.permission_changed.connect(_refresh_notif)
 
 	# --- Accessibility
-	_caption("Accessibility")
+	_caption(tr("Accessibility"))
 	var a := _group()
-	a.add_child(_switch_line("Colour-blind symbols", "Shapes on pawns and players.", "colorblind"))
+	a.add_child(_switch_line(tr("Colour-blind symbols"), tr("Shapes on pawns and players."), "colorblind"))
 	a.add_child(_divider())
-	a.add_child(_switch_line("Reduce motion", "Fewer animations, no shaking.", "reduce_motion"))
+	a.add_child(_switch_line(tr("Reduce motion"), tr("Fewer animations, no shaking."), "reduce_motion"))
 
 	# --- Help
-	_caption("Help")
+	_caption(tr("Help"))
 	var hp := _group()
-	hp.add_child(_link_line("How to play", _open_howto))
+	hp.add_child(_link_line(tr("How to play"), _open_howto))
 	hp.add_child(_divider())
-	hp.add_child(_link_line("Credits", _open_credits))
-	for k: Array in [["privacy", "Privacy policy"], ["delete", "Delete my account"], ["support", "Support"]]:
+	hp.add_child(_link_line(tr("Credits"), _open_credits))
+	for k: Array in [["privacy", tr("Privacy policy")], ["delete", tr("Delete my account")], ["support", tr("Support")]]:
 		var url := str(URLS.get(k[0], ""))
 		if url != "":
 			hp.add_child(_divider())
@@ -158,7 +158,7 @@ func _build() -> void:
 	var ad := Ads.instance()
 	if ad != null and ad.privacy_options_required():
 		hp.add_child(_divider())
-		var pc := _link_line("Privacy choices", func(): ad.show_privacy_options())
+		var pc := _link_line(tr("Privacy choices"), func(): ad.show_privacy_options())
 		pc.name = "PrivacyChoices"
 		hp.add_child(pc)
 
@@ -168,14 +168,14 @@ func _build() -> void:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_list.add_child(gap)
 	var rs := _group()
-	rs.add_child(_link_line("Reset progress", _confirm_reset, true))
+	rs.add_child(_link_line(tr("Reset progress"), _confirm_reset, true))
 
 	var ver := str(ProjectSettings.get_setting("application/config/version", ""))
 	var foot := UIKit.label(VERSION_LINE % (ver if ver != "" else "0.1.0"), UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var id := str(Save.profile.get("id", ""))
 	if id != "":
-		foot.text += "\nSupport ID " + id
+		foot.text += "\n" + tr("Support ID %s") % id
 	_list.add_child(UIKit.margin(foot, 0, UIKit.SPACE.xs, 0, UIKit.SPACE.xs))
 
 
@@ -248,20 +248,20 @@ func _account_line(acc: Account) -> Control:
 	var h := UIKit.hbox(UIKit.SPACE.md)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(h)
-	var title := "Guest"
-	var note := "Your progress is saved on our server."
+	var title := tr("Guest")
+	var note := tr("Your progress is saved on our server.")
 	if not acc.is_guest():
 		title = acc.google_name() if acc.google_name() != "" else "Google Play Games"
-		note = "Signed in with Google Play Games"
+		note = tr("Signed in with Google Play Games")
 	elif not acc.has_session():
-		title = "Guest · offline"
-		note = "Your progress will sync when you’re back online."
+		title = tr("Guest · offline")
+		note = tr("Your progress will sync when you’re back online.")
 	h.add_child(_label_box(title, note))
 	if not acc.is_guest():
 		var ok := UIKit.hbox(UIKit.SPACE.xs)
 		ok.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ok.add_child(UIKit.glyph("ic_check", 16, Palette.TEAL_INK))
-		var sl := UIKit.caps_label("Synced", Palette.TEAL_INK)
+		var sl := UIKit.caps_label(tr("Synced"), Palette.TEAL_INK)
 		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ok.add_child(sl)
 		h.add_child(ok)
@@ -297,8 +297,8 @@ func _refresh_notif(_state: Variant = null) -> void:
 		_notif_master._set_t(1.0 if on else 0.0)
 	if _notif_note != null:
 		match Notifications.permission():
-			"ask": _notif_note.text = "Tap to allow notifications on this phone."
-			"denied": _notif_note.text = "Off in your phone settings. Tap to open them."
+			"ask": _notif_note.text = tr("Tap to allow notifications on this phone.")
+			"denied": _notif_note.text = tr("Off in your phone settings. Tap to open them.")
 			_: _notif_note.text = ""
 		_notif_note.visible = _notif_note.text != ""
 	for l in _notif_lines:
@@ -350,10 +350,10 @@ func _graphics_line() -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.xs)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(v)
-	var box := _label_box("Graphics", " ")
+	var box := _label_box(tr("Graphics"), " ")
 	_gfx_note = box.get_child(1) as Label
 	v.add_child(box)
-	var opts := [["auto", "Auto (%s)" % Quality.detected().capitalize()], ["low", "Low"], ["medium", "Medium"], ["high", "High"]]
+	var opts := [["auto", tr("Auto (%s)") % tr(Quality.detected().capitalize())], ["low", tr("Low")], ["medium", tr("Medium")], ["high", tr("High")]]
 	var seg := UIKit.segmented(opts, Quality.saved_pref(), _on_quality, "sm")
 	seg.name = "QualitySeg"
 	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -368,7 +368,7 @@ func _language_line() -> Control:
 	var row := Row.new()
 	row.name = "Language"
 	row.custom_minimum_size.y = ROW_H
-	var opts := [["auto", "Auto (%s)" % L10n.NATIVE[L10n.phone()]], ["en", L10n.NATIVE.en], ["bn", L10n.NATIVE.bn]]
+	var opts := [["auto", tr("Auto (%s)") % L10n.NATIVE[L10n.phone()]], ["en", L10n.NATIVE.en], ["bn", L10n.NATIVE.bn]]
 	var seg := UIKit.segmented(opts, str(Save.prefs.get("lang", "auto")), _on_language, "sm")
 	seg.name = "LanguageSeg"
 	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -391,7 +391,7 @@ func _on_language(v: Variant) -> void:
 func _gfx_hint(t: String) -> void:
 	if _gfx_note == null:
 		return
-	_gfx_note.text = "Texture detail applies on next launch." if Quality.needs_restart(t) else ""
+	_gfx_note.text = tr("Texture detail applies on next launch.") if Quality.needs_restart(t) else ""
 	_gfx_note.visible = _gfx_note.text != ""
 
 func _on_quality(t: Variant) -> void:
@@ -480,9 +480,9 @@ func _open_credits() -> void:
 		await CreditsSheet.new().open(layer)
 
 func _confirm_reset() -> void:
-	var yes := await Sheet.confirm(self, "Reset all progress?",
-			"Your coins, level, stats and items start over. Sound settings stay. This can’t be undone.",
-			"Reset", "Cancel", true)
+	var yes := await Sheet.confirm(self, tr("Reset all progress?"),
+			tr("Your coins, level, stats and items start over. Sound settings stay. This can’t be undone."),
+			tr("Reset"), tr("Cancel"), true)
 	if not yes or not is_inside_tree():
 		return
 	Save.reset_progress()
@@ -493,7 +493,7 @@ func _confirm_reset() -> void:
 	_build()
 	prefs_changed.emit()
 	Haptics.medium()
-	Toast.show(self, "Progress reset.")
+	Toast.show(self, tr("Progress reset."))
 
 
 # ---------- widgets ----------
@@ -635,17 +635,19 @@ class VolSlider extends HSlider:
 
 ## Credits (Settings > Help > Credits): who made the game and the third-party parts with their licences.
 class CreditsSheet extends Sheet:
-	const ITEMS := [
-		["Ludo Zing Mymensingh", "Made by Flipfold Studio."],
-		["Godot Engine", "Built with Godot. © Juan Linietsky, Ariel Manzur and contributors. MIT licence."],
-		["Sounds", "Kenney (kenney.nl), CC0 licence. The music and some effects are original to this game."],
-		["Fonts", "Lilita One and Nunito, SIL Open Font License 1.1."],
-	]
+	## Names of the game, people, fonts and licences stay as they are; titles and sentences are translated.
+	func _items() -> Array:
+		return [
+			["Ludo Zing Mymensingh", tr("Made by Flipfold Studio.")],
+			["Godot Engine", tr("Built with Godot. © Juan Linietsky, Ariel Manzur and contributors. MIT licence.")],
+			[tr("Sounds"), tr("Kenney (kenney.nl), CC0 licence. The music and some effects are original to this game.")],
+			[tr("Fonts"), tr("Lilita One, Nunito, Baloo Da 2 and Noto Sans Bengali, SIL Open Font License 1.1.")],
+		]
 
 	func _init() -> void:
-		super("Credits", UIKit.W.form, true, LOOK_PM)
+		super(L10n.t("Credits"), UIKit.W.form, true, LOOK_PM)
 		var list := add_scroll_body(UIKit.SPACE.sm)
-		for it: Array in ITEMS:
+		for it: Array in _items():
 			var v := UIKit.vbox(2)
 			v.add_child(UIKit.label(str(it[0]), UIKit.FS.body_l, Palette.INK, UIKit.font_body(900)))
 			v.add_child(UIKit.paragraph(str(it[1]), UIKit.FS.body, Palette.SUB))

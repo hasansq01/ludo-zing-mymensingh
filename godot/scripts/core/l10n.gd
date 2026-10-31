@@ -64,7 +64,7 @@ static func seat_name(n: String) -> String:
 	if n in SEAT_NAMES:
 		return t(n)
 	if n.begins_with("Player ") and n.trim_prefix("Player ").is_valid_int():
-		return t("Player %d") % int(n.trim_prefix("Player "))
+		return L10n.t("Player %d") % int(n.trim_prefix("Player "))
 	return n
 
 ## tr() for static functions.

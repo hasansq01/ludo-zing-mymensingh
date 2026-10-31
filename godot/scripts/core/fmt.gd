@@ -35,7 +35,7 @@ static func gain(n: int, short := false) -> String:
 
 ## A button / note for a price the player can't afford yet: shortfall(2500) -> "Need 2.5K".
 static func shortfall(n: int) -> String:
-	return "Need " + coins(maxi(0, n))
+	return L10n.t("Need %s") % coins(maxi(0, n))
 
 ## A ticking countdown: "3:53:10" (an hour or more), "53:10", "0:05". Negative counts as 0.
 static func clock(sec: int) -> String:
@@ -48,7 +48,7 @@ static func clock(sec: int) -> String:
 ## "1m". Same rule as Rewards.fmt_dur.
 static func until(sec: int) -> String:
 	var m := maxi(1, ceili(sec / 60.0))
-	return "%dh %dm" % [m / 60, m % 60] if m >= 60 else "%dm" % m
+	return L10n.t("%dh %dm") % [m / 60, m % 60] if m >= 60 else L10n.t("%dm") % m
 
 ## A fraction (0..1) as a whole percent: 0.426 -> "43%". Never shows "100%" before it is done (0.996 -> "99%") or
 ## "0%" once something happened (0.001 -> "1%"). Clamped to 0..100.

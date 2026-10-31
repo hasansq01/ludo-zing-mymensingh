@@ -35,14 +35,14 @@ var _tick := 0.0
 
 
 func _init(bonus_ := {}) -> void:
-	super("Out of coins", UIKit.W.form, true, Sheet.LOOK_PM)
+	super(L10n.t("Out of coins"), UIKit.W.form, true, Sheet.LOOK_PM)
 	dismissable = true
-	set_kicker("Coin tables")
+	set_kicker(tr("Coin tables"))
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	var intro := UIKit.paragraph("", UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	intro.name = "Intro"
 	body.add_child(intro)
-	bonus_button = UIKit.button_with("Daily bonus +%d" % BONUS, UIKit.icon("coin", 28), "honey", "lg")
+	bonus_button = UIKit.button_with(tr("Daily bonus +%d") % BONUS, UIKit.icon("coin", 28), "honey", "lg")
 	bonus_button.name = "Bonus"
 	_bonus_text = bonus_button.find_child("Text", true, false) as Label
 	bonus_button.pressed.connect(_claim)
@@ -50,9 +50,9 @@ func _init(bonus_ := {}) -> void:
 		if _busy or bool(bonus.available):
 			return ""
 		var left := int(bonus.next_at) - int(Time.get_unix_time_from_system())
-		return "Daily bonus is back in %s." % Fmt.until(left) if left > 0 else "Daily bonus is back tomorrow.")
+		return tr("Daily bonus is back in %s.") % Fmt.until(left) if left > 0 else tr("Daily bonus is back tomorrow."))
 	body.add_child(bonus_button)
-	video_button = UIKit.button_with("Watch a video: +%s coins" % Fmt.coins_full(REFILL), UIKit.icon("coin", 26), "teal", "md")
+	video_button = UIKit.button_with(tr("Watch a video: +%s coins") % Fmt.coins_full(REFILL), UIKit.icon("coin", 26), "teal", "md")
 	video_button.name = "Video"
 	narrow_changed.connect(func(narrow: bool):      # the long video line shrinks to fit a 320 px card
 		(video_button.find_child("Text", true, false) as Label).add_theme_font_size_override("font_size", 15 if narrow else UIKit.BTN.md.fs))
@@ -62,7 +62,7 @@ func _init(bonus_ := {}) -> void:
 	note_label.name = "Note"
 	note_label.visible = false
 	body.add_child(note_label)
-	practice_button = UIKit.btn("Play Practice instead", "ghost", "md")
+	practice_button = UIKit.btn(tr("Play Practice instead"), "ghost", "md")
 	practice_button.name = "Practice"
 	practice_button.pressed.connect(func():
 		practice_pressed.emit()
@@ -110,15 +110,15 @@ func set_bonus(b: Dictionary) -> void:
 ## Texts and states from the balance, the bonus and the ads.
 func refresh() -> void:
 	var intro := body.find_child("Intro", true, false) as Label
-	intro.text = "You have %s coins. Tables start at %d. Top up, or play Practice for free." % [Fmt.coins_full(balance()), CoinTables.BROKE_BELOW]
+	intro.text = tr("You have %s coins. Tables start at %d. Top up, or play Practice for free.") % [Fmt.coins_full(balance()), CoinTables.BROKE_BELOW]
 	var avail := bool(bonus.available)
 	bonus_button.disabled = _busy or not avail
 	_bonus_kind("honey" if avail else "off")
 	if avail:
-		_bonus_text.text = "Daily bonus +%d" % int(bonus.amount)
+		_bonus_text.text = tr("Daily bonus +%d") % int(bonus.amount)
 	else:
 		var left := int(bonus.next_at) - int(Time.get_unix_time_from_system())
-		_bonus_text.text = "Daily bonus · %s" % (Fmt.until(left) if left > 0 else "tomorrow")
+		_bonus_text.text = tr("Daily bonus · %s") % (Fmt.until(left) if left > 0 else tr("tomorrow"))
 	video_button.visible = _ads()
 	video_button.disabled = _busy
 	practice_button.disabled = _busy
@@ -158,7 +158,7 @@ func _claim() -> void:
 		var got := int(r.get("coins", bonus.amount))
 		bonus.available = false
 		bonus.next_at = int(r.get("next_at", 0))
-		_say("+%s coins" % Fmt.coins_full(got), "coin")
+		_say(tr("+%s coins") % Fmt.coins_full(got), "coin")
 		_after_top_up()
 		return
 	var code := str(r.get("error", ""))
@@ -182,10 +182,10 @@ func _watch() -> void:
 	_busy = false
 	var info: Dictionary = res.info
 	if bool(res.ok):
-		_say("+%s coins" % Fmt.coins_full(int(info.get("amount", REFILL))), "coin")
+		_say(tr("+%s coins") % Fmt.coins_full(int(info.get("amount", REFILL))), "coin")
 		_after_top_up()
 		return
-	_say(str(info.get("text", AdFlow.NO_FILL_TEXT)))
+	_say(str(info.get("text", tr(AdFlow.NO_FILL_TEXT))))
 	refresh()
 
 ## Back at 100 coins or more: on to the table picker. Still short: the other ways stay open.

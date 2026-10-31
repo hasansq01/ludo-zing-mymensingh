@@ -39,13 +39,13 @@ var _pull := 0.0
 
 
 func _init(width: float = UIKit.W.catalog) -> void:
-	super("Leaderboard", width, true, LOOK_PM)
+	super(L10n.t("Leaderboard"), width, true, LOOK_PM)
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
-	board_seg = UIKit.segmented([["xp", "Level"], ["wins", "Online wins"]], board, _set_board, "sm")
+	board_seg = UIKit.segmented([["xp", tr("Level")], ["wins", tr("Online wins")]], board, _set_board, "sm")
 	board_seg.name = "Boards"
 	body.add_child(board_seg)
 	var bar := UIKit.hbox(UIKit.SPACE.sm)
-	period_seg = UIKit.segmented([["week", "Weekly"], ["all", "All time"]], period, _set_period, "sm")
+	period_seg = UIKit.segmented([["week", tr("Weekly")], ["all", tr("All time")]], period, _set_period, "sm")
 	period_seg.name = "Periods"
 	period_seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(period_seg)
@@ -111,7 +111,7 @@ func load_board(force := false) -> void:
 		if fresh and not force:
 			return
 	else:
-		_show_state("loading", "Loading…")
+		_show_state("loading", tr("Loading…"))
 		_me_bar.visible = false
 	_loading = true
 	refresh_button.disabled = true
@@ -134,7 +134,7 @@ func load_board(force := false) -> void:
 	if r.get("error", "") == "offline":
 		_show_state("offline", Account.offline_text("leaderboard"), true)
 	else:
-		_show_state("error", "The leaderboard isn’t available right now. Try again soon.", true)
+		_show_state("error", tr("The leaderboard isn’t available right now. Try again soon."), true)
 
 func _fetch(b: String, p: String) -> Dictionary:
 	if fetch_fn.is_valid():
@@ -180,7 +180,7 @@ func _show_state(kind: String, text: String, retry := false) -> void:
 	l.name = "Message"
 	v.add_child(l)
 	if retry:
-		retry_button = UIKit.btn("Try again", "honey", "sm")
+		retry_button = UIKit.btn(tr("Try again"), "honey", "sm")
 		retry_button.name = "Retry"
 		retry_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		retry_button.custom_minimum_size.x = 160
@@ -193,7 +193,7 @@ func _show_state(kind: String, text: String, retry := false) -> void:
 func _render(r: Dictionary) -> void:
 	var top: Array = r.get("top", []) if r.get("top") is Array else []
 	if top.is_empty():
-		_show_state("empty", "No one is on the board yet. Play online matches to be the first.")
+		_show_state("empty", tr("No one is on the board yet. Play online matches to be the first."))
 	else:
 		state = "list"
 		_clear()
@@ -218,12 +218,12 @@ func _row(e: Dictionary, board_: String, mine := 0) -> Control:
 	var col := UIKit.vbox(0)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var nm := UIKit.label(str(e.get("name", "Player")), UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	var nm := UIKit.label(str(e.get("name", L10n.t("Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	nm.name = "Name"
 	nm.clip_text = true
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(nm)
-	var lv := UIKit.label("Level %d" % maxi(1, int(e.get("level", 1))), UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
+	var lv := UIKit.label(tr("Level %d") % maxi(1, int(e.get("level", 1))), UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
 	lv.name = "Level"
 	col.add_child(lv)
 	h.add_child(col)
@@ -262,8 +262,8 @@ func _rank_cell(rank: int) -> Control:
 ## "1.2K XP" / "42 wins".
 static func value_text(v: int, board_: String) -> String:
 	if board_ == "xp":
-		return "%s XP" % Fmt.coins(v)
-	return "%s %s" % [Fmt.coins(v), "win" if v == 1 else "wins"]
+		return L10n.t("%s XP") % Fmt.coins(v)
+	return L10n.tn("%s win", "%s wins", v) % Fmt.coins(v)
 
 ## How many more finished matches until the account is listed.
 static func matches_to_go(min_matches: int, completed: int) -> int:
@@ -280,7 +280,7 @@ func _render_me(r: Dictionary) -> void:
 	var col := UIKit.vbox(0)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var nm := UIKit.label("You", UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	var nm := UIKit.label(tr("You"), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	nm.name = "YouName"
 	col.add_child(nm)
 	var sub := ""
@@ -294,17 +294,17 @@ func _render_me(r: Dictionary) -> void:
 			var acc := Account.instance()
 			var done := int(acc.account.get("completed_matches", 0)) if acc != null else 0
 			var n := matches_to_go(int(r.get("min_matches", 3)), done)
-			sub = "Play %d more %s to appear" % [n, "match" if n == 1 else "matches"]
+			sub = tr_n("Play %d more match to appear", "Play %d more matches to appear", n) % n
 			value = value_text(v, board)
 		elif m.get("rank") == null or int(m.get("rank", 0)) <= 0:
-			sub = "Not ranked yet"
+			sub = tr("Not ranked yet")
 			value = value_text(v, board)
 		else:
 			rank_text = "#%d" % int(m.rank)
-			sub = "Level %d" % int(Save.level_info(int(p.get("xp", 0))).level)
+			sub = tr("Level %d") % int(Save.level_info(int(p.get("xp", 0))).level)
 			value = value_text(v, board)
 	else:
-		sub = "Connect to see your rank"
+		sub = tr("Connect to see your rank")
 	var rl := UIKit.label(rank_text, UIKit.FS.h2, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
 	rl.name = "YouRank"
 	rl.custom_minimum_size.x = 34

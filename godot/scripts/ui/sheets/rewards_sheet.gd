@@ -18,19 +18,30 @@ extends Sheet
 
 signal picked(id: String)                ## a row was tapped: "spin" | "daily" | "free"
 
-const ROWS := [
-	["spin", "Daily spin", "spin", "Spin"],
-	["daily", "Daily reward", "gift", "Claim"],
-	["free", "Free coins", "coins", "Claim"],
-]
+const ROWS := [["spin", "spin"], ["daily", "gift"], ["free", "coins"]]   # id, icon
+## id -> [title, action button]; shown through L10n.t.
+# l10n:begin
+const ROW_TEXT := {
+	spin = ["Daily spin", "Spin"],
+	daily = ["Daily reward", "Claim"],
+	free = ["Free coins", "Claim"],
+}
+# l10n:end
 
 ## Dev / tests: show the video section even where ads can't run (the previews).
 static var force_videos := false
 
 const VIDEO_ROWS := [
-	["reroll", "Free re-roll", "res://assets/ui/home/hi_again.svg", "Roll again in an online match"],
-	["gems", "+2 gems", "res://assets/ui/gem.svg", "Gems buy rooms, dice and more"],
+	["reroll", "res://assets/ui/home/hi_again.svg"],
+	["gems", "res://assets/ui/gem.svg"],
 ]
+## kind -> [title, note]; shown through L10n.t.
+# l10n:begin
+const VIDEO_TEXT := {
+	reroll = ["Free re-roll", "Roll again in an online match"],
+	gems = ["+2 gems", "Gems buy rooms, dice and more"],
+}
+# l10n:end
 
 var flow: AdFlow
 var wins_row := false                    ## the Get coins variant: a "Win vs computer" info row after the rewards
@@ -41,12 +52,12 @@ var _video_box: VBoxContainer
 var _tick: Timer
 
 
-func _init(title_ := "Rewards", wins_row_ := false) -> void:
-	super(title_, UIKit.W.form, true, LOOK_PM)
+func _init(title_ := "Rewards", wins_row_ := false) -> void:   # l10n
+	super(L10n.t(title_), UIKit.W.form, true, LOOK_PM)
 	wins_row = wins_row_
 	var list := add_scroll_body(UIKit.SPACE.sm)
 	for r in ROWS:
-		var row := Row.new(r[0], r[1], HomeScreen.HI % r[2], r[3], _note(r[0]))
+		var row := Row.new(r[0], L10n.t(ROW_TEXT[r[0]][0]), HomeScreen.HI % r[1], L10n.t(ROW_TEXT[r[0]][1]), _note(r[0]))
 		row.pressed.connect(_go.bind(str(r[0])))
 		list.add_child(row)
 		_rows[r[0]] = row
@@ -55,9 +66,9 @@ func _init(title_ := "Rewards", wins_row_ := false) -> void:
 	if videos_shown():
 		_video_box = UIKit.vbox(UIKit.SPACE.sm)
 		_video_box.name = "Videos"
-		_video_box.add_child(UIKit.margin(UIKit.caption("Free with a video"), 4, UIKit.SPACE.sm, 0, 0))
+		_video_box.add_child(UIKit.margin(UIKit.caption(tr("Free with a video")), 4, UIKit.SPACE.sm, 0, 0))
 		for v in VIDEO_ROWS:
-			var vr := VideoRow.new(v[0], v[1], v[2], v[3])
+			var vr := VideoRow.new(v[0], L10n.t(VIDEO_TEXT[v[0]][0]), v[1], L10n.t(VIDEO_TEXT[v[0]][1]))
 			vr.pressed.connect(_watch.bind(str(v[0])))
 			_video_box.add_child(vr)
 			_vrows[v[0]] = vr
@@ -89,11 +100,11 @@ func _ready() -> void:
 static func _note(id: String) -> String:
 	match id:
 		"spin":
-			return "Win up to %s coins" % Fmt.coins_full(Rewards.PRIZES.max())
+			return L10n.t("Win up to %s coins") % Fmt.coins_full(Rewards.PRIZES.max())
 		"daily":
-			return "A new gift every day"
+			return L10n.t("A new gift every day")
 		_:
-			return "%s coins every %dh" % [Fmt.gain(Rewards.FREE_AMOUNT), roundi(Rewards.FREE_EVERY_SEC / 3600.0)]
+			return L10n.t("%s coins every %dh") % [Fmt.gain(Rewards.FREE_AMOUNT), roundi(Rewards.FREE_EVERY_SEC / 3600.0)]
 
 
 ## The row of a reward ("spin" | "daily" | "free"), or null (main flies the free coins from it).
@@ -133,7 +144,7 @@ func _refresh_videos() -> void:
 		var n := int(_left.get(kind, -1))
 		var extra := ""
 		if kind == "reroll" and rr > 0:
-			extra = " · you have %d" % rr
+			extra = " · " + tr("you have %d") % rr
 		vr.set_left(n, extra, flow == null or not flow.busy)
 
 
@@ -162,12 +173,12 @@ func _on_watched(ok: bool, info: Dictionary) -> void:
 		Sound.sfx("buy")
 		Haptics.success()
 		var amount := int(info.get("amount", 0))
-		var what := "+%d gems" % amount if info.kind == "gems" else "+%d free re-roll" % maxi(1, amount)
+		var what := tr("+%d gems") % amount if info.kind == "gems" else tr("+%d free re-roll") % maxi(1, amount)
 		Toast.show(self, what, card, 2.0, "gem" if info.kind == "gems" else "good")
 	else:
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, str(info.get("text", "Something went wrong. Please try again.")), card, 2.4, "bad")
+		Toast.show(self, str(info.get("text", tr("Something went wrong. Please try again."))), card, 2.4, "bad")
 	await load_today()
 
 
@@ -180,8 +191,8 @@ func _wins_row() -> Control:
 	var col := UIKit.vbox(-1)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(UIKit.label("Win vs computer", UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
-	var n := UIKit.paragraph("%s in Ludo, %s in Snakes & Ladders" % [Fmt.gain(LudoRules.WIN_REWARD), Fmt.gain(SnakesLaddersRules.REWARD)],
+	col.add_child(UIKit.label(tr("Win vs computer"), UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
+	var n := UIKit.paragraph(tr("%s in Ludo, %s in Snakes & Ladders") % [Fmt.gain(LudoRules.WIN_REWARD), Fmt.gain(SnakesLaddersRules.REWARD)],
 			UIKit.FS.small + 1, Palette.SUB)
 	col.add_child(n)
 	h.add_child(col)
@@ -229,7 +240,7 @@ func _local(id: String) -> void:
 		var n := Rewards.claim_free(Save.profile)
 		if n > 0:
 			Sound.sfx("coin", n)
-			Toast.show(self, "%s coins" % Fmt.gain(n), card, 1.8, "coin")
+			Toast.show(self, tr("%s coins") % Fmt.gain(n), card, 1.8, "coin")
 	else:
 		var path := "res://scripts/ui/sheets/%s_sheet.gd" % id
 		if ResourceLoader.exists(path) and get_parent():
@@ -299,7 +310,7 @@ class Row extends Button:
 			RewardsSheet._row_look(self, is_ready)
 		go.visible = is_ready
 		wait.visible = not is_ready
-		var t := "in " + countdown if countdown != "" else ""
+		var t := tr("in %s") % countdown if countdown != "" else ""
 		if wait_label.text != t:
 			wait_label.text = t
 
@@ -352,7 +363,7 @@ class VideoRow extends Button:
 		note.name = "Note"
 		col.add_child(note)
 		RewardsSheet._fit_text(t, note, ic, self)
-		go = UIKit.button("Watch", "honey", "sm")
+		go = UIKit.button(tr("Watch"), "honey", "sm")
 		go.name = "Go"
 		go.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -376,11 +387,11 @@ class VideoRow extends Button:
 		var done := n == 0
 		go.visible = not done
 		wait.visible = done
-		wait_label.text = "Done today"
-		note.text = (("%d left today" % n) if n > 0 else ("Come back tomorrow" if done else _base_note)) + extra
-		go.text = "Watch"
+		wait_label.text = tr("Done today")
+		note.text = ((tr("%d left today") % n) if n > 0 else (tr("Come back tomorrow") if done else _base_note)) + extra
+		go.text = tr("Watch")
 		go.disabled = not can_watch
 
 	func set_busy(on: bool) -> void:
-		go.text = "…" if on else "Watch"
+		go.text = "…" if on else tr("Watch")
 		disabled = on

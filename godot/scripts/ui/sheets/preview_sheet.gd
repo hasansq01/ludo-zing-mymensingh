@@ -32,6 +32,7 @@ const LOOK := Vector3(-2, 3, -2)
 const MAX_W := 440.0
 const LOAD_TIMEOUT := 25.0
 const HINT_SEC := 2.0                    # "Drag to look around" fades after this (or on the first drag)
+## l10n-keys: room, scene
 const KIND_TEXT := {room = "Ludo room", scene = "S&L scene"}
 const SPIN_PER_PX := 0.012               # scene: table turn (radians) per dragged px
 
@@ -84,7 +85,7 @@ const MOUSE := 1000
 
 
 func _init(id: String, kind_ := "room") -> void:
-	super(str(_item_of(id, kind_).get("name", "")), 390.0, true, LOOK_PM)
+	super(L10n.t(str(_item_of(id, kind_).get("name", ""))), 390.0, true, LOOK_PM)
 	kind = "scene" if kind_ == "scene" else "room"
 	room_id = id
 	_name_l = title_label
@@ -206,7 +207,7 @@ func _build_view() -> Control:
 	_tex.modulate.a = 0.0
 	_view.add_child(_tex)
 	# "Drag to look around" (fades after a few seconds or on the first drag)
-	_hint = UIKit.label("Drag to spin the board" if kind == "scene" else "Drag to look around", UIKit.FS.label, Color.WHITE, UIKit.font_body(800))
+	_hint = UIKit.label(tr("Drag to spin the board") if kind == "scene" else tr("Drag to look around"), UIKit.FS.label, Color.WHITE, UIKit.font_body(800))
 	var hs := UIKit.box(Palette.TOAST, UIKit.R.pill)
 	UIKit.pad(hs, 12, 4)
 	_hint.add_theme_stylebox_override("normal", hs)
@@ -214,7 +215,7 @@ func _build_view() -> Control:
 	_hint.visible = false
 	_view.add_child(_hint)
 	# low tier: the live view on request
-	_chip = UIKit.button_with("Tap to view in 3D", UIKit.icon("ic_eye", 20), "white", "sm")
+	_chip = UIKit.button_with(tr("Tap to view in 3D"), UIKit.icon("ic_eye", 20), "white", "sm")
 	_chip.name = "View3D"
 	_chip.custom_minimum_size.x = 196
 	_chip.visible = false
@@ -225,7 +226,7 @@ func _build_view() -> Control:
 	# back to the start view (pinch / wheel zoom, drag turns)
 	var reset := UIKit.icon_button("ic_reset", "glass", UIKit.TAP, 24)
 	reset.name = "Reset"
-	reset.tooltip_text = "Reset view"
+	reset.tooltip_text = tr("Reset view")
 	reset.pressed.connect(_reset_view)
 	_tools = reset
 	_tools.visible = false
@@ -234,8 +235,8 @@ func _build_view() -> Control:
 	_msg = PanelContainer.new()
 	_msg.add_theme_stylebox_override("panel", UIKit.surface("bubble"))
 	var mv := UIKit.vbox(UIKit.SPACE.sm)
-	mv.add_child(UIKit.label("The 3D preview couldn’t load.", UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
-	var retry := UIKit.btn("Retry", "honey", "sm")
+	mv.add_child(UIKit.label(tr("The 3D preview couldn’t load."), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
+	var retry := UIKit.btn(tr("Retry"), "honey", "sm")
 	retry.name = "Retry"
 	retry.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	retry.custom_minimum_size.x = 120
@@ -248,7 +249,7 @@ func _build_view() -> Control:
 
 func _build_panel() -> Control:
 	_info = UIKit.vbox(UIKit.SPACE.xs)
-	_kind_l = UIKit.eyebrow(KIND_TEXT[kind])
+	_kind_l = UIKit.eyebrow(L10n.t(KIND_TEXT[kind]))
 	_kind_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_info.add_child(UIKit.margin(_kind_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
 	_desc_l = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
@@ -257,13 +258,13 @@ func _build_panel() -> Control:
 	slot.custom_minimum_size.y = UIKit.TAP + 4
 	slot.add_theme_constant_override("margin_top", UIKit.SPACE.sm)
 	var price := int(_item().get("price", 0))
-	_buy = UIKit.button_with("Buy", CoinAmount.new(price, "md", "plain"), "gold", "md")
+	_buy = UIKit.button_with(tr("Buy"), CoinAmount.new(price, "md", "plain"), "gold", "md")
 	_buy.name = "Buy"
 	var row := _buy.get_node("Content") as HBoxContainer
 	row.move_child(row.get_child(0), -1)  # "Buy  (coin) 3K"
 	_need = UIKit.btn("", "off", "md")
 	_need.name = "Need"
-	_use = UIKit.btn("Use", "teal", "md")
+	_use = UIKit.btn(tr("Use"), "teal", "md")
 	_use.name = "Use"
 	for b: Button in [_buy, _need, _use]:
 		b.pressed.connect(_on_act)
@@ -325,9 +326,9 @@ func _panel() -> void:
 	var own := _owns()
 	var on := own and _in_use() == room_id
 	var short := int(r.price) - Catalog.coins()
-	if ribbon and ribbon.label.text != str(r.name):
-		ribbon.set_text(str(r.name))
-	_desc_l.text = r.desc
+	if ribbon and ribbon.label.text != L10n.t(str(r.name)):
+		ribbon.set_text(L10n.t(str(r.name)))
+	_desc_l.text = L10n.t(r.desc)
 	_buy.visible = not own and short <= 0
 	_need.visible = not own and short > 0
 	_need.text = Fmt.shortfall(short)
@@ -346,7 +347,7 @@ func _on_gems() -> void:
 		return
 	_busy_gems = true
 	_asking = true
-	var res: String = await ShopSheet.buy_with_gems(self, "scene" if kind == "scene" else "room", room_id, str(r.name))
+	var res: String = await ShopSheet.buy_with_gems(self, "scene" if kind == "scene" else "room", room_id, L10n.t(str(r.name)))
 	_asking = false
 	_busy_gems = false
 	if not is_instance_valid(self) or _closing:
@@ -369,12 +370,12 @@ func _on_act() -> void:
 		var ok := SLScenes.equip_scene(room_id) if kind == "scene" else Catalog.equip_room(room_id)
 		if ok:
 			Sound.sfx("select")
-			Toast.show(self, "%s is in use" % r.name, card, 1.6, "good")
+			Toast.show(self, tr("%s is in use") % L10n.t(r.name), card, 1.6, "good")
 			_changed()
 		else:
 			Sound.sfx("error")
 			Haptics.error()
-			Toast.show(self, Catalog.SAVE_FAILED, card, 2.2, "bad")
+			Toast.show(self, L10n.t(Catalog.SAVE_FAILED), card, 2.2, "bad")
 		_panel()
 		return
 	var price := int(r.price)
@@ -382,10 +383,10 @@ func _on_act() -> void:
 	if short > 0:
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, "Need %s more coins" % Fmt.coins(short), card, 1.8, "bad")
+		Toast.show(self, tr("Need %s more coins") % Fmt.coins(short), card, 1.8, "bad")
 		return
 	_asking = true
-	var yes: bool = await Sheet.confirm(self, "Buy %s?" % r.name, "%s coins. You’ll have %s left." % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], "Buy")
+	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % L10n.t(r.name), tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
 	_asking = false
 	if not yes or not is_instance_valid(self) or _closing:
 		return
@@ -393,7 +394,7 @@ func _on_act() -> void:
 	if err == "":
 		Sound.sfx("buy")
 		Haptics.success()
-		Toast.show(self, "%s is yours!" % r.name, card, 1.8, "good")
+		Toast.show(self, tr("%s is yours!") % L10n.t(r.name), card, 1.8, "good")
 		bought.emit(room_id)
 		_changed()
 	else:

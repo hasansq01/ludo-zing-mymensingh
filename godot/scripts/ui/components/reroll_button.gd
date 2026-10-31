@@ -66,7 +66,7 @@ func hide_offer() -> void:
 
 ## The label under "Roll again" ("Free" or "5" beside the gem).
 func price_text() -> String:
-	return "Free" if costs_nothing else str(cost)
+	return tr("Free") if costs_nothing else str(cost)
 
 func _process(d: float) -> void:
 	if not visible:
@@ -129,12 +129,12 @@ func _draw() -> void:
 		draw_string(f, c + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.ON_HONEY)
 	var x := c.x + RING_R + 10.0
 	var f2 := UIKit.font_body(900)
-	draw_string(f2, Vector2(x, cy - 1.0), "Rolling…" if busy else "Roll again", HORIZONTAL_ALIGNMENT_LEFT, W - x - 8.0, 16, Palette.ON_HONEY)
+	draw_string(f2, Vector2(x, cy - 1.0), tr("Rolling…") if busy else tr("Roll again"), HORIZONTAL_ALIGNMENT_LEFT, W - x - 8.0, 16, Palette.ON_HONEY)
 	if busy:
 		return
 	var f3 := UIKit.font_body(800, true)
 	if costs_nothing:
-		draw_string(f3, Vector2(x, cy + 16.0), "Free", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(Palette.ON_HONEY, 0.8))
+		draw_string(f3, Vector2(x, cy + 16.0), tr("Free"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(Palette.ON_HONEY, 0.8))
 	else:
 		draw_gem(self, Vector2(x + 7.0, cy + 10.0), 14.0)
 		draw_string(f3, Vector2(x + 18.0, cy + 16.0), str(cost), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(Palette.ON_HONEY, 0.9))

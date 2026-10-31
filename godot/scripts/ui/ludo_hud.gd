@@ -120,7 +120,7 @@ class Tile extends PlayerTile:
 			_badge.queue_free()
 			_badge = null
 		if b != "":
-			_badge = UIKit.tag("Bot" if b == "bot" else "Offline", "ink" if b == "bot" else "white")
+			_badge = UIKit.tag(tr("Bot") if b == "bot" else tr("Offline"), "ink" if b == "bot" else "white")
 			_badge.name = "Badge"
 			add_child(_badge)
 		_apply_done()
@@ -270,15 +270,15 @@ func _build_pair_box() -> void:
 	pair_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	var col := UIKit.vbox(UIKit.SPACE.xs)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	var cap := UIKit.label("Join these two pawns?", UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var cap := UIKit.label(tr("Join these two pawns?"), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(cap)
 	head.add_child(Info.icon("pair", false, 20))
 	col.add_child(head)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	pair_yes = UIKit.button("Pair up", "honey", "sm")
-	pair_no = UIKit.button("Keep single", "ghost", "sm")
+	pair_yes = UIKit.button(tr("Pair up"), "honey", "sm")
+	pair_no = UIKit.button(tr("Keep single"), "ghost", "sm")
 	for b in [pair_yes, pair_no]:
 		b.custom_minimum_size.x = 132
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -317,9 +317,9 @@ func _build_online() -> void:
 	away_box.add_theme_stylebox_override("panel", st)
 	away_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	var col := UIKit.vbox(UIKit.SPACE.xs)
-	var l := UIKit.label("You were away — a bot played for you.", UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(tr("You were away — a bot played for you."), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(l)
-	away_button = UIKit.button("I’m back", "honey", "sm")
+	away_button = UIKit.button(tr("I’m back"), "honey", "sm")
 	away_button.name = "Back"
 	away_button.pressed.connect(func(): away_pressed.emit())
 	col.add_child(away_button)
@@ -657,16 +657,16 @@ static func team_chip(s: Dictionary, c: int) -> String:
 		return ""
 	var m := LudoRules.mate_of(c)
 	if LudoRules.all_home(s, c):
-		return ("Helping " + Palette.NAMES[m]) if s.free[c] else "Roll a 6 to help"
+		return (L10n.t("Helping %s") % L10n.seat_name(Palette.NAMES[m])) if s.free[c] else L10n.t("Roll a 6 to help")
 	var me := -1
 	for k in 4:
 		if LudoRules.active(s, k) and NetLudo.you(s, k):
 			me = k
 	if me < 0 or c == me:
-		return "With " + Palette.NAMES[m]
+		return L10n.t("With %s") % L10n.seat_name(Palette.NAMES[m])
 	if c == LudoRules.mate_of(me):
-		return "With you"
-	return "Rivals"
+		return L10n.t("With you")
+	return L10n.t("Rivals")
 
 ## A transient event line (GameTopBar.say): kind "event" pops and stays readable, "info" just shows.
 ## Quiet during the tutorial (the coach bubble is the only instruction).

@@ -22,21 +22,21 @@ var _busy := ""
 
 func _init(game_ := "ludo") -> void:
 	game = game_ if game_ in ["ludo", "sl"] else "ludo"
-	super("Play with friends", UIKit.W.form, true, Sheet.LOOK_PM)
-	set_kicker("Snakes & Ladders online" if game == "sl" else "Ludo online")
+	super(L10n.t("Play with friends"), UIKit.W.form, true, Sheet.LOOK_PM)
+	set_kicker(tr("Snakes & Ladders online") if game == "sl" else tr("Ludo online"))
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
-	var intro := UIKit.paragraph("Play with up to 3 friends on their own phones. Make a room and share the code, or join theirs.",
+	var intro := UIKit.paragraph(tr("Play with up to 3 friends on their own phones. Make a room and share the code, or join theirs."),
 		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	body.add_child(intro)
-	create_button = UIKit.button_with("Create room", UIKit.icon("perk_friends", 30), "honey", "lg")
+	create_button = UIKit.button_with(tr("Create room"), UIKit.icon("perk_friends", 30), "honey", "lg")
 	create_button.name = "Create"
 	create_button.pressed.connect(func():
 		if _busy == "":
 			create_room.emit())
 	body.add_child(create_button)
-	body.add_child(_or_rule("or join a friend"))
+	body.add_child(_or_rule(tr("or join a friend")))
 	var col := UIKit.vbox(UIKit.SPACE.sm)
-	var cap := UIKit.caption("Room code")
+	var cap := UIKit.caption(tr("Room code"))
 	col.add_child(cap)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	code_edit = LineEdit.new()
@@ -46,14 +46,14 @@ func _init(game_ := "ludo") -> void:
 	code_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	code_edit.add_theme_font_override("font", UIKit.font_caps(900, 4))
 	code_edit.add_theme_font_size_override("font_size", UIKit.FS.h1 + 2)
-	code_edit.placeholder_text = "Enter code"
+	code_edit.placeholder_text = tr("Enter code")
 	code_edit.add_theme_color_override("font_placeholder_color", Color(Palette.MUTED, 0.6))
 	code_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
 	code_edit.select_all_on_focus = true
 	code_edit.text_changed.connect(_on_code_changed)
 	code_edit.text_submitted.connect(func(_t: String): _join())
 	row.add_child(code_edit)
-	paste_button = UIKit.button("Paste", "white", "sm")
+	paste_button = UIKit.button(tr("Paste"), "white", "sm")
 	paste_button.name = "Paste"
 	paste_button.custom_minimum_size.x = 84
 	paste_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -61,7 +61,7 @@ func _init(game_ := "ludo") -> void:
 	row.add_child(paste_button)
 	col.add_child(row)
 	body.add_child(col)
-	join_button = UIKit.button("Join room", "teal", "lg")
+	join_button = UIKit.button(tr("Join room"), "teal", "lg")
 	join_button.name = "Join"
 	join_button.pressed.connect(_join)
 	body.add_child(join_button)
@@ -99,7 +99,7 @@ func paste() -> void:
 	var t := DisplayServer.clipboard_get() if DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD) else ""
 	set_code(code_from_text(t))
 	if code_edit.text == "":
-		Toast.show(self, "No room code to paste", null, 1.6, "info")
+		Toast.show(self, tr("No room code to paste"), null, 1.6, "info")
 
 ## A room code inside any text ("Join my Ludo Zing room: K7QX2M" -> "K7QX2M"): the last 6-character run of code
 ## letters, else the cleaned text.
@@ -137,7 +137,7 @@ func _refresh() -> void:
 	code_edit.editable = _busy == ""
 	var cl := create_button.find_child("Text", true, false) as Label
 	if cl:
-		cl.text = "Creating…" if _busy == "create" else "Create room"
-	join_button.text = "Joining…" if _busy == "join" else "Join room"
+		cl.text = tr("Creating…") if _busy == "create" else tr("Create room")
+	join_button.text = tr("Joining…") if _busy == "join" else tr("Join room")
 	var join_off := join_button.disabled and _busy == ""        # can't be pressed yet: the off kind, not a faded teal
 	UIKit.set_kind(join_button, "off" if join_off else "teal")

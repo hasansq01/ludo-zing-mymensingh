@@ -35,7 +35,7 @@ var _ticks := 0
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
 func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
-	super("Daily spin", width, true, LOOK_PM)
+	super(L10n.t("Daily spin"), width, true, LOOK_PM)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
 	_width = width
@@ -48,7 +48,7 @@ func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> voi
 	_note.custom_minimum_size.y = 28   # reserved: the card doesn't jump when the result shows
 	_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	body.add_child(_note)
-	_go = UIKit.button("Spin", "honey", "lg")
+	_go = UIKit.button(tr("Spin"), "honey", "lg")
 	_go.name = "Spin"
 	_go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_go.clip_text = true
@@ -110,19 +110,19 @@ func _render() -> void:
 	if ready_now or _spinning:
 		if _go.get_meta("kit_kind", "") != "honey":
 			UIKit.style_button(_go, "honey", "lg")
-		_go.text = "Spin"
+		_go.text = tr("Spin")
 		_go.disabled = _spinning
 	else:
 		if _go.get_meta("kit_kind", "") != "off":
 			UIKit.style_button(_go, "off", "lg")
 			_go.add_theme_color_override("font_disabled_color", Palette.SUB)
-		_go.text = "Next spin in %s" % Fmt.until(Rewards.sec_to_midnight())
+		_go.text = tr("Next spin in %s") % Fmt.until(Rewards.sec_to_midnight())
 		_go.disabled = true
 	_fit_go_text()
 	_note.visible = ready_now or _spinning or not _result.is_empty()   # no empty gap once today's spin is used
 	if _spinning:
 		return
-	_note.text = ("You won %s coins!" % Fmt.coins_full(int(_result.prize))) if not _result.is_empty() else ""
+	_note.text = (tr("You won %s coins!") % Fmt.coins_full(int(_result.prize))) if not _result.is_empty() else ""
 
 func _spin() -> void:
 	if _spinning or _closing:
@@ -186,7 +186,7 @@ func _landed(r: Dictionary) -> void:
 		DailySheet.reward_coins(self, wheel.segment_center(int(r.index)), prize, false, int(profile.get("coins", -1)))
 	else:   # no counter on screen: the coins burst out of the hub
 		DailySheet.reward_coins(self, wheel.get_global_rect().get_center(), prize)
-		Toast.show(self, "%s coins" % Fmt.gain(prize), card, 1.8, "coin")
+		Toast.show(self, tr("%s coins") % Fmt.gain(prize), card, 1.8, "coin")
 	if int(r.index) == JACKPOT or prize >= 1000:
 		Celebrate.run(self, "burst", 0.6)
 	spun.emit(prize)

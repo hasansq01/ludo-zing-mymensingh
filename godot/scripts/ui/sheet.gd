@@ -147,7 +147,7 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 	if closable:
 		close_btn = UIKit.close_button()
 		close_btn.name = "Close"
-		close_btn.tooltip_text = "Close"
+		close_btn.tooltip_text = tr("Close")
 		# on its own layer over the card's content, so nothing the sheet adds later (a 3D preview, a grid) draws over
 		# the X or takes its taps
 		_chrome = Control.new()
@@ -808,7 +808,7 @@ func _place_chrome() -> void:
 ##   if await Sheet.confirm(self, "Restart this game?", "Everyone goes back to the start.", "Restart", "Keep playing"):
 ## host: any node of the app; the dialog opens on the app's sheet layer (Main.sheet_layer), else on host (a
 ## Control) or the root's first Control.
-static func confirm(host: Node, title_text: String, text: String, yes: String, no := "Cancel", danger := false) -> bool:
+static func confirm(host: Node, title_text: String, text: String, yes: String, no := "Cancel", danger := false) -> bool:  # l10n
 	var s := make_confirm(title_text, text, yes, no, danger)
 	var layer := _layer_for(host)
 	if layer == null:
@@ -819,7 +819,7 @@ static func confirm(host: Node, title_text: String, text: String, yes: String, n
 	return v
 
 ## The confirm dialog itself, not opened yet (previews; Sheet.confirm opens it and waits).
-static func make_confirm(title_text: String, text: String, yes: String, no := "Cancel", danger := false) -> Sheet:
+static func make_confirm(title_text: String, text: String, yes: String, no := "Cancel", danger := false) -> Sheet:  # l10n
 	var s := Sheet.new(title_text, UIKit.W.dialog, false)
 	s.dismissable = true
 	s.set_meta("confirm", true)
@@ -830,9 +830,9 @@ static func make_confirm(title_text: String, text: String, yes: String, no := "C
 		var l := UIKit.paragraph(text, UIKit.FS.body_l, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		s.body.add_child(l)
 	var state := {value = false, done = false}
-	var nb := UIKit.btn(no, "ghost", "md")
+	var nb := UIKit.btn(L10n.t(no), "ghost", "md")
 	nb.name = "No"
-	var yb := UIKit.btn(yes, "red" if danger else "honey", "md")
+	var yb := UIKit.btn(L10n.t(yes), "red" if danger else "honey", "md")
 	yb.name = "Yes"
 	for b: Button in [nb, yb]:
 		UIKit.fit_text(b, 14)

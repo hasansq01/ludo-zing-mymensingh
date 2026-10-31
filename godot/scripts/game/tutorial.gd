@@ -30,6 +30,7 @@ const STAR := 8                          # your first star square (progress = ab
 ## The lesson, one entry per decision of yours. roll: what your next dice tap shows. move: your pawn the step lets
 ## you tap (only it glows); mark: what else the cut-out shows ("pawn:<key>" = colour * 4 + index, "square:<p>",
 ## "goal"); expect: what the move must do (checked by tests/test_tutorial.gd).
+## l10n-keys: text, sub
 const STEPS := [
 	{roll = 6, text = "Tap the dice to roll"},
 	{move = 0, text = "A 6 brings a pawn out", sub = "Tap the glowing pawn", expect = "enter"},
@@ -49,16 +50,16 @@ const BOT_ROLLS := [3]
 const FIRST_DELAY := 1.0                 # s before the first coach mark (the camera flies to the board)
 
 const NOTE_SEC := 8.0                    # a held note closes by itself after this (a tap closes it sooner)
-const PAIR_NOTE := ["You made a pair!", "Pairs move on even rolls and block rivals"]
-const SAFE_NOTE := ["Your pawn on the star is safe", "Mocha landed there too but can’t capture it"]
-const READY_TITLE := "You’re ready!"
-const READY_TEXT := "Get all four pawns home first to win. Roll 6s, capture rivals and use stars to stay safe."
-const READY_PLAY := "Play a real game"
-const READY_HOME := "Back to home"
-const SKIP_TITLE := "Skip the tutorial?"
-const SKIP_TEXT := "You can replay it from How to play."
-const SKIP_YES := "Skip"
-const SKIP_NO := "Keep learning"
+const PAIR_NOTE := ["You made a pair!", "Pairs move on even rolls and block rivals"]  # l10n
+const SAFE_NOTE := ["Your pawn on the star is safe", "Mocha landed there too but can’t capture it"]  # l10n
+const READY_TITLE := "You’re ready!"  # l10n
+const READY_TEXT := "Get all four pawns home first to win. Roll 6s, capture rivals and use stars to stay safe."  # l10n
+const READY_PLAY := "Play a real game"  # l10n
+const READY_HOME := "Back to home"  # l10n
+const SKIP_TITLE := "Skip the tutorial?"  # l10n
+const SKIP_TEXT := "You can replay it from How to play."  # l10n
+const SKIP_YES := "Skip"  # l10n
+const SKIP_NO := "Keep learning"  # l10n
 
 var match_: Node                         # the LudoMatch
 var marks: CoachMarks
@@ -169,7 +170,7 @@ func on_turn(c: int) -> bool:
 
 func _dice_step() -> void:
 	var st := step()
-	marks.step(CoachMarks.around_control(match_.hud.dice), st.text, str(st.get("sub", "")))
+	marks.step(CoachMarks.around_control(match_.hud.dice), tr(st.text), tr(str(st.get("sub", ""))) if st.has("sub") else "")
 
 func _first_step() -> void:
 	await get_tree().create_timer(FIRST_DELAY).timeout
@@ -198,7 +199,7 @@ func allowed(c: int) -> Array:
 	var board: LudoBoard = match_.board
 	var cam: Camera3D = match_.world.camera
 	var target := CoachMarks.around_point(func() -> Vector2: return cam.unproject_position(board.pawn_point(key)))
-	marks.step(target, st.text, str(st.get("sub", "")), _mark_of(str(st.get("mark", ""))))
+	marks.step(target, tr(st.text), tr(str(st.get("sub", ""))) if st.has("sub") else "", _mark_of(str(st.get("mark", ""))))
 	return [k]
 
 ## Your move went through.
@@ -217,7 +218,7 @@ func on_event(e: Dictionary) -> void:
 	if e.get("type", "") == "pair_formed" and int(e.get("c", -1)) == YOU:
 		var key := YOU * 4 + int(e.get("a", 0))
 		var at := _pawn_rect(key)
-		marks.note(PAIR_NOTE[0], PAIR_NOTE[1], at, NOTE_SEC, true)
+		marks.note(tr(PAIR_NOTE[0]), tr(PAIR_NOTE[1]), at, NOTE_SEC, true)
 
 ## Leaving the match (Home, a new game) while the lesson runs counts as skipping it.
 func cancel() -> void:
@@ -248,7 +249,7 @@ func _finish() -> void:
 	var a_key := YOU * 4 + 0
 	var star_ok: bool = int(match_.S.tok[YOU][0]) == STAR
 	if star_ok:
-		await marks.note(SAFE_NOTE[0], SAFE_NOTE[1], _pawn_rect(a_key), NOTE_SEC, true)
+		await marks.note(tr(SAFE_NOTE[0]), tr(SAFE_NOTE[1]), _pawn_rect(a_key), NOTE_SEC, true)
 	if not is_inside_tree() or _over:
 		return
 	_over = true
@@ -258,7 +259,7 @@ func _finish() -> void:
 	var parent := marks.get_parent() as Control
 	if parent:
 		_confetti = Celebrate.run(parent, "burst", 0.45)
-	var what := await marks.card(READY_TITLE, READY_TEXT, READY_PLAY, READY_HOME)
+	var what := await marks.card(tr(READY_TITLE), tr(READY_TEXT), tr(READY_PLAY), tr(READY_HOME))
 	_drop_confetti()                          # before the next screen: no confetti over the real game
 	if not is_inside_tree():
 		return
@@ -271,7 +272,7 @@ func _on_skip() -> void:
 		return
 	_asking = true
 	var host: Node = marks if is_instance_valid(marks) else self
-	var yes: bool = await Sheet.confirm(host, SKIP_TITLE, SKIP_TEXT, SKIP_YES, SKIP_NO)
+	var yes: bool = await Sheet.confirm(host, tr(SKIP_TITLE), tr(SKIP_TEXT), tr(SKIP_YES), tr(SKIP_NO))
 	_asking = false
 	if not yes or _over or not is_inside_tree():
 		return

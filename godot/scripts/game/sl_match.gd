@@ -178,8 +178,8 @@ func _build_online() -> void:
 	away_box.add_theme_stylebox_override("panel", st)
 	away_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	var col := UIKit.vbox(UIKit.SPACE.xs)
-	col.add_child(UIKit.label("You were away — a bot played for you.", UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
-	away_button = UIKit.button("I’m back", "honey", "sm")
+	col.add_child(UIKit.label(tr("You were away — a bot played for you."), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
+	away_button = UIKit.button(tr("I’m back"), "honey", "sm")
 	away_button.name = "Back"
 	away_button.pressed.connect(_net_back)
 	col.add_child(away_button)
@@ -315,7 +315,7 @@ func _set_dice_turn(p: Dictionary, can_tap: bool) -> void:
 	dice_pad.set_color(c, can_tap)
 	if can_tap and not dice.active and not dice.rolling:
 		dice.show_ready()                     # a neutral pose while waiting, not the last roll's face
-	var who := "%s’s turn" % p.name if G.get("mode", "cpu") == "local" else ""
+	var who := tr("%s’s turn") % L10n.seat_name(str(p.name)) if G.get("mode", "cpu") == "local" else ""
 	dice.set_turn(Palette.PLAYER[c], can_tap, who, PlayerTile.name_color(c))
 	_waiting = can_tap
 	set_process(true)
@@ -379,7 +379,7 @@ func wait(sec: float) -> void:
 
 ## "You" or the player's bold name (tinted by GameTopBar with the turn's colour).
 func _who(p: Dictionary) -> String:
-	return "You" if p.you else "[b]%s[/b]" % p.name
+	return tr("You") if p.you else "[b]%s[/b]" % L10n.seat_name(str(p.name))
 
 func _human(p: Dictionary) -> bool:
 	if online:
@@ -496,13 +496,13 @@ func _begin() -> void:
 	if not p.cpu:
 		_ff = false
 	if p.cpu or autoplay:
-		top.set_idle("%s is rolling…" % _who(p) if not p.you else "Rolling…")
+		top.set_idle(tr("%s is rolling…") % _who(p) if not p.you else tr("Rolling…"))
 		_set_dice_turn(p, false)
 		await wait(CPU_ROLL_WAIT)
 		if live(id) and G.phase == "roll":
 			roll()
 	else:
-		top.set_idle("Your turn" if p.you else "%s’s turn" % _who(p))
+		top.set_idle(tr("Your turn") if p.you else tr("%s’s turn") % _who(p))
 		_set_dice_turn(p, true)
 		if TapLog.enabled():
 			(func(): TapLog.point(dice)).call_deferred()
@@ -543,20 +543,20 @@ func _play_roll(id: int, p: Dictionary, pi: int, v: int, ev: Array) -> void:
 	for e in ev:
 		match e.type:
 			"three_sixes":
-				top.say("%s rolled three 6s. Turn over." % _who(p), HOLD_WAIT + 0.6, "event")
+				top.say(tr("%s rolled three 6s. Turn over.") % _who(p), HOLD_WAIT + 0.6, "event")
 				Sound.sfx("error", {soft = soft})
 				await wait(HOLD_WAIT)
 			"wait":
 				if p.you:
-					top.say("You need a 1 to start.", 1.6)             # one line in the status pill (the die shows the roll)
+					top.say(tr("You need a 1 to start."), 1.6)             # one line in the status pill (the die shows the roll)
 				else:
-					top.say("%s needs a 1 to start." % _who(p), 1.6)
+					top.say(tr("%s needs a 1 to start.") % _who(p), 1.6)
 				await wait(HOLD_WAIT)
 			"over":
 				if p.you:
-					top.say("You need exactly %d to finish." % e.need, 1.8)
+					top.say(tr("You need exactly %d to finish.") % e.need, 1.8)
 				else:
-					top.say("%s needs exactly %d to finish." % [_who(p), e.need], 1.8)
+					top.say(tr("%s needs exactly %d to finish.") % [_who(p), e.need], 1.8)
 				await wait(HOLD_WAIT)
 			"move":
 				await _walk(id, p, pi, e, v)
@@ -574,11 +574,11 @@ func _play_roll(id: int, p: Dictionary, pi: int, v: int, ev: Array) -> void:
 				_again = e.again
 				if e.again:
 					if p.you:
-						top.say("You rolled a 6. Roll again!", 1.6, "event")
+						top.say(tr("You rolled a 6. Roll again!"), 1.6, "event")
 					else:
-						top.say("%s rolls again (a 6)." % _who(p), 1.6, "event")
+						top.say(tr("%s rolls again (a 6).") % _who(p), 1.6, "event")
 					Sound.sfx("six", {soft = soft})
-					_pop("Roll again!", board.pawn_top(pi), Palette.HONEY, 26)
+					_pop(tr("Roll again!"), board.pawn_top(pi), Palette.HONEY, 26)
 				_save()
 				await wait(CPU_AFTER_WAIT if soft else HUMAN_AFTER_WAIT)
 				_busy = false
@@ -592,7 +592,7 @@ func _play_roll(id: int, p: Dictionary, pi: int, v: int, ev: Array) -> void:
 ## The pawn hops square by square, then rides a ladder or a snake.
 func _walk(id: int, p: Dictionary, pi: int, e: Dictionary, v: int) -> void:
 	var soft := _soft(p)
-	top.say(("You rolled a %d." if p.you else "%s rolled a %d.") % ([v] if p.you else [_who(p), v]), 1.2 if int(e.from) > 0 else 1.4)
+	top.say((tr("You rolled a %d.") if p.you else tr("%s rolled a %d.")) % ([v] if p.you else [_who(p), v]), 1.2 if int(e.from) > 0 else 1.4)
 	var sq: int = int(e.from)
 	for k in int(e.steps):
 		while app.paused and not online and live(id):
@@ -606,27 +606,27 @@ func _walk(id: int, p: Dictionary, pi: int, e: Dictionary, v: int) -> void:
 			return
 	if e.ladder:
 		if p.you:
-			top.say("Ladder! You climbed to %d." % e.to, 1.8, "event")
+			top.say(tr("Ladder! You climbed to %d.") % e.to, 1.8, "event")
 		else:
-			top.say("Ladder! %s climbed to %d." % [_who(p), e.to], 1.8, "event")
+			top.say(tr("Ladder! %s climbed to %d.") % [_who(p), e.to], 1.8, "event")
 		Sound.sfx("ladder", {soft = soft})
 		if _human(p):
 			Haptics.success()
-		_pop("Up to %d!" % e.to, board.pawn_top(pi), Palette.GOLD_HI, 30)
+		_pop(tr("Up to %d!") % e.to, board.pawn_top(pi), Palette.GOLD_HI, 30)
 		if not online and emotes:
 			emotes.react_ladder(int(p.c))
 		await board.climb(pi, e.via, e.to, _spd())
 	elif e.snake:
 		if p.you:
-			top.say("Snake! You slid down to %d." % e.to, 1.8, "event")
+			top.say(tr("Snake! You slid down to %d.") % e.to, 1.8, "event")
 		else:
-			top.say("Snake! %s slid down to %d." % [_who(p), e.to], 1.8, "event")
+			top.say(tr("Snake! %s slid down to %d.") % [_who(p), e.to], 1.8, "event")
 		Sound.sfx("snake", {soft = soft})
 		_rr_head = online                      # the offer's 3 s run from the server's clock: show it now, not after the gulp
 		_net_reroll_show()
 		if _human(p):
 			Haptics.medium()
-		_pop("Down to %d" % e.to, board.pawn_top(pi), Palette.CORAL, 30)
+		_pop(tr("Down to %d") % e.to, board.pawn_top(pi), Palette.CORAL, 30)
 		if not online and emotes:
 			emotes.react_snake(int(p.c))
 		await board.slide(pi, e.via, e.to, _spd())
@@ -646,12 +646,12 @@ func _finished_one(p: Dictionary, pi: int, place: int, ending: bool) -> void:
 		_my_place = place
 		_my_away = online and bool(p.cpu)
 	_refresh_tiles()
-	print("[sl] %s finished %s%s" % [p.name, ResultScreen.ordinal(place), " (game over)" if ending else ""])
+	print("[sl] %s finished %s%s" % [p.name, ResultScreen.ordinal_en(place), " (game over)" if ending else ""])
 	if ending:
 		return
 	var nth := ResultScreen.ordinal(place)
-	top.say("%s finished %s! The others play on." % [_who(p), nth], 2.4, "event")
-	_pop("%s finished %s!" % ["You" if p.you else str(p.name), nth], board.pawn_top(pi), Palette.GOLD_HI if place == 1 else Palette.HONEY, 30)
+	top.say(tr("%s finished %s! The others play on.") % [_who(p), nth], 2.4, "event")
+	_pop(tr("%s finished %s!") % [tr("You") if p.you else str(p.name), nth], board.pawn_top(pi), Palette.GOLD_HI if place == 1 else Palette.HONEY, 30)
 	Sound.sfx("win", {soft = _soft(p)})
 	if not online and emotes:
 		emotes.react_finish(int(p.c))
@@ -684,7 +684,7 @@ func _win(w: Dictionary) -> void:
 		emotes.react_win([int(p.c)], G.players.map(func(x): return int(x.c)))
 	top.set_idle("")
 	if _homes() <= 1:                         # (play on: the later finishes already popped)
-		top.say("You reached 100!" if p.you else "%s reached 100!" % _who(p), 2.0, "event")
+		top.say(tr("You reached 100!") if p.you else tr("%s reached 100!") % _who(p), 2.0, "event")
 		_pop("100!", board.pawn_top(G.winner), Palette.GOLD_HI, 36)
 	Sound.sfx("lose" if p.cpu else "win")
 	if _human(p):
@@ -719,7 +719,7 @@ func result_data(reward := 0) -> Dictionary:
 			pos = int(s.pos), progress = float(s.progress)})
 	var w: Dictionary = G.players[int(G.winner)] if int(G.winner) >= 0 else {}
 	var won := not w.is_empty() and not bool(w.cpu)
-	var title := "Game over"
+	var title := tr("Game over")
 	var sub := ""
 	var me: Dictionary = {}
 	for r: Dictionary in rows:
@@ -727,14 +727,14 @@ func result_data(reward := 0) -> Dictionary:
 			me = r
 	if not w.is_empty():                      # headlined from your side: "You finished 2nd" / "Mocha won"
 		if w.you or me.is_empty():
-			title = "You win!" if w.you else "%s wins!" % w.name
-			sub = "First to square 100!"
+			title = tr("You win!") if w.you else tr("%s wins!") % L10n.seat_name(str(w.name))
+			sub = tr("First to square 100!")
 		else:
-			title = "You finished %s" % ResultScreen.ordinal(maxi(int(me.place), 2))
+			title = tr("You finished %s") % ResultScreen.ordinal(maxi(int(me.place), 2))
 			if bool(me.finished):
-				sub = "%s won · you reached 100 too" % w.name
+				sub = tr("%s won · you reached 100 too") % L10n.seat_name(str(w.name))
 			else:
-				sub = "%s won · you reached square %d" % [w.name, int(me.pos)] if int(me.pos) > 0 else "%s won" % w.name
+				sub = tr("%s won · you reached square %d") % [L10n.seat_name(str(w.name)), int(me.pos)] if int(me.pos) > 0 else tr("%s won") % L10n.seat_name(str(w.name))
 	return {game = "sl", title = title, sub = sub, standings = rows, human_won = won,
 		reward = reward,
 		vs_cpu = G.mode == "cpu", color = int(w.get("c", 0))}
@@ -1120,7 +1120,7 @@ func net_rerolled(msg: Dictionary) -> void:
 	_rr_wait = true                            # the dice stay asleep until the new roll's act
 	_net_apply_hold()
 	var p := _player_of(c)
-	Toast.show(hud, "%s rolled again" % ("You" if c == ns.me else str(p.get("name", "Someone"))), null, 1.8, "info")
+	Toast.show(hud, tr("%s rolled again") % (tr("You") if c == ns.me else L10n.seat_name(str(p.get("name", tr("Someone"))))), null, 1.8, "info")
 	get_tree().create_timer(4.0).timeout.connect(func():
 		if _rr_wait:                           # failsafe: the roll never came
 			_rr_wait = false
@@ -1143,7 +1143,7 @@ func _net_reroll_error(code: String, msg: Dictionary) -> void:
 ## NetClient.status: the "Reconnecting…" pill.
 func net_status(st: String) -> void:
 	if online:
-		_set_banner("Reconnecting…" if st in ["reconnecting", "connecting"] else "")
+		_set_banner(tr("Reconnecting…") if st in ["reconnecting", "connecting"] else "")
 
 ## {t: "emote", c, id}: another seat's reaction (a friend, a quick-match player).
 func net_emote(msg: Dictionary) -> void:
@@ -1190,12 +1190,12 @@ func _net_badges() -> void:
 ## The event line while you wait: "Your turn", "Rafi’s turn", "Rafi is away. A bot is playing…".
 func _net_wait_line(p: Dictionary) -> String:
 	if ns.my_turn():
-		return "Your turn"
+		return tr("Your turn")
 	if bool(p.you):
-		return "A bot is playing for you"
+		return tr("A bot is playing for you")
 	if bool(p.cpu):
-		return "%s is away. A bot is playing…" % _who(p)
-	return "%s’s turn" % _who(p)
+		return tr("%s is away. A bot is playing…") % _who(p)
+	return tr("%s’s turn") % _who(p)
 
 ## The server's countdown on the tile of colour c (c < 0 clears every tile).
 func _set_timer(c: int, left_ms: float, total_ms: float) -> void:
@@ -1407,7 +1407,7 @@ class SLTile extends Control:
 	const NAME_Y := 47.0
 	const NAME_H := 20.0
 	const NOTE_H := 18.0
-	const OFF_BOARD := "Off board"
+	const OFF_BOARD := "Off board"   # l10n
 	var color_index := 0
 	var kind := "cpu"
 	var active := false
@@ -1453,11 +1453,11 @@ class SLTile extends Control:
 		_sb_glow.shadow_size = 12
 		_ava = PlayerTile.make_avatar(color_index, kind, AVA, cpu_id if cpu_id != "" else name_)
 		add_child(_ava)
-		_name = UIKit.label(name_, UIKit.FS.label, Palette.INK_STRONG, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+		_name = UIKit.label(L10n.seat_name(name_), UIKit.FS.label, Palette.INK_STRONG, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 		_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		add_child(_name)
-		_note = UIKit.label(OFF_BOARD, UIKit.FS.small, PlayerTile.name_color(color_index), UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
+		_note = UIKit.label(L10n.t(OFF_BOARD), UIKit.FS.small, PlayerTile.name_color(color_index), UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
 		_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_note_pill = PanelContainer.new()
 		var st := UIKit.box((Palette.TINT[color_index] as Color).lerp(Color.WHITE, 0.55), UIKit.R.pill, 0, Color.TRANSPARENT)
@@ -1494,7 +1494,7 @@ class SLTile extends Control:
 			_badge.queue_free()
 			_badge = null
 		if b != "":
-			_badge = UIKit.tag("Bot" if b == "bot" else "Offline", "ink" if b == "bot" else "white")
+			_badge = UIKit.tag(tr("Bot") if b == "bot" else tr("Offline"), "ink" if b == "bot" else "white")
 			_badge.name = "Badge"
 			add_child(_badge)
 		_layout()
@@ -1583,13 +1583,13 @@ class SLTile extends Control:
 	## "Square 47" / "Sq 47"; 0 = "Off board".
 	static func square_text(n: int, short_ := false) -> String:
 		if n <= 0:
-			return OFF_BOARD
-		return ("Sq %d" if short_ else "Square %d") % n
+			return L10n.t(OFF_BOARD)
+		return (L10n.t("Sq %d") if short_ else L10n.t("Square %d")) % n
 
 	## The long form fits a tile `w` px wide (its widest case, "Square 100"), so the row can use it everywhere.
 	static func fits_long(w: float) -> bool:
 		var f := UIKit.font_body(900, true)
-		return f.get_string_size("Square 100", HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.small).x <= w - 2.0 * 6.0 - 14.0
+		return f.get_string_size(L10n.t("Square %d") % 100, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.small).x <= w - 2.0 * 6.0 - 14.0
 
 	func _layout() -> void:
 		var w := size.x

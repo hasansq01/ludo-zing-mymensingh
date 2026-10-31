@@ -57,13 +57,13 @@ var _acct_signing := false
 
 
 func _init(width := 360.0) -> void:
-	super("Profile", width, true, Sheet.LOOK_PM)
+	super(L10n.t("Profile"), width, true, Sheet.LOOK_PM)
 	var stack := UIKit.vbox(0)
 	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(stack)
 	_tabs = TabStrip.new([
-		{key = "profile", text = "Me", icon = "tab_profile"},
-		{key = "ach", text = "Achievements", icon = "ic_trophy"},
+		{key = "profile", text = tr("Me"), icon = "tab_profile"},
+		{key = "ach", text = tr("Achievements"), icon = "ic_trophy"},
 	], pane, "folder")
 	_tabs.picked.connect(show_pane)
 	# the strip stops short of the corner X: the Achievements count badge sits clear of it
@@ -87,8 +87,8 @@ func _init(width := 360.0) -> void:
 
 	_profile_pane = UIKit.vbox(UIKit.SPACE.md)
 	_profile_pane.add_child(UIKit.list_row(_build_identity()))
-	_profile_pane.add_child(_section("Your name", _build_name()))
-	_acct_box = _section("Account", _build_account())
+	_profile_pane.add_child(_section(tr("Your name"), _build_name()))
+	_acct_box = _section(tr("Account"), _build_account())
 	_acct_box.name = "AccountBox"
 	_profile_pane.add_child(_acct_box)
 	_profile_pane.add_child(_build_stats())
@@ -221,13 +221,13 @@ func _build_identity() -> VBoxContainer:
 	v.add_child(head)
 
 	var btns := UIKit.hbox(UIKit.SPACE.sm)         # Leaderboard (secondary) left, Inventory (primary) right
-	var ranks := UIKit.btn("Leaderboard", "white", "sm")
+	var ranks := UIKit.btn(tr("Leaderboard"), "white", "sm")
 	ranks.name = "Leaderboard"
 	ranks.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UIKit.fit_text(ranks, 13)
 	ranks.pressed.connect(_open_leaderboard)
 	btns.add_child(ranks)
-	var look := UIKit.btn("Inventory", "honey", "sm")
+	var look := UIKit.btn(tr("Inventory"), "honey", "sm")
 	look.name = "Inventory"
 	look.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UIKit.fit_text(look, 13)
@@ -251,7 +251,7 @@ func _build_name() -> VBoxContainer:
 	_name_edit = LineEdit.new()
 	_name_edit.max_length = MAX_NAME
 	_name_edit.text = str(Save.profile.get("name", "You"))
-	_name_edit.placeholder_text = "Your name"
+	_name_edit.placeholder_text = tr("Your name")
 	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_name_edit.custom_minimum_size = Vector2(0, UIKit.TAP)
@@ -261,7 +261,7 @@ func _build_name() -> VBoxContainer:
 	_name_edit.text_changed.connect(func(_t: String): _validate(true))
 	_name_edit.text_submitted.connect(func(_t: String): _save_name())
 	row.add_child(_name_edit)
-	_save_btn = UIKit.button("Save", "honey", "sm")
+	_save_btn = UIKit.button(tr("Save"), "honey", "sm")
 	_save_btn.custom_minimum_size.x = 84
 	_save_btn.pressed.connect(_save_name)
 	row.add_child(_save_btn)
@@ -284,7 +284,7 @@ func _open_leaderboard() -> void:
 func _build_account() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
 	var head := UIKit.hbox(UIKit.SPACE.sm)
-	_acct_title = UIKit.label("Guest", UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	_acct_title = UIKit.label(tr("Guest"), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	_acct_title.name = "AccountTitle"
 	_acct_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_acct_title.clip_text = true
@@ -293,7 +293,7 @@ func _build_account() -> VBoxContainer:
 	_acct_synced = UIKit.hbox(UIKit.SPACE.xs)
 	_acct_synced.name = "Synced"
 	_acct_synced.add_child(UIKit.glyph("ic_check", 16, Palette.TEAL_INK))
-	var sl := UIKit.caps_label("Synced", Palette.TEAL_INK)
+	var sl := UIKit.caps_label(tr("Synced"), Palette.TEAL_INK)
 	sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_acct_synced.add_child(sl)
 	_acct_synced.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -302,12 +302,12 @@ func _build_account() -> VBoxContainer:
 	_acct_note = UIKit.paragraph("", UIKit.FS.small, Palette.SUB)
 	_acct_note.name = "AccountNote"
 	v.add_child(_acct_note)
-	_acct_button = UIKit.btn("Sign in with Google Play Games", "honey", "sm")
+	_acct_button = UIKit.btn(tr("Sign in with Google Play Games"), "honey", "sm")
 	_acct_button.name = "GoogleSignIn"
 	UIKit.fit_text(_acct_button, 13)
 	_acct_button.pressed.connect(_sign_in_google)
 	UIKit.deny_disabled(_acct_button, func() -> String:
-		return "You’re offline. Connect to sign in." if account_state() == "offline" else "")
+		return tr("You’re offline. Connect to sign in.") if account_state() == "offline" else "")
 	v.add_child(_acct_button)
 	return v
 
@@ -335,24 +335,24 @@ func _refresh_account() -> void:
 	_acct_synced.visible = st == "linked"
 	_acct_button.visible = st in ["guest", "offline"] and acc.google_available()
 	_acct_button.disabled = _acct_signing or st == "offline"
-	_acct_button.text = "Signing in…" if _acct_signing else "Sign in with Google Play Games"
+	_acct_button.text = tr("Signing in…") if _acct_signing else tr("Sign in with Google Play Games")
 	match st:
 		"linked":
 			var g := acc.google_name()
 			_acct_title.text = g if g != "" else "Google Play Games"
-			_acct_note.text = "Signed in with Google Play Games. Your progress is saved to your account."
+			_acct_note.text = tr("Signed in with Google Play Games. Your progress is saved to your account.")
 		"guest":
-			_acct_title.text = "Guest"
-			_acct_note.text = "Sign in to keep your progress if you change phones."
+			_acct_title.text = tr("Guest")
+			_acct_note.text = tr("Sign in to keep your progress if you change phones.")
 		"guest_local":
-			_acct_title.text = "Guest"
-			_acct_note.text = "Your progress is saved on our server. Sign-in with Google Play Games is available on Android."
+			_acct_title.text = tr("Guest")
+			_acct_note.text = tr("Your progress is saved on our server. Sign-in with Google Play Games is available on Android.")
 		"offline":
-			_acct_title.text = "Guest · offline"
-			_acct_note.text = "You’re offline. Your progress will sync when you’re back online."
+			_acct_title.text = tr("Guest · offline")
+			_acct_note.text = tr("You’re offline. Your progress will sync when you’re back online.")
 		"banned":
-			_acct_title.text = "Account unavailable"
-			_acct_note.text = "This account can’t play online right now."
+			_acct_title.text = tr("Account unavailable")
+			_acct_note.text = tr("This account can’t play online right now.")
 			_acct_button.visible = false
 
 func _sign_in_google() -> void:
@@ -368,7 +368,7 @@ func _sign_in_google() -> void:
 	_refresh_account()
 	if r.get("ok", false):
 		Haptics.success()
-		Toast.show(self, "Signed in as %s" % (acc.google_name() if acc.google_name() != "" else "your Google account"), card, 2.0, "good")
+		Toast.show(self, tr("Signed in as %s") % (acc.google_name() if acc.google_name() != "" else tr("your Google account")), card, 2.0, "good")
 		profile_changed.emit()
 		return
 	var why := Account.google_error_text(str(r.get("error", "")))
@@ -385,12 +385,12 @@ func _heading(text: String) -> Label:
 ## Stats in tidy tiles: Ludo vs computer (2 x 2), Snakes & Ladders, Overall (pairs, Pass & Play, coins earned).
 func _build_stats() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.lg)
-	_stats_note = UIKit.paragraph("Finish a game to start your stats.", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_stats_note = UIKit.paragraph(tr("Finish a game to start your stats."), UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_stats_note)
-	v.add_child(_stat_group("Ludo vs computer", [["played", "Played"], ["wins", "Wins"], ["winRate", "Win rate"], ["bestStreak", "Best streak"]]))
-	v.add_child(_stat_group("Snakes & Ladders", [["slPlayed", "Played"], ["slWins", "Wins"]]))
-	var overall := _stat_group("Overall", [["pairsFormed", "Pairs formed"], ["ppGames", "Pass & Play games"]])
-	overall.add_child(_coin_tile("coinsEarned", "Coins earned"))
+	v.add_child(_stat_group(tr("Ludo vs computer"), [["played", tr("Played")], ["wins", tr("Wins")], ["winRate", tr("Win rate")], ["bestStreak", tr("Best streak")]]))
+	v.add_child(_stat_group(tr("Snakes & Ladders"), [["slPlayed", tr("Played")], ["slWins", tr("Wins")]]))
+	var overall := _stat_group(tr("Overall"), [["pairsFormed", tr("Pairs formed")], ["ppGames", tr("Pass & Play games")]])
+	overall.add_child(_coin_tile("coinsEarned", tr("Coins earned")))
 	v.add_child(overall)
 	return v
 
@@ -436,7 +436,7 @@ func _build_ach() -> void:
 	sum.add_child(_ach_earned)
 	_ach_claim = UIKit.hbox(UIKit.SPACE.sm)               # the rewards still to claim (not the wallet)
 	_ach_claim.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_ach_claim.add_child(UIKit.label("To claim", UIKit.FS.small, Palette.SUB, UIKit.font_body(800)))
+	_ach_claim.add_child(UIKit.label(tr("To claim"), UIKit.FS.small, Palette.SUB, UIKit.font_body(800)))
 	_ach_coins = CoinAmount.new(0, "sm", "chip")
 	_ach_coins.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_ach_claim.add_child(_ach_coins)
@@ -461,10 +461,10 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 
 	var txt := UIKit.vbox(UIKit.SPACE.xxs)
 	txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var t := UIKit.label(a.name, UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	var t := UIKit.label(tr(a.name), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	txt.add_child(t)
-	var d := UIKit.paragraph(a.desc, UIKit.FS.small, Palette.MUTED)
+	var d := UIKit.paragraph(tr(a.desc), UIKit.FS.small, Palette.MUTED)
 	txt.add_child(d)
 	var foot := UIKit.hbox(UIKit.SPACE.sm)
 	var bar := Meter.new("teal", 18, true)
@@ -480,7 +480,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	var claimed := UIKit.hbox(UIKit.SPACE.xs)
 	claimed.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	claimed.add_child(UIKit.glyph("ic_check", 16, Palette.TEAL_INK))
-	var cl := UIKit.caps_label("Claimed", Palette.TEAL_INK)
+	var cl := UIKit.caps_label(tr("Claimed"), Palette.TEAL_INK)
 	cl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	claimed.add_child(cl)
 	foot.add_child(claimed)
@@ -494,7 +494,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 		amt_gems.name = "Gems"
 		amt_gems.set_color(Palette.ON_HONEY)
 		amt.add_child(amt_gems)
-	var claim := UIKit.button_with("Claim", amt, "honey", "sm")
+	var claim := UIKit.button_with(tr("Claim"), amt, "honey", "sm")
 	claim.name = "Claim"
 	claim.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	claim.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -509,7 +509,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.gui_input.connect(func(e: InputEvent) -> void:        # a tap on one not earned yet says what it asks for
 		if Sheet._is_tap(e) and not bool(Collection.ach_progress(id, Save.profile).get("done", false)):
-			UIKit.deny(self, "%s: %s" % [a.name, str(a.desc).trim_suffix(".")], p, 2.2))
+			UIKit.deny(self, "%s: %s" % [tr(a.name), tr(str(a.desc)).trim_suffix(".").trim_suffix("।")], p, 2.2))
 
 	_ach_updaters.append(func():
 		var pr := Collection.ach_progress(id, Save.profile)
@@ -538,7 +538,7 @@ static func _reorder_claim(b: Button) -> void:
 ## anchored inside the button, so the button doesn't grow with it by itself).
 static func _claim_width(amt: Control) -> float:
 	var p: Dictionary = UIKit.BTN.sm
-	var tw := UIKit.font_display().get_string_size("Claim", HORIZONTAL_ALIGNMENT_LEFT, -1, int(p.fs)).x
+	var tw := UIKit.font_display().get_string_size(L10n.t("Claim"), HORIZONTAL_ALIGNMENT_LEFT, -1, int(p.fs)).x
 	return ceilf(2.0 * float(p.pad) + tw + UIKit.SPACE.sm + amt.get_combined_minimum_size().x)
 
 ## Earned: full colour on a honey well with a gold ring. Not yet: a faded, desaturated medal on a dim well.
@@ -604,9 +604,9 @@ func _claim(id: String) -> void:
 				_refresh()
 		CoinFly.run(self, from, target, n, landed, Collection.coins())
 		if gems > 0:
-			Toast.show(self, "+%d gems" % gems, card, 1.8, "gem")
+			Toast.show(self, tr("+%d gems") % gems, card, 1.8, "gem")
 	else:
-		Toast.show(self, "%s: %s coins%s" % [Collection.ach(id).name, Fmt.gain(n), (" +%d gems" % gems) if gems > 0 else ""], card, 1.8, "coin")
+		Toast.show(self, tr("%s: %s coins") % [tr(Collection.ach(id).name), Fmt.gain(n)] + ((" " + tr("+%d gems") % gems) if gems > 0 else ""), card, 1.8, "coin")
 	_refresh()
 	profile_changed.emit()
 
@@ -624,7 +624,7 @@ func _refresh() -> void:
 		return
 	var p: Dictionary = Save.profile
 	_ava.refresh()
-	_plate.set_look(str(p.get("name", "You")), Collection.equipped("plate", p), Collection.equipped("badge", p))
+	_plate.set_look(L10n.seat_name(str(p.get("name", "You"))), Collection.equipped("plate", p), Collection.equipped("badge", p))
 	var info: Dictionary = Save.level_info(int(p.get("xp", 0)))
 	_level.set_level(int(info.level))
 	_xp.set_value(float(info.into), float(info.need))
@@ -660,7 +660,7 @@ func _refresh() -> void:
 				waiting += int(a.reward)
 	_ach_coins.set_amount(waiting)
 	_ach_claim.visible = waiting > 0
-	_ach_earned.text = "%d of %d earned" % [earned, Collection.ACH.size()]
+	_ach_earned.text = tr("%d of %d earned") % [earned, Collection.ACH.size()]
 	for u in _ach_updaters:
 		u.call()
 	_tabs.set_count("ach", Collection.claimable_count(p))
@@ -681,8 +681,8 @@ func _validate(show_err: bool) -> bool:
 	var changed := n != str(Save.profile.get("name", ""))
 	_save_btn.visible = changed
 	_save_btn.disabled = not ok or not changed
-	_err.text = "" if not show_err or ok else "Pick another name: “You” is how the game shows you to yourself." if reserved \
-		else "Enter a name of 1 to %d characters." % MAX_NAME
+	_err.text = "" if not show_err or ok else tr("Pick another name: “You” is how the game shows you to yourself.") if reserved \
+		else tr("Enter a name of 1 to %d characters.") % MAX_NAME
 	_err.visible = _err.text != ""
 	return ok
 
@@ -709,5 +709,5 @@ func _save_name() -> void:
 	Haptics.success()
 	Save.changed.emit()      # also refreshes this sheet
 	_validate(false)
-	Toast.show(self, "Name saved", card, 1.4, "good")
+	Toast.show(self, tr("Name saved"), card, 1.4, "good")
 	profile_changed.emit()

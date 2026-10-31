@@ -620,7 +620,7 @@ func _open_setup(game: String, mode: String) -> void:
 		if game == "ludo":
 			online.open_friends()
 		else:
-			_home_toast("Coming soon for Snakes & Ladders", "bad")
+			_home_toast(tr("Coming soon for Snakes & Ladders"), "bad")
 			Haptics.error()
 			Sound.sfx("error")
 		return
@@ -668,7 +668,7 @@ func continue_match() -> void:
 	var game := MatchStore.game()
 	var st := MatchStore.load()
 	if st.is_empty() or game not in ["ludo", "sl"]:
-		_home_toast("This match can’t be continued.", "bad")
+		_home_toast(tr("This match can’t be continued."), "bad")
 		MatchStore.clear()
 		home.refresh()
 		return
@@ -813,7 +813,7 @@ func _claim_free() -> void:
 	var left := Rewards.free_left_sec(Save.profile)
 	var from := _home_side("free")
 	if left > 0:
-		_home_toast("Free coins in %s" % Fmt.until(left), "bad")
+		_home_toast(tr("Free coins in %s") % Fmt.until(left), "bad")
 		if from and from.has_method("shake"):
 			from.call("shake")
 		Haptics.error()
@@ -849,7 +849,7 @@ func _claim_free() -> void:
 		boost(2.0)
 		var at: Vector2 = from.get_global_rect().get_center() if from else ui_root.size * 0.5
 		CoinFly.run(ui_root, at, target, n, Callable(), int(Save.profile.coins))
-	_home_toast("%s coins" % Fmt.gain(n), "coin")
+	_home_toast(tr("%s coins") % Fmt.gain(n), "coin")
 
 ## A toast on Home: just above the dock (or the Continue pill), never over the play buttons; under the card of a
 ## sheet open on top (the Rewards sheet); elsewhere the usual place.
@@ -951,21 +951,21 @@ func open_pause() -> void:
 		return                                   # a question is open: it holds the game anyway
 	paused = true
 	var on := _online_match()
-	var s := Sheet.new("Menu" if on else "Paused", UIKit.W.dialog, false, "pm")
+	var s := Sheet.new(tr("Menu") if on else tr("Paused"), UIKit.W.dialog, false, "pm")
 	s.dismissable = true                         # Back / a backdrop tap = Resume
 	_pause_sheet = s
 	s.body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	if on:                                       # online the game goes on: no pause, no restart
-		var note := s.add_text("The game keeps going while this is open.", UIKit.FS.body)
+		var note := s.add_text(tr("The game keeps going while this is open."), UIKit.FS.body)
 		note.add_theme_color_override("font_color", Palette.SUB)
-		s.add_button("Back to game", "honey", s.close, "lg")
-		s.add_button("Settings", "ghost", open_settings, "md")
-		s.add_button("Leave match", "ghost", _ask_leave_online, "md")
+		s.add_button(tr("Back to game"), "honey", s.close, "lg")
+		s.add_button(tr("Settings"), "ghost", open_settings, "md")
+		s.add_button(tr("Leave match"), "ghost", _ask_leave_online, "md")
 	else:
-		s.add_button("Resume", "honey", s.close, "lg")
-		s.add_button("Restart", "ghost", _ask_restart, "md")
-		s.add_button("Settings", "ghost", open_settings, "md")
-		s.add_button("Exit to home", "ghost", _ask_exit, "md")   # safe: the match is kept (Continue match)
+		s.add_button(tr("Resume"), "honey", s.close, "lg")
+		s.add_button(tr("Restart"), "ghost", _ask_restart, "md")
+		s.add_button(tr("Settings"), "ghost", open_settings, "md")
+		s.add_button(tr("Exit to home"), "ghost", _ask_exit, "md")   # safe: the match is kept (Continue match)
 	s.closed.connect(func():
 		if _pause_sheet == s:
 			_pause_sheet = null
@@ -976,8 +976,8 @@ func open_pause() -> void:
 ## nothing is lost: your place stands and is granted at the end.
 func _ask_leave_online() -> void:
 	var done := _online_finished()
-	var body := "Your place is kept: your reward comes when the game ends." if done else "A bot plays your colour for the rest of the game."
-	if not await Sheet.confirm(self, "Leave this match?", body, "Leave", "Keep playing" if not done else "Keep watching", true):
+	var body := tr("Your place is kept: your reward comes when the game ends.") if done else tr("A bot plays your colour for the rest of the game.")
+	if not await Sheet.confirm(self, tr("Leave this match?"), body, tr("Leave"), tr("Keep playing") if not done else tr("Keep watching"), true):
 		return
 	if not _online_match():
 		return
@@ -1003,7 +1003,7 @@ func _online_finished() -> bool:
 
 func _ask_restart() -> void:
 	var game := screen
-	if not await Sheet.confirm(self, "Restart this game?", "Everyone goes back to the start.", "Restart", "Keep playing", true):
+	if not await Sheet.confirm(self, tr("Restart this game?"), tr("Everyone goes back to the start."), tr("Restart"), tr("Keep playing"), true):
 		return
 	if screen != game:
 		return
@@ -1012,7 +1012,7 @@ func _ask_restart() -> void:
 
 func _ask_exit() -> void:
 	var game := screen
-	if not await Sheet.confirm(self, "Leave this game?", "Your progress in this match is saved.", "Leave", "Keep playing"):
+	if not await Sheet.confirm(self, tr("Leave this game?"), tr("Your progress in this match is saved."), tr("Leave"), tr("Keep playing")):
 		return
 	if screen != game:
 		return
@@ -1133,7 +1133,7 @@ func _on_gems_granted(gems: int, _product: String) -> void:
 	if _top_sheet() is StoreSheet:
 		return
 	if screen == "home":
-		_home_toast("+%s gems" % Fmt.coins_full(gems), "gem")
+		_home_toast(tr("+%s gems") % Fmt.coins_full(gems), "gem")
 	home.refresh()
 
 ## The Store: gem packs and swapping gems for coins.
@@ -1290,7 +1290,7 @@ func _back() -> void:
 			get_tree().quit()
 
 func _confirm_quit() -> void:
-	if await Sheet.confirm(self, "Quit Ludo Zing?", "Your progress is saved.", "Quit", "Stay", true):
+	if await Sheet.confirm(self, tr("Quit Ludo Zing?"), tr("Your progress is saved."), tr("Quit"), tr("Stay"), true):
 		notifications.schedule_now()
 		Save.flush()
 		crash_watch.mark_ended("quit")

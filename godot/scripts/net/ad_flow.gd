@@ -24,7 +24,7 @@ signal _wake
 
 const POLL_SEC := 1.5
 const TIMEOUT_SEC := 20.0
-const NO_FILL_TEXT := "No video right now, try again in a minute."
+const NO_FILL_TEXT := "No video right now, try again in a minute."  # l10n (show it as L10n.t(AdFlow.NO_FILL_TEXT))
 
 var busy := false
 var poll_sec := POLL_SEC
@@ -59,15 +59,15 @@ func account() -> Account:
 static func error_text(code: String) -> String:
 	match code:
 		"unavailable":
-			return "Videos aren’t available on this device."
+			return L10n.t("Videos aren’t available on this device.")
 		"no_fill":
-			return NO_FILL_TEXT
+			return L10n.t(NO_FILL_TEXT)
 		"closed":
-			return "Watch the whole video to get the reward."
+			return L10n.t("Watch the whole video to get the reward.")
 		"rejected":
-			return "We couldn’t confirm that video. Try another one in a minute."
+			return L10n.t("We couldn’t confirm that video. Try another one in a minute.")
 		"timeout":
-			return "Still checking your reward. It will show up soon."
+			return L10n.t("Still checking your reward. It will show up soon.")
 		"offline":
 			return Account.offline_text("ads")
 	return Account.error_text(code, "ads")

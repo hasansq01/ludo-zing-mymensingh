@@ -287,7 +287,7 @@ func _open(s: Dictionary, fresh: bool) -> void:
 	world.view_game(S.view, Save.prefs.cam == "top")
 	_apply_view()
 	if S.teams and fresh:
-		hud.say("Teams: Red + Yellow vs Green + Blue", 2.2, "info")
+		hud.say(tr("Teams: Red + Yellow vs Green + Blue"), 2.2, "info")
 		await wait(1.0)
 		if not live(id):
 			return
@@ -427,19 +427,22 @@ func _idle_line() -> void:
 		hud.idle(_net_wait_line(c))
 		return
 	if _cpu_turn(c) and not autoplay:
-		hud.idle("[b]%s[/b] is thinking…" % LudoRules.pname(S, c))
+		hud.idle(tr("[b]%s[/b] is thinking…") % _pn(c))
 		return
 	var you := _you(c)
 	match str(S.phase):
 		"roll":
 			if LudoRules.waiting_six(S, c):
-				hud.idle(("Roll a 6 to help " if you else "[b]%s[/b]: roll a 6 to help " % LudoRules.pname(S, c)) + _name_of(LudoRules.mate_of(c)))
+				if you:
+					hud.idle(tr("Roll a 6 to help %s") % _name_of(LudoRules.mate_of(c)))
+				else:
+					hud.idle(tr("[b]%s[/b]: roll a 6 to help %s") % [_pn(c), _name_of(LudoRules.mate_of(c))])
 			elif you:
-				hud.idle("Your turn — tap the dice")
+				hud.idle(tr("Your turn — tap the dice"))
 			else:
-				hud.idle("[b]%s[/b]’s turn — tap the dice" % LudoRules.pname(S, c))
+				hud.idle(tr("[b]%s[/b]’s turn — tap the dice") % _pn(c))
 		"choose":
-			hud.idle("Tap a glowing pawn")
+			hud.idle(tr("Tap a glowing pawn"))
 		"pair_ask":
 			hud.idle("")                     # the inline prompt asks the question itself
 		_:
@@ -447,6 +450,46 @@ func _idle_line() -> void:
 
 func _name_of(c: int) -> String:
 	return GameTopBar.who(LudoRules.pname(S, c), c)
+
+## Colour c's name as shown ("You" / a colour in the interface language, a bot's or player's own name as it is).
+func _pn(c: int) -> String:
+	return L10n.seat_name(LudoRules.pname(S, c))
+
+## The place word: 1st / 2nd / 3rd / 4th in the interface language.
+static func _place(n: int) -> String:
+	match n:
+		1: return L10n.t("1st")
+		2: return L10n.t("2nd")
+		3: return L10n.t("3rd")
+		4: return L10n.t("4th")
+	return ResultScreen.ordinal(n)
+
+## "Red + Yellow" / "Green + Blue" (the colours in the interface language).
+static func _team_label(c: int) -> String:
+	var m := LudoRules.mate_of(c)
+	return "%s + %s" % [L10n.seat_name(LudoRules.COLOR_NAMES[mini(c, m)]), L10n.seat_name(LudoRules.COLOR_NAMES[maxi(c, m)])]
+
+## A stuck reason from the rules (English, also sent by the server) in the interface language.
+static func _reason_text(r: String) -> String:
+	if not L10n.is_bn():
+		return r                              # the rules' own English
+	if r == "No move. Roll again.":
+		return L10n.t("No move. Roll again.")
+	if r == "No move this time.":
+		return L10n.t("No move this time.")
+	if r == "A pair needs an even roll.":
+		return L10n.t("A pair needs an even roll.")
+	var tail := ""
+	var base := r
+	if base.ends_with(" Roll again."):
+		base = base.trim_suffix(" Roll again.")
+		tail = " " + L10n.t("Roll again.")
+	if base == "Blocked by your pair.":
+		return L10n.t("Blocked by your pair.") + tail
+	if base.begins_with("Blocked by ") and base.ends_with("'s pair."):
+		var who := base.trim_prefix("Blocked by ").trim_suffix("'s pair.")
+		return L10n.t("Blocked by %s’s pair.") % L10n.seat_name(who) + tail
+	return r
 
 func _begin_turn() -> void:
 	var id := _id
@@ -503,24 +546,24 @@ func _tumble(c: int, v: int) -> void:
 func _after_roll(id: int, c: int, v: int, ev: Array) -> void:
 	var soft := not _loud(c)
 	var you := _you(c)
-	var who := "You" if you else "[b]%s[/b]" % LudoRules.pname(S, c)
+	var who := "[b]%s[/b]" % _pn(c)
 	for e in ev:
 		match e.type:
 			"three_sixes":
 				Sound.sfx("error", {soft = soft})
 				if _loud(c):
 					Haptics.error()
-				hud.say("%s rolled three 6s. Turn lost." % who, HOLD * 2.0, "event")
+				hud.say(tr("You rolled three 6s. Turn lost.") if you else tr("%s rolled three 6s. Turn lost.") % who, HOLD * 2.0, "event")
 				await wait(HOLD)
 			"need_six":
-				hud.say("%s %s a 6 to help %s." % [who, "need" if you else "needs", _name_of(LudoRules.mate_of(c))], HOLD * 2.0)
+				hud.say((tr("You need a 6 to help %s.") % _name_of(LudoRules.mate_of(c))) if you else (tr("%s needs a 6 to help %s.") % [who, _name_of(LudoRules.mate_of(c))]), HOLD * 2.0)
 				await wait(HOLD)
 			"free_hand":
 				print("[ludo] free hand: %s now moves %s" % [LudoRules.pname(S, c), LudoRules.pname(S, e.mate)])
 				Sound.sfx("six", {soft = soft})
-				hud.say("Six! %s now %s %s." % [who, "move" if you else "moves", _name_of(e.mate)], 2.0, "event")
+				hud.say((tr("Six! You now move %s.") % _name_of(e.mate)) if you else (tr("Six! %s now moves %s.") % [who, _name_of(e.mate)]), 2.0, "event")
 			"stuck":
-				hud.say("%s rolled %d. %s" % [who, v, e.reason], HOLD * 2.0)
+				hud.say((tr("You rolled %d. %s") % [v, _reason_text(e.reason)]) if you else (tr("%s rolled %d. %s") % [who, v, _reason_text(e.reason)]), HOLD * 2.0)
 				await wait(HOLD)
 			"turn":
 				if live(id):
@@ -597,9 +640,9 @@ func tap(screen_pos: Vector2) -> bool:
 			return true
 	var own := board.pick_any(world.camera, screen_pos, mc)
 	if own >= 0:
-		hud.say("That pawn can’t move with a %d." % int(S.dice), 1.4)
+		hud.say(tr("That pawn can’t move with a %d.") % int(S.dice), 1.4)
 	else:
-		hud.say("Tap a glowing pawn", 1.2)
+		hud.say(tr("Tap a glowing pawn"), 1.2)
 	Haptics.error()
 	Sound.sfx("tap")
 	board.pulse_movable()
@@ -645,7 +688,7 @@ func _after_move(id: int, roller: int, ev: Array, info: Dictionary) -> void:
 				info.victims = e.victims
 				await _capture(e.c, e.victims, soft, roller)
 			"split":
-				info.split = "in the home lane" if e.where == "lane" else "on the start square"
+				info.split = "lane" if e.where == "lane" else "start"
 				Sound.sfx("split", {soft = soft})
 			"pair_offer":
 				board.relayout(S)
@@ -679,7 +722,7 @@ func _after_move(id: int, roller: int, ev: Array, info: Dictionary) -> void:
 				var at := LudoBoard.to_world(LudoBoard.grid_of(e.c, LudoRules.GOAL, 0))
 				board.home_burst(at, Palette.PLAYER[e.c])
 				if not ev.slice(k).any(func(x): return x.type == "finished"):   # (a side's last pawn: its place pops instead)
-					hud.pop("Home!", _screen(at + Vector3(0, 1.2, 0)), Palette.HONEY, 30, true)
+					hud.pop(tr("Home!"), _screen(at + Vector3(0, 1.2, 0)), Palette.HONEY, 30, true)
 				hud.update(S, roller)
 				hud.bump_tile(e.c)
 				if human:
@@ -719,8 +762,8 @@ func _side_finished(e: Dictionary, roller: int, ending: bool) -> void:
 		_my_place = place
 		_my_away = online and ns.me >= 0 and S.players[ns.me] == "cpu"
 	hud.update(S, roller)
-	var text := "%s finished %s!" % [_finish_who(e, false), ResultScreen.ordinal(place)]
-	print("[ludo] %s%s" % [text, " (game over)" if ending else ""])
+	var text := _finish_text(e, false, false)
+	print("[ludo] %s%s" % ["%s finished %s!" % [_finish_who(e, false), ResultScreen.ordinal(place)], " (game over)" if ending else ""])
 	if ending:
 		return
 	var at := LudoBoard.to_world(LudoBoard.grid_of(c, LudoRules.GOAL, 0))
@@ -737,6 +780,19 @@ func _side_finished(e: Dictionary, roller: int, ending: bool) -> void:
 
 ## Who finished, for the pop / the event line: "You" / "Your team", else the name ("Mocha", "Red") or the team
 ## ("Team Red + Yellow"); bold = the event line's bold name.
+## "<who> finished <place>!" (tail: " The others play on." too) in the interface language.
+func _finish_text(e: Dictionary, bold: bool, tail: bool) -> String:
+	var c := int(e.c)
+	var pl := _place(int(e.place))
+	if (e.get("team", [c]) as Array).any(func(x): return _you(int(x))):
+		if e.has("team"):
+			return (tr("Your team finished %s! The others play on.") if tail else tr("Your team finished %s!")) % pl
+		return (tr("You finished %s! The others play on.") if tail else tr("You finished %s!")) % pl
+	var nm := (tr("Team %s") % _team_label(c)) if e.has("team") else _pn(c)
+	if bold:
+		nm = "[b]%s[/b]" % nm
+	return (tr("%s finished %s! The others play on.") if tail else tr("%s finished %s!")) % [nm, pl]
+
 func _finish_who(e: Dictionary, bold: bool) -> String:
 	var c := int(e.c)
 	if (e.get("team", [c]) as Array).any(func(x): return _you(int(x))):
@@ -761,7 +817,7 @@ func _capture(c: int, victims: Array, soft: bool, roller: int) -> void:
 	if _loud(roller) or hit_you:
 		Haptics.medium()
 	_shake()
-	hud.pop("+1 roll", _screen(at + Vector3(0, 1.3, 0)), Palette.HONEY, 28, true)
+	hud.pop(tr("+1 roll"), _screen(at + Vector3(0, 1.3, 0)), Palette.HONEY, 28, true)
 	if not online and tut == null and hud.get("emotes") != null:
 		hud.emotes.react_capture(roller, victims.map(func(v): return int(v[0])))
 	await board.send_home(victims)
@@ -787,56 +843,62 @@ func _screen(p: Vector3) -> Vector2:
 func _turn_message(roller: int, info: Dictionary, extra: bool) -> void:
 	var c: int = info.get("c", roller)
 	var you := _you(roller)
-	var who := "You" if you else "[b]%s[/b]" % LudoRules.pname(S, roller)
-	var again := " Roll again." if you or (LudoRules.is_human(S, roller) and not online) else ""
+	var who := "[b]%s[/b]" % _pn(roller)
+	var again := (" " + tr("Roll again.")) if you or (LudoRules.is_human(S, roller) and not online) else ""
 	var msg := ""
 	var kind := "event"
 	var victims: Array = info.get("victims", [])
 	if victims.size() == 2:
 		var vc: int = victims[0][0]
 		if you:
-			msg = "You broke a pair!%s" % again
+			msg = tr("You broke a pair!") + again
 		elif _you(vc):
-			msg = "%s broke your pair!" % who
+			msg = tr("%s broke your pair!") % who
 		else:
-			msg = "%s broke %s pair!" % [who, _poss_tinted(vc)]
+			msg = tr("%s broke %s’s pair!") % [who, _name_tinted(vc)]
 	elif victims.size() == 1:
 		var vc: int = victims[0][0]
 		if you:
-			msg = "You captured a pawn!%s" % again
+			msg = tr("You captured a pawn!") + again
 		elif _you(vc):
-			msg = "%s captured your pawn!" % who
+			msg = tr("%s captured your pawn!") % who
 		else:
-			msg = "%s captured %s pawn!" % [who, _poss_tinted(vc)]
+			msg = tr("%s captured %s’s pawn!") % [who, _name_tinted(vc)]
 	elif info.has("done"):
 		var d: Dictionary = info.done            # play on: a side finished, the others go on
-		msg = "%s finished %s! The others play on." % [_finish_who(d, true), ResultScreen.ordinal(int(d.place))]
+		msg = _finish_text(d, true, true)
 	elif info.has("finished"):
 		var f: int = info.finished
 		if _you(f):
-			msg = "All four home! Roll a 6 to help %s." % _name_of(LudoRules.mate_of(f))
+			msg = tr("All four home! Roll a 6 to help %s.") % _name_of(LudoRules.mate_of(f))
 		else:
-			msg = "%s is done! A 6 lets them help %s." % [_name_of(f), _name_of(LudoRules.mate_of(f))]
+			msg = tr("%s is done! A 6 lets them help %s.") % [_name_of(f), _name_of(LudoRules.mate_of(f))]
 	elif info.get("home", false):
-		var what := "Pair" if info.get("pair", false) else "Pawn"
-		msg = ("%s home!%s" % [what, again]) if you or again != "" else "%s got a %s home!" % [who, what.to_lower()]
+		var pr: bool = info.get("pair", false)
+		if you or again != "":
+			msg = (tr("Pair home!") if pr else tr("Pawn home!")) + again
+		else:
+			msg = (tr("%s got a pair home!") if pr else tr("%s got a pawn home!")) % who
 	elif info.get("paired", false):
-		msg = "%s made a pair.%s" % [who, again if extra else ""]
+		msg = (tr("You made a pair.") if you else tr("%s made a pair.") % who) + (again if extra else "")
 		kind = "info"
 	elif info.has("split"):
-		msg = "%s pair split %s.%s" % ["Your" if _you(c) else "[b]%s[/b]’s" % LudoRules.pname(S, c), info.split, again if extra else ""]
+		var lane: bool = info.split == "lane"
+		if _you(c):
+			msg = tr("Your pair split in the home lane.") if lane else tr("Your pair split on the start square.")
+		else:
+			msg = (tr("[b]%s[/b]’s pair split in the home lane.") if lane else tr("[b]%s[/b]’s pair split on the start square.")) % _pn(c)
+		msg += again if extra else ""
 		kind = "info"
 	elif extra:
-		msg = "Six! Roll again." if (you or (LudoRules.is_human(S, roller) and not online)) else "Six! %s rolls again." % who
-		hud.turn_pop("+1 roll", Palette.HONEY, 26)
+		msg = tr("Six! Roll again.") if (you or (LudoRules.is_human(S, roller) and not online)) else tr("Six! %s rolls again.") % who
+		hud.turn_pop(tr("+1 roll"), Palette.HONEY, 26)
 	if msg != "":
 		hud.say(msg, 2.2 if kind == "event" else 1.6, kind)
 
-## "Mocha’s" / "your" in the victim's own colour.
-func _poss_tinted(c: int) -> String:
-	if _you(c):
-		return "your"
-	return "[b][color=#%s]%s[/color][/b]’s" % [PlayerTile.name_color(c).to_html(false), LudoRules.pname(S, c)]
+## The victim's name in its own colour (the "’s" follows in the message).
+func _name_tinted(c: int) -> String:
+	return "[b][color=#%s]%s[/color][/b]" % [PlayerTile.name_color(c).to_html(false), _pn(c)]
 
 ## House rule "Ask before pairing": the inline prompt (your own turn only). Autoplay answers at random.
 func _ask_pair() -> bool:
@@ -950,21 +1012,26 @@ static func result_copy(s: Dictionary) -> Dictionary:
 				place = int(e.place)
 	if LudoRules.team_on(s):
 		if me < 0:
-			return {title = "Team %s wins!" % LudoRules.team_label(s, w), sub = "Both teammates got all four pawns home!"}
+			return {title = L10n.t("Team %s wins!") % _team_label(w), sub = L10n.t("Both teammates got all four pawns home!")}
 		var mate := LudoRules.mate_of(me)
 		if you_won:
-			return {title = "Your team wins!", sub = "You and %s got all 8 pawns home!" % LudoRules.pname(s, mate)}
+			return {title = L10n.t("Your team wins!"), sub = L10n.t("You and %s got all 8 pawns home!") % L10n.seat_name(LudoRules.pname(s, mate))}
 		var n := home_count(s, me) + home_count(s, mate)
-		var won_by := "Team %s won" % LudoRules.team_label(s, w)
-		return {title = "Your team finished %s" % ResultScreen.ordinal(maxi(place, 2)),
-			sub = won_by + (" · %d of 8 pawns home" % n if n > 0 else "")}
+		var won_by := L10n.t("Team %s won") % _team_label(w)
+		return {title = L10n.t("Your team finished %s") % _place(maxi(place, 2)),
+			sub = (L10n.t("%s · %d of 8 pawns home") % [won_by, n]) if n > 0 else won_by}
 	if me < 0:
-		return {title = "%s wins!" % LudoRules.pname(s, w), sub = "All four pawns home!"}
+		return {title = L10n.t("%s wins!") % L10n.seat_name(LudoRules.pname(s, w)), sub = L10n.t("All four pawns home!")}
 	if you_won:
-		return {title = "You win!", sub = "All four pawns home!"}
+		return {title = L10n.t("You win!"), sub = L10n.t("All four pawns home!")}
 	var k := home_count(s, me)
-	var home := " · you got all four home" if k == 4 else (" · %d of 4 pawns home" % k if k > 0 else "")
-	return {title = "You finished %s" % ResultScreen.ordinal(maxi(place, 2)), sub = "%s won" % LudoRules.pname(s, w) + home}
+	var won := L10n.t("%s won") % L10n.seat_name(LudoRules.pname(s, w))
+	var sub := won
+	if k == 4:
+		sub = L10n.t("%s · you got all four home") % won
+	elif k > 0:
+		sub = L10n.t("%s · %d of 4 pawns home") % [won, k]
+	return {title = L10n.t("You finished %s") % _place(maxi(place, 2)), sub = sub}
 
 
 # ---------- emotes ----------
@@ -1351,7 +1418,7 @@ func _net_apply_hold() -> void:
 		return
 	var holding := rr.holds(ns.me)
 	hud.roll_locked = holding or _rr_wait
-	hud.set_hold(LudoRules.pname(S, int(rr.hold.c)) if holding and not S.is_empty() and int(rr.hold.c) >= 0 else "")
+	hud.set_hold(_pn(int(rr.hold.c)) if holding and not S.is_empty() and int(rr.hold.c) >= 0 else "")
 	hud.refresh_roll()
 	if holding:
 		var token: float = rr.hold.end
@@ -1377,8 +1444,7 @@ func net_rerolled(msg: Dictionary) -> void:
 	rr.clear_hold()
 	_rr_wait = true                            # the dice stay asleep until the new roll's act
 	_net_apply_hold()
-	var who := "You" if c == ns.me else LudoRules.pname(S, c)
-	Toast.show(hud, "%s rolled again" % who, null, 1.8, "info")
+	Toast.show(hud, tr("You rolled again") if c == ns.me else tr("%s rolled again") % _pn(c), null, 1.8, "info")
 	get_tree().create_timer(4.0).timeout.connect(func():
 		if _rr_wait:                           # failsafe: the roll never came
 			_rr_wait = false
@@ -1430,17 +1496,17 @@ func _net_badges() -> void:
 
 ## The event line while someone else plays: "Ana’s turn", "Ana is choosing…", a bot "Ana (bot) is thinking…".
 func _net_wait_line(c: int) -> String:
-	var nm := "[b]%s[/b]" % LudoRules.pname(S, c)
+	var nm := "[b]%s[/b]" % _pn(c)
 	if c == ns.me:
-		return "A bot is playing for you"
+		return tr("A bot is playing for you")
 	if S.players[c] == "cpu":
-		return "%s is away. A bot is playing…" % nm
+		return tr("%s is away. A bot is playing…") % nm
 	match str(S.phase):
 		"choose":
-			return "%s is choosing a pawn…" % nm
+			return tr("%s is choosing a pawn…") % nm
 		"pair_ask":
-			return "%s is deciding on a pair…" % nm
-	return "%s’s turn" % nm
+			return tr("%s is deciding on a pair…") % nm
+	return tr("%s’s turn") % nm
 
 ## The online result: what the match earns (NetReplica.online_reward: the server grants it into your account at
 ## `over` and Online refreshes the profile; without an account the XP is kept locally and there are no coins); the

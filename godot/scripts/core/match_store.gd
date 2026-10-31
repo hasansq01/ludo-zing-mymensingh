@@ -35,6 +35,36 @@ static func save(game: String, state: Dictionary, summary := "") -> void:
 	f.close()
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(path))
 
+## The summary pieces the games write (always English in the file). localize_summary() translates them.
+const SUMMARY_PIECES := [  # l10n:begin
+	"Snakes & Ladders vs Computer", "Snakes & Ladders · Pass & Play", "Ludo vs Computer", "Ludo Teams (2 v 2)",
+	"Ludo Pass & Play", "Snakes & Ladders", "Ludo", "Off the board",
+]  # l10n:end
+
+## A stored summary line ("Ludo vs Computer · 35%", "Snakes & Ladders vs Computer · Square 47") in the language in
+## use. The file keeps the English line; the Continue pill shows localize_summary(peek().summary).
+static func localize_summary(s: String) -> String:
+	if L10n.lang() == "en" or s == "":
+		return s
+	for head: String in SUMMARY_PIECES:       # longest known head first (the list is ordered so)
+		if s == head or s.begins_with(head + " · "):
+			var rest := s.trim_prefix(head).trim_prefix(" · ")
+			var out := L10n.t(head)
+			if rest != "":
+				var bits := []
+				for bit in rest.split(" · "):
+					bits.append(_summary_bit(bit))
+				out += " · " + " · ".join(bits)
+			return out
+	return s
+
+static func _summary_bit(bit: String) -> String:
+	if bit == "Off the board":
+		return L10n.t("Off the board")
+	if bit.begins_with("Square ") and bit.trim_prefix("Square ").is_valid_int():
+		return L10n.t("Square %d") % int(bit.trim_prefix("Square "))
+	return bit
+
 ## A saved match is waiting.
 static func has_saved() -> bool:
 	return not _read().is_empty()

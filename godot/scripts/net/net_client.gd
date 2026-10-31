@@ -177,38 +177,38 @@ static func wire_name(n: String) -> String:
 static func error_text(code_: String) -> String:
 	match code_:
 		"not_found":
-			return "We couldn’t find that room. Check the code."
+			return L10n.t("We couldn’t find that room. Check the code.")
 		"full":
-			return "That room is full."
+			return L10n.t("That room is full.")
 		"started":
-			return "That game has already started."
+			return L10n.t("That game has already started.")
 		"no_connection":
-			return "No connection. Check your internet and try again."
+			return L10n.t("No connection. Check your internet and try again.")
 		"version":
-			return "Update Ludo Zing to play online."
+			return L10n.t("Update Ludo Zing to play online.")
 		"too_few":
-			return "You need at least 2 players to start."
+			return L10n.t("You need at least 2 players to start.")
 		"teams_need_4":
-			return "Teams need exactly 4 players."
+			return L10n.t("Teams need exactly 4 players.")
 		"not_host":
-			return "Only the host can do that."
+			return L10n.t("Only the host can do that.")
 		"rate":
-			return "Slow down a little."
+			return L10n.t("Slow down a little.")
 		"server":
-			return "The game server isn’t answering. Try again soon."
+			return L10n.t("The game server isn’t answering. Try again soon.")
 		"maintenance":
-			return "Online play is down for maintenance. Try again soon."
+			return L10n.t("Online play is down for maintenance. Try again soon.")
 		"banned":
-			return "You can’t play online right now."
+			return L10n.t("You can’t play online right now.")
 		"kicked":
-			return "You were removed from the room."
+			return L10n.t("You were removed from the room.")
 		"session":
-			return "We couldn’t sign you in. Check your internet and try again."
+			return L10n.t("We couldn’t sign you in. Check your internet and try again.")
 		"replaced":
-			return "You started a search on another device."
+			return L10n.t("You started a search on another device.")
 		"busy":
-			return "You’re already being matched on another device."
-	return "Something went wrong. Please try again."
+			return L10n.t("You’re already being matched on another device.")
+	return L10n.t("Something went wrong. Please try again.")
 
 
 # =====================================================================================================================

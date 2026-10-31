@@ -8,9 +8,13 @@ extends Node
 ## --logical=320x568 lays the UI out at that logical size (the project's stretch base is 390x844 with aspect expand,
 ## so a narrow window alone still lays out at >= 390 px). Use it with a --resolution of the same size to see the
 ## narrow (< 340 px) layouts, e.g. --resolution 320x568 ... -- out --logical=320x568.
-## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online ludo sl
+## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online ludo sl lang
+## (lang: Settings' language switch done live, on Home and over a game's pause menu, then back)
 ## Online sheets run against the in-process fake server (NetFake.Hub, as dev/econ_shots.gd): no network.
 ## Never writes the real save: Save's debounced flush is unhooked, and the file is backed up and restored at the end.
+## --lang=bn (or en) runs the tour in that interface language (Save.prefs.lang, never saved). In Bangla every shot
+## is also scanned for text still showing Latin words (L10N_OK aside): they are printed as "l10n: <shot>: <text>"
+## and listed once each in <out_dir>/l10n_latin.txt, to find strings that were never marked for translation.
 
 var out := "/tmp/audit"
 var main: Node
@@ -18,10 +22,15 @@ var n := 0
 var _backup := ""
 var hub: NetFake.Hub
 var only: PackedStringArray = []
+var lang := ""
+var _latin := {}                         # Latin text seen on screen in Bangla -> the first shot it was in
+## Latin words that belong in Bangla text too (brand, names, units), ignored by the --lang=bn scan.
+const L10N_OK := ["Ludo Zing", "Ludo Zing Mymensingh", "Flipfold Studio", "Google Play Games", "Google Play", "Google",
+	"Shihab", "XP", "VS", "LZM", "SIL", "OFL", "Lilita One", "Nunito", "Baloo Da 2", "Noto Sans Bengali", "English"]
 var coins := 5000
 var level := 7
 
-const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "ludo", "sl"]
+const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "ludo", "sl", "lang"]
 
 
 func _ready() -> void:
@@ -31,6 +40,8 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("--only="):
 			only = a.trim_prefix("--only=").split(",")
+		if a.begins_with("--lang="):
+			lang = a.trim_prefix("--lang=")
 		if a.begins_with("--logical="):                 # lay the UI out at this logical size (see the header)
 			var wh := a.trim_prefix("--logical=").split("x")
 			if wh.size() == 2:
@@ -51,6 +62,8 @@ func _ready() -> void:
 	Save.prefs.quick_players = 2
 	Save.prefs.quick_table = "practice"
 	Save.profile.name = "Shihab"
+	if lang != "":
+		Save.prefs.lang = lang                        # main._ready applies it (L10n.apply)
 	Save.profile.coins = 4800
 	Save.profile.xp = maxi(int(Save.profile.get("xp", 0)), 1400)
 	Rewards.daily_data(Save.profile).auto_on = Time.get_date_string_from_system()   # no daily sheet popping up
@@ -84,6 +97,12 @@ func _ready() -> void:
 				main.go_home()
 				await _sleep(1.2)
 	_restore()
+	if L10n.is_bn():
+		var f := FileAccess.open(out + "/l10n_latin.txt", FileAccess.WRITE)
+		for t: String in _latin:
+			f.store_line("%s\t%s" % [_latin[t], t.replace("\n", " / ")])
+		f.close()
+		print("l10n: %d texts with Latin words -> %s/l10n_latin.txt" % [_latin.size(), out])
 	get_tree().quit()
 
 func _on(s: String) -> bool:
@@ -617,6 +636,32 @@ func _s_sl() -> void:
 # Helpers
 # =====================================================================================================================
 
+## Settings' language switch, live (Main.set_language): Home and the open sheets are built again in the other
+## language; then, over a game's pause menu, back to the language the tour runs in.
+func _s_lang() -> void:
+	var back := str(Save.prefs.lang)
+	main.open_settings()
+	await _sleep(0.9)
+	main.set_language("en" if L10n.is_bn() else "bn")
+	await _sleep(1.0)
+	await shot("lang_switched_settings")
+	main.close_all_sheets()
+	await _sleep(0.6)
+	await shot("lang_switched_home")
+	main.start_ludo({game = "ludo", players = ["human", "cpu", "cpu", "cpu"], teams = false})
+	await _sleep(2.4)
+	main.ludo._id += 1                                # freeze the match (no more turns)
+	main.open_pause()
+	await _sleep(0.6)
+	main.open_settings()
+	await _sleep(0.6)
+	main.set_language(back)
+	await _sleep(1.0)
+	await shot("lang_back_in_game")
+	main.close_all_sheets()
+	await _sleep(0.5)
+	await shot("lang_back_in_game_hud")
+
 func _open_shop(t: String, owned := false) -> ShopSheet:
 	var s := ShopSheet.new(t, float(UIKit.W.catalog), owned)
 	main._wire_shop(s)
@@ -646,6 +691,28 @@ func shot(name: String) -> void:
 	n += 1
 	get_viewport().get_texture().get_image().save_png("%s/%02d_%s.png" % [out, n, name])
 	print("shot ", name)
+	if L10n.is_bn():
+		_scan_latin(get_tree().root, "%02d_%s" % [n, name])
+
+## Bangla run: every visible text on screen that still shows Latin words (3+ letters, L10N_OK removed).
+func _scan_latin(node: Node, shot_name: String) -> void:
+	var re := RegEx.create_from_string("[A-Za-z]{3,}")
+	var t := ""
+	if node is Label or node is Button:
+		t = node.text                     # (not what auto-translation shows: an unmarked text was measured in English)
+	elif node is RichTextLabel:
+		t = (node as RichTextLabel).get_parsed_text()
+	elif node is LineEdit:
+		t = (node as LineEdit).placeholder_text if (node as LineEdit).text == "" else ""
+	if t != "" and node is CanvasItem and (node as CanvasItem).is_visible_in_tree():
+		var rest := t
+		for ok: String in L10N_OK:
+			rest = rest.replace(ok, "")
+		if re.search(rest) and not _latin.has(t):
+			_latin[t] = shot_name
+			print("l10n: %s: %s" % [shot_name, t.replace("\n", " / ")])
+	for c in node.get_children():
+		_scan_latin(c, shot_name)
 
 func _restore() -> void:
 	Save._dirty = false

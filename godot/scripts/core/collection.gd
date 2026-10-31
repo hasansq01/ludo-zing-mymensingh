@@ -18,9 +18,12 @@ extends RefCounted
 const DEFAULT_AVATAR := "pawn-red"
 const DEFAULT_FRAME := "classic"
 const DEFAULT_PLATE := "plain"
-const SAVE_FAILED := "Couldn’t save on this device. No coins were spent."
-const SAVE_FAILED_EQUIP := "Couldn’t save on this device."
+## Display text (name, desc, unlock texts) is translated where it is shown: L10n.t(x.name), L10n.t(x.desc); the l10n-keys line
+## below collects the table values. Character names stay English (their entries say so in bn.po).
+const SAVE_FAILED := "Couldn’t save on this device. No coins were spent."  # l10n
+const SAVE_FAILED_EQUIP := "Couldn’t save on this device."  # l10n
 
+## l10n-keys: name, desc
 ## Character portraits: skin, hair (colour), hs (hairstyle), top (outfit colour), od (outfit detail), acc (accessory),
 ## ac (accessory colour), g ("m" | "f"); a1 / a2 the tile gradient. The first of each gender is free.
 const CHARS := [
@@ -133,7 +136,7 @@ static func item(kind: String, id: String) -> Dictionary:
 		"plate":
 			return plate(id)
 		"badge":
-			return {id = "", name = "No badge"} if id == "" else ach(id)
+			return {id = "", name = L10n.t("No badge")} if id == "" else ach(id)
 	return {}
 
 ## The tile gradient of an avatar: [a1, a2].
@@ -197,16 +200,16 @@ static func is_unlocked(kind: String, id: String, p: Dictionary = {}) -> bool:
 ## Why an item is locked: "12K coins", "Reach level 5", "Earn “Coin Collector”" ("" when it is free).
 static func unlock_text(kind: String, id: String) -> String:
 	if kind == "badge":
-		return "" if id == "" else "Earn “%s”" % ach(id).get("name", id)
+		return "" if id == "" else L10n.t("Earn “%s”") % L10n.t(str(ach(id).get("name", id)))
 	var it := item(kind, id)
 	if int(it.get("price", 0)) > 0:
-		return "%s coins" % Fmt.coins(int(it.price))
+		return L10n.t("%s coins") % Fmt.coins(int(it.price))
 	var u: Dictionary = it.get("unlock", {})
 	if u.is_empty():
 		return ""
 	if u.has("level"):
-		return "Reach level %d" % int(u.level)
-	return "Earn “%s”" % ach(str(u.ach)).get("name", u.ach)
+		return L10n.t("Reach level %d") % int(u.level)
+	return L10n.t("Earn “%s”") % L10n.t(str(ach(str(u.ach)).get("name", u.ach)))
 
 ## What is in use for a kind ("avatar" | "frame" | "plate" | "badge"), falling back to the default when the saved
 ## value is unknown or no longer unlocked (ensureProfile).
@@ -240,12 +243,12 @@ static func is_equipped(kind: String, id: String, p: Dictionary = {}) -> bool:
 static func buy_char(id: String, equip_it := false) -> String:
 	var c := character(id)
 	if c.is_empty():
-		return "That character isn’t in the collection."
+		return L10n.t("That character isn’t in the collection.")
 	var price := int(c.price)
 	if price <= 0:
-		return "%s is free to use." % c.name
+		return L10n.t("%s is free to use.") % c.name
 	if is_unlocked("char", id):
-		return "You already own %s." % c.name
+		return L10n.t("You already own %s.") % c.name
 	if coins() < price:
 		return Catalog.need_text(price - coins())
 	var ok := _commit(func(p: Dictionary) -> void:
@@ -255,7 +258,7 @@ static func buy_char(id: String, equip_it := false) -> String:
 		p.av_owned = owned
 		if equip_it:
 			p.avatar = id)
-	return "" if ok else SAVE_FAILED
+	return "" if ok else L10n.t(SAVE_FAILED)
 
 ## Puts an unlocked item in use (kind "avatar" | "char" | "frame" | "plate" | "badge"; badge "" = no badge).
 ## False when it is locked or unknown (or the save failed); true when it is in use now.

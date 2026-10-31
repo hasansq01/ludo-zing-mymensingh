@@ -24,7 +24,8 @@ const DAILY_CYCLES := [
 		{"coins": 1500, "char": "ch-tanvir", "or": 2000}],
 ]
 ## Dice skins a daily reward can give (index.html SKINS names).
-const DICE_NAMES := {classic = "Classic", crema = "Crema", espresso = "Espresso", gold = "Royal Gold"}
+## Shown through L10n.t(name) (the display sites translate).
+const DICE_NAMES := {classic = "Classic", crema = "Crema", espresso = "Espresso", gold = "Royal Gold"}  # l10n
 ## The 8 wheel segments, clockwise from the top (index.html PRIZES).
 const PRIZES := [100, 250, 150, 500, 100, 1000, 200, 300]
 const FREE_EVERY_SEC := 14400
@@ -135,9 +136,9 @@ static func char_name(id: String) -> String:
 static func grant_label(g: Dictionary) -> String:
 	var parts := []
 	if int(g.coins) > 0:
-		parts.append(fmt_coins(int(g.coins)) + " coins")
+		parts.append(L10n.t("%s coins") % fmt_coins(int(g.coins)))
 	if str(g.dice) != "":
-		parts.append(str(DICE_NAMES.get(g.dice, g.dice)) + " dice")
+		parts.append(L10n.t("%s dice") % L10n.t(str(DICE_NAMES.get(g.dice, g.dice))))
 	if str(g.get("char", "")) != "":
 		parts.append(char_name(str(g.char)))
 	return " + ".join(parts)
@@ -192,7 +193,7 @@ static func _granted(d: Dictionary, cycle: int, k: int, r: Dictionary) -> Dictio
 static func claim_daily(p: Dictionary, today := "") -> Dictionary:
 	var st := daily_state(p, today)
 	if not st.claimable:
-		return {ok = false, coins = 0, dice = "", text = "Already claimed today", day = st.day, cycle = st.cycle}
+		return {ok = false, coins = 0, dice = "", text = L10n.t("Already claimed today"), day = st.day, cycle = st.cycle}
 	var g: Dictionary = st.rewards[st.today].grant
 	var d: Dictionary = p.daily
 	var now := int(Time.get_unix_time_from_system())
@@ -215,13 +216,13 @@ static func claim_daily(p: Dictionary, today := "") -> Dictionary:
 		p.av_owned = have
 	var bits := []
 	if g.coins > 0:
-		bits.append("+%s coins" % fmt_coins(g.coins))
+		bits.append(L10n.t("+%s coins") % fmt_coins(g.coins))
 	if g.dice != "":
-		bits.append("%s dice unlocked" % DICE_NAMES.get(g.dice, g.dice))
+		bits.append(L10n.t("%s dice unlocked") % L10n.t(str(DICE_NAMES.get(g.dice, g.dice))))
 	if str(g.get("char", "")) != "":
-		bits.append("%s joined your collection" % char_name(str(g.char)))
+		bits.append(L10n.t("%s joined your collection") % char_name(str(g.char)))
 	commit(p)
-	return {ok = true, coins = g.coins, dice = g.dice, text = "Day %d: %s" % [st.today + 1, ", ".join(bits)],
+	return {ok = true, coins = g.coins, dice = g.dice, text = L10n.t("Day %d: %s") % [st.today + 1, ", ".join(bits)],
 		day = st.today + 1, cycle = st.cycle}
 
 ## The calendar opens by itself on the first home visit of a day with a reward waiting; once a day.
@@ -277,7 +278,7 @@ static func claim_free(p: Dictionary, now := -1) -> int:
 ## The Free Coins button caption: "Free Coins" when ready, else the time left ("3h 59m").
 static func free_caption(p: Dictionary, now := -1) -> String:
 	var left := free_left_sec(p, now)
-	return "Free Coins" if left <= 0 else fmt_dur(left)
+	return L10n.t("Free Coins") if left <= 0 else fmt_dur(left)
 
 
 # ---------- internals ----------

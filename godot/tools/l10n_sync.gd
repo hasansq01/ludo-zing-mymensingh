@@ -4,7 +4,7 @@ extends SceneTree
 ##   godot --headless --path godot -s res://tools/l10n_sync.gd -- --check       # change nothing; exit 1 when a marked
 ##                                                                              # string has no Bangla (or on warnings)
 ##   ... -- --dump=<out.json> [--files=scripts/ui/a.gd,scripts/ui/b.gd]         # the marked strings as JSON (no write)
-##   ... -- --import=<drafts.json>                                              # take Bangla from a JSON list, then sync
+##   ... -- --import=<drafts.json>[,<more.json>]                                # take Bangla from JSON lists, then sync
 ## The marking forms are in scripts/core/l10n.gd; the lexer and the .po reader / writer in tools/l10n_extract.gd.
 ## Sync: every marked string gets an entry (English msgid, a "#." line saying where it is shown, "#:" file:line
 ## references, the TRANSLATORS: notes of the code), in script order; existing Bangla, translator comments ("# ")
@@ -56,8 +56,8 @@ func _initialize() -> void:
 		print("l10n: %d strings -> %s" % [arr.size(), dump])
 		quit(0)
 		return
-	if imp != "":
-		_import(po, imp)
+	for path in imp.split(",", false):
+		_import(po, path)
 	# merge
 	var out := {header = po.header if po.header != "" else HEADER, entries = {}, order = []}
 	var missing := []

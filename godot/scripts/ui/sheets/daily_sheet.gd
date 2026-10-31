@@ -38,7 +38,7 @@ func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> voi
 	super("", width, true, LOOK_PM)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
-	ribbon = RibbonTitle.new("Daily reward")   # the Sheet places it on the card's top edge (no ⓘ: the grid explains itself)
+	ribbon = RibbonTitle.new(tr("Daily reward"))   # the Sheet places it on the card's top edge (no ⓘ: the grid explains itself)
 	ribbon.name = "Ribbon"
 	header.add_child(ribbon)
 	title_label = ribbon.label
@@ -81,13 +81,13 @@ func _build() -> void:
 	_note.add_theme_font_override("font", UIKit.font_body(800))
 	_note.visible = false
 	col.add_child(_note)
-	_btn = UIKit.button("Claim", "honey", "lg")
+	_btn = UIKit.button(tr("Claim"), "honey", "lg")
 	_btn.name = "Claim"
 	_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn.clip_text = true
 	_btn.pressed.connect(_claim)
 	UIKit.deny_disabled(_btn, func() -> String:                    # claimed today: the button says when to come back
-		return "" if _busy or _closing else "Come back tomorrow for the next reward.")
+		return "" if _busy or _closing else tr("Come back tomorrow for the next reward."))
 	_btn.resized.connect(_fit_btn)
 	body.add_child(_btn)
 
@@ -107,16 +107,16 @@ func _render() -> Dictionary:
 		if _btn.get_meta("kit_kind", "") != "honey":
 			UIKit.style_button(_btn, "honey", "lg")
 		_btn.disabled = _busy
-		_btn.text = "Claim"
+		_btn.text = tr("Claim")
 	else:
 		if _btn.get_meta("kit_kind", "") != "off":
 			UIKit.style_button(_btn, "off", "lg")
 			_btn.add_theme_color_override("font_disabled_color", Palette.SUB)
 		_btn.disabled = true
-		_btn.text = "Come back tomorrow · %s" % Fmt.until(Rewards.sec_to_midnight())
+		_btn.text = tr("Come back tomorrow · %s") % Fmt.until(Rewards.sec_to_midnight())
 	_fit_btn()
 	# the note only when it tells something the grid doesn't: a broken run
-	_note.text = "You missed a day, so you’re back to Day 1." if can and bool(st.missed) else ""
+	_note.text = tr("You missed a day, so you’re back to Day 1.") if can and bool(st.missed) else ""
 	_note.visible = _note.text != ""
 	return st
 
@@ -129,9 +129,9 @@ static func tomorrow_index(st: Dictionary) -> int:
 ## A tile's status line: "CLAIMED", "TODAY", "TOMORROW", or none (later days: the header already says "Day 5").
 static func status_text(status: String, is_tomorrow: bool) -> String:
 	match status:
-		"claimed": return "CLAIMED"
-		"today": return "TODAY"
-	return "TOMORROW" if is_tomorrow else ""
+		"claimed": return L10n.t("CLAIMED")
+		"today": return L10n.t("TODAY")
+	return L10n.t("TOMORROW") if is_tomorrow else ""
 
 ## The button text at the largest size that fits (lg 24, the countdown 20 down to 14).
 func _fit_btn() -> void:
@@ -220,11 +220,11 @@ func _claim() -> void:
 static func reward_text(r: Dictionary) -> String:
 	var bits := []
 	if int(r.get("coins", 0)) > 0:
-		bits.append("%s coins" % Fmt.gain(int(r.coins)))
+		bits.append(L10n.t("%s coins") % Fmt.gain(int(r.coins)))
 	if str(r.get("dice", "")) != "":
-		bits.append("%s dice unlocked" % Rewards.DICE_NAMES.get(r.dice, r.dice))
+		bits.append(L10n.t("%s dice unlocked") % L10n.t(str(Rewards.DICE_NAMES.get(r.dice, r.dice))))
 	if str(r.get("char", "")) != "":
-		bits.append("%s unlocked" % Rewards.char_name(str(r.char)))
+		bits.append(L10n.t("%s unlocked") % Rewards.char_name(str(r.char)))
 	return " · ".join(bits)
 
 
@@ -404,6 +404,7 @@ class Tile extends Control:
 			_caps.base_font = load("res://assets/fonts/Nunito.woff2")
 			_caps.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 900}
 			_caps.spacing_glyph = 1
+			_caps.fallbacks = [UIKit.bangla_font(900)]
 		return _caps
 
 	func _init(index: int) -> void:
@@ -432,8 +433,8 @@ class Tile extends Control:
 		accept_event()
 		match status:
 			"today": tapped.emit()
-			"claimed": refused.emit("Day %d is already claimed." % (k + 1))
-			_: refused.emit("Day %d opens %s." % [k + 1, "tomorrow" if tomorrow else "in a few days"])
+			"claimed": refused.emit(tr("Day %d is already claimed.") % (k + 1))
+			_: refused.emit((tr("Day %d opens tomorrow.") if tomorrow else tr("Day %d opens in a few days.")) % (k + 1))
 
 	func _process(delta: float) -> void:
 		_glow_t += delta
@@ -502,7 +503,7 @@ class Tile extends Control:
 		draw_style_box(sb[0], Rect2(0, 0, w, h))
 		draw_style_box(sb[2], Rect2(0, 0, w, HEAD))
 		var fd := UIKit.font_display()
-		DailySheet.draw_text_shadowed(self, fd, Vector2(0, 19), "Day %d" % (k + 1), w, 16, Color.WHITE, Color(Palette.INK, 0.3))
+		DailySheet.draw_text_shadowed(self, fd, Vector2(0, 19), tr("Day %d") % (k + 1), w, 16, Color.WHITE, Color(Palette.INK, 0.3))
 		var a := 0.5 if claimed else 1.0
 		var sat := 0.7 if status == "locked" else 1.0
 		var gr: Dictionary = info.grant
@@ -515,7 +516,7 @@ class Tile extends Control:
 			var label := ""
 			if str(gr.dice) != "":
 				DailySheet.draw_die(self, Rect2(icon_c - Vector2(21, 21), Vector2(42, 42)), gr.dice, a, sat)
-				label = "%s dice" % Rewards.DICE_NAMES.get(gr.dice, gr.dice)
+				label = tr("%s dice") % tr(str(Rewards.DICE_NAMES.get(gr.dice, gr.dice)))
 			elif str(gr.get("char", "")) != "":
 				_draw_portrait(icon_c, 23, str(gr.char), a)
 				label = Rewards.char_name(str(gr.char))
@@ -632,7 +633,7 @@ class CoinBurst extends Control:
 			draw_set_transform(p, 0.0, Vector2(maxf(0.25, squash), 1.0))
 			DailySheet.draw_coin(self, Vector2.ZERO, c[2], fade)
 		draw_set_transform(Vector2.ZERO)
-		var text := Fmt.gain(amount) if amount > 0 else ("Unlocked!" if item else "")
+		var text := Fmt.gain(amount) if amount > 0 else (tr("Unlocked!") if item else "")
 		if text == "":
 			return
 		var k := clampf(t / 0.9, 0.0, 1.0)

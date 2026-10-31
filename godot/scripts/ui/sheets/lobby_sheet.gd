@@ -53,7 +53,7 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	code = code_
 	me_id = me_id_
 	game = game_ if game_ in ["ludo", "sl"] else "ludo"
-	super("Friends room", UIKit.W.form, false, Sheet.LOOK_PM)
+	super(L10n.t("Friends room"), UIKit.W.form, false, Sheet.LOOK_PM)
 	dismissable = false
 	back_action = func(): leave_pressed.emit()
 	set_kicker(_kicker_text())
@@ -62,8 +62,8 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	body.add_child(status_pill)
 	var box := add_scroll_body(UIKit.SPACE.sm)
 	box.add_child(UIKit.margin(_code_card(), 0, 0, 0, UIKit.SPACE.xs))   # scrolls away on a short screen (LO-03)
-	box.add_child(UIKit.caption("Game"))
-	game_picker = UIKit.segmented([["ludo", "Ludo"], ["sl", "Snakes & Ladders"]], game, func(v):
+	box.add_child(UIKit.caption(tr("Game")))
+	game_picker = UIKit.segmented([["ludo", tr("Ludo")], ["sl", tr("Snakes & Ladders")]], game, func(v):
 		if _quiet or not host or str(v) == game:
 			return
 		game = str(v)
@@ -75,9 +75,9 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	game_picker.mouse_filter = Control.MOUSE_FILTER_PASS    # a guest's (untappable) picker still answers a tap
 	game_picker.gui_input.connect(func(e: InputEvent) -> void:
 		if not host and Sheet._is_tap(e):
-			UIKit.deny(self, "Only the host can pick the game.", game_picker))
+			UIKit.deny(self, tr("Only the host can pick the game."), game_picker))
 	var head := UIKit.hbox(UIKit.SPACE.xs)
-	var cap := UIKit.caption("Players")
+	var cap := UIKit.caption(tr("Players"))
 	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(cap)
 	count_label = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_RIGHT)
@@ -86,7 +86,7 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	box.add_child(head)
 	_list = UIKit.vbox(UIKit.SPACE.sm)
 	box.add_child(_list)
-	_rules_cap = UIKit.caption("House rules")
+	_rules_cap = UIKit.caption(tr("House rules"))
 	box.add_child(_rules_cap)
 	# one grouped card with a divider, as Settings' House rules
 	var rules := _rules_group()
@@ -94,8 +94,8 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	teams_switch.name = "Teams"
 	teams_switch.toggled.connect(func(_on: bool): _changed())
 	UIKit.deny_disabled(teams_switch, func() -> String:
-		return "Only the host can change the rules." if not host else "Teams need exactly 4 players.")
-	_teams_row = _rule_row("Teams (2 v 2)", "Red + Yellow vs Green + Blue", teams_switch)
+		return tr("Only the host can change the rules.") if not host else tr("Teams need exactly 4 players."))
+	_teams_row = _rule_row(tr("Teams (2 v 2)"), tr("Red + Yellow vs Green + Blue"), teams_switch)
 	_teams_note = _teams_row.find_child("Note", true, false) as Label
 	rules.add_child(_teams_row)
 	# ("Ask before pairing" is not a room rule: everyone plays their own Settings choice)
@@ -105,22 +105,22 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	note = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	note.name = "Note"
 	body.add_child(UIKit.margin(note, 0, UIKit.SPACE.xs, 0, 0))   # clear of the scroll fade above it
-	leave_button = UIKit.btn("Leave", "ghost", "md")
+	leave_button = UIKit.btn(tr("Leave"), "ghost", "md")
 	leave_button.name = "Leave"
 	leave_button.pressed.connect(func(): leave_pressed.emit())
-	start_button = UIKit.btn("Start game", "honey", "md")
+	start_button = UIKit.btn(tr("Start game"), "honey", "md")
 	start_button.name = "Start"
 	start_button.pressed.connect(func():
 		if not start_button.disabled:
 			start_pressed.emit())
 	UIKit.deny_disabled(start_button, func() -> String:         # why the game can't start yet
 		if not host:
-			return "Waiting for the host to start the game."
+			return tr("Waiting for the host to start the game.")
 		if status_pill.visible:
-			return "Reconnecting. Hold on a moment."
+			return tr("Reconnecting. Hold on a moment.")
 		if members.size() < 2:
-			return "Wait for a friend to join first."
-		return "Teams need exactly 4 players.")
+			return tr("Wait for a friend to join first.")
+		return tr("Teams need exactly 4 players."))
 	for b: Button in [leave_button, start_button]:
 		UIKit.fit_text(b, 12)
 	var row := add_row([leave_button, start_button])
@@ -142,7 +142,7 @@ func _code_card() -> Control:
 	var col := UIKit.vbox(0)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	col.add_child(UIKit.eyebrow("Room code"))
+	col.add_child(UIKit.eyebrow(tr("Room code")))
 	code_label = UIKit.label(spaced(code), UIKit.FS.title, Palette.INK, UIKit.font_display())
 	code_label.name = "Code"
 	code_label.add_theme_constant_override("outline_size", 0)
@@ -150,10 +150,10 @@ func _code_card() -> Control:
 	h.add_child(col)
 	var btns := UIKit.hbox(UIKit.SPACE.sm)
 	btns.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	copy_button = UIKit.button("Copy", "white", "sm")
+	copy_button = UIKit.button(tr("Copy"), "white", "sm")
 	copy_button.name = "Copy"
 	copy_button.pressed.connect(copy_code)
-	share_button = UIKit.button("Share", "teal", "sm")
+	share_button = UIKit.button(tr("Share"), "teal", "sm")
 	share_button.name = "Share"
 	share_button.pressed.connect(share)
 	for b: Button in [copy_button, share_button]:
@@ -181,7 +181,7 @@ static func spaced(c: String) -> String:
 
 ## The line Share copies.
 static func invite_text(c: String) -> String:
-	return "Join my Ludo Zing room: %s" % c
+	return L10n.t("Join my Ludo Zing room: %s") % c
 
 func _status_pill() -> PanelContainer:
 	var p := PanelContainer.new()
@@ -190,7 +190,7 @@ func _status_pill() -> PanelContainer:
 	UIKit.pad(st, UIKit.SPACE.md, UIKit.SPACE.xs)
 	p.add_theme_stylebox_override("panel", st)
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var l := UIKit.label("Reconnecting…", UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(tr("Reconnecting…"), UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	l.name = "Text"
 	p.add_child(l)
 	p.visible = false
@@ -252,7 +252,7 @@ func _member_row(m: Dictionary, index: int) -> Control:
 			ph.draw_arc(Vector2(r, r), r - 2.0, 0.0, TAU, 40, Palette.LINE_STRONG, 2.0, true))
 		row.add_child(ph)
 		var more := MAX - members.size()
-		var t := UIKit.label("Waiting for friends to join…" if more > 1 else "Waiting for one more friend…", UIKit.FS.body, Palette.MUTED, UIKit.font_body(800))
+		var t := UIKit.label(tr("Waiting for friends to join…") if more > 1 else tr("Waiting for one more friend…"), UIKit.FS.body, Palette.MUTED, UIKit.font_body(800))
 		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		t.clip_text = true
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -274,18 +274,18 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	lv.size = Vector2(lv.px, lv.px)
 	av.add_child(lv)
 	row.add_child(av)
-	var nm := UIKit.label(str(m.get("name", "Player")) + (" (you)" if mine else ""), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	var nm := UIKit.label((tr("%s (you)") % L10n.seat_name(str(m.get("name", "Player")))) if mine else L10n.seat_name(str(m.get("name", "Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.clip_text = true
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(nm)
 	if NetClient.id_str(m.get("id", "")) == _host_id:
-		var tag := UIKit.tag("Host", "honey")
+		var tag := UIKit.tag(tr("Host"), "honey")
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(tag)
 	if not bool(m.get("online", true)):
-		var off := UIKit.tag("Away", "white")
+		var off := UIKit.tag(tr("Away"), "white")
 		off.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(off)
 	if c >= 0:
@@ -322,14 +322,14 @@ func update(msg: Dictionary, you_host: bool) -> void:
 ## NetClient.status: "reconnecting" shows the pill and holds the buttons.
 func set_status(st: String) -> void:
 	status_pill.visible = st in ["reconnecting", "connecting"]
-	(status_pill.get_node("Text") as Label).text = "Connecting…" if st == "connecting" else "Reconnecting…"
+	(status_pill.get_node("Text") as Label).text = tr("Connecting…") if st == "connecting" else tr("Reconnecting…")
 	_refresh()
 
 func can_start() -> bool:
 	return host and members.size() >= 2 and (game != "ludo" or not teams or members.size() == 4) and not status_pill.visible
 
 func _kicker_text() -> String:
-	return "Snakes & Ladders online" if game == "sl" else "Ludo online"
+	return tr("Snakes & Ladders online") if game == "sl" else tr("Ludo online")
 
 func _refresh() -> void:
 	for ch in _list.get_children():
@@ -339,7 +339,7 @@ func _refresh() -> void:
 		_list.add_child(_member_row(members[k], k))
 	if members.size() < MAX:
 		_list.add_child(_member_row({}, members.size()))   # one open-seat row, not one per seat (the card stays short)
-	count_label.text = "%d of %d" % [members.size(), MAX]
+	count_label.text = tr("%d of %d") % [members.size(), MAX]
 	_quiet = true
 	for b: Button in game_picker.get_children():
 		b.set_pressed_no_signal(str(b.get_meta("value")) == game)
@@ -356,9 +356,9 @@ func _refresh() -> void:
 	var four := members.size() == 4
 	teams_switch.disabled = not host or (not four and not teams)
 	teams_switch.modulate.a = 1.0 if not teams_switch.disabled else 0.5
-	_teams_note.text = "Red + Yellow vs Green + Blue" if four else "Needs exactly 4 players"
+	_teams_note.text = tr("Red + Yellow vs Green + Blue") if four else tr("Needs exactly 4 players")
 	start_button.disabled = not can_start()
-	start_button.text = "Start game" if host else "Waiting for host…"
+	start_button.text = tr("Start game") if host else tr("Waiting for host…")
 	UIKit.set_kind(start_button, "honey" if host else "off")
 	UIKit.refit_text(start_button)            # after set_kind (it resets the size): the guest's text fits at 320 px too
 	if host:
@@ -366,13 +366,13 @@ func _refresh() -> void:
 	else:
 		start_button.disabled = true
 	if members.size() < 2:
-		note.text = "Share the code. The game can start when a friend joins."
+		note.text = tr("Share the code. The game can start when a friend joins.")
 	elif host and ludo and teams and not four:
-		note.text = "Teams need exactly 4 players."
+		note.text = tr("Teams need exactly 4 players.")
 	elif host:
-		note.text = "Everyone’s here? Start when you’re ready."
+		note.text = tr("Everyone’s here? Start when you’re ready.")
 	else:
-		note.text = "The host starts the game."
+		note.text = tr("The host starts the game.")
 
 func _changed() -> void:
 	if _quiet or not host:
@@ -383,11 +383,11 @@ func _changed() -> void:
 
 func copy_code() -> void:
 	DisplayServer.clipboard_set(code)
-	Toast.show(self, "Code copied", null, 1.6, "info")
+	Toast.show(self, tr("Code copied"), null, 1.6, "info")
 
 func share() -> void:
 	DisplayServer.clipboard_set(invite_text(code))
-	Toast.show(self, "Invite copied. Paste it in a chat.", null, 2.0, "info")
+	Toast.show(self, tr("Invite copied. Paste it in a chat."), null, 2.0, "info")
 
 
 ## The green / grey presence dot on an avatar's corner.

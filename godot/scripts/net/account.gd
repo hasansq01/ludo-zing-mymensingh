@@ -450,20 +450,20 @@ func push_identity(fields: Dictionary = {}) -> Dictionary:
 static func offline_text(action: String) -> String:
 	match action:
 		"buy":
-			return "Connect to the internet to buy."
+			return L10n.t("Connect to the internet to buy.")
 		"store":
-			return "Connect to the internet to use the Store."
+			return L10n.t("Connect to the internet to use the Store.")
 		"ads":
-			return "Connect to the internet to watch a video."
+			return L10n.t("Connect to the internet to watch a video.")
 		"equip":
-			return "Connect to the internet to change your look."
+			return L10n.t("Connect to the internet to change your look.")
 		"name":
-			return "Connect to the internet to change your name."
+			return L10n.t("Connect to the internet to change your name.")
 		"spin":
-			return "Connect to the internet to spin."
+			return L10n.t("Connect to the internet to spin.")
 		"leaderboard":
-			return "Connect to the internet to see the leaderboard."
-	return "Connect to the internet to claim."
+			return L10n.t("Connect to the internet to see the leaderboard.")
+	return L10n.t("Connect to the internet to claim.")
 
 ## Friendly copy for a wallet error code.
 static func error_text(code: String, action := "claim") -> String:
@@ -471,36 +471,36 @@ static func error_text(code: String, action := "claim") -> String:
 		"offline":
 			return offline_text(action)
 		"banned":
-			return "This account can’t use the shop or rewards."
+			return L10n.t("This account can’t use the shop or rewards.")
 		"coins":
-			return "Not enough coins."
+			return L10n.t("Not enough coins.")
 		"owned":
-			return "You already own that."
+			return L10n.t("You already own that.")
 		"gems":
-			return "Not enough gems."
+			return L10n.t("Not enough gems.")
 		"locked":
-			return "That’s still locked."
+			return L10n.t("That’s still locked.")
 		"cap":
-			return "No more videos today. Come back tomorrow."
+			return L10n.t("No more videos today. Come back tomorrow.")
 		"not_eligible":
-			return "That video isn’t available right now."
+			return L10n.t("That video isn’t available right now.")
 		"not_broke":
-			return "This bonus is for when you’re running low on coins."
+			return L10n.t("This bonus is for when you’re running low on coins.")
 		"pending":
-			return "Your payment is still going through. The gems arrive as soon as it does."
+			return L10n.t("Your payment is still going through. The gems arrive as soon as it does.")
 		"invalid":
-			return "We couldn’t confirm that purchase."
+			return L10n.t("We couldn’t confirm that purchase.")
 		"unavailable":
-			return "That isn’t available right now. Try again in a moment."
+			return L10n.t("That isn’t available right now. Try again in a moment.")
 		"reserved":
-			return "Pick another name: “You” is how the game shows you to yourself."
+			return L10n.t("Pick another name: “You” is how the game shows you to yourself.")
 		"claimed", "spun", "cooldown":
-			return "Already claimed. Come back later."
+			return L10n.t("Already claimed. Come back later.")
 		"busy", "server", "accounts_disabled", "rate":
-			return "The server is busy. Try again in a moment."
+			return L10n.t("The server is busy. Try again in a moment.")
 		"unauthorized":
-			return "Signing in… try again in a moment."
-	return "Something went wrong. Please try again."
+			return L10n.t("Signing in… try again in a moment.")
+	return L10n.t("Something went wrong. Please try again.")
 
 ## A write that needs the server: signs in first when there is no session, plays queued claims first (so the
 ## server profile already counts them), then calls. Answers {ok, error, status, ...the answer's fields}.
@@ -700,17 +700,17 @@ func flush_claims() -> bool:
 ## The subtle result-screen / toast note for a limited claim, "" when it was paid in full.
 static func claim_note(ans: Dictionary) -> String:
 	if not bool(ans.get("limited", false)):
-		return ""
+		return L10n.t("")
 	match str(ans.get("reason", "")):
 		"daily_coins", "daily_xp":
-			return "Daily limit reached"
+			return L10n.t("Daily limit reached")
 		"hourly":
-			return "Too many matches this hour"
+			return L10n.t("Too many matches this hour")
 		"too_short":
-			return "Too short to count"
+			return L10n.t("Too short to count")
 		"replay":
-			return "We couldn’t verify that win"
-	return "Daily limit reached"
+			return L10n.t("We couldn’t verify that win")
+	return L10n.t("Daily limit reached")
 
 
 # =====================================================================================================================
@@ -871,20 +871,20 @@ func resolve_conflict(keep: String) -> Dictionary:
 static func google_error_text(code: String) -> String:
 	match code:
 		"canceled", "conflict", "other_google", "signed_out":
-			return ""
+			return L10n.t("")
 		"unavailable":
-			return "Google Play Games sign-in is available on Android."
+			return L10n.t("Google Play Games sign-in is available on Android.")
 		"offline":
-			return "Connect to the internet to sign in."
+			return L10n.t("Connect to the internet to sign in.")
 		"google_not_configured":
-			return "Google sign-in isn’t switched on yet. Please try again later."
+			return L10n.t("Google sign-in isn’t switched on yet. Please try again later.")
 		"google_rejected", "google_failed":
-			return "Google sign-in didn’t work. Please try again."
+			return L10n.t("Google sign-in didn’t work. Please try again.")
 		"banned":
-			return "This Google account can’t play online."
+			return L10n.t("This Google account can’t play online.")
 		"bad_ticket":
-			return "That took too long. Please sign in again."
-	return "Couldn’t sign in. Please try again."
+			return L10n.t("That took too long. Please sign in again.")
+	return L10n.t("Couldn’t sign in. Please try again.")
 
 
 ## Waits for one of several signals of an object (a plugin answer) with a timeout; no lambdas, so nothing can be

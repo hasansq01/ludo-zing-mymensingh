@@ -372,8 +372,6 @@ static func read_po(path := PO) -> Dictionary:
 			continue
 		if l == "":
 			continue
-		if obsolete:
-			cur.obsolete = true
 		if l.begins_with("\""):
 			_po_append(cur, field, _unq(l))
 			continue
@@ -382,11 +380,10 @@ static func read_po(path := PO) -> Dictionary:
 			continue
 		var kw := l.substr(0, sp)
 		var val := _unq(l.substr(sp + 1).strip_edges())
-		if kw == "msgctxt" or (kw == "msgid" and cur.has("id")):
-			if cur.has("id"):
-				var keep_comments: Array = []
-				flush.call()
-				cur.comments = keep_comments
+		if (kw == "msgctxt" or kw == "msgid") and cur.has("id"):
+			flush.call()                   # the next entry starts (no blank line or comment between)
+		if obsolete:
+			cur.obsolete = true
 		match kw:
 			"msgctxt": field = "ctx"
 			"msgid": field = "id"
