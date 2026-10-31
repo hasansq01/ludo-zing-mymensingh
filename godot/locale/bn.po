@@ -3830,7 +3830,7 @@ msgstr "রোজ নতুন উপহার"
 #. rewards_sheet.gd _note()
 #: scripts/ui/sheets/rewards_sheet.gd:107
 msgid "%s coins every %dh"
-msgstr "%s কয়েন, %dঘ পরপর"
+msgstr "%s কয়েন/%dঘ"
 
 #. rewards_sheet.gd _refresh_videos()
 #: scripts/ui/sheets/rewards_sheet.gd:147

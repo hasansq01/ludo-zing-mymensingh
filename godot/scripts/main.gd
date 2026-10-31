@@ -894,9 +894,10 @@ func open_settings() -> SettingsSheet:
 
 ## Settings' language switch (pref "auto" | "en" | "bn", Save.prefs.lang). Text made with tr() keeps the language
 ## it was made in, so what is on screen is built again: Home (a fresh HomeScreen in the old one's place) and the
-## open sheets (all closed; Settings opens again, over the pause menu when in a game). Local
-## notifications are planned again in the new language. In a match, the HUD's turn lines, toasts and every sheet
-## opened later follow at once; its few fixed labels (seat names, buttons) follow from the next match.
+## open sheets (all closed; Settings opens again, over the pause menu when in a game). Local notifications follow
+## by themselves (they are written when the app goes away). In a match, the next status line, toasts and every
+## sheet opened later are in the new language; the line on screen and the HUD's fixed labels (your seat's name,
+## tags) change with the next turn / the next match.
 func set_language(pref: String) -> void:
 	Save.prefs.lang = pref if pref in L10n.LANGS else "auto"
 	Save.save()
