@@ -9,6 +9,8 @@ extends Sheet
 ##           pairing" is not a room rule: everyone plays their own Settings choice.)
 ##   Others: the same choices, read only, and "Waiting for host…".
 ## Leave (and Back) asks first. The sheet has no close button: leaving is a choice, not a dismissal.
+## Friends (Social): the open-seat row has Invite (invite_pressed: your friends and recent players), and a long-press
+## on another member asks to add them to your friends (member_held). The sheet hands itself to Social when it opens.
 ##
 ##   var s := LobbySheet.new(code, my_member_id)
 ##   s.update(lobby_msg, is_host)               # every `lobby` message
@@ -20,6 +22,10 @@ signal settings_changed(teams: bool)
 signal game_changed(game: String)
 signal start_pressed
 signal leave_pressed
+## The open-seat row's Invite (Social: your friends and recent players, each with Invite).
+signal invite_pressed
+## Another member was long-pressed (Social asks "Add to friends?"): their member id and name.
+signal member_held(id: String, name: String)
 
 const AVA := 40.0
 const MAX := 4
@@ -128,6 +134,12 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	row.name = "Actions"
 	fit(0.92)
 	_refresh()
+
+
+func _ready() -> void:
+	var s := Social.instance()
+	if s != null:
+		s.wire_lobby(self)                   # Invite and the long-press (they need the account and the room code)
 
 
 # ---------- pieces ----------
@@ -258,6 +270,11 @@ func _member_row(m: Dictionary, index: int) -> Control:
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(t)
+		var inv := UIKit.btn(tr("Invite"), "honey", "xs")         # your friends and recent players (Social)
+		inv.name = "Invite"
+		inv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		inv.pressed.connect(func(): invite_pressed.emit())
+		row.add_child(inv)
 		return p
 	var av := Control.new()
 	av.custom_minimum_size = Vector2(AVA, AVA)
@@ -294,6 +311,10 @@ func _member_row(m: Dictionary, index: int) -> Control:
 		seat.skin = str(m.get("pawn", ""))           # their pawn skin, as it will stand on the board
 		seat.set_color(c)
 		row.add_child(seat)
+	if not mine:                                       # long-press: add them to your friends (Social)
+		var id := NetClient.id_str(m.get("id", ""))
+		var who := str(m.get("name", "Player"))
+		LongPress.attach(p, func(): member_held.emit(id, who))
 	return p
 
 static func _avatar_id(m: Dictionary, c: int) -> String:

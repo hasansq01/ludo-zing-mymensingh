@@ -8,6 +8,7 @@ extends Sheet
 ## board / period, so switching tabs is instant (and refreshes in the background once they are older).
 ##
 ##   LeaderboardSheet.new().open(app.sheet_layer)
+## Long-press another player's row (its `uid`) to add them to your friends (Social.ask_friend).
 ## Tests: set fetch_fn (board, period) -> {ok, top, me, min_matches | error} (a coroutine) and auto_load false.
 
 const ROW_H := 60.0
@@ -233,6 +234,14 @@ func _row(e: Dictionary, board_: String, mine := 0) -> Control:
 	h.add_child(val)
 	var p := UIKit.list_row(h, "you" if rank > 0 and rank == mine else "")   # rank 1 has its medal: no gold rim
 	p.name = "Row%d" % rank
+	var uid := str(e.get("uid", ""))
+	var acc := Account.instance()
+	var own := acc != null and str(acc.account.get("uid", "")) == uid
+	if uid != "" and not own and not (rank > 0 and rank == mine):   # long-press: add them to your friends (Social)
+		LongPress.attach(p, func():
+			var s := Social.instance()
+			if s != null:
+				s.ask_friend(self, e))
 	return p
 
 ## Your rank on this board (0: not listed).

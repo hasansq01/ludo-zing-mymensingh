@@ -13,6 +13,8 @@ extends Sheet
 ##                  the phone, or opens its settings once it can't ask any more), and Rewards, Reminders, Game alerts,
 ##                  News & offers (Save.prefs notif, notif_rewards, notif_reminders, notif_game, notif_offers); a note
 ##                  under the master says what a tap will do while the phone doesn't allow them
+##   Friends        Invites from players (Save.prefs.invites, default on; the server keeps it, through Social: off,
+##                  nobody can invite you, and they can't tell)
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
 ##   Help           How to play, Credits, Privacy policy, Delete my account, Support (URLS)
 ##   Reset progress (confirm first), then the version line and the Support ID (the player ID; nothing else uses it
@@ -135,6 +137,14 @@ func _build() -> void:
 	var notifs := Notifications.instance()
 	if notifs != null and not notifs.permission_changed.is_connected(_refresh_notif):
 		notifs.permission_changed.connect(_refresh_notif)
+
+	# --- Friends: who may invite you (the server keeps it: Social)
+	_caption(tr("Friends"))
+	var fr := _group()
+	var inv := Switch.new(bool(Save.prefs.get("invites", true)))
+	inv.name = "Invites"
+	inv.toggled.connect(_on_invites)
+	fr.add_child(_line(tr("Invites from players"), tr("People you played with or who added you can invite you to a game."), inv, inv))
 
 	# --- Accessibility
 	_caption(tr("Accessibility"))
@@ -458,6 +468,17 @@ func _set_volume(key: String, v: int) -> void:
 	Save.prefs.vol = vol
 	Save.save()
 	Sound.set_volumes(int(vol.get("master", 100)), int(vol.get("music", Sound.DEFAULT_MUSIC)), int(vol.get("sfx", Sound.DEFAULT_EFFECTS)))
+	prefs_changed.emit()
+
+## "Invites from players": Save.prefs.invites, and the server through Social (sent later when offline).
+func _on_invites(on: bool) -> void:
+	var s := Social.instance()
+	if s != null:
+		s.set_invites(on)
+	else:
+		Save.prefs.invites = on
+		Save.prefs.invites_sync = true
+		Save.save()
 	prefs_changed.emit()
 
 func _set_pref(key: String, v: Variant) -> void:

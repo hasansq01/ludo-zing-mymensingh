@@ -30,6 +30,7 @@ var ludo: LudoMatch
 var sl: SLMatch
 var sl_hud: Control
 var online: Online                      # friend rooms (scripts/net/online.gd)
+var social: Social                      # recent players, friends, invites (scripts/net/social.gd)
 var account: Account                    # the server account, wallet and claims (scripts/net/account.gd)
 var notifications: Notifications        # reminders, push and the permission question (scripts/net/notifications.gd)
 var ads: Ads                            # rewarded ads + the consent form (scripts/net/ads.gd; AdFlow shows them)
@@ -308,6 +309,9 @@ func _build_screens() -> void:
 	online = Online.new(self)
 	online.name = "Online"
 	add_child(online)
+	social = Social.new(self)
+	social.name = "Social"
+	add_child(social)
 	_on_resize()
 
 

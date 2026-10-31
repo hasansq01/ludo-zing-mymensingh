@@ -140,6 +140,19 @@ func join_code(code: String) -> void:
 		return
 	_join(c)
 
+## A new friend room, as Create room makes it, and its lobby (Social's Invite while you are in no room). True once we
+## are in the lobby (also when we already were); false when it failed (the reason was toasted) or a match / search is on.
+func create_room(game_ := "") -> bool:
+	if state == "lobby" and net.in_room() and not net.quick:
+		return true
+	if state != "idle":
+		return false
+	_friends_game = game_ if game_ in ["ludo", "sl"] else _home_game()
+	await _create()
+	while state == "joining":
+		await state_changed
+	return state == "lobby" and net.in_room()
+
 func _create() -> void:
 	if friends:
 		friends.set_busy("create")

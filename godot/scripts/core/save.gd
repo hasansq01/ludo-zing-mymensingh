@@ -135,6 +135,7 @@ func _ensure() -> void:
 	pr.reduce_motion = bool(pr.get("reduce_motion", false))
 	for k in NOTIF_KEYS:                       # Notifications: the master switch and the four kinds, all on until changed
 		pr[k] = pr[k] if pr.get(k) is bool else true
+	pr.invites = pr.invites if pr.get("invites") is bool else true   # "Invites from players" (Social; the server's copy wins)
 	pr.notif_asked = maxi(0, as_int(pr.get("notif_asked"), 0))         # how often the soft permission prompt was shown
 	pr.notif_asked_at = maxi(0, as_int(pr.get("notif_asked_at"), 0))   # ... and when last (unix seconds)
 	if not pr.get("last_setup") is Dictionary:

@@ -43,6 +43,7 @@ extends Node
 signal finished(result: Dictionary)
 signal pause_pressed
 signal settings_pressed
+signal tile_held(c: int)                  ## online: another player's tile was long-pressed (Social: add to friends)
 
 const CPU_ROLL_WAIT := 0.35              # a computer's turn starts, then it rolls
 const BACK_WINDOW_MS := 30_000            # app_resumed(): how long a bot on your seat is still "you were away"
@@ -285,6 +286,8 @@ func _build_tiles() -> void:
 		if online and kind == "human":
 			var st := ns.seat(int(p.c))
 			t.set_look(str(st.get("avatar", "")), str(st.get("frame", "")))
+			var c := int(p.c)
+			LongPress.attach(t, func(): tile_held.emit(c))
 		chips.add_child(t)
 		if own < 0 and (p.you or (not p.cpu and not online)):
 			own = k

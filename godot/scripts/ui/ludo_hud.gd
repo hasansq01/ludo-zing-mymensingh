@@ -31,6 +31,7 @@ signal pair_answered(yes: bool)
 signal away_pressed                      # online: "I’m back" (a bot was playing your seat)
 signal finish_home_pressed               # the finish card's Home (online: leave the room)
 signal reroll_pressed                    # online: the "Roll again" button (ECONOMY_V1.md 4)
+signal tile_held(c: int)                 # online: another player's tile was long-pressed (Social: add to friends)
 
 const POS := ["bl", "tl", "tr", "br"]
 const DICE := 72.0                       # the die's control (its face is DICE_FILL of it, ≈ 62 px)
@@ -223,6 +224,9 @@ func _ready() -> void:
 		var t := Tile.new(c, "left")
 		t.mouse_filter = Control.MOUSE_FILTER_STOP          # your tile is a roll target too (CL-21)
 		t.gui_input.connect(_on_tile_input.bind(c))
+		LongPress.attach(t, func():
+			if online and c != me and not _s.is_empty() and LudoRules.is_human(_s, c):
+				tile_held.emit(c))
 		add_child(t)
 		tiles.append(t)
 	dice = Dice3D.new()

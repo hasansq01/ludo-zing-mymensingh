@@ -1,7 +1,7 @@
 extends SceneTree
 ## Runs every rule test suite headless and exits with 1 when any check fails:
 ##   godot --headless --path godot -s res://tests/run_tests.gd
-## (or tools/godot-test.sh from the repo root).
+## (or tools/godot-test.sh from the repo root). `-- --only=social,net_ui` runs the suites whose file names contain one of them.
 
 const SUITES := [
 	"res://tests/test_pair_rules.gd",
@@ -58,17 +58,25 @@ const SUITES := [
 	"res://tests/test_pair_online.gd",
 	"res://tests/test_share.gd",
 	"res://tests/test_l10n.gd",
+	"res://tests/test_social.gd",
 ]
 
 ## Suites whose run() is a coroutine that the runner waits for (the others run to their first wait, as before).
-const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_stack.gd", "res://tests/test_crash_watch.gd", "res://tests/test_pair_online.gd", "res://tests/test_share.gd"]
+const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_stack.gd", "res://tests/test_crash_watch.gd", "res://tests/test_pair_online.gd", "res://tests/test_share.gd",
+	"res://tests/test_social.gd"]
 
 func _initialize() -> void:
 	await process_frame                       # the info-bubble checks need a live scene tree
 	TranslationServer.set_locale("en")        # the checks read English UI text, whatever this computer's language
 	var failed := 0
 	var total := 0
+	var only := PackedStringArray()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--only="):
+			only = a.trim_prefix("--only=").split(",", false)
 	for path in SUITES:
+		if not only.is_empty() and not Array(only).any(func(o: String) -> bool: return path.get_file().contains(o)):
+			continue
 		var suite = load(path).new()
 		if path in ASYNC_SUITES:
 			await suite.run()                  # (waits for frames: the live match tests)

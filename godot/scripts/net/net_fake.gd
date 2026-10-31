@@ -1173,3 +1173,183 @@ class Hub extends RefCounted:
 			if r:
 				return {status = 200, data = r.info()}
 		return {status = 404, data = null}
+
+
+## The /v1/social endpoints for one account (server/PROTOCOL.md "Recent players, friends and invites"), in process,
+## as Social.http_fn: (method, path, body) -> {ok, status, data, error} like Account.request. Seed it with people
+## (person(), add_recent(), add_friend(), add_invite()); `hub` (optional) answers which rooms you are in, so
+## {code, member} adds and invites check the room like the server (an open friend room). As the server: one invite
+## per person per 10 minutes, and an invite to a ghost or to someone with invites off answers exactly like any other
+## (`quiet` people only change what `reached` records). offline = true: every call answers {ok = false, "offline"}.
+class SocialServer extends RefCounted:
+	var recent: Array = []                ## [{uid, name, avatar, frame, level, game, played_at, friend}]
+	var friends: Array = []               ## [{uid, name, avatar, frame, level, added_at, game, played_at}]
+	var invites: Array = []               ## to you: [{id, from, code, game, sent_at, expires_at}]
+	var prefs := {invites = true}
+	var sent: Array = []                  ## invites you sent: [{uid, code, at}]
+	var reached: Array = []               ## of those, the ones a person would get (not quiet)
+	var quiet := {}                       ## uid -> true: a ghost, or invites off (the answers stay the same)
+	var accepted: Array = []              ## ids (or codes) accepted
+	var declined: Array = []
+	var calls: Array = []                 ## [method, path, body] of every call
+	var hub: Hub
+	var offline := false
+	var now := 0                          ## unix s (0: the system clock)
+	var _n := 0
+
+	func _now() -> int:
+		return now if now > 0 else int(Time.get_unix_time_from_system())
+
+	## A person as the server sends one (the uid made from the name when not given).
+	static func person(name: String, avatar := "pawn-red", level := 3, frame := "classic", uid := "") -> Dictionary:
+		var u := uid if uid != "" else ("%016x" % absi(hash(name))).substr(0, 16)
+		return {uid = u, name = name, avatar = avatar, frame = frame, level = level}
+
+	func add_recent(p: Dictionary, game := "ludo", ago_s := 600) -> Dictionary:
+		var r := p.duplicate()
+		r.game = game
+		r.played_at = _now() - ago_s
+		r.friend = friends.any(func(f: Dictionary) -> bool: return f.uid == p.uid)
+		recent.append(r)
+		recent.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.played_at) > int(b.played_at))
+		return r
+
+	func add_friend(p: Dictionary, ago_s := 3600) -> Dictionary:
+		var f := p.duplicate()
+		f.added_at = _now() - ago_s
+		f.game = null
+		f.played_at = null
+		for r: Dictionary in recent:
+			if r.uid == p.uid:
+				r.friend = true
+				f.game = r.game
+				f.played_at = r.played_at
+		friends.push_front(f)
+		# the server's order: the last match together (or when added), newest first
+		var key := func(x: Dictionary) -> int: return int(x.played_at) if x.played_at != null else int(x.added_at)
+		friends.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return key.call(a) > key.call(b))
+		return f
+
+	## An invite to you from p into room `code`.
+	func add_invite(p: Dictionary, code: String, game := "ludo", ttl_s := 600) -> Dictionary:
+		_n += 1
+		var inv := {id = "inv_fake%012d" % _n, from = p.duplicate(), code = code, game = game, sent_at = _now(), expires_at = _now() + ttl_s}
+		invites.push_front(inv)
+		return inv
+
+	func _ok(data: Dictionary) -> Dictionary:
+		return {ok = true, status = 200, data = data, error = ""}
+
+	func _err(status: int, code: String, extra := {}) -> Dictionary:
+		var d := {error = code}
+		d.merge(extra)
+		return {ok = false, status = status, data = d, error = code}
+
+	func _find(uid: String) -> Dictionary:
+		for list: Array in [recent, friends]:
+			for p: Dictionary in list:
+				if p.uid == uid:
+					return {uid = p.uid, name = p.name, avatar = p.avatar, frame = p.frame, level = p.level}
+		return {}
+
+	## "" when room `code` takes an invite now, else the server's error code.
+	func _room_open(code: String) -> String:
+		if hub == null:
+			return "" if NetClient.valid_code(code) else "not_in_room"
+		var r: Room = hub.rooms.get(code)
+		if r == null or r.quick:
+			return "not_in_room"
+		if r.playing:
+			return "started"
+		return "room_full" if r.members.size() >= 4 else ""
+
+	func http(method: int, path: String, body: Variant = null) -> Dictionary:
+		var b: Dictionary = body if body is Dictionary else {}
+		calls.append([method, path, b])
+		if offline:
+			return {ok = false, status = 0, data = {}, error = "offline"}
+		var post := method == HTTPClient.METHOD_POST
+		match path:
+			"/v1/social":
+				return _ok({recent = recent.duplicate(true), friends = friends.duplicate(true), prefs = prefs.duplicate(),
+					max = {recent = 30, friends = 100}})
+			"/v1/social/friends":
+				if method == HTTPClient.METHOD_DELETE:
+					friends = friends.filter(func(f: Dictionary) -> bool: return f.uid != str(b.get("uid", "")))
+					for r: Dictionary in recent:
+						if r.uid == str(b.get("uid", "")):
+							r.friend = false
+					return _ok({ok = true})
+				var p := {}
+				if b.has("uid"):
+					p = _find(str(b.uid))
+				elif hub != null and hub.rooms.has(str(b.get("code", ""))):
+					for m: Dictionary in (hub.rooms[str(b.code)] as Room).members:
+						if str(m.id) == str(b.get("member", "")):
+							p = person(str(m.name), str(m.get("avatar", "pawn-red")), int(m.get("level", 1)), str(m.get("frame", "classic")))
+				if p.is_empty():
+					return _err(404, "not_found")
+				if not friends.any(func(f: Dictionary) -> bool: return f.uid == p.uid):
+					add_friend(p, 0)
+				return _ok({ok = true, friend = p})
+			"/v1/social/invites":
+				if not post:
+					return _ok({invites = invites.filter(func(i: Dictionary) -> bool: return int(i.expires_at) > _now())})
+				var uid := str(b.get("uid", ""))
+				if _find(uid).is_empty():
+					return _err(404, "not_found")
+				var why := _room_open(str(b.get("code", "")))
+				if why != "":
+					return _err(409, why)
+				for s: Dictionary in sent:
+					if s.uid == uid and _now() - int(s.at) < 600:
+						return _err(429, "rate", {scope = "person", retry_at = int(s.at) + 600})
+				var rec := {uid = uid, code = str(b.code), at = _now()}
+				sent.append(rec)
+				if not quiet.has(uid):
+					reached.append(rec)
+				return _ok({ok = true, expires_at = _now() + 600})
+			"/v1/social/invites/accept", "/v1/social/invites/decline":
+				var key := str(b.get("id", b.get("code", "")))
+				var found := {}
+				for i: Dictionary in invites:
+					if (i.id == key or i.code == key) and int(i.expires_at) > _now():
+						found = i
+				invites = invites.filter(func(i: Dictionary) -> bool: return i.id != key and i.code != key)
+				if path.ends_with("decline"):
+					declined.append(key)
+					return _ok({ok = true})
+				if found.is_empty() or _room_open(str(found.code)) != "":
+					return _err(410, "gone")
+				accepted.append(key)
+				return _ok({ok = true, code = found.code, game = found.game})
+			"/v1/social/prefs":
+				prefs.invites = bool(b.get("invites", true))
+				if not prefs.invites:
+					invites.clear()
+				return _ok({ok = true, prefs = prefs.duplicate()})
+		return _err(404, "not_found")
+
+	## An empty one on a fixed clock (unix s; 0: the system clock).
+	static func at(now_ := 0) -> SocialServer:
+		var s := SocialServer.new()
+		s.now = now_
+		return s
+
+	## A few people for the screens: a recent list (a friend among them), and its friends.
+	static func sample(now_ := 0) -> SocialServer:
+		var s := at(now_)
+		var rafi := person("Rafi", "ch-rafi", 12, "gold")
+		var mitu := person("Mitu", "ch-mim", 8)
+		var tanvir := person("Tanvir Ahmed Chowdhury", "ch-tanvir", 21)
+		var nusrat := person("Nusrat", "ch-nusrat", 5)
+		var sakib := person("Sakib", "pawn-green", 9)
+		var ayesha := person("Ayesha", "pawn-blue", 3)
+		s.add_recent(rafi, "ludo", 240)
+		s.add_recent(mitu, "sl", 3 * 3600)
+		s.add_recent(tanvir, "ludo", 26 * 3600)
+		s.add_recent(nusrat, "ludo", 3 * 86400)
+		s.add_recent(sakib, "sl", 5 * 86400)
+		s.add_friend(rafi, 2 * 86400)
+		s.add_friend(ayesha, 6 * 86400)
+		return s
