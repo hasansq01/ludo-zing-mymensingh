@@ -13,7 +13,8 @@ extends Node
 ## app on Home.
 ## Online (friend rooms, Ludo only): Home's Friends opens Online's Friends sheet; the room's `start` /
 ## `sync` comes back here as start_online(); the pause menu offers Leave match instead of Restart; the result's Play
-## again is the host's rematch and Home leaves the room. A room kept from an earlier run is taken back at launch.
+## again is a yes in the room's vote (anyone may ask; online_vote shows the others' answers) and Home leaves the
+## room. A room kept from an earlier run is taken back at launch.
 
 const GESTURE_DP := 20.0                # immersive mode hides the system bars but not the bottom swipe zone (PH-01)
 
@@ -538,10 +539,18 @@ func start_online(msg: Dictionary, net: Object) -> void:
 func _online_match() -> bool:
 	return (screen == "ludo" and ludo.online) or (screen == "sl" and bool(sl.get("online")))
 
-## The room's host changed (the result's Play again follows).
-func online_host_changed(is_host: bool) -> void:
+## Whether the result may offer Play again changed (the room's host changed, a refused request, a search ended).
+func online_host_changed(can_rematch: bool) -> void:
 	if is_instance_valid(_result) and _result.has_method("set_host"):
-		_result.set_host(is_host)
+		_result.set_host(can_rematch)
+
+## The friend room's Play again vote (Online.vote): onto the result. True when a result shows it, or will (the match
+## is still on screen: the result opens with Online.vote); false elsewhere (Online then prompts by itself).
+func online_vote(v: Dictionary) -> bool:
+	if is_instance_valid(_result) and not _result.is_queued_for_deletion():
+		_result.set_vote(v, str(online.net.member_id))
+		return true
+	return _online_match()
 
 ## The room closed under us (gone on the server): back home.
 func online_closed() -> void:
@@ -1083,7 +1092,9 @@ func _on_finished(result: Dictionary, game: String) -> void:
 		if not info.is_empty():
 			_claim_id = account.report_match(info)   # the server reconciles the local reward (queued when offline)
 	if net_game:
-		data.host = online.is_host()
+		data.host = online.can_rematch()
+		data.vote = online.vote.duplicate(true)  # a vote opened before this screen: shown at once
+		data.me = str(online.net.member_id)
 	var r := ResultScreen.new(data)
 	_result = r
 	if net_game:

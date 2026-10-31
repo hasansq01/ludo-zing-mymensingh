@@ -136,8 +136,9 @@ service-account JSON of the Firebase project, whole). Project id from it.
   - "Friend joined" (`kind: "joined"`): a member joins the lobby while the host is away. Body "<Name> joined your room
     <CODE>"; at most once per host per 3 minutes.
   - "Rematch?" (`kind: "rematch"`): a rematch / new round opens in a friend room and a member is away. As built: when
-    a match ends (`over`, the room back under lobby rules), to each away member while someone is here; body "<Name>
-    wants a rematch in room <CODE>"; at most once per member per 3 minutes.
+    a match ends (`over`, the room back under lobby rules), to each away member while someone is here, and when
+    someone opens a Play again vote (PROTOCOL.md "Play again"; the name is theirs); body "<Name> wants a rematch in
+    room <CODE>"; at most once per member per 3 minutes. Tapping it within the vote's 30 s still lets them answer.
   - "Weekly result" (`kind: "weekly"`, link `leaderboard`): the daily cron on Monday (Bangladesh time) enqueues one
     push per listed account of last week's XP board top 100 ("You finished #N on last week's board!"), through the
     Pusher. As built: title "Weekly results are in"; one push per device with `prefs_game`; queued once per week

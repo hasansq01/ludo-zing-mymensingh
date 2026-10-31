@@ -23,9 +23,13 @@ extends Control
 ##   r.play_again.connect(...); r.home.connect(...)
 ##   r.open(app.sheet_layer)
 ## The screen closes itself after a button (or Back); `closed` fires when it is gone.
-## Online (data.online = true, data.host = you host the room): rows carry the friends' own avatars (e.avatar,
-## e.frame); Play again is the host's rematch (the screen stays until the server starts it: the app closes it),
-## for everyone else a disabled "Waiting for host…" (set_host() when the host changes).
+## Online (data.online = true, data.host = Play again can be offered: you are in the room): rows carry the friends'
+## own avatars (e.avatar, e.frame). In a friend room Play again is anyone's yes in the room's vote (server/PROTOCOL.md
+## "Play again"; the screen stays until the server starts the next match: the app closes it). set_vote(vote, me)
+## (data.vote / data.me at the start) shows the vote above the buttons: the title ("Rafi wants to play again",
+## "Waiting for the others…", "Starting a new game…"), the countdown, and everyone asked (a teal tick: in; a ring:
+## still deciding; a cross: left). While you are asked the buttons are Play / Leave (Leave = home: out of the room);
+## after your yes Play again waits ("Waiting…") and Home reads Leave. set_host(false) disables Play again.
 ## A coin-table match (data.table = {tier, entry, payout, bonus, refund, ended, match_id}, entry > 0; ECONOMY_V1.md 3):
 ## `reward` is what you received, the payout plus the 1st place's house bonus (the Coins tile reads "Prize +228" and a
 ## line says "Includes +38 house bonus"); a refund says "Entry 100 refunded"; a payout of 0 without a refund says
@@ -56,6 +60,7 @@ var double_button: Button                ## coin table, prize > 0, a video can r
 var table_note: Label                    ## coin table, no prize: "Entry 100 lost" / "Entry 100 refunded"
 var bonus_note: Label                    ## coin table, bonus > 0: "Includes +38 house bonus"
 var away_note: Label                     ## the server ended the match while nobody was connected
+var vote_card: PanelContainer            ## online friend rooms: the Play again vote (hidden while none is open)
 var flow: AdFlow
 var coins: CoinAmount
 var xp_meter: Meter
@@ -76,6 +81,15 @@ var _closing := false
 var _done := false
 var _sharing := false
 var _extra := 0                          # coins the "double" video added (the shared card counts them)
+var _revealed := false                   # the buttons have played in (from then on they may be enabled)
+var _vote := {}                          # the vote as the server last sent it ({} = none open)
+var _me := ""                            # your member id (the vote's "you")
+var _vote_end := 0                       # Time.get_ticks_msec() when the vote closes
+var _prompted := false                   # the "wants to play again" nudge (haptics) was given
+var _vote_title: Label
+var _vote_sub: Label
+var _vote_timer: Label
+var _vote_names: HFlowContainer
 
 static var _blur: Shader
 
@@ -338,6 +352,8 @@ func _build() -> void:
 	_buttons = UIKit.vbox(UIKit.SPACE.sm)
 	_buttons.custom_minimum_size = Vector2(CARD_W - 20.0, 0)
 	_buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vote_card = _build_vote()
+	_buttons.add_child(vote_card)
 	again_button = UIKit.btn(tr("Play again"), "honey", "lg")
 	again_button.pressed.connect(_pick.bind("again"))
 	_buttons.add_child(again_button)
@@ -350,8 +366,11 @@ func _build() -> void:
 	home_button.pressed.connect(_pick.bind("home"))
 	_buttons.add_child(home_button)
 	content.add_child(_buttons)
+	_me = str(data.get("me", ""))
 	if is_online():
 		set_host(bool(data.get("host", false)))
+		if data.get("vote") is Dictionary and not (data.vote as Dictionary).is_empty():
+			set_vote(data.vote, _me)
 	resized.connect(_layout)
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -499,15 +518,178 @@ static func _make_avatar(e: Dictionary, px: float) -> Control:
 func is_online() -> bool:
 	return bool(data.get("online", false))
 
-## Online: the host may start the rematch; everyone else waits for them.
+## Online: whether Play again can be offered (you are still in the room).
 func set_host(on: bool) -> void:
 	data.host = on
+	_sync_buttons()
+
+## Play again / Home as things stand: online, the vote (asked: Play / Leave; after your yes: "Waiting…" / Leave;
+## at the close: "Starting…"); nothing is tappable before the screen has played in.
+func _sync_buttons() -> void:
 	if again_button == null:
 		return
-	var waiting := is_online() and not on
-	again_button.text = tr("Waiting for host…") if waiting else tr("Play again")
-	UIKit.set_kind(again_button, "off" if waiting else "honey")
-	again_button.disabled = waiting or home_button.disabled   # (home is enabled once the screen has played in)
+	var res := str(_vote.get("result", ""))
+	var open := not _vote.is_empty() and res == ""
+	var mine := Online.vote_of(_vote, _me) if not _vote.is_empty() else ""
+	var text := tr("Play again")
+	var kind := "honey"
+	var off := false
+	if is_online() and not bool(data.get("host", false)):
+		kind = "off"
+		off = true
+	elif mine == "wait" and open:
+		text = tr("Play")
+	elif mine == "yes":
+		text = tr("Starting…") if res == "go" else tr("Waiting…")
+		kind = "off"
+		off = true
+	if again_button.text != text or str(again_button.get_meta("kit_kind", "honey")) != kind:
+		again_button.text = text
+		UIKit.set_kind(again_button, kind)
+		again_button.set_meta("kit_kind", kind)
+	again_button.disabled = off or not _revealed
+	home_button.text = tr("Leave") if open else tr("Home")
+	home_button.disabled = not _revealed
+	if share_button:
+		share_button.visible = _vote.is_empty()   # (the vote needs the room)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Play again: the vote (online friend rooms)
+# ---------------------------------------------------------------------------------------------------------------
+
+## The vote's card above the buttons (hidden until a vote is open): the title and the countdown pill, a line on who
+## plays, and everyone asked as name chips.
+func _build_vote() -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = "Vote"
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Palette.CARD, UIKit.R.md, UIKit.BW.line, Palette.ROW_EDGE)
+	st.border_width_bottom = UIKit.LIP.sm
+	UIKit.pad(st, 12, 8)
+	p.add_theme_stylebox_override("panel", st)
+	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(col)
+	var head := UIKit.hbox(UIKit.SPACE.sm)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_title = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	_vote_title.name = "Title"
+	_vote_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_vote_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_vote_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(_vote_title)
+	var pill := PanelContainer.new()
+	pill.name = "Timer"
+	var ps := UIKit.box(Palette.HONEY_TINT, UIKit.R.pill, UIKit.BW.line, Palette.HONEY_TINT_EDGE)
+	UIKit.pad(ps, 10, 2)
+	pill.add_theme_stylebox_override("panel", ps)
+	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_timer = UIKit.label("0:30", UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
+	pill.add_child(_vote_timer)
+	head.add_child(pill)
+	col.add_child(head)
+	_vote_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+	_vote_sub.name = "Sub"
+	_vote_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_vote_sub)
+	_vote_names = HFlowContainer.new()
+	_vote_names.name = "Names"
+	_vote_names.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_names.add_theme_constant_override("h_separation", UIKit.SPACE.xs + 2)
+	_vote_names.add_theme_constant_override("v_separation", UIKit.SPACE.xs + 2)
+	col.add_child(_vote_names)
+	p.visible = false
+	return p
+
+## The room's Play again vote (a `rematch` message; {} = none): the card, the buttons, the countdown. me: your member
+## id ("" keeps the one you have). The first time you are asked the phone gives a nudge.
+func set_vote(v: Dictionary, me := "") -> void:
+	_vote = v.duplicate(true)
+	if me != "":
+		_me = me
+	data.vote = _vote
+	if vote_card == null:
+		return
+	var res := str(_vote.get("result", ""))
+	var mine := Online.vote_of(_vote, _me)
+	vote_card.visible = not _vote.is_empty() and (res == "" or mine == "yes")
+	if vote_card.visible:
+		if res == "":
+			_vote_end = Time.get_ticks_msec() + maxi(0, int(_vote.get("until", 0)) - int(_vote.get("now", 0)))
+		if res == "go":
+			_vote_title.text = tr("Starting a new game…")
+		elif mine == "wait":
+			_vote_title.text = tr("%s wants to play again") % Online.vote_by_name(_vote)
+		else:
+			_vote_title.text = tr("Waiting for the others…")
+		var ffa := bool(_vote.get("ffa", false))
+		_vote_sub.text = tr("Teams need 4 players: this game is everyone for themselves.") if ffa else tr("The next game starts with everyone who taps Play.")
+		_vote_sub.visible = res == "" or ffa
+		(_vote_timer.get_parent() as Control).visible = res == ""
+		_tick_vote()
+		for c in _vote_names.get_children():
+			_vote_names.remove_child(c)
+			c.queue_free()
+		for pl: Dictionary in _vote.get("players", []) if _vote.get("players") is Array else []:
+			_vote_names.add_child(_vote_chip(pl))
+		if mine == "wait" and res == "" and not _prompted:
+			_prompted = true
+			Haptics.medium()
+			UIKit.sfx("select")
+	_sync_buttons()
+	if is_inside_tree():
+		_layout.call_deferred()
+
+## One name in the vote: a teal tick (in), a dotted ring (still deciding) or a cross (left), then the name ("You").
+func _vote_chip(pl: Dictionary) -> Control:
+	var v := str(pl.get("vote", "wait"))
+	var chip := PanelContainer.new()
+	chip.name = "Voter%s" % NetClient.id_str(pl.get("id", ""))
+	chip.set_meta("vote", v)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Color.WHITE if v != "no" else Palette.CHIP, UIKit.R.pill, UIKit.BW.line, Palette.TEAL if v == "yes" else Palette.ROW_EDGE)
+	UIKit.pad(st, 6, 3)
+	st.content_margin_right = 10
+	chip.add_theme_stylebox_override("panel", st)
+	var row := UIKit.hbox(UIKit.SPACE.xs)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_check_disc(16.0) if v == "yes" else _vote_mark(v, 16.0))
+	var mine := NetClient.id_str(pl.get("id", "")) == _me
+	var nm := UIKit.label(tr("You") if mine else L10n.seat_name(str(pl.get("name", "Player"))), UIKit.FS.label,
+		Palette.MUTED if v == "no" else Palette.INK, UIKit.font_body(900))
+	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.custom_minimum_size.x = minf(UIKit.font_body(900).get_string_size(nm.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.label).x + 2.0, 104.0)
+	row.add_child(nm)
+	chip.add_child(row)
+	return chip
+
+## A ring with three dots (still deciding) or a grey disc with a cross (left), px wide.
+static func _vote_mark(v: String, px: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(px, px)
+	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.draw.connect(func() -> void:
+		var m := c.size / 2.0
+		var r := px / 2.0
+		if v == "no":
+			c.draw_circle(m, r, Palette.TAN_DEEP, true, -1.0, true)
+			var d := r * 0.42
+			c.draw_line(m - Vector2(d, d), m + Vector2(d, d), Color.WHITE, 2.0, true)
+			c.draw_line(m + Vector2(-d, d), m + Vector2(d, -d), Color.WHITE, 2.0, true)
+			return
+		c.draw_arc(m, r - 1.0, 0.0, TAU, 32, Palette.TAN_DEEP, 2.0, true)
+		for k in 3:
+			c.draw_circle(m + Vector2((k - 1) * r * 0.48, 0.0), 1.4, Palette.MUTED, true, -1.0, true))
+	return c
+
+## The countdown pill: the seconds left on the vote ("0:24").
+func _tick_vote() -> void:
+	if _vote_timer and vote_card.visible:
+		_vote_timer.text = Fmt.clock(ceili(maxi(0, _vote_end - Time.get_ticks_msec()) / 1000.0))
 
 func _row(e: Dictionary) -> Control:
 	var c := int(e.get("color", 0))
@@ -578,8 +760,8 @@ func _result_cell(e: Dictionary) -> Control:
 	box.add_child(l)
 	return box
 
-## A teal disc with the white check (a finished player).
-func _check_disc(px: float) -> Control:
+## A teal disc with the white check (a finished player; a yes in the vote).
+static func _check_disc(px: float) -> Control:
 	var c := Control.new()
 	c.custom_minimum_size = Vector2(px, px)
 	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -715,6 +897,8 @@ func _place_ribbon() -> void:
 
 func _process(_d: float) -> void:
 	_place_ribbon()
+	if not _vote.is_empty():
+		_tick_vote()
 
 func _play() -> void:
 	var reduce := Sheet.reduce_motion()
@@ -770,10 +954,10 @@ func _play() -> void:
 	await _wait(0.15)
 	if not _alive():
 		return
-	home_button.disabled = false
+	_revealed = true
 	if share_button:
 		share_button.disabled = _sharing
-	again_button.disabled = is_online() and not bool(data.get("host", false))
+	_sync_buttons()
 	await _count_rewards()
 	_done = true
 
@@ -870,8 +1054,10 @@ func _pick(what: String) -> void:
 	if what == "again":
 		play_again.emit()
 		if is_online():
-			again_button.disabled = true       # the server's start closes the screen
-			again_button.text = tr("Starting…")
+			again_button.disabled = true       # a yes in the vote (it says so next); the server's start closes the screen
+			again_button.text = tr("Waiting…")
+			UIKit.set_kind(again_button, "off")
+			again_button.set_meta("kit_kind", "off")
 			return
 	else:
 		home.emit()

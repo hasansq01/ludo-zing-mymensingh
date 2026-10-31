@@ -46,7 +46,8 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 |---|---|---|
 | `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
 | `settings` | `teams?: bool, game?: "ludo" \| "sl"` | host, lobby only (friend rooms). A `pair_ask` from older clients is accepted and ignored |
-| `start` | – | host, lobby (or after `over` for a rematch); needs ≥ 2 members (teams: exactly 4) |
+| `start` | – | host, lobby; needs ≥ 2 members (teams: exactly 4). After `over` it is a `rematch` (older clients' Play again) |
+| `rematch` | – | friend rooms, after `over`: Play again (or Play on the prompt), you say yes; the first one opens the vote (see "Play again") |
 | `roll` | `n` | your turn, phase `roll` |
 | `move` | `n, i` (token index 0–3, as `LudoRules.move`) | your turn, phase `choose` |
 | `pair` | `n, yes` | your turn, phase `pair_ask` |
@@ -76,6 +77,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | `error` | `code, msg` |
 | `emote` | `c, id` (+ `member` when `c` = -1; see "Emotes") |
 | `pong` | `now` (only from other ping shapes; the exact `{"t":"ping"}` gets `{"t":"pong"}`, see "Keep-alive") |
+| `rematch` | `by, until, now, players: [{id, name, avatar, frame, vote: "yes" \| "no" \| "wait"}]`, at the close also `result: "go" \| "few"` (+ `ffa: true`); see "Play again" |
 
 `seats`: `[{color, id, name, avatar, frame, pawn, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
 LudoRules state (JSON) with `players[c]` = `"human"` (a member), `"cpu"` (a bot) or `"off"`, and `names[c]` = the
@@ -127,6 +129,39 @@ rules (the same in GDScript and TS, so clients get there from the acts alone):
 
 Members are seated in join order. At `start` the playing colours are: 2 players → Red, Yellow (0, 2: opposite
 corners); 3 → Red, Green, Yellow (0, 1, 2); 4 → all. Teams needs 4 (Red + Yellow vs Green + Blue).
+
+## Play again (friend rooms)
+
+After `over` (owner 2026-11-01) anyone in a friend room can ask for the next match; nobody is put into one without
+saying yes. The server keeps the vote, its clock and who is in; clients only show it. Quick rooms have no rematch
+(`rematch` → `bad_action`; Play again = queue again).
+
+- `{t: "rematch"}` from a member while the room is `over`: they say **yes**. The first one opens the vote: everyone
+  else in the room is asked (`vote: "wait"`), and away members get the "Rematch?" push (see "Away and event pushes").
+  Later ones add their yes; several at the same moment are simply all yes (one vote, `by` = the first). A repeat is
+  ignored. In the lobby or during a match: `bad_action`. An older client's `start` after `over` is the same as
+  `rematch` (there is no instant rematch any more).
+- `{t: "rematch", by, until, now, players}` goes to everyone in the room when the vote opens and on every change:
+  `by` asked first, `until` is when it closes (server ms, 30 s after it opened; `now` = the server clock), `players`
+  every member asked, in join order, with `vote` `"yes"`, `"wait"` (still deciding) or `"no"` (left the room).
+  Clients show it: the prompt ("Rafi wants to play again", Play / Leave) for those still deciding, the ticks for
+  everyone, a countdown to `until`.
+- **No** is `leave` (Leave on the prompt, Home on the result): the member leaves the room as in the lobby (close
+  4002); the others see their `vote: "no"`.
+- Joining the room by code while a vote is open is a yes (the newcomer is added to `players`). A member who comes
+  back within the window (token, or the same pid / account) gets `sync`, `over`, `lobby` and then the vote, and can
+  still answer. While a vote is open, its members are not dropped by the disconnect grace: the vote decides.
+- The vote **closes** as soon as nobody is `"wait"`, or at `until` (the room's alarm; it is stored with the room, so
+  it survives an eviction). The last `rematch` carries `result`, then only those who said yes stay in the room:
+  - The others (Leave, no answer, offline the whole time: a no) are removed: any socket of theirs gets
+    `error {code: "rematch_out"}` and closes with 4002. They may join again with the code like anyone once the room
+    is open (after that match's `over`, or in the lobby); while the new match runs, a hello is `started`.
+  - `result: "go"` (2 or more said yes): `start` follows for them, seated in join order (the usual colours). The host
+    stays host if they said yes, else the next member in join order. Ludo **Teams** needs exactly 4: with 2 or 3 yes
+    the match is free-for-all instead, the room's teams setting turns off and the message has `ffa: true`. A yes-sayer
+    offline at the close gets a fresh 20 s grace (then a bot plays the seat).
+  - `result: "few"` (fewer than 2): no match. The room goes back to its lobby (`lobby` with `status: "lobby"`): the
+    one who said yes waits there as host and invites others with the code; `start` works as before.
 
 ## Emotes
 
@@ -348,6 +383,8 @@ profile (`GET /v1/me`) after `over`; rewards are not part of any room message.
 
 `version` (unsupported v), `not_found`, `full` (4 members), `started` (match in progress and you have no seat),
 `not_host`, `not_your_turn`, `bad_action` (illegal for the rules), `stale`, `too_few`, `teams_need_4`, `rate`
+(over 20 messages/s), `rematch_out` (a Play again vote closed without your yes: you are out of the room, close 4002; see
+"Play again"), `rate`
 (over 20 messages/s), `bad_message`, `emote_locked` / `emote_rate` (see "Emotes"), `banned` (your pid is banned from online play; `msg` says so, with the
 reason; the socket then closes with 4003: on hello, or while you are in a room when the ban happens), `kicked` (an
 admin removed you from the room; the socket then closes with 4002). `banned` also covers a banned account (by
@@ -365,7 +402,7 @@ Clarifications of the tables above; nothing here changes a message the client se
   that is not ≤ 32 chars of `[A-Za-z0-9_.:-]` becomes `""`.
 - **Close codes**: `4000` after a fatal error (`version`, `full`, `started`, bad hello, `not_found`), `4001`
   replaced by a newer connection of the same member, `4002` after your own `leave` (or an admin kick, preceded by
-  `error {code: "kicked"}`), `4003` banned (preceded by `error {code: "banned"}`; don't auto-reconnect), `4004` the
+  `error {code: "kicked"}`; or a Play again vote that went on without you, preceded by `error {code: "rematch_out"}`), `4003` banned (preceded by `error {code: "banned"}`; don't auto-reconnect), `4004` the
   room was deleted (stale / empty cleanup or closed by an admin; preceded by `error {code: "not_found"}`).
 - **hello and bans**: the server checks the pid against the ban list (one D1 read, cached 60 s) before answering
   `welcome`; messages sent before `welcome` wait for it and keep their order.
@@ -390,8 +427,9 @@ Clarifications of the tables above; nothing here changes a message the client se
   later hello joins as a new member at the end of the order.
 - **`over`** also carries `standings: [{color, place, finished, progress}]` (`LudoRules.standings`), and is
   followed by `lobby` (`status: "over"`). The room is then back under lobby rules: people may join (up to 4) or
-  leave, the host may change settings, and the host's `start` begins a rematch with the current members in join
-  order (a new `start`, `n: 0`). Members still offline after the game are dropped after the grace.
+  leave and the host may change settings; the next match comes from the Play again vote (see "Play again"; a new
+  `start`, `n: 0`, for those who said yes). Members still offline after the game are dropped after the grace,
+  except while a vote they are in is open.
 - **`leave` in a match**: the others get `presence {online: false}` and `act mode cpu`; the bot keeps that colour
   for the rest of the match, and the old token no longer works (`started`).
 - **Quick-match seats the server plays** (ONLINE_V2.md §3, owner decision: no disclosure): to clients they are

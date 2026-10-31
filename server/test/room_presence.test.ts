@@ -126,8 +126,9 @@ describe("leave and host", () => {
     expect(await again.wait("error")).toMatchObject({ code: "started" });
 
     await finishAll([grn, yel]);
-    // the new host can start the rematch with the two remaining members
-    grn.send({ t: "start" });
+    // the two remaining members play again (the vote: both say yes)
+    grn.send({ t: "rematch" });
+    yel.send({ t: "rematch" });
     const st = await yel.wait("start");
     expect(st.seats.map((s: Msg) => s.id)).toEqual([grn.id, yel.id]);
     expect(st.state.players).toEqual(["human", "off", "human", "off"]);

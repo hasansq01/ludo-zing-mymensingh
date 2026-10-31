@@ -1,7 +1,7 @@
 extends "res://tests/test_suite.gd"
 ## Online rooms, the UI pieces: the Friends sheet's code field (cleaning, paste of an invite line, Join only with a
 ## full code), the Lobby sheet (rows, host controls, Teams only with 4, Start with 2+, guests wait), the online
-## result screen (Play again for the host, "Waiting for host…" for the others), the HUD's online parts (badges,
+## result screen (Play again for anyone in the room; the vote is in test_rematch.gd), the HUD's online parts (badges,
 ## the turn timer, I’m back, Reconnecting…) and the copy rules. Nothing here writes the save or opens a socket.
 
 func run() -> void:
@@ -105,9 +105,11 @@ func _result() -> void:
 	]
 	var r := ResultScreen.new({game = "ludo", online = true, host = false, standings = st, human_won = true, reward = 0,
 		xp_before = 10, xp_after = 110})
-	check("online result: guests see Waiting for host…", r.again_button.text == "Waiting for host…" and r.again_button.disabled)
+	check("online result: out of the room, Play again is off", r.again_button.text == "Play again" and r.again_button.disabled)
 	r.set_host(true)
-	check("online result: the new host can rematch", r.again_button.text == "Play again")
+	r._revealed = true
+	r._sync_buttons()
+	check("online result: anyone in the room may Play again (a yes in the vote)", r.again_button.text == "Play again" and not r.again_button.disabled)
 	check("online result: no coins tile", r.coins == null)
 	check("online result: a friend's own avatar", ResultScreen._make_avatar(st[1], 40) is Collection.AvatarView)
 	r.free()

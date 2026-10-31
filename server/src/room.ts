@@ -74,6 +74,7 @@ export const TIMING = {
   stale: 2 * 60 * 60_000, // no action (or lobby change) for this long -> the room is deleted
   // a quick match frozen this long (no person connected) ends for good: settled by progress (endAway; owner 2026-10-31)
   abandonAfter: 2 * 60_000,
+  rematch: 30_000, // friend rooms: a Play again vote closes this long after it opened (owner 2026-11-01)
 };
 
 /**
@@ -271,6 +272,21 @@ interface QuickInfo {
   overAt: number;
 }
 
+/**
+ * A friend room's Play again vote after `over` (PROTOCOL.md "Play again"; owner 2026-11-01): opened by anyone's
+ * `rematch` (they count as yes), closed when nobody asked is still deciding or at `until` (closeVote). Then only those
+ * who said yes stay in the room: 2 or more play the next match, fewer wait in the lobby. Stored with the room (it
+ * survives an eviction; the alarm closes it).
+ */
+interface Vote {
+  /** The member who asked first. */
+  by: number;
+  /** Epoch ms: the vote closes. */
+  until: number;
+  /** Everyone asked (the members when it opened, then those who joined: yes), with their answer; one who left: "no". */
+  players: Array<{ id: number; name: string; avatar: string; frame: string; vote: "yes" | "no" | "wait" }>;
+}
+
 interface PendingGrant {
   g: OnlineMatchGrant;
   tries: number;
@@ -294,6 +310,8 @@ interface RoomData {
   quick?: QuickInfo;
   /** Online reward grants not yet confirmed by the accounts module. */
   grants?: PendingGrant[];
+  /** Friend rooms after `over`: the open Play again vote. */
+  vote?: Vote;
   /** Signature of the rooms-row fields last queued for D1, and the status they had (see commit()). */
   dbSig?: string;
   dbStatus?: Status;
@@ -323,6 +341,8 @@ export interface TestHooks {
   chain?: boolean;
   /** Replaces ECON_V1.ghost_reroll_chance (1 = a ghost always re-rolls a bad roll, 0 = never). */
   rerollChance?: number;
+  /** Friend rooms: the Play again vote's window in ms, unscaled (tests that scale the graces but answer at test speed). */
+  rematchMs?: number;
 }
 
 /**
@@ -523,6 +543,11 @@ export function badRoll(game: GameKind, ev: Array<{ type: string; v?: number; sn
   if (ev.some((e) => e.type === "need_six")) return true;
   const rolled = ev.find((e) => e.type === "rolled");
   return ev.some((e) => e.type === "stuck") && rolled?.v !== 6;
+}
+
+/** A member's line in the Play again vote (Vote.players): what the others are shown, and the answer. */
+function voter(m: Member, vote: Vote["players"][number]["vote"]): Vote["players"][number] {
+  return { id: m.id, name: m.name, avatar: m.avatar, frame: m.frame, vote };
 }
 
 function isInt(x: unknown, lo: number, hi: number): x is number {
@@ -765,6 +790,7 @@ export class Room extends DurableObject<Env> {
     const mem = this.room?.members.find((m) => m.id === memberId);
     if (!mem || mem.ghost) return false;
     this.expel(mem, CLOSE.left, "kicked", "you were removed from the room");
+    await this.voteCheck();
     this.commit();
     await this.settle();
     return true;
@@ -777,6 +803,7 @@ export class Room extends DurableObject<Env> {
     const mem = pid ? this.room?.members.find((m) => m.pid === pid && !m.ghost) : undefined;
     if (!mem) return false;
     this.expel(mem, CLOSE.banned, "banned", banMsg(reason));
+    await this.voteCheck();
     this.commit();
     await this.settle();
     return true;
@@ -794,6 +821,7 @@ export class Room extends DurableObject<Env> {
     const mem = account ? this.room?.members.find((m) => m.account === account && !m.ghost) : undefined;
     if (!mem) return false;
     this.expel(mem, CLOSE.banned, "banned", banMsg(reason));
+    await this.voteCheck();
     this.commit();
     await this.settle();
     return true;
@@ -898,6 +926,10 @@ export class Room extends DurableObject<Env> {
         this.settings(ws, mem, msg);
         break;
       case "start": {
+        if (r.status === "over" && !r.quick) {
+          this.rematch(ws, mem); // an older client's Play again: a yes like any other (no instant rematch)
+          break;
+        }
         let timers: TurnTimers | undefined;
         if (this.startError(mem) === null) {
           timers = await this.turnTimers(); // read at every match start: config changes apply to the next match
@@ -908,6 +940,9 @@ export class Room extends DurableObject<Env> {
         this.start(ws, mem, timers);
         break;
       }
+      case "rematch":
+        this.rematch(ws, mem);
+        break;
       case "roll":
       case "move":
       case "pair":
@@ -935,6 +970,7 @@ export class Room extends DurableObject<Env> {
       default:
         return this.error(ws, "bad_message", `unknown type ${String(msg.t).slice(0, 20)}`);
     }
+    await this.voteCheck();
     this.commit();
     await this.settle();
   }
@@ -1012,6 +1048,10 @@ export class Room extends DurableObject<Env> {
     if (q && r.status === "over" && q.overAt && now >= q.overAt + this.overKeep()) {
       await this.destroy("done", "over");
       return;
+    }
+    if (r.vote && now >= r.vote.until) {
+      await this.closeVote();
+      if (this.room !== r) return;
     }
     for (const mem of [...r.members]) {
       if (!mem.graceAt) continue;
@@ -1114,6 +1154,7 @@ export class Room extends DurableObject<Env> {
       if (who.level !== null) mem.level = who.level;
       r.members.push(mem);
       if (r.host < 0) r.host = mem.id;
+      if (r.vote) r.vote.players.push(voter(mem, "yes")); // joining while the others vote: in for the next match
       r.touched = now;
       this.playerSeen(mem, true);
     }
@@ -1144,6 +1185,10 @@ export class Room extends DurableObject<Env> {
     } else {
       if (r.status === "over" && m) this.sendSnapshot(ws);
       this.broadcast(this.lobbyMsg());
+      if (r.vote) {
+        if (fresh) this.broadcast(this.voteMsg(r.vote)); // (everyone sees the new name with its tick)
+        else this.send(ws, this.voteMsg(r.vote)); // back within the window: the answer can still be given
+      }
       const host = r.members.find((h) => h.id === r.host);
       if (fresh && host && host !== mem) this.pushTo(host, "joined", "Friend joined", `${mem.name} joined your room ${r.code}`);
     }
@@ -1190,6 +1235,7 @@ export class Room extends DurableObject<Env> {
         if (this.ops.turnColor(m.state) === seat.color) this.planStep();
       }
     } else if (!r.quick) {
+      if (r.vote?.players.some((p) => p.id === mem.id)) return; // a vote is open: it decides (closeVote)
       this.removeMember(mem);
       this.broadcast(this.lobbyMsg());
     }
@@ -1241,6 +1287,11 @@ export class Room extends DurableObject<Env> {
       if (hostWas !== r.host && !r.quick) this.broadcast(this.lobbyMsg()); // tells everyone who the new host is
     } else if (!r.quick) {
       this.broadcast(this.lobbyMsg());
+      const vp = r.vote?.players.find((p) => p.id === mem.id);
+      if (vp) {
+        vp.vote = "no"; // Leave on the Play again prompt (or a kick): out of the next match
+        this.broadcast(this.voteMsg(r.vote!));
+      }
     }
     if (this.sockets().length === 0 && !r.emptySince) r.emptySince = Date.now();
     this.updateFreeze();
@@ -1473,6 +1524,7 @@ export class Room extends DurableObject<Env> {
     r.match = m;
     r.status = "playing";
     r.touched = now;
+    delete r.vote;
     const ghosts = seats.filter((st) => st.ghost).length;
     const row = {
       code: r.code,
@@ -1494,6 +1546,87 @@ export class Room extends DurableObject<Env> {
     this.ctx.waitUntil(this.loadRerollMeans());
     // members offline at the start keep their grace; it now turns their seat into a bot
     this.planStep();
+  }
+
+  // ---------- Play again: the rematch vote (friend rooms, after `over`; PROTOCOL.md "Play again") ----------
+
+  /**
+   * `rematch` (Play again, or Play on the prompt; an older client's `start` after `over`): mem says yes. The first one
+   * opens the vote (everyone else in the room is asked, "Rematch?" goes to those away); later ones, also at the same
+   * moment, just add their yes.
+   */
+  private rematch(ws: WebSocket, mem: Member): void {
+    const r = this.room!;
+    if (r.quick) return this.error(ws, "bad_action", "quick matches have no rematch: queue again");
+    if (r.status !== "over") return this.error(ws, "bad_action", r.status === "playing" ? "the match is in progress" : "no match to play again: the host starts");
+    const now = Date.now();
+    let v = r.vote;
+    if (!v) {
+      const ms = this.env.TEST_MODE === "1" && this.hooks.rematchMs !== undefined ? this.hooks.rematchMs : this.ms(TIMING.rematch);
+      v = r.vote = { by: mem.id, until: now + ms, players: r.members.map((x) => voter(x, x === mem ? "yes" : "wait")) };
+      for (const x of r.members) if (x !== mem) this.pushTo(x, "rematch", "Rematch?", `${mem.name} wants a rematch in room ${r.code}`);
+    } else {
+      const p = v.players.find((x) => x.id === mem.id);
+      if (p?.vote === "yes") return; // (a double tap)
+      if (p) p.vote = "yes";
+      else v.players.push(voter(mem, "yes"));
+    }
+    r.touched = now;
+    this.broadcast(this.voteMsg(v));
+  }
+
+  private voteMsg(v: Vote, result?: "go" | "few", ffa = false): Record<string, unknown> {
+    const msg: Record<string, unknown> = { t: "rematch", by: v.by, until: v.until, now: Date.now(), players: v.players.map((p) => ({ ...p })) };
+    if (result) msg.result = result;
+    if (ffa) msg.ffa = true;
+    return msg;
+  }
+
+  /** After a handler: the vote closes as soon as nobody asked is still deciding. */
+  private async voteCheck(): Promise<void> {
+    const v = this.room?.vote;
+    if (v && !v.players.some((p) => p.vote === "wait")) await this.closeVote();
+  }
+
+  /**
+   * Closes the vote (everyone answered, or the alarm at `until`): only those who said yes stay. The others (Leave,
+   * no answer, offline the whole time) are removed: `error rematch_out` and close 4002 for any socket they still have;
+   * they may join again with the code once the room is open (after the next `over`, or in the lobby). Two or more:
+   * the next match starts with them, in join order (Ludo Teams needs exactly 4: fewer play free-for-all, the teams
+   * setting turns off and the message says ffa). Fewer: no match; the room is back in its lobby (status "lobby").
+   */
+  private async closeVote(): Promise<void> {
+    const v = this.room?.vote;
+    if (!v) return;
+    const timers = await this.turnTimers(); // (read at every match start, as for the host's start)
+    const r = this.room;
+    if (!r || r.vote !== v) return; // closed meanwhile (the alarm and the last answer at once), or the room is gone
+    delete r.vote;
+    const yes = new Set(v.players.filter((p) => p.vote === "yes" && r.members.some((m) => m.id === p.id)).map((p) => p.id));
+    const go = yes.size >= 2;
+    const ffa = go && (r.settings.game ?? "ludo") === "ludo" && r.settings.teams && yes.size !== 4;
+    if (ffa) r.settings.teams = false;
+    this.broadcast(this.voteMsg(v, go ? "go" : "few", ffa));
+    const now = Date.now();
+    for (const mem of [...r.members]) {
+      if (yes.has(mem.id)) continue;
+      this.removeMember(mem);
+      for (const sock of this.socketsOf(mem.id)) {
+        this.send(sock, { t: "error", code: "rematch_out", msg: go ? "the others started a new game" : "not enough players wanted to play again" });
+        this.closeWith(sock, CLOSE.left, "rematch_out");
+      }
+    }
+    // the ones who stay and are offline: a fresh grace (in the match it then turns their seat into a bot)
+    for (const mem of r.members) mem.graceAt = this.online(mem.id) ? 0 : now + this.ms(TIMING.grace);
+    if (this.sockets().length === 0 && !r.emptySince) r.emptySince = now;
+    r.touched = now;
+    if (go) {
+      this.startMatch(timers);
+      this.updateFreeze(); // (every yes-sayer offline: frozen from the start)
+    } else {
+      r.status = "lobby";
+      this.broadcast(this.lobbyMsg());
+    }
   }
 
   // ---------- match ----------
@@ -2298,6 +2431,7 @@ export class Room extends DurableObject<Env> {
       if (r.match?.gemotes?.length && r.status !== "lobby") for (const e of r.match.gemotes) due.push(e.at);
       if (r.quick && r.status === "lobby") due.push(r.quick.startBy);
       if (r.quick && r.status === "over" && r.quick.overAt) due.push(r.quick.overAt + this.overKeep());
+      if (r.vote) due.push(r.vote.until);
     }
     for (const g of r.grants ?? []) due.push(g.next);
     const next = Math.ceil(Math.min(...due));

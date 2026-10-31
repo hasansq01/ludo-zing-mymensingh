@@ -1,7 +1,9 @@
 extends Node
 ## Dev: the UI/UX audit tour. Screenshots of every sheet (scripts/ui/sheets/*), every nested path a player can reach
 ## (Profile -> Leaderboard / Inventory, Shop -> Preview / Emote pack / Store, Rewards -> Spin / Daily, Settings ->
-## How to play / Credits, Pause -> Settings, Home -> Quick match -> its states, Friends -> Lobby), the match HUDs
+## How to play / Credits, Pause -> Settings, Home -> Quick match -> its states, Friends -> Lobby, a friend room's Play
+## again vote: the prompt, the ticks, waiting, starting, Teams falling back, the prompt elsewhere, a newcomer's lobby,
+## not enough players), the match HUDs
 ## (Ludo and Snakes & Ladders: top bar, player tiles, emote picker, Roll again), toasts, the result screens, Home,
 ## the Snakes & Ladders landing, the welcome and splash screens. Used for before / after comparisons.
 ##   godot --path . --resolution 360x780 res://dev/audit_tour.tscn -- <out_dir> [--safe=38,16] [--only=a,b]
@@ -497,6 +499,79 @@ func _s_online() -> void:
 	ls.start_button.gui_input.emit(_tap())    # a guest's disabled Start says why
 	await _sleep(0.4)
 	await shot("lobby_guest_start_toast")
+	await _play_again()
+
+## A friend room's Play again vote (server/PROTOCOL.md "Play again") as each person sees it: on the result (Rafi
+## asked: the prompt; after your yes: waiting with the ticks; at the close: starting, and Teams falling back to
+## free-for-all), the prompt elsewhere in the app, a newcomer's lobby while the others decide, not enough players.
+func _play_again() -> void:
+	main.close_all_sheets()
+	await _sleep(2.0)                                 # (the last toast fades)
+	main.start_ludo({game = "ludo", players = ["human", "cpu", "cpu", "cpu"], teams = false})
+	await _sleep(1.0)
+	main.ludo._id += 1                                # frozen: the board behind the result
+	var xp := int(Save.profile.xp)
+	var st := [
+		{color = 1, name = "Rafi", kind = "human", avatar = "ch-rafi", frame = "classic", place = 1, finished = true, progress = 1.0},
+		{color = 0, name = "You", kind = "you", place = 2, finished = false, progress = 0.72},
+		{color = 2, name = "Tanvir Ahmed C", kind = "human", avatar = "ch-tanvir", frame = "classic", place = 3, finished = false, progress = 0.41}]
+	var r := ResultScreen.new({game = "ludo", online = true, host = true, me = "m1", standings = st, human_won = false, reward = 50,
+		xp_before = xp - 60, xp_after = xp, safe_top = main.safe_top, safe_bottom = main.safe_bottom})
+	main._result = r
+	r.open(main.sheet_layer)
+	await _sleep(3.6)
+	r.set_vote(_vote("wait", "wait"))
+	await _sleep(0.8)
+	await shot("result_vote_asked")
+	r.set_vote(_vote("yes", "wait"))
+	await _sleep(0.6)
+	await shot("result_vote_waiting")
+	r.set_vote(_vote("yes", "no", "go"))
+	await _sleep(0.6)
+	await shot("result_vote_starting")
+	r.set_vote(_vote("yes", "yes", "go", true))
+	await _sleep(0.6)
+	await shot("result_vote_ffa")
+	main.go_home()
+	await _sleep(1.2)
+	main.online._vote_prompt(_vote("wait", "yes"))     # elsewhere in the app: the small prompt
+	await _sleep(0.9)
+	await shot("vote_prompt_elsewhere")
+	main.close_all_sheets()
+	await _sleep(0.3)
+	var ls := LobbySheet.new("K7QX2M", "m4", "ludo")
+	ls.open(main.sheet_layer)
+	ls.update({code = "K7QX2M", host = "m2", settings = {teams = false, game = "ludo"}, members = [
+		{id = "m2", name = "Rafi", avatar = "ch-rafi", level = 12, online = true, color = 0},
+		{id = "m1", name = "Shihab", avatar = "pawn-red", level = 7, online = true, color = 1},
+		{id = "m4", name = "Mitu", avatar = "ch-mim", level = 4, online = true, color = 2}]}, false)
+	var v := _vote("wait", "yes")
+	(v.players as Array).append({id = "m4", name = "Mitu", avatar = "ch-mim", frame = "classic", vote = "yes"})
+	ls.set_vote(v)
+	await _sleep(0.9)
+	await shot("lobby_vote_joined")
+	main.close_all_sheets()
+	await _sleep(0.3)
+	var lone := LobbySheet.new("K7QX2M", "m1", "ludo")
+	lone.open(main.sheet_layer)
+	lone.update({code = "K7QX2M", host = "m1", settings = {teams = false, game = "ludo"}, members = [
+		{id = "m1", name = "Shihab", avatar = "pawn-red", level = 7, online = true, color = 0}]}, true)
+	lone.set_notice(tr("Not enough players said yes. Invite friends with the code."))
+	await _sleep(0.9)
+	await shot("lobby_vote_not_enough")
+
+## A `rematch` message: Rafi asked (yes); you (Shihab) and Tanvir as given; result "go" / "few" at the close.
+func _vote(you: String, tanvir: String, result := "", ffa := false) -> Dictionary:
+	var now := int(Time.get_unix_time_from_system() * 1000.0)
+	var v := {t = "rematch", by = "m2", until = now + 24000, now = now, players = [
+		{id = "m2", name = "Rafi", avatar = "ch-rafi", frame = "classic", vote = "yes"},
+		{id = "m1", name = "Shihab", avatar = "pawn-red", frame = "classic", vote = you},
+		{id = "m3", name = "Tanvir Ahmed C", avatar = "ch-tanvir", frame = "classic", vote = tanvir}]}
+	if result != "":
+		v.result = result
+	if ffa:
+		v.ffa = true
+	return v
 
 func _s_ludo() -> void:
 	main.speed = 0.5

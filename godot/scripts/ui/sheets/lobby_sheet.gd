@@ -9,12 +9,17 @@ extends Sheet
 ##           pairing" is not a room rule: everyone plays their own Settings choice.)
 ##   Others: the same choices, read only, and "Waiting for host…".
 ## Leave (and Back) asks first. The sheet has no close button: leaving is a choice, not a dismissal.
+## Joined while the others decide on Play again (server/PROTOCOL.md "Play again"; you are in by joining): set_vote()
+## marks each row (a teal tick: in; "Deciding…") and the note says the next game is on its way. Back here after a
+## vote with too few yes: set_notice() says so in the note until a friend joins.
 ##
 ##   var s := LobbySheet.new(code, my_member_id)
 ##   s.update(lobby_msg, is_host)               # every `lobby` message
 ##   s.set_status("reconnecting")               # NetClient.status
 ##   s.settings_changed.connect(func(teams): ...); s.start_pressed.connect(...); s.leave_pressed.connect(...)
 ##   s.game_changed.connect(func(game): ...)    # the host picked "ludo" | "sl"
+##   s.set_vote(rematch_msg)                    # the room's Play again vote ({} or a closed one: no marks)
+##   s.set_notice("Not enough players said yes…")  # the note while you are alone ("" = the usual one)
 
 signal settings_changed(teams: bool)
 signal game_changed(game: String)
@@ -47,6 +52,8 @@ var _teams_row: Control
 var _rules_card: Control
 var _teams_note: Label
 var _quiet := false                       # setting the switches from a lobby message: don't echo it back
+var _votes := {}                          # member id -> "yes" | "wait" while a Play again vote is open
+var _notice := ""                         # set_notice(): the note while you are alone
 
 
 func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
@@ -280,6 +287,16 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(nm)
+	var vote := str(_votes.get(NetClient.id_str(m.get("id", "")), ""))
+	if vote == "yes":
+		var tick := ResultScreen._check_disc(20.0)
+		tick.name = "In"
+		row.add_child(tick)
+	elif vote == "wait":
+		var dec := UIKit.tag(tr("Deciding…"), "white")
+		dec.name = "Deciding"
+		dec.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(dec)
 	if NetClient.id_str(m.get("id", "")) == _host_id:
 		var tag := UIKit.tag(tr("Host"), "honey")
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -318,6 +335,22 @@ func update(msg: Dictionary, you_host: bool) -> void:
 	teams = bool(s.get("teams", false))
 	game = str(s.get("game", "ludo")) if str(s.get("game", "ludo")) in ["ludo", "sl"] else "ludo"
 	set_kicker(_kicker_text())
+	_refresh()
+
+## The room's Play again vote (a `rematch` message): the rows' marks and the note while it is open; {} or a closed
+## one clears them.
+func set_vote(v: Dictionary) -> void:
+	_votes = {}
+	if str(v.get("result", "")) == "" and v.get("players") is Array:
+		for p: Dictionary in v.players:
+			if str(p.get("vote", "")) in ["yes", "wait"]:
+				_votes[NetClient.id_str(p.get("id", ""))] = str(p.vote)
+	_refresh()
+
+## A note in place of the usual one while you are alone in the room (after a Play again vote with too few yes);
+## "" (or a friend joining) brings the usual one back.
+func set_notice(text: String) -> void:
+	_notice = text
 	_refresh()
 
 ## NetClient.status: "reconnecting" shows the pill and holds the buttons.
@@ -366,7 +399,11 @@ func _refresh() -> void:
 		start_button.disabled = not can_start()
 	else:
 		start_button.disabled = true
-	if members.size() < 2:
+	if not _votes.is_empty():
+		note.text = tr("Your friends are still deciding. You’re in for the next game.")
+	elif _notice != "" and members.size() < 2:
+		note.text = _notice
+	elif members.size() < 2:
 		note.text = tr("Share the code. The game can start when a friend joins.")
 	elif host and ludo and teams and not four:
 		note.text = tr("Teams need exactly 4 players.")

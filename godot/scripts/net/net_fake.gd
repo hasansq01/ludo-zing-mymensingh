@@ -43,6 +43,11 @@ extends RefCounted
 ## the next player during the hold gets `error hold {until}`. Ghosts take an offer with probability ghost_reroll (0 by
 ## default; step() takes it when ghost_take). Force it: room.force_bad_roll(c) readies colour c's next roll to be bad;
 ## room.end_hold() lets the hold run out (step() waits for it, timeout() ends it).
+## Play again (PROTOCOL.md "Play again"): after `over`, {t: "rematch"} (or a `start`) is a yes and the first opens the
+## vote: {t: "rematch", by, until, now, players [{id, name, avatar, frame, vote}]} to everyone on every change; `leave`
+## is a no, a newcomer is a yes. It closes when nobody is deciding, or on room.vote_timeout() (the server's alarm at
+## `until`; no timers here): result "go" (2+ yes: `start` with them; Teams with fewer than 4: free-for-all, ffa) or
+## "few" (back to the lobby); everyone else gets error rematch_out and the socket closes.
 ## Pipe is the client end of a socket; pipe.drop() cuts it from the server side.
 
 const GHOST_NAMES := ["Rafi", "Mitu", "Tanvir", "Nusrat", "Sakib", "Ayesha", "Shuvo", "Tania"]
@@ -148,6 +153,8 @@ class Room extends RefCounted:
 	var rr_used: Array = []               ## colours that have rolled again this match
 	var rr_log: Array = []                ## every {c, paid} re-roll done (tests)
 	var settled := false
+	var vote := {}                        ## the open Play again vote {by, until, players [{id, name, avatar, frame, vote}]}
+	var vote_ms := 30000                  ## its window (vote_timeout() closes it: there are no timers here)
 	var hold := false                     ## tests: queue outgoing frames instead of delivering them
 	var held: Array = []
 	var _ids := 0
@@ -246,8 +253,12 @@ class Room extends RefCounted:
 			"start":
 				if quick:
 					_send(pipe, {t = "error", code = "bad_action", msg = "quick matches have no rematch: queue again"})
+				elif finished_once and not playing:
+					_rematch(pipe, me)            # (an older client's Play again: a yes)
 				else:
 					_start(pipe, me)
+			"rematch":
+				_rematch(pipe, me)
 			"roll", "move", "pair":
 				_request(pipe, me, t, m)
 			"reroll":
@@ -337,6 +348,8 @@ class Room extends RefCounted:
 						_send(pipe, _sync_msg())
 						_send(pipe, _over_msg())
 					_lobby()
+					if not vote.is_empty():
+						_send(pipe, _vote_msg(vote))  # back within the window: still asked
 				return
 		if quick:
 			_send(pipe, {t = "error", code = "full", msg = "the room is full"})
@@ -358,6 +371,9 @@ class Room extends RefCounted:
 			host = mem.id
 		_send(pipe, {t = "welcome", token = mem.token, id = mem.id, code = code, host = host})
 		_lobby()
+		if not vote.is_empty():
+			(vote.players as Array).append(_voter(mem, "yes"))   # joining while the others vote: in
+			_broadcast(_vote_msg(vote))
 
 	func _start(pipe: Pipe, me: Dictionary) -> void:
 		if me.id != host:
@@ -412,6 +428,7 @@ class Room extends RefCounted:
 				S.names[st.color] = st.name
 		n = 0
 		acts = []
+		vote = {}
 		rr_offer = {}
 		rr_used = []
 		rr_log = []
@@ -484,6 +501,11 @@ class Room extends RefCounted:
 			host = members[0].id if not members.is_empty() and not quick else -1
 		if not quick:
 			_lobby()
+		var vp := _voter_of(me.id)
+		if not vp.is_empty():
+			vp.vote = "no"                        # Leave on the Play again prompt
+			_broadcast(_vote_msg(vote))
+			_vote_check()
 
 	## A socket closed (client or network).
 	func dropped(pipe: Pipe) -> void:
@@ -498,6 +520,87 @@ class Room extends RefCounted:
 					_broadcast({t = "presence", id = mem.id, online = false})
 				elif not quick:
 					_lobby()
+
+	# ---------- Play again: the vote ----------
+
+	## {t: "rematch"}: a yes; the first one opens the vote (everyone else is asked). Several at once: all yes.
+	func _rematch(pipe: Pipe, me: Dictionary) -> void:
+		if quick:
+			_send(pipe, {t = "error", code = "bad_action", msg = "quick matches have no rematch: queue again"})
+			return
+		if playing or not finished_once:
+			_send(pipe, {t = "error", code = "bad_action", msg = "no match to play again"})
+			return
+		if vote.is_empty():
+			var ps := []
+			for mem in members:
+				ps.append(_voter(mem, "yes" if mem == me else "wait"))
+			vote = {by = me.id, until = _now() + vote_ms, players = ps}
+		else:
+			var p := _voter_of(me.id)
+			if not p.is_empty() and str(p.vote) == "yes":
+				return                             # (a double tap)
+			if p.is_empty():
+				(vote.players as Array).append(_voter(me, "yes"))
+			else:
+				p.vote = "yes"
+		_broadcast(_vote_msg(vote))
+		_vote_check()
+
+	static func _voter(mem: Dictionary, v: String) -> Dictionary:
+		return {id = mem.id, name = mem.name, avatar = mem.avatar, frame = mem.frame, vote = v}
+
+	func _voter_of(id: Variant) -> Dictionary:
+		for p: Dictionary in vote.get("players", []):
+			if p.id == id:
+				return p
+		return {}
+
+	func _vote_msg(v: Dictionary, result := "", ffa := false) -> Dictionary:
+		var msg := {t = "rematch", by = v.by, until = v.until, now = _now(), players = (v.players as Array).duplicate(true)}
+		if result != "":
+			msg.result = result
+		if ffa:
+			msg.ffa = true
+		return msg
+
+	func _vote_check() -> void:
+		if not vote.is_empty() and not (vote.players as Array).any(func(p): return str(p.vote) == "wait"):
+			close_vote()
+
+	## The window ran out (the server's alarm at `until`): those still deciding count as no.
+	func vote_timeout() -> void:
+		close_vote()
+
+	## Only the yes-sayers stay: 2+ play (Teams with fewer than 4: free-for-all), fewer are back in the lobby.
+	func close_vote() -> void:
+		if vote.is_empty():
+			return
+		var v := vote
+		vote = {}
+		var yes := []
+		for p: Dictionary in v.players:
+			if str(p.vote) == "yes" and members.any(func(x): return x.id == p.id):
+				yes.append(p.id)
+		var go := yes.size() >= 2
+		var ffa := go and str(settings.get("game", "ludo")) == "ludo" and bool(settings.teams) and yes.size() != 4
+		if ffa:
+			settings.teams = false
+		_broadcast(_vote_msg(v, "go" if go else "few", ffa))
+		for mem in members.duplicate():
+			if yes.has(mem.id):
+				continue
+			if mem.pipe != null:
+				_send(mem.pipe, {t = "error", code = "rematch_out", msg = ""})
+				(mem.pipe as Pipe).server_close()
+			members.erase(mem)
+		if not members.any(func(x): return x.id == host):
+			host = members[0].id if not members.is_empty() else -1
+		if go:
+			_deal()
+		else:
+			finished_once = false                  # status "lobby"
+			_lobby()
 
 	# ---------- the rules, by game ----------
 
