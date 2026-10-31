@@ -123,6 +123,7 @@ func _ensure() -> void:
 	pr.sl_need_one = bool(pr.get("sl_need_one", true))       # Snakes & Ladders house rule "Need a 1 to start"
 	pr.pair_ask = bool(pr.get("pair_ask", true))             # Ludo house rule "Ask before pairing"
 	pr.bot_level = str(pr.get("bot_level")) if BOT_LEVELS.has(pr.get("bot_level")) else "normal"   # computer skill
+	pr.lang = str(pr.lang) if L10n.LANGS.has(pr.get("lang")) else "auto"   # interface language: auto (the phone's) | en | bn
 	pr.colorblind = bool(pr.get("colorblind", false))
 	pr.reduce_motion = bool(pr.get("reduce_motion", false))
 	for k in NOTIF_KEYS:                       # Notifications: the master switch and the four kinds, all on until changed
@@ -170,10 +171,10 @@ static func fold_master(vol: Dictionary) -> void:
 	vol.master = 100
 
 ## Settings "Reset progress": a brand-new profile (coins, XP, stats, items, rewards, a new player ID) and default
-## preferences, except the sound switch, volumes and notification choices, which are kept. Saved at once.
+## preferences, except the sound switch, volumes, language and notification choices, which are kept. Saved at once.
 func reset_progress() -> void:
 	var keep := {}
-	for k in ["sound", "vol", "notif_asked", "notif_asked_at"] + NOTIF_KEYS:
+	for k in ["sound", "vol", "lang", "notif_asked", "notif_asked_at"] + NOTIF_KEYS:
 		if prefs.has(k):
 			keep[k] = prefs[k]
 	profile = {}

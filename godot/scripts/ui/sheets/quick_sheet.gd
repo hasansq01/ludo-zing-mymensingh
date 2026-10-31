@@ -63,10 +63,10 @@ func _init(game_ := "ludo", players_ := 2, table_ := "practice") -> void:
 	if _has_save():
 		level = Save.level_info(int(Save.profile.get("xp", 0))).level
 		coins = int(Save.profile.get("coins", 0))
-	super("Quick match", UIKit.W.form, true, Sheet.LOOK_PM)
+	super(L10n.t("Quick match"), UIKit.W.form, true, Sheet.LOOK_PM)
 	dismissable = true
 	back_action = func(): _cancel()
-	set_kicker("Snakes & Ladders online" if game == "sl" else "Ludo online")
+	set_kicker(tr("Snakes & Ladders online") if game == "sl" else tr("Ludo online"))
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	_build_pick()
 	_build_search()
@@ -87,20 +87,20 @@ func _build_pick() -> void:
 	# the intro, players and tables scroll on a short screen (320x568); Find players stays under them
 	var list := add_scroll_body(UIKit.SPACE.md)
 	_scroll_wrap.reparent(_pick_box)
-	var intro := UIKit.paragraph("Play people online. Pick a table and we’ll seat you in a few seconds.",
+	var intro := UIKit.paragraph(tr("Play people online. Pick a table and we’ll seat you in a few seconds."),
 		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	list.add_child(intro)
-	list.add_child(UIKit.caption("Players"))
-	picker = UIKit.segmented([[2, "2 players"], [4, "4 players"]], players, func(v):
+	list.add_child(UIKit.caption(tr("Players")))
+	picker = UIKit.segmented([[2, tr("2 players")], [4, tr("4 players")]], players, func(v):
 		players = int(v)
 		_refresh_rows())
 	picker.name = "Players"
 	list.add_child(picker)
-	list.add_child(UIKit.caption("Table"))
+	list.add_child(UIKit.caption(tr("Table")))
 	_table_box = UIKit.vbox(UIKit.SPACE.sm)            # the list-row gap
 	_table_box.name = "Tables"
 	list.add_child(_table_box)
-	find_button = UIKit.button_with("Find players", UIKit.icon("perk_friends", 30), "honey", "lg")
+	find_button = UIKit.button_with(tr("Find players"), UIKit.icon("perk_friends", 30), "honey", "lg")
 	find_button.name = "Find"
 	find_button.pressed.connect(func():
 		if stage in ["pick", "error"] and _table_ok(table):
@@ -110,7 +110,7 @@ func _build_pick() -> void:
 func _build_search() -> void:
 	_search_box = UIKit.vbox(UIKit.SPACE.sm)
 	_search_box.name = "Search"
-	status_label = UIKit.label("Finding players…", UIKit.FS.h1, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	status_label = UIKit.label(tr("Finding players…"), UIKit.FS.h1, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.name = "Status"
 	status_label.add_theme_constant_override("outline_size", 0)
 	_search_box.add_child(status_label)
@@ -121,7 +121,7 @@ func _build_search() -> void:
 	slots_row.name = "Seats"
 	slots_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_search_box.add_child(UIKit.margin(slots_row, 0, UIKit.SPACE.sm, 0, UIKit.SPACE.sm))
-	cancel_button = UIKit.btn("Cancel", "ghost", "md")
+	cancel_button = UIKit.btn(tr("Cancel"), "ghost", "md")
 	cancel_button.name = "Cancel"
 	cancel_button.pressed.connect(_cancel)
 	_search_box.add_child(cancel_button)
@@ -137,7 +137,7 @@ func _show(s: String) -> void:
 	find_button.text = ""
 	var fl := find_button.find_child("Text", true, false) as Label
 	if fl:
-		fl.text = "Try again" if s == "error" else "Find players"
+		fl.text = tr("Try again") if s == "error" else tr("Find players")
 	if is_inside_tree():
 		fit_now()
 
@@ -148,10 +148,10 @@ func _show(s: String) -> void:
 static func fail_text(code: String, info := {}) -> String:
 	match code:
 		"coins":
-			return "Not enough coins for that table. Pick a smaller one, or play Practice."
+			return L10n.t("Not enough coins for that table. Pick a smaller one, or play Practice.")
 		"locked":
 			var lv := int(info.get("level", 0))
-			return "That table unlocks at level %d." % lv if lv > 0 else "That table isn’t unlocked yet."
+			return L10n.t("That table unlocks at level %d.") % lv if lv > 0 else L10n.t("That table isn’t unlocked yet.")
 	return NetClient.error_text(code)
 
 ## Your level and coins (what unlocks and affords a table); the rows follow.
@@ -210,12 +210,12 @@ func _on_row(id: String) -> void:
 		if r.id != id:
 			continue
 		if bool(r.locked):
-			UIKit.deny(self, "Reach level %d to play that table." % int(r.level), row_of(id))
+			UIKit.deny(self, tr("Reach level %d to play that table.") % int(r.level), row_of(id))
 		elif not bool(r.affordable):
 			if CoinTables.is_broke(coins):
 				broke_requested.emit()
 			else:
-				UIKit.deny(self, "You need %s coins for that table." % Fmt.coins_full(int(r.entry)), row_of(id))
+				UIKit.deny(self, tr("You need %s coins for that table.") % Fmt.coins_full(int(r.entry)), row_of(id))
 		else:
 			select_table(id)
 		return
@@ -247,7 +247,7 @@ func set_searching(n := -1) -> void:
 	_started_ms = Time.get_ticks_msec()
 	_eta = 0
 	_build_slots()
-	status_label.text = "Finding players…"
+	status_label.text = tr("Finding players…")
 	_show("searching")
 	_update_sub()
 
@@ -258,16 +258,16 @@ func set_queued(_position: int, eta_s: int) -> void:
 
 ## matched: a table was found; the room is being joined (the seats are revealed at the start).
 func set_matched() -> void:
-	status_label.text = "Players found!"
+	status_label.text = tr("Players found!")
 	_show("matched")
-	sub_label.text = "Getting the table ready…"
+	sub_label.text = tr("Getting the table ready…")
 
 ## The players at the table pop into their seats one by one (yours stays first). Coroutine; emits revealed.
 ## seats: the server's seats [{color, name, avatar, frame, level}]; me: your colour.
 func reveal(seats: Array, me: int) -> void:
 	_show("found")
-	status_label.text = "Players found!"
-	sub_label.text = "Get ready…"
+	status_label.text = tr("Players found!")
+	sub_label.text = tr("Get ready…")
 	var others := seats.filter(func(st): return int(st.get("color", -1)) != me)
 	while slots.size() < others.size() + 1:
 		var s := Slot.new(_slot_px())
@@ -326,7 +326,7 @@ func _update_sub() -> void:
 		return
 	var sec := int((Time.get_ticks_msec() - _started_ms) / 1000.0) if _started_ms > 0 else 0
 	var t := "%d:%02d" % [sec / 60, sec % 60]
-	sub_label.text = t + (" · usually about %d s" % _eta if _eta > 0 and sec < _eta + 20 else "")
+	sub_label.text = t + (" · " + tr("usually about %d s") % _eta if _eta > 0 and sec < _eta + 20 else "")
 
 ## Seconds waited so far (tests).
 func elapsed() -> float:
@@ -360,7 +360,7 @@ class Slot extends VBoxContainer:
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ring.draw.connect(_draw_ring)
 		add_child(ring)
-		name_label = UIKit.label("Searching", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+		name_label = UIKit.label(tr("Searching"), UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		name_label.custom_minimum_size = Vector2(px + 10.0, 0)
 		add_child(name_label)
@@ -396,7 +396,7 @@ class Slot extends VBoxContainer:
 		_badge.set_level(level_)                      # size_for may grow the star for two digits: place it after
 		_badge.position = Vector2(px + 8.0 - _badge.px + 2.0, px + 8.0 - _badge.px + 2.0)
 		_badge.size = Vector2(_badge.px, _badge.px)
-		name_label.text = nm
+		name_label.text = L10n.seat_name(nm)
 		name_label.add_theme_color_override("font_color", Palette.INK)
 		name_label.add_theme_font_override("font", UIKit.font_body(900))
 		name_label.add_theme_font_size_override("font_size", UIKit.FS.label)
@@ -453,7 +453,7 @@ class TableRow extends PanelContainer:
 			h.add_child(UIKit.icon("coin", 26))
 		else:
 			h.add_child(UIKit.icon("pawn_icon", 26))
-		title = UIKit.label("Practice" if entry <= 0 else Fmt.coins_full(entry), UIKit.FS.h2, Palette.INK, UIKit.font_display())
+		title = UIKit.label(tr("Practice") if entry <= 0 else Fmt.coins_full(entry), UIKit.FS.h2, Palette.INK, UIKit.font_display())
 		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -468,11 +468,11 @@ class TableRow extends PanelContainer:
 			var lock := UIKit.icon("ic_lock", 18)
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			right.add_child(lock)
-			prize_label = UIKit.label("Level %d" % int(row.level), UIKit.FS.body, Palette.MUTED, UIKit.font_body(900))
+			prize_label = UIKit.label(tr("Level %d") % int(row.level), UIKit.FS.body, Palette.MUTED, UIKit.font_body(900))
 		elif entry <= 0:
-			prize_label = UIKit.label("Free", UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900))
+			prize_label = UIKit.label(tr("Free"), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900))
 		else:
-			prize_label = UIKit.label("Win %s" % Fmt.coins_full(int(row.get("total", row.prize))), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
+			prize_label = UIKit.label(tr("Win %s") % Fmt.coins_full(int(row.get("total", row.prize))), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
 		prize_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		prize_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		prize_label.mouse_filter = Control.MOUSE_FILTER_IGNORE

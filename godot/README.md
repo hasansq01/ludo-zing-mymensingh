@@ -13,9 +13,23 @@ The web version stays the reference until the Godot version matches it.
 | `scripts/world/` | 3D: `TableWorld` (table, cups, lights, camera), `Rooms` + `rooms/*.gd` (five room themes and their moods), `LudoBoard`, `SLBoard`, `MeshKit` (rounded box, lathe, materials), `TexBaker` (GPU-painted textures, mipmapped). |
 | `scripts/ui/` | `UIKit` (fonts, buttons, styles), `Sheet` (modal base), HUDs, home, setup, splash, confetti, 3D dice, logo; `sheets/` for settings, profile, how to play, shop, inventory, daily reward, spin. |
 | `scripts/audio/sound.gd` | Autoload `Sound`: effects pool, music loop, buses. Sounds are synthesised offline by `tools/gen_audio.gd` into `assets/audio/`. |
-| `assets/` | Fonts (Lilita One, Nunito variable), SVG art (logos, icons), app icon, audio. |
+| `assets/` | Fonts (Lilita One, Nunito variable; Baloo Da 2 and Noto Sans Bengali for Bangla), SVG art (logos, icons), app icon, audio. |
+| `locale/bn.po` | The Bangla interface text (see Languages below). |
 | `tests/` | Headless tests (ports of `../tests/*.js` plus turn-flow, shop and reward checks). |
 | `dev/` | Desktop previews and the integration driver (not exported). |
+
+## Languages (English, Bangla)
+The scripts are written in English; `locale/bn.po` (registered in `project.godot`) holds the Bangla. Settings has
+Auto / English / বাংলা (`Save.prefs.lang`); Auto follows the phone (Bangla when its language is bn). Switching in
+Settings rebuilds Home and the open sheets at once (`Main.set_language`). How to mark text is in the header of
+`scripts/core/l10n.gd` (`tr()`, `L10n.t()`, the `# l10n` markers); ids, saves and the server protocol stay English.
+Lilita One and Nunito have no Bengali glyphs: `UIKit.bangla_font` puts Baloo Da 2 / Noto Sans Bengali under them.
+```bash
+godot --headless --path godot -s res://tools/l10n_sync.gd               # bn.po in step with the scripts (keeps every translation)
+godot --headless --path godot -s res://tools/l10n_sync.gd -- --check    # what has no Bangla yet (tests/test_l10n.gd fails on it too)
+godot --path godot --resolution 360x780 res://dev/audit_tour.tscn -- /tmp/audit --lang=bn   # screenshots in Bangla + l10n_latin.txt
+```
+New text: mark it, run the sync, fill its `msgstr` (each entry says where it is shown), run the tests.
 
 ## Rules design (why it looks like this)
 The rules are pure functions over a plain Dictionary state: no nodes, timers or animation, and dice values are

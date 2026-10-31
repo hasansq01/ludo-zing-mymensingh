@@ -9,31 +9,32 @@ extends Sheet
 ## match through the app (main.start_ludo(Tutorial.config()), which closes the sheets).
 ## The texts restate ludo_rules.gd / snakes_ladders_rules.gd: change them together with Info.INFO.
 
+## l10n-keys: t
 ## Static sections; the pairs and Snakes & Ladders cards are built by sections() (they follow the house rules).
 const SECTIONS := [
 	{t = "Ludo basics", c = 0, icon = "res://assets/ui/home/hi_ludo.svg", game = "ludo", b = [
-		"Get all four of your pawns around the board and into the centre. The first player with all four home wins.",
-		"Roll a [b]6[/b] to bring a pawn out of your base.",
-		"Tap a glowing pawn to move it. When only one move is possible, it moves by itself.",
-		"A [b]6[/b], a capture or getting a pawn home earns you [b]another roll[/b]. Roll three 6s in a row and you lose the turn.",
-		"You need the [b]exact number[/b] to reach the centre. A bigger roll can’t move that pawn."]},
+		"Get all four of your pawns around the board and into the centre. The first player with all four home wins.",  # l10n
+		"Roll a [b]6[/b] to bring a pawn out of your base.",  # l10n
+		"Tap a glowing pawn to move it. When only one move is possible, it moves by itself.",  # l10n
+		"A [b]6[/b], a capture or getting a pawn home earns you [b]another roll[/b]. Roll three 6s in a row and you lose the turn.",  # l10n
+		"You need the [b]exact number[/b] to reach the centre. A bigger roll can’t move that pawn."]},  # l10n
 	{t = "Captures & safe squares", c = 1, icon = "ic_star", game = "ludo", b = [
-		"Land on a loose pawn of another colour to send it [b]back to its base[/b], then roll again.",
-		"A single pawn captures one pawn at a time, even from a stack.",
-		"[b]Star squares[/b] and [b]coloured start squares[/b] are safe: nobody can be captured there."]},
+		"Land on a loose pawn of another colour to send it [b]back to its base[/b], then roll again.",  # l10n
+		"A single pawn captures one pawn at a time, even from a stack.",  # l10n
+		"[b]Star squares[/b] and [b]coloured start squares[/b] are safe: nobody can be captured there."]},  # l10n
 ]
 const TEAMS := {t = "Teams (2 v 2)", c = 3, icon = "perk_friends", game = "ludo", b = [
-	"Two teams of teammates sitting opposite: [b]Red + Yellow[/b] play against [b]Green + Blue[/b]. Four players only.",
-	"Teammates never capture or block each other. Only the other team’s pawns can be captured.",
-	"All four of your pawns home? Roll a [b]6[/b] to start [b]Help your teammate[/b]. Until then your turn passes.",
-	"That 6 already moves your teammate’s pawns, and so does every roll after it.",
-	"Your team wins when [b]both teammates[/b] have all four pawns home."]}
-const FAIR_DICE := "Every roll is random and the same for every player — the computer never gets better dice."
+	"Two teams of teammates sitting opposite: [b]Red + Yellow[/b] play against [b]Green + Blue[/b]. Four players only.",  # l10n
+	"Teammates never capture or block each other. Only the other team’s pawns can be captured.",  # l10n
+	"All four of your pawns home? Roll a [b]6[/b] to start [b]Help your teammate[/b]. Until then your turn passes.",  # l10n
+	"That 6 already moves your teammate’s pawns, and so does every roll after it.",  # l10n
+	"Your team wins when [b]both teammates[/b] have all four pawns home."]}  # l10n
+const FAIR_DICE := "Every roll is random and the same for every player — the computer never gets better dice."  # l10n
 
 const FIXED_H := 680.0                   ## one card height for both tabs
-const REPLAY_TITLE := "New to Ludo?"
-const REPLAY_TEXT := "A one-minute guided game."
-const REPLAY_BUTTON := "Replay tutorial"
+const REPLAY_TITLE := "New to Ludo?"  # l10n
+const REPLAY_TEXT := "A one-minute guided game."  # l10n
+const REPLAY_BUTTON := "Replay tutorial"  # l10n
 
 var game := "ludo"                       ## the tab on show: "ludo" | "sl"
 var _width := 370.0
@@ -46,15 +47,15 @@ var replay_button: Button                ## "Replay tutorial" (null when the app
 
 ## start: "ludo" | "sl" | "" (= the game picked on Home, Save.prefs.home_game).
 func _init(width := 370.0, start := "") -> void:
-	super("How to play", width, true, LOOK_PM)
+	super(tr("How to play"), width, true, LOOK_PM)
 	_width = width
 	game = start if start in ["ludo", "sl"] else ("sl" if _pref_str("home_game") == "sl" else "ludo")
 	var stack := UIKit.vbox(0)
 	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(stack)
 	_tabs = TabStrip.new([
-		{key = "ludo", text = "Ludo", icon = "res://assets/ui/home/hi_ludo.svg"},
-		{key = "sl", text = "Snakes & Ladders", icon = "res://assets/ui/home/hi_snakes.svg"},
+		{key = "ludo", text = tr("Ludo"), icon = "res://assets/ui/home/hi_ludo.svg"},
+		{key = "sl", text = tr("Snakes & Ladders"), icon = "res://assets/ui/home/hi_snakes.svg"},
 	], game, "folder")
 	_tabs.picked.connect(show_game)
 	stack.add_child(UIKit.margin(_tabs, 0, UIKit.SPACE.sm, 0, 0))
@@ -136,17 +137,17 @@ func _replay_card() -> PanelContainer:
 	var v := UIKit.vbox(2)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	var t := UIKit.label(REPLAY_TITLE, UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	var t := UIKit.label(tr(REPLAY_TITLE), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	t.custom_minimum_size.x = 40          # (a wrapping label with no width yet asks for one glyph per line)
 	v.add_child(t)
-	var p := UIKit.paragraph(REPLAY_TEXT, UIKit.FS.small, Palette.SUB)
+	var p := UIKit.paragraph(tr(REPLAY_TEXT), UIKit.FS.small, Palette.SUB)
 	v.add_child(p)
 	h.add_child(v)
 	# icon + text on one line, the full-width button under it
 	var col := UIKit.vbox(UIKit.SPACE.sm)
 	col.add_child(h)
-	replay_button = UIKit.btn(REPLAY_BUTTON, "honey", "sm")
+	replay_button = UIKit.btn(tr(REPLAY_BUTTON), "honey", "sm")
 	replay_button.name = "ReplayTutorial"
 	UIKit.fit_text(replay_button, 13)
 	replay_button.pressed.connect(replay_tutorial)
@@ -158,20 +159,20 @@ static func sections() -> Array:
 	var ask := _pref("pair_ask")
 	var need_one := _pref("sl_need_one")
 	var pairs := {t = "Pairs", c = 2, icon = "two_pawns", game = "ludo", b = [
-		"Land a pawn on another of your own and they join into a [b]pair[/b]. Pairs never form on a start square or in the home lane, and never by themselves on a star.",
-		("[b]Ask before pairing[/b] is on: you choose each time." if ask else "Pairs form by themselves. Turn on [b]Ask before pairing[/b] in Settings to choose each time."),
-		"A pair moves on [b]even rolls only[/b], and half the roll: a 4 moves it 2 squares. Tap either pawn of a pair to move it.",
-		"Single pawns can’t jump your pair. They must land on it, then roll exactly a [b]1[/b] to move on.",
-		"[b]Only a pair can capture a pair[/b], and a pair never captures a single pawn.",
-		"A pair splits by itself on any coloured start square or when it enters its home lane."]}
+		"Land a pawn on another of your own and they join into a [b]pair[/b]. Pairs never form on a start square or in the home lane, and never by themselves on a star.",  # l10n
+		("[b]Ask before pairing[/b] is on: you choose each time." if ask else "Pairs form by themselves. Turn on [b]Ask before pairing[/b] in Settings to choose each time."),  # l10n
+		"A pair moves on [b]even rolls only[/b], and half the roll: a 4 moves it 2 squares. Tap either pawn of a pair to move it.",  # l10n
+		"Single pawns can’t jump your pair. They must land on it, then roll exactly a [b]1[/b] to move on.",  # l10n
+		"[b]Only a pair can capture a pair[/b], and a pair never captures a single pawn.",  # l10n
+		"A pair splits by itself on any coloured start square or when it enters its home lane."]}  # l10n
 	var sl := {t = "Snakes & Ladders", c = -1, icon = "res://assets/ui/home/hi_snakes.svg", game = "sl", b = [
-		("Everyone starts off the board. Roll a [b]1[/b] to step onto square 1 (house rule [b]Need a 1 to start[/b])." if need_one
-				else "Everyone starts off the board. [b]Any roll[/b] moves you on: a 3 takes you to square 3."),
-		"Land on the foot of a [b]ladder[/b] to climb it. Land on a [b]snake’s head[/b] to slide down to its tail.",
-		"A [b]6[/b] gives you another roll. Three 6s in a row end your turn.",
-		"You need the [b]exact roll[/b] to land on 100. The first player to reach square [b]100[/b] wins."]}
+		("Everyone starts off the board. Roll a [b]1[/b] to step onto square 1 (house rule [b]Need a 1 to start[/b])." if need_one  # l10n
+				else "Everyone starts off the board. [b]Any roll[/b] moves you on: a 3 takes you to square 3."),  # l10n
+		"Land on the foot of a [b]ladder[/b] to climb it. Land on a [b]snake’s head[/b] to slide down to its tail.",  # l10n
+		"A [b]6[/b] gives you another roll. Three 6s in a row end your turn.",  # l10n
+		"You need the [b]exact roll[/b] to land on 100. The first player to reach square [b]100[/b] wins."]}  # l10n
 	if not need_one:
-		(sl.b as Array).append("For the classic start, turn on [b]Need a 1 to start[/b] in Settings.")
+		(sl.b as Array).append("For the classic start, turn on [b]Need a 1 to start[/b] in Settings.")  # l10n
 	return SECTIONS + [pairs, TEAMS, sl]
 
 static func _pref_str(name: String) -> String:
@@ -204,7 +205,7 @@ func _section(title_text: String, colour: int, lines: Array, icon := "") -> Pane
 		chip.add_theme_stylebox_override("panel", UIKit.box(accent, 5, UIKit.BW.line, Color.WHITE))
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		head.add_child(chip)
-	var t := UIKit.label(title_text, UIKit.FS.h2, Palette.INK, UIKit.font_display())
+	var t := UIKit.label(tr(title_text), UIKit.FS.h2, Palette.INK, UIKit.font_display())
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.add_child(t)
@@ -221,11 +222,11 @@ func _fair_card(skill_line := true) -> PanelContainer:
 	h.add_child(ic)
 	var v := UIKit.vbox(2)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(UIKit.label("Fair dice", UIKit.FS.h2, Palette.INK, UIKit.font_display()))
-	var p := UIKit.paragraph(FAIR_DICE, UIKit.FS.body, Palette.INK)
+	v.add_child(UIKit.label(tr("Fair dice"), UIKit.FS.h2, Palette.INK, UIKit.font_display()))
+	var p := UIKit.paragraph(tr(FAIR_DICE), UIKit.FS.body, Palette.INK)
 	v.add_child(p)
 	if skill_line:
-		v.add_child(UIKit.paragraph("Computer skill (Easy, Normal, Hard) only changes how it moves.", UIKit.FS.small, Palette.SUB))
+		v.add_child(UIKit.paragraph(tr("Computer skill (Easy, Normal, Hard) only changes how it moves."), UIKit.FS.small, Palette.SUB))
 	h.add_child(v)
 	var st := UIKit.surface("row", true).duplicate() as StyleBoxFlat
 	st.bg_color = Palette.HONEY_TINT
@@ -254,7 +255,7 @@ func _bullet(bb: String) -> HBoxContainer:
 	r.add_theme_color_override("default_color", Palette.INK)
 	r.add_theme_constant_override("line_separation", 2)
 	var strong := Palette.INK_STRONG.to_html(false)
-	r.text = bb.replace("[b]", "[b][color=#%s]" % strong).replace("[/b]", "[/color][/b]")
+	r.text = tr(bb).replace("[b]", "[b][color=#%s]" % strong).replace("[/b]", "[/color][/b]")
 	h.add_child(r)
 	return h
 

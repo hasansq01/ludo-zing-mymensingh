@@ -153,7 +153,7 @@ func _init() -> void:
 	_text.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_text)
-	_text.text = "LOADING"
+	_text.text = tr("LOADING")
 
 	resized.connect(_layout)
 

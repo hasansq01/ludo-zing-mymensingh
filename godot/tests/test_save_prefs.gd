@@ -35,6 +35,9 @@ func run() -> void:
 	var sv := fresh_save({}, {})
 	var pr: Dictionary = sv.prefs
 	check("new player: vibrate on", pr.vibrate == true)
+	check("new player: language follows the phone (auto)", pr.lang == "auto", pr.lang)
+	check("a saved language is kept, an unknown one becomes auto", fresh_save({}, {lang = "bn"}).prefs.lang == "bn"
+		and fresh_save({}, {lang = "fr"}).prefs.lang == "auto" and fresh_save({}, {lang = 3}).prefs.lang == "auto")
 	check("new player: Relaxed speed (1.0)", is_equal_approx(pr.speed, 1.0), pr.speed)
 	check("new player: both house rules on", pr.sl_need_one == true and pr.pair_ask == true)
 	check("new player: Top camera for Ludo and Snakes & Ladders", pr.cam == "top" and pr.sl_cam == "top", [pr.cam, pr.sl_cam])
@@ -80,7 +83,7 @@ func run() -> void:
 
 	# ---- reset progress ----
 	sv = fresh_save({id = "LZM-ABCD-EFGH", name = "Shihab", coins = 99999, xp = 900, stats = {played = 12, wins = 7}, rooms = ["night", "cafe", "rooftop"]},
-		{sound = false, vol = {master = 20, music = 10, sfx = 30}, speed = 1.0, pair_ask = true, bot_level = "hard", welcome_seen = true, tutorial_done = true, info = {pair = 3}})
+		{sound = false, vol = {master = 20, music = 10, sfx = 30}, lang = "bn", speed = 1.0, pair_ask = true, bot_level = "hard", welcome_seen = true, tutorial_done = true, info = {pair = 3}})
 	var changed := [0]
 	sv.changed.connect(func(): changed[0] += 1)
 	sv.reset_progress()
@@ -89,6 +92,7 @@ func run() -> void:
 	check("reset: fresh profile (coins, XP, stats, name, rooms)", p.coins == 2500 and p.gems == 0 and p.rerolls == 0 and p.xp == 0 and p.stats.played == 0 and p.stats.wins == 0 and p.name == "You" and p.rooms == ["night", "cafe"], p)
 	check("reset: a new player ID", p.id is String and p.id.begins_with("LZM-") and p.id != "LZM-ABCD-EFGH")
 	check("reset: sound switch and volumes kept (20 x 10 / 30 folded)", pr.sound == false and pr.vol.master == 100 and pr.vol.music == 2 and pr.vol.sfx == 6, pr.vol)
+	check("reset: the language is kept", pr.lang == "bn", pr.lang)
 	check("reset: other prefs back to defaults (Relaxed, house rules on, Top cameras, normal bots, first-run flags off)", is_equal_approx(pr.speed, 1.0) and pr.pair_ask == true and pr.sl_need_one == true and pr.cam == "top"
 		and pr.bot_level == "normal" and pr.welcome_seen == false and pr.tutorial_done == false and not pr.has("info"), pr)
 	check("reset: changed is emitted", changed[0] == 1)

@@ -122,8 +122,15 @@ func _unhandled_input(e: InputEvent) -> void:
 # Copy
 # ---------------------------------------------------------------------------------------------------------------
 
-## The ordinal: 1 -> "1st", 2 -> "2nd" ...
+const PLACES := ["1st", "2nd", "3rd", "4th"]  # l10n
+
+## The ordinal: 1 -> "1st", 2 -> "2nd" ... (Bangla: the place word, প্রথম ... চতুর্থ)
 static func ordinal(n: int) -> String:
+	var en := ordinal_en(n)
+	return L10n.t(PLACES[n - 1]) if n >= 1 and n <= 4 else en
+
+## The English ordinal (logs, ids).
+static func ordinal_en(n: int) -> String:
 	var suf := "th"
 	if n % 100 < 11 or n % 100 > 13:
 		match n % 10:
@@ -183,19 +190,19 @@ func title_text() -> String:
 		return t
 	var w := winners()
 	if w.is_empty():
-		return "Game over"
+		return tr("Game over")
 	if you_lost():
 		var place := ordinal(maxi(int(you().get("place", 2)), 2))
-		return ("Your team finished %s" if is_teams() else "You finished %s") % place
+		return (tr("Your team finished %s") if is_teams() else tr("You finished %s")) % place
 	if is_teams():
 		if w.any(func(e): return str(e.get("kind", "")) == "you"):
-			return "Your team wins!"
+			return tr("Your team wins!")
 		var cols := w.map(func(e): return int(e.color))
 		cols.sort()
-		return "Team %s wins!" % " + ".join(cols.map(func(c): return Palette.NAMES[c]))
+		return tr("Team %s wins!") % " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
 	if str(w[0].get("kind", "")) == "you":
-		return "You win!"
-	return "%s wins!" % str(w[0].get("name", Palette.NAMES[int(w[0].color)]))
+		return tr("You win!")
+	return tr("%s wins!") % L10n.seat_name(str(w[0].get("name", Palette.NAMES[int(w[0].color)])))
 
 ## The line under the title: data.sub, else what happened ("All four pawns home!") or, for a loss, who won
 ## ("Mocha won", "Team Green + Blue won"). The XP is not repeated here (the card shows it).
@@ -204,12 +211,12 @@ func sub_text() -> String:
 	if s != "":
 		return s
 	if you_lost():
-		return "%s won" % winner_label()
+		return tr("%s won") % winner_label()
 	if str(data.get("game", "ludo")) == "sl":
-		return "First to square 100!"
+		return tr("First to square 100!")
 	if is_teams():
-		return "Both teammates got all four pawns home!"
-	return "All four pawns home!"
+		return tr("Both teammates got all four pawns home!")
+	return tr("All four pawns home!")
 
 ## "Mocha" / "Team Green + Blue": who won, for the copy.
 func winner_label() -> String:
@@ -219,8 +226,8 @@ func winner_label() -> String:
 	if is_teams():
 		var cols := w.map(func(e): return int(e.color))
 		cols.sort()
-		return "Team " + " + ".join(cols.map(func(c): return Palette.NAMES[c]))
-	return str(w[0].get("name", Palette.NAMES[int(w[0].color)]))
+		return tr("Team %s") % " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
+	return L10n.seat_name(str(w[0].get("name", Palette.NAMES[int(w[0].color)])))
 
 ## Whose avatars the hero shows: the winners, or on a loss you (and your teammate).
 func hero_rows() -> Array:
@@ -331,15 +338,15 @@ func _build() -> void:
 	_buttons = UIKit.vbox(UIKit.SPACE.sm)
 	_buttons.custom_minimum_size = Vector2(CARD_W - 20.0, 0)
 	_buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	again_button = UIKit.btn("Play again", "honey", "lg")
+	again_button = UIKit.btn(tr("Play again"), "honey", "lg")
 	again_button.pressed.connect(_pick.bind("again"))
 	_buttons.add_child(again_button)
 	if can_share():
-		share_button = UIKit.btn("Share", "teal", "md")
+		share_button = UIKit.btn(tr("Share"), "teal", "md")
 		share_button.name = "Share"
 		share_button.pressed.connect(share)
 		_buttons.add_child(share_button)
-	home_button = UIKit.btn("Home", "ghost", "md")
+	home_button = UIKit.btn(tr("Home"), "ghost", "md")
 	home_button.pressed.connect(_pick.bind("home"))
 	_buttons.add_child(home_button)
 	content.add_child(_buttons)
@@ -377,7 +384,7 @@ func _build_table(parent: VBoxContainer) -> void:
 	if not is_coin_table():
 		return
 	if str(table().get("ended", "")) == "away":
-		away_note = _quiet_line(CoinTables.AWAY_TEXT, "AwayNote")
+		away_note = _quiet_line(tr(CoinTables.AWAY_TEXT), "AwayNote")
 		parent.add_child(away_note)
 	if table_payout() <= 0:
 		var refunded := table_refund() > 0
@@ -397,7 +404,7 @@ func _build_table(parent: VBoxContainer) -> void:
 		parent.add_child(bonus_note)
 	if not _ads_ok():
 		return
-	double_button = UIKit.btn("Double it with a video", "teal", "md")
+	double_button = UIKit.btn(tr("Double it with a video"), "teal", "md")
 	double_button.name = "Double"
 	double_button.pressed.connect(_double)
 	parent.add_child(double_button)
@@ -414,7 +421,7 @@ func _double() -> void:
 	if double_button == null or double_button.disabled or _closing:
 		return
 	double_button.disabled = true
-	double_button.text = "Watching…"
+	double_button.text = tr("Watching…")
 	if flow == null:
 		flow = AdFlow.new()
 		add_child(flow)
@@ -424,14 +431,14 @@ func _double() -> void:
 	var info: Dictionary = res.info
 	if bool(res.ok):
 		var extra := int(info.get("amount", table_payout()))
-		double_button.text = "Doubled!"
-		Toast.show(self, "+%s coins" % Fmt.coins_full(extra), null, 2.0, "coin")
+		double_button.text = tr("Doubled!")
+		Toast.show(self, tr("+%s coins") % Fmt.coins_full(extra), null, 2.0, "coin")
 		_extra += extra
 		doubled.emit(extra)
 		return
-	double_button.text = "Double it with a video"
+	double_button.text = tr("Double it with a video")
 	double_button.disabled = false
-	Toast.show(self, str(info.get("text", AdFlow.NO_FILL_TEXT)), null, 2.2, "bad")
+	Toast.show(self, str(info.get("text", tr(AdFlow.NO_FILL_TEXT))), null, 2.2, "bad")
 
 ## A quiet line under the rewards when the server cut the payout of an offline match ("Daily limit reached"; see
 ## Account.claim_note). Safe to call late or twice; "" removes it.
@@ -461,7 +468,7 @@ func _team_caption(e: Dictionary) -> String:
 	var mates := standings().filter(func(x): return int(x.get("place", 0)) == int(e.get("place", 0)))
 	var cols := mates.map(func(x): return int(x.color))
 	cols.sort()
-	var label := " + ".join(cols.map(func(c): return Palette.NAMES[c]))
+	var label := " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
 	return "%s · %s" % [ordinal(int(e.get("place", 1))), label]
 
 ## An avatar in a white mount ring in the player's colour (hero).
@@ -498,7 +505,7 @@ func set_host(on: bool) -> void:
 	if again_button == null:
 		return
 	var waiting := is_online() and not on
-	again_button.text = "Waiting for host…" if waiting else "Play again"
+	again_button.text = tr("Waiting for host…") if waiting else tr("Play again")
 	UIKit.set_kind(again_button, "off" if waiting else "honey")
 	again_button.disabled = waiting or home_button.disabled   # (home is enabled once the screen has played in)
 
@@ -529,7 +536,7 @@ func _row(e: Dictionary) -> Control:
 	var name_box := UIKit.hbox(UIKit.SPACE.xs + 2)
 	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var nm := UIKit.label(str(e.get("name", Palette.NAMES[c])), UIKit.FS.h3, PlayerTile.name_color(c) if not mine else Palette.INK, UIKit.font_body(900))
+	var nm := UIKit.label(L10n.seat_name(str(e.get("name", Palette.NAMES[c]))), UIKit.FS.h3, PlayerTile.name_color(c) if not mine else Palette.INK, UIKit.font_body(900))
 	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -537,7 +544,7 @@ func _row(e: Dictionary) -> Control:
 	nm.custom_minimum_size.x = minf(tw_, 118.0)       # a trimmed Label reports no width of its own
 	name_box.add_child(nm)
 	if str(e.get("kind", "")) == "cpu":
-		var tag := UIKit.tag("CPU", "ink")
+		var tag := UIKit.tag(tr("CPU"), "ink")
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_box.add_child(tag)
 	row.add_child(name_box)
@@ -553,7 +560,7 @@ func _result_cell(e: Dictionary) -> Control:
 	if bool(e.get("finished", false)):
 		box.add_theme_constant_override("separation", UIKit.SPACE.xs)
 		box.add_child(_check_disc(18.0))
-		var f := UIKit.label("Finished", UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_RIGHT)
+		var f := UIKit.label(tr("Finished"), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_RIGHT)
 		f.name = "Finished"
 		f.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		box.add_child(f)
@@ -564,7 +571,7 @@ func _result_cell(e: Dictionary) -> Control:
 	m.set_value(prog, 1.0)
 	m.size_flags_horizontal = Control.SIZE_SHRINK_END
 	box.add_child(m)
-	var txt := ("Sq %d" % int(e.get("pos", roundi(prog * 100.0)))) if sl else Fmt.pct(prog)
+	var txt := (tr("Sq %d") % int(e.get("pos", roundi(prog * 100.0)))) if sl else Fmt.pct(prog)
 	var l := UIKit.label(txt, UIKit.FS.label, Palette.SUB, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_RIGHT)
 	l.custom_minimum_size.x = 40 if not sl else 46
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -602,7 +609,7 @@ func _rewards_row() -> Control:
 		var v := UIKit.vbox(2)
 		v.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cap := UIKit.eyebrow("Prize" if is_coin_table() else "Coins")
+		var cap := UIKit.eyebrow(tr("Prize") if is_coin_table() else tr("Coins"))
 		v.add_child(cap)                          # left-aligned, the value under it (like the Experience tile)
 		coins = CoinAmount.new(0, "lg", "plain", "+")
 		coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -622,11 +629,11 @@ func _rewards_row() -> Control:
 	xv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cap2 := UIKit.eyebrow("Experience")
+	var cap2 := UIKit.eyebrow(tr("Experience"))
 	cap2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(cap2)
 	# "Level up!" takes the caption's place in the head row (inside the tile): no sticker straddling the border
-	_level_up = UIKit.tag("Level up!", "gold", UIKit.FS.label)
+	_level_up = UIKit.tag(tr("Level up!"), "gold", UIKit.FS.label)
 	_level_up.visible = false
 	_level_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_level_up.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -831,7 +838,7 @@ func share_coins() -> int:
 ## What the card says: your name, the place, the title, the coins, the game (the live profile supplies the avatar).
 func card_data() -> Dictionary:
 	var n := str(Save.profile.get("name", ""))
-	return {name = n if n != "" else "You", place = int(you().get("place", 1)), title = title_text(), coins = share_coins(),
+	return {name = n if n != "" else tr("You"), place = int(you().get("place", 1)), title = title_text(), coins = share_coins(),
 		game = str(data.get("game", "ludo"))}
 
 ## Draws the WinCard once and opens the share sheet with it and the text ("I just won 228 coins in Ludo Zing! ...");
@@ -864,7 +871,7 @@ func _pick(what: String) -> void:
 		play_again.emit()
 		if is_online():
 			again_button.disabled = true       # the server's start closes the screen
-			again_button.text = "Starting…"
+			again_button.text = tr("Starting…")
 			return
 	else:
 		home.emit()

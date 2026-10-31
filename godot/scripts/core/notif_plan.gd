@@ -29,9 +29,10 @@ const KEYS := ["daily", "spin", "free"]
 
 const TITLE := "Ludo Zing"
 ## What each reward is called inside "Your daily reward and a free spin are waiting".
-const NAMES := {daily = "your daily reward", spin = "a free spin", free = "free coins"}
+const NAMES := {daily = "your daily reward", spin = "a free spin", free = "free coins"}  # l10n (shown through L10n.t)
 const LINKS := {daily = "daily", spin = "spin", free = "free"}
 ## Come-back copy per day, [title, body]; the day number picks one.
+# l10n:begin
 const COMEBACK := {
 	1: [["Your table is waiting", "Come back for a quick game of Ludo Zing."],
 		["Ready for a game?", "Your pawns are lined up. Roll the dice!"],
@@ -43,6 +44,7 @@ const COMEBACK := {
 		["A week without Ludo Zing?", "Your table is ready. Come and roll the dice."],
 		["Still your favourite game?", "Come back for a game and a daily reward."]],
 }
+# l10n:end
 
 
 # ---------- the plan ----------
@@ -115,19 +117,19 @@ static func _comebacks(tz: int, close: int) -> Array:
 		var at := quiet(close + n * DAY, tz)
 		var pool: Array = COMEBACK[n]
 		var copy: Array = pool[posmod(day_num(close, tz) + n, pool.size())]
-		out.append({id = "cb%d" % n, at = at, channel = "reminders", title = copy[0], body = copy[1], link = "home"})
+		out.append({id = "cb%d" % n, at = at, channel = "reminders", title = L10n.t(copy[0]), body = L10n.t(copy[1]), link = "home"})
 	return out
 
 ## "Your daily reward and a free spin are waiting" for the keys that are ready (in the order given).
 static func rewards_text(keys: Array) -> String:
-	var names := keys.map(func(k: String) -> String: return NAMES[k])
+	var names := keys.map(func(k: String) -> String: return L10n.t(NAMES[k]))
 	var list := ""
 	if names.size() == 1:
 		list = names[0]
 	else:
-		list = ", ".join(names.slice(0, -1)) + " and " + names[-1]
+		list = L10n.t("%s and %s") % [", ".join(names.slice(0, -1)), names[-1]]
 	list = list.substr(0, 1).to_upper() + list.substr(1)
-	return list + (" is waiting" if keys.size() == 1 and keys[0] != "free" else " are waiting")
+	return (L10n.t("%s is waiting") if keys.size() == 1 and keys[0] != "free" else L10n.t("%s are waiting")) % list
 
 
 # ---------- offline reward times ----------

@@ -74,6 +74,7 @@ const KINDS := {
 static var _display: Font
 static var _body := {}
 static var _caps := {}
+static var _bangla := {}
 static var _theme: Theme
 static var _tex := {}
 static var _surf := {}
@@ -83,10 +84,13 @@ static var _surf := {}
 # Fonts
 # =====================================================================================================================
 
-## Lilita One: titles, buttons, the logo, big numbers.
+## Lilita One: titles, buttons, the logo, big numbers (Bangla in Baloo Da 2, see bangla_font).
 static func font_display() -> Font:
 	if _display == null:
-		_display = load("res://assets/fonts/LilitaOne.woff2")
+		var fv := FontVariation.new()
+		fv.base_font = load("res://assets/fonts/LilitaOne.woff2")
+		fv.fallbacks = [bangla_font(0)]
+		_display = fv
 	return _display
 
 ## Nunito at a weight (500, 700, 800, 900; it is a variable font). tnum = tabular figures, so counting numbers and
@@ -100,6 +104,7 @@ static func font_body(weight := 700, tnum := false) -> Font:
 		fv.variation_opentype = {ts.name_to_tag("wght"): weight}
 		if tnum:
 			fv.opentype_features = {ts.name_to_tag("tnum"): 1}
+		fv.fallbacks = [bangla_font(weight)]
 		_body[key] = fv
 	return _body[key]
 
@@ -114,8 +119,29 @@ static func font_caps(weight := 900, spacing := 1) -> Font:
 		fv.base_font = load("res://assets/fonts/Nunito.woff2")
 		fv.variation_opentype = {ts.name_to_tag("wght"): weight}
 		fv.spacing_glyph = spacing
+		fv.fallbacks = [bangla_font(weight)]
 		_caps[key] = fv
 	return _caps[key]
+
+## The Bangla under the Latin faces (neither Lilita One nor Nunito has Bengali glyphs): weight 0 = Baloo Da 2
+## ExtraBold under Lilita's titles, else Noto Sans Bengali at the same weight as the Nunito above it, so mixed
+## Latin / Bangla text keeps one look. Both are OFL (assets/fonts/OFL-*.txt), cut to the Bengali block with
+## pyftsubset (layout features kept: the advanced text server shapes the conjuncts and vowel signs). Their lines
+## are a little trimmed (spacing_top / spacing_bottom): Bengali fonts are taller, and a Bangla line would
+## otherwise stand ~3 px taller than a Latin one in the same Label. Cached. A FontVariation keeps its own
+## fallbacks: one built on another font only hands the base font's fallbacks on, without the weight.
+static func bangla_font(weight := 700) -> Font:
+	if not _bangla.has(weight):
+		var fv := FontVariation.new()
+		if weight <= 0:
+			fv.base_font = load("res://assets/fonts/BalooDa2.woff2")
+		else:
+			fv.base_font = load("res://assets/fonts/NotoSansBengali.woff2")
+			fv.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): weight}
+		fv.spacing_top = -3
+		fv.spacing_bottom = -3
+		_bangla[weight] = fv
+	return _bangla[weight]
 
 ## The app-wide theme (cached; don't modify it): Nunito body text in plum, no focus rings over the cozy buttons,
 ## cream LineEdits with a honey focus ring, slim honey scrollbars.

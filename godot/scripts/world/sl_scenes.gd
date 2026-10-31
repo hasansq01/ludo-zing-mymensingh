@@ -16,6 +16,7 @@ extends Node3D
 signal scene_built(id: String)
 
 ## The shop list (SL_SCENES): Jungle and Enchanted Jungle are free and always owned (FREE).
+## l10n-keys: desc
 const LIST := [
 	{id = "jungle", name = "Jungle Clearing", price = 0, desc = "The classic sunny jungle.", g = [Color("#c8ee9c"), Color("#6aa84a")]},
 	{id = "frost", name = "Frosty Wonderland", price = 20000, desc = "Snowy pines, a frozen pond, lanterns, falling snow.", g = [Color("#eef8ff"), Color("#9fc4e6")]},
@@ -287,9 +288,9 @@ static func owned_scenes() -> Array:
 static func buy_scene(id: String, equip := true) -> String:
 	var s := info(id)
 	if s.is_empty():
-		return "That scene isn’t in the shop."
+		return L10n.t("That scene isn’t in the shop.")
 	if owns_scene(id):
-		return "You already own %s." % s.name
+		return L10n.t("You already own %s.") % L10n.t(s.name)
 	var price := int(s.price)
 	if Catalog.coins() < price:
 		return Catalog.need_text(price - Catalog.coins())
@@ -300,7 +301,7 @@ static func buy_scene(id: String, equip := true) -> String:
 		p.scenes = owned
 		if equip:
 			p.scene = id)
-	return "" if ok else Catalog.SAVE_FAILED
+	return "" if ok else L10n.t(Catalog.SAVE_FAILED)
 
 ## Puts an owned scene in use. False when it isn't owned (or the save failed).
 static func equip_scene(id: String) -> bool:
@@ -1163,7 +1164,8 @@ func _make_sign(S: Dictionary) -> Node3D:
 		var w := c.size.x
 		var h := c.size.y
 		var font := UIKit.font_display()
-		for wd in [["SNAKES", h * 0.3, 150, S.c1], ["& LADDERS", h * 0.72, 132, S.c2]]:
+		# TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
+		for wd in [[tr("SNAKES"), h * 0.3, 150, S.c1], [tr("& LADDERS"), h * 0.72, 132, S.c2]]:
 			var px: int = wd[2]
 			var asc := font.get_ascent(px)
 			var desc := font.get_descent(px)

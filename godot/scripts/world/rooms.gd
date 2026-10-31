@@ -5,6 +5,7 @@ extends Node3D
 ## key light and table tint on the TableWorld.
 ## Builders put pieces under `_cur` (the room being built) with the helpers below, in the web version's units.
 
+## l10n-keys: desc
 const LIST := [
 	{id = "night", name = "Moonlit Café", price = 0, desc = "The café after dark: string lights, candles, stars."},
 	{id = "cafe", name = "Corner Café", price = 0, desc = "Honey wood, peach brick and pastel cups."},
@@ -246,7 +247,7 @@ func _paint_menu(c: Control) -> void:
 	var w := c.size.x
 	c.draw_rect(Rect2(Vector2.ZERO, c.size), Color("#fffaf2"))
 	var f: Font = UIKit.font_display()
-	var title := "Today's Brew"
+	var title := tr("Today's Brew")
 	var tw := f.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 76).x
 	c.draw_string(f, Vector2((w - tw) / 2, 112), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 76, Color("#ff8f7a"))
 	var items := [["Espresso", "2.50"], ["Cappuccino", "3.20"], ["Flat White", "3.40"], ["Honey Latte", "3.80"], ["Lavender Mocha", "3.90"], ["Ludo & Latte", "5.00"]]

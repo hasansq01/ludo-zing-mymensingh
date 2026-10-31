@@ -27,7 +27,7 @@ const GAP := 14.0                        # caption ↔ cut-out gap (plus the tai
 const DIM_A := 0.55                      # scrim opacity (of Palette.VEIL's colour)
 const FADE := 0.18
 const HOLD_MIN := 0.5                    # s before a tap may close a held note (not the tap that made the move)
-const TAP_HINT := "Tap to continue"
+const TAP_HINT := "Tap to continue"  # l10n
 
 const SHADER := """
 shader_type canvas_item;
@@ -109,7 +109,7 @@ func _ready() -> void:
 	_hand.visible = false
 	add_child(_hand)
 	_skip = Button.new()
-	_skip.text = "Skip tutorial"
+	_skip.text = tr("Skip tutorial")
 	_skip.focus_mode = Control.FOCUS_NONE
 	_skip.custom_minimum_size = Vector2(UIKit.TAP * 2.4, UIKit.TAP)
 	var sb := UIKit.box(Palette.NIGHT_GLASS, UIKit.R.pill)
@@ -144,7 +144,7 @@ func _build_bubble() -> void:
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_sub = UIKit.label("", UIKit.FS.body, Palette.SUB, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
 	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint = UIKit.label(TAP_HINT, UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	_hint = UIKit.label(tr(TAP_HINT), UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	_hint.visible = false
 	col.add_child(_title)
 	col.add_child(_sub)

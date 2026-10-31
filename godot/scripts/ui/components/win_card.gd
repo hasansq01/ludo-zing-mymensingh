@@ -33,13 +33,13 @@ func _init(data_: Dictionary = {}) -> void:
 
 ## "1ST PLACE · LUDO": the eyebrow over the name.
 func eyebrow_text() -> String:
-	return "%s · %s" % [TranslationServer.translate("%s place") % ResultScreen.ordinal(int(data.get("place", 1))),
+	return "%s · %s" % [L10n.t("%s place") % ResultScreen.ordinal(int(data.get("place", 1))),
 		Share.game_name(str(data.get("game", "ludo")))]
 
 ## The title in the ribbon: data.title, else "You win!".
 func title_text() -> String:
 	var t := str(data.get("title", ""))
-	return t if t != "" else TranslationServer.translate("You win!")
+	return t if t != "" else L10n.t("You win!")
 
 func _build() -> void:
 	var cx := W / 2.0
@@ -87,7 +87,7 @@ func _build() -> void:
 	if int(data.get("coins", 0)) > 0:
 		_coins(1096.0)
 	var foot := 1244.0 if int(data.get("coins", 0)) > 0 else 1170.0
-	_text(TranslationServer.translate("Play with me on Google Play"), Vector2(60, foot), W - 120, 44, Palette.CREMA, UIKit.font_body(900))
+	_text(L10n.t("Play with me on Google Play"), Vector2(60, foot), W - 120, 44, Palette.CREMA, UIKit.font_body(900))
 
 ## A one-line centred label of `px` at `pos` in a box `w` wide.
 func _text(t: String, pos: Vector2, w: float, px: int, color: Color, font: Font) -> Label:
@@ -134,7 +134,7 @@ func _coins(y: float) -> void:
 	var n := "+%s" % Fmt.coins_full(int(data.get("coins", 0)))
 	var big := UIKit.font_display()
 	var small := UIKit.font_body(900)
-	var word := TranslationServer.translate("coins")
+	var word := L10n.t("coins")
 	var nw := big.get_string_size(n, HORIZONTAL_ALIGNMENT_LEFT, -1, 84).x
 	var ww := small.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, 46).x
 	var coin := 96.0

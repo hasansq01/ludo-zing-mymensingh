@@ -205,7 +205,7 @@ func _close_lobby() -> void:
 	lobby_sheet = null
 
 func _ask_leave_lobby() -> void:
-	if await Sheet.confirm(self, "Leave this room?", "Your friends can keep the room going.", "Leave", "Stay", true):
+	if await Sheet.confirm(self, tr("Leave this room?"), tr("Your friends can keep the room going."), tr("Leave"), tr("Stay"), true):
 		leave()
 
 
@@ -218,7 +218,7 @@ func open_quick(game_ := "") -> void:
 	if state == "searching" and is_instance_valid(quick_sheet):
 		return
 	if net.in_room() and state in ["lobby", "match"]:
-		toast("Leave this room first.", "info")
+		toast(tr("Leave this room first."), "info")
 		return
 	if CoinTables.is_broke(_coins()) and not is_instance_valid(broke_sheet):
 		_open_broke(g)
@@ -515,7 +515,7 @@ func _on_error(m: Dictionary) -> void:
 	if code == "not_found" and state in ["lobby", "match", "over"]:
 		var was := state
 		if was != "over":                      # (a finished room may be deleted under the result: nothing to say)
-			toast("The room has closed.", "bad")
+			toast(tr("The room has closed."), "bad")
 		_close_lobby()
 		_set_state("idle")
 		if was != "over":
@@ -561,7 +561,7 @@ func _notification(what: int) -> void:
 		_stopped_in_bg = true
 		cancel_quick()
 		if is_instance_valid(quick_sheet):
-			quick_sheet.set_error("The search stopped while the app was in the background.")
+			quick_sheet.set_error(tr("The search stopped while the app was in the background."))
 
 
 # ---------- helpers ----------

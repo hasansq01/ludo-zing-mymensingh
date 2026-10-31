@@ -332,7 +332,7 @@ class EmoteButton extends Button:
 		name = "EmoteButton"
 		flat = true
 		focus_mode = Control.FOCUS_ALL
-		tooltip_text = "Emotes"
+		tooltip_text = tr("Emotes")
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		custom_minimum_size = Vector2(SZ, SZ)
 		size = Vector2(SZ, SZ)

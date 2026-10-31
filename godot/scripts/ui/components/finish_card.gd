@@ -44,13 +44,13 @@ func _init() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(title)
 	col.add_child(head)
-	sub = UIKit.label("The others play on for the next places.", UIKit.FS.label, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	sub = UIKit.label(tr("The others play on for the next places."), UIKit.FS.label, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	sub.name = "Sub"
 	col.add_child(sub)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	watch_button = UIKit.button("Keep watching", "honey", "sm")
+	watch_button = UIKit.button(tr("Keep watching"), "honey", "sm")
 	watch_button.name = "Watch"
-	home_button = UIKit.button("Home", "ghost", "sm")
+	home_button = UIKit.button(tr("Home"), "ghost", "sm")
 	home_button.name = "Home"
 	for b in [watch_button, home_button]:
 		b.custom_minimum_size.x = 128
@@ -67,7 +67,7 @@ func _init() -> void:
 ## Shows the card for place n (1-based); team: your team finished; home: offer Home (off: only Keep watching).
 func present(n: int, team := false, home := true) -> void:
 	place = n
-	title.text = ("Your team finished %s!" if team else "You finished %s!") % ResultScreen.ordinal(n)
+	title.text = (tr("Your team finished %s!") if team else tr("You finished %s!")) % ResultScreen.ordinal(n)
 	if _badge:
 		_badge.queue_free()
 	_badge = PlayerTile.PlaceBadge.make(n, BADGE)

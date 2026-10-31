@@ -25,7 +25,7 @@ var _busy := false
 
 
 func _init(store_: GemStore = null) -> void:
-	super("Store", UIKit.W.form, true, LOOK_PM)
+	super(L10n.t("Store"), UIKit.W.form, true, LOOK_PM)
 	store = store_ if store_ != null else GemStore.instance()
 	var list := add_scroll_body(UIKit.SPACE.sm)
 	# your balances
@@ -43,12 +43,12 @@ func _init(store_: GemStore = null) -> void:
 	_pending = _pending_card()
 	list.add_child(_pending)
 	# the gem packs
-	list.add_child(UIKit.margin(UIKit.caption("Gem packs"), 4, UIKit.SPACE.sm, 0, 0))
+	list.add_child(UIKit.margin(UIKit.caption(tr("Gem packs")), 4, UIKit.SPACE.sm, 0, 0))
 	_pack_box = UIKit.vbox(UIKit.SPACE.sm)
 	_pack_box.name = "Packs"
 	list.add_child(_pack_box)
 	# gems -> coins
-	list.add_child(UIKit.margin(UIKit.caption("Swap gems for coins"), 4, UIKit.SPACE.sm, 0, 0))
+	list.add_child(UIKit.margin(UIKit.caption(tr("Swap gems for coins")), 4, UIKit.SPACE.sm, 0, 0))
 	for i in PACKS.size():
 		list.add_child(_swap_row(i))
 	fit()
@@ -77,7 +77,7 @@ func refresh() -> void:
 	for i in _swap_buttons.size():
 		var b := _swap_buttons[i]
 		var need := int(PACKS[i][0]) - have
-		b.text = "Swap" if need <= 0 else "Need %d" % need
+		b.text = tr("Swap") if need <= 0 else tr("Need %d") % need
 		b.resized.emit()                         # re-fit the label (fit_text)
 		var kind := "teal" if need <= 0 else "off"
 		if b.get_meta("kit_kind", "") != kind:
@@ -97,7 +97,7 @@ func _build_packs() -> void:
 		c.queue_free()
 	_pack_buttons.clear()
 	if store == null or not store.available():
-		_pack_box.add_child(_note_card("Gem packs are available in the Android app."))
+		_pack_box.add_child(_note_card(tr("Gem packs are available in the Android app.")))
 		return
 	for id: String in Billing.PRODUCT_IDS:
 		var pr := store.product(id)
@@ -133,7 +133,7 @@ func _pack_row(id: String, gems: int, price: String) -> Control:
 	var col := UIKit.vbox(-1)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(UIKit.label("%s gems" % Fmt.coins_full(gems), UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
+	col.add_child(UIKit.label(tr("%s gems") % Fmt.coins_full(gems), UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
 	var b := UIKit.btn(price if price != "" else "…", "honey", "sm")
 	b.name = id
 	b.custom_minimum_size.x = 96
@@ -160,7 +160,7 @@ func _on_pack(id: String) -> void:
 func _on_granted(gems: int, _id: String) -> void:
 	Sound.sfx("buy")
 	Haptics.success()
-	_toast("+%s gems" % Fmt.coins_full(gems), "gem")
+	_toast(tr("+%s gems") % Fmt.coins_full(gems), "gem")
 	refresh()
 
 func _on_rejected(_id: String) -> void:
@@ -168,8 +168,8 @@ func _on_rejected(_id: String) -> void:
 
 func _pending_card() -> PanelContainer:
 	var v := UIKit.vbox(2)
-	v.add_child(UIKit.label("Payment pending…", UIKit.FS.h3, Palette.ON_HONEY, UIKit.font_body(900)))
-	v.add_child(UIKit.paragraph("The gems arrive as soon as your payment goes through.", UIKit.FS.small + 1, Palette.ON_HONEY))
+	v.add_child(UIKit.label(tr("Payment pending…"), UIKit.FS.h3, Palette.ON_HONEY, UIKit.font_body(900)))
+	v.add_child(UIKit.paragraph(tr("The gems arrive as soon as your payment goes through."), UIKit.FS.small + 1, Palette.ON_HONEY))
 	var p := PanelContainer.new()
 	p.name = "Pending"
 	var st := UIKit.box(Palette.HONEY_TINT, UIKit.R.md, UIKit.BW.line, Palette.HONEY_TINT_EDGE)
@@ -207,7 +207,7 @@ func _swap_row(i: int) -> Control:
 	col.add_child(arrow)
 	col.add_child(CoinAmount.new(coins, "sm", "plain"))
 	row.add_child(col)
-	var b := UIKit.btn("Swap", "teal", "sm")
+	var b := UIKit.btn(tr("Swap"), "teal", "sm")
 	b.name = "Swap%d" % i
 	b.custom_minimum_size.x = 88
 	UIKit.fit_text(b, 13)
@@ -230,14 +230,14 @@ func _on_swap(i: int) -> void:
 	if gems > have:
 		Sound.sfx("error")
 		Haptics.error()
-		_toast("Not enough gems — you need %s more." % Fmt.coins_full(gems - have), "bad")
+		_toast(tr("Not enough gems — you need %s more.") % Fmt.coins_full(gems - have), "bad")
 		return
 	if not Account.wallet_active():
 		Sound.sfx("error")
 		_toast(Account.error_text("offline", "store"), "bad")
 		return
 	_busy = true
-	var yes: bool = await Sheet.confirm(self, "Swap gems for coins?", "%s gems for %s coins." % [Fmt.coins_full(gems), Fmt.coins_full(coins)], "Swap")
+	var yes: bool = await Sheet.confirm(self, tr("Swap gems for coins?"), tr("%s gems for %s coins.") % [Fmt.coins_full(gems), Fmt.coins_full(coins)], tr("Swap"))
 	if not yes or not is_instance_valid(self) or _closing:
 		_busy = false
 		return
@@ -248,12 +248,12 @@ func _on_swap(i: int) -> void:
 	if r.get("ok", false):
 		Sound.sfx("coin", coins)
 		Haptics.success()
-		_toast("+%s coins" % Fmt.coins_full(int(r.get("coins", coins))), "coin")
+		_toast(tr("+%s coins") % Fmt.coins_full(int(r.get("coins", coins))), "coin")
 	else:
 		Sound.sfx("error")
 		Haptics.error()
 		var short := int(r.get("short", 0))
-		_toast(("Not enough gems — you need %s more." % Fmt.coins_full(short)) if str(r.get("error", "")) == "gems" and short > 0
+		_toast((tr("Not enough gems — you need %s more.") % Fmt.coins_full(short)) if str(r.get("error", "")) == "gems" and short > 0
 			else Account.error_text(str(r.get("error", "")), "store"), "bad")
 	refresh()
 

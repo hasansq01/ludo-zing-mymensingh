@@ -37,6 +37,7 @@ signal emotes_changed                    ## an emote pack was bought / put in us
 signal store_requested                   ## "Open Store" after "not enough gems": main opens the Store sheet
 signal shop_requested(tab: String)       ## Inventory: "Open shop" (main closes the inventory and opens the Shop there)
 
+## l10n-keys: text
 const TABS := [
 	{key = "rooms", text = "Rooms"},
 	{key = "scenes", text = "Scenes"},
@@ -46,6 +47,8 @@ const TABS := [
 ]
 ## What the Look tab holds, as a segmented filter under the tabs (the item categories behind `tab`).
 const LOOK := [["avatars", "Avatars"], ["frames", "Frames"], ["plates", "Plates"], ["badges", "Badges"]]
+## The Look filter's labels for the extractor: shown through L10n.t (the pairs above keep the ids).
+const _LOOK_TEXT := ["Avatars", "Frames", "Plates", "Badges"]  # l10n
 ## Old tab names (Collection, the Coins tab, Inventory) -> the merged tabs.
 const TAB_ALIAS := {chars = "avatars", characters = "avatars", nameplates = "plates", coins = "rooms", look = "avatars"}
 const MAX_H := 680.0                     ## one card height for every tab (web .shop-card min(100%, 680px))
@@ -71,7 +74,7 @@ var _busy := false                       # a purchase confirm is showing
 
 
 func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory_ := false) -> void:
-	super("Inventory" if inventory_ else "Shop", width, true, LOOK_PM)
+	super(L10n.t("Inventory") if inventory_ else L10n.t("Shop"), width, true, LOOK_PM)
 	inventory = inventory_
 	owned_only = owned_only_ or inventory_
 	_open_earn = start_tab == "coins"
@@ -81,7 +84,7 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	st.content_margin_right = SIDE_PAD
 	# All | Owned, then the balance with its "+" (tap = Get coins), on one row under the ribbon
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	_filter = UIKit.segmented([["all", "All"], ["owned", "Owned"]], "owned" if owned_only else "all", _on_filter, "sm")
+	_filter = UIKit.segmented([["all", tr("All")], ["owned", tr("Owned")]], "owned" if owned_only else "all", _on_filter, "sm")
 	_filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_filter)
 	_earn_btn = _balance_button()
@@ -89,11 +92,14 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	row.visible = not inventory               # the inventory lists what you own: nothing to filter or buy
 	body.add_child(row)
 	# the tabs reach the card's rim (seven icon + label tabs need the width)
-	_tabs = TabStrip.new(TABS.duplicate(true), strip_key(tab), "gtabs")
+	var tabs := TABS.duplicate(true)
+	for t: Dictionary in tabs:
+		t.text = L10n.t(t.text)
+	_tabs = TabStrip.new(tabs, strip_key(tab), "gtabs")
 	_tabs.picked.connect(show_tab)
 	_bleed = UIKit.margin(_tabs, -_bleed_px(), 0, -_bleed_px(), 0)
 	body.add_child(_bleed)
-	_look = UIKit.segmented(LOOK, "avatars", show_tab, "sm")
+	_look = UIKit.segmented(LOOK.map(func(l: Array) -> Array: return [l[0], L10n.t(l[1])]), "avatars", show_tab, "sm")
 	_look.name = "LookFilter"
 	body.add_child(UIKit.margin(_look, 0, UIKit.SPACE.sm, 0, 0))
 	_look.get_parent().visible = false
@@ -241,7 +247,7 @@ func _balance_button() -> Button:
 	h.add_child(plus)
 	var b := UIKit.button_with("", h, "white", "sm")
 	b.name = "GetCoins"
-	b.tooltip_text = "Get coins"
+	b.tooltip_text = tr("Get coins")
 	b.custom_minimum_size.x = 120
 	_balance.resized.connect(func():
 		b.custom_minimum_size.x = maxf(120.0, h.get_combined_minimum_size().x + 2.0 * float(UIKit.BTN.sm.pad)))
@@ -284,8 +290,8 @@ static func _sections(key: String) -> Array:
 				else:
 					classic.append(a)
 			return [
-				["Characters", chars.map(func(c: Dictionary) -> Dictionary: return {kind = "char", id = c.id, name = c.name})],
-				["Classic", classic.map(func(a: Dictionary) -> Dictionary: return {kind = "avatar", id = a.id, name = a.name})],
+				[L10n.t("Characters"), chars.map(func(c: Dictionary) -> Dictionary: return {kind = "char", id = c.id, name = c.name})],
+				[L10n.t("Classic"), classic.map(func(a: Dictionary) -> Dictionary: return {kind = "avatar", id = a.id, name = a.name})],
 			]
 		"frames":
 			return [["", Collection.FRAMES.map(func(f: Dictionary) -> Dictionary: return {kind = "frame", id = f.id, name = f.name})]]
@@ -323,7 +329,7 @@ static func _price(kind: String, id: String) -> int:
 
 ## The name in sentences: "Royal Gold dice", "Pastel Dream Room".
 static func _title(kind: String, name_: String) -> String:
-	return name_ + " dice" if kind == "dice" else name_
+	return L10n.t("%s dice") % L10n.t(name_) if kind == "dice" else L10n.t(name_)
 
 ## What unlocks a level / achievement item, as the thing to do: "Reach level 5", "Win 3 games in a row".
 static func _unlock_note(kind: String, id: String) -> String:
@@ -331,10 +337,10 @@ static func _unlock_note(kind: String, id: String) -> String:
 	if kind != "badge":
 		var u: Dictionary = Collection.item(kind, id).get("unlock", {})
 		if u.has("level"):
-			return "Reach level %d" % int(u.level)
+			return L10n.t("Reach level %d") % int(u.level)
 		ach_id = str(u.get("ach", ""))
 	var a := Collection.ach(ach_id)
-	return str(a.desc).trim_suffix(".") if not a.is_empty() else Collection.unlock_text(kind, id)
+	return L10n.t(str(a.desc)).trim_suffix(".").trim_suffix("।") if not a.is_empty() else L10n.t(Collection.unlock_text(kind, id))
 
 
 # =====================================================================================================================
@@ -367,7 +373,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	tag.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	v.add_child(art)
 	# name: two lines kept for every card, so the state rows line up
-	var nl := UIKit.label(it.name, NAME_FS, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	var nl := UIKit.label(L10n.t(it.name), NAME_FS, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	nl.max_lines_visible = 2
 	nl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -380,12 +386,12 @@ func _card(it: Dictionary) -> PanelContainer:
 	slot.custom_minimum_size.y = UIKit.TAP
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(slot)
-	var buy := UIKit.btn("Buy", "gold", "sm")
+	var buy := UIKit.btn(tr("Buy"), "gold", "sm")
 	buy.name = "Buy"
 	UIKit.fit_text(buy, 13)
 	buy.pressed.connect(func(): _on_buy(kind, id, it.name))
 	slot.add_child(buy)
-	var use := UIKit.btn("Use", "teal", "sm")
+	var use := UIKit.btn(tr("Use"), "teal", "sm")
 	use.name = "Use"
 	use.pressed.connect(func(): _on_use(kind, id))
 	slot.add_child(use)
@@ -415,7 +421,7 @@ func _card(it: Dictionary) -> PanelContainer:
 		v.add_child(gem_row)
 	p.gui_input.connect(func(e: InputEvent) -> void:          # a tap on a locked card says what unlocks it
 		if lock_row.visible and Sheet._is_tap(e):
-			UIKit.deny(self, ll.text + ".", p, 2.0))
+			UIKit.deny(self, ll.text + ("।" if L10n.is_bn() else "."), p, 2.0))
 	_cards.append(p)
 	_updaters.append(func():
 		var owned := _owned(kind, id)
@@ -433,7 +439,7 @@ func _card(it: Dictionary) -> PanelContainer:
 		(view.get_meta("art", view) as CanvasItem).modulate.a = 0.55 if lock_row.visible else 1.0
 		if for_sale:
 			var short := price - Catalog.coins()
-			buy.text = "Buy" if short <= 0 else Fmt.shortfall(short)
+			buy.text = tr("Buy") if short <= 0 else Fmt.shortfall(short)
 			if buy.get_meta("kit_kind", "") != ("gold" if short <= 0 else "off"):
 				UIKit.set_kind(buy, "gold" if short <= 0 else "off"))
 	return p
@@ -454,7 +460,7 @@ static func gem_option(gems: int) -> Button:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	b.add_child(h)
-	var or_l := UIKit.label("or", UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
+	var or_l := UIKit.label(L10n.t("or"), UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
 	or_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(or_l)
 	var amt := CoinAmount.gems(gems, "xs", "plain")
@@ -563,7 +569,7 @@ func _view_button(kind: String, id: String) -> Button:
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
 	b.set_meta("view", id)
-	b.tooltip_text = "View"
+	b.tooltip_text = tr("View")
 	for s in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		b.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -577,7 +583,7 @@ func _view_button(kind: String, id: String) -> Button:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(UIKit.icon("ic_eye", 18))
 	if not is_narrow and kind != "emotes":  # narrow cards (and emote cards, whose icons fill the art): the eye alone
-		var l := UIKit.label("View", UIKit.FS.small + 1, Palette.INK, UIKit.font_body(900))
+		var l := UIKit.label(tr("View"), UIKit.FS.small + 1, Palette.INK, UIKit.font_body(900))
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		h.add_child(l)
 	chip.add_child(h)
@@ -605,7 +611,7 @@ static func in_use_pill() -> PanelContainer:
 	var ic := UIKit.glyph("ic_check", 18, Palette.ON_HONEY)
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(ic)
-	var l := UIKit.label("In use", UIKit.FS.body_l, Palette.ON_HONEY, UIKit.font_body(900))
+	var l := UIKit.label(L10n.t("In use"), UIKit.FS.body_l, Palette.ON_HONEY, UIKit.font_body(900))
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(l)
 	p.add_child(h)
@@ -626,9 +632,9 @@ func _more_row(n: int) -> Control:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	b.add_child(h)
-	var more := UIKit.label("%d more in the shop" % n, UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
+	var more := UIKit.label(tr("%d more in the shop") % n, UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
 	var dot := UIKit.label("·", UIKit.FS.label, Palette.SUB, UIKit.font_body(900))
-	var link := UIKit.label("Open shop" if inventory else "Show all", UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900))
+	var link := UIKit.label(tr("Open shop") if inventory else tr("Show all"), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900))
 	for l: Label in [more, dot, link]:
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		h.add_child(l)
@@ -648,8 +654,8 @@ func _show_all() -> void:
 func _empty() -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.md)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(UIKit.paragraph("You don’t own any of these yet.", UIKit.FS.body_l, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var b := UIKit.btn("Open shop" if inventory else "Show all", "white", "sm")
+	v.add_child(UIKit.paragraph(tr("You don’t own any of these yet."), UIKit.FS.body_l, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var b := UIKit.btn(tr("Open shop") if inventory else tr("Show all"), "white", "sm")
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.custom_minimum_size.x = 140
 	b.pressed.connect(_show_all)
@@ -674,7 +680,7 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 	if short > 0:
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, "Need %s more coins" % Fmt.coins(short), card, 1.8, "bad")
+		Toast.show(self, tr("Need %s more coins") % Fmt.coins(short), card, 1.8, "bad")
 		return
 	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
 		_busy = true
@@ -688,7 +694,7 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 			Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
 			return
 	_busy = true
-	var yes: bool = await Sheet.confirm(self, "Buy %s?" % title, "%s coins. You’ll have %s left." % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], "Buy")
+	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % title, tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
 	_busy = false
 	if not yes or not is_instance_valid(self) or _closing:
 		return
@@ -705,7 +711,7 @@ func _on_buy(kind: String, id: String, name_: String) -> void:
 		return
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(self, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], card, 1.8, "good")
+	Toast.show(self, _yours(kind, title), card, 1.8, "good")
 	_announce(kind, id)
 	refresh()
 
@@ -728,11 +734,15 @@ static func _purchase(kind: String, id: String, currency := "coins") -> String:
 		"scene": return SLScenes.buy_scene(id)
 		"emotes": return Catalog.buy_emotes(id)
 		"char": return Collection.buy_char(id, true)
-	return "That isn’t for sale."
+	return L10n.t("That isn’t for sale.")
+
+## "<Item> is yours!" ("are" for dice).
+static func _yours(kind: String, title: String) -> String:
+	return (L10n.t("%s are yours!") if kind == "dice" else L10n.t("%s is yours!")) % title
 
 ## "Not enough gems — you need 12 more."
 static func gems_need_text(short: int) -> String:
-	return "Not enough gems — you need %s more." % Fmt.coins_full(short)
+	return L10n.t("Not enough gems — you need %s more.") % Fmt.coins_full(short)
 
 ## Buy with gems: not enough -> "Not enough gems" + Open Store; else confirm -> buy and put in use -> "<Item> is yours!".
 func _on_buy_gems(kind: String, id: String, name_: String) -> void:
@@ -770,7 +780,7 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 	if gems > have:
 		Sound.sfx("error")
 		Haptics.error()
-		var open_store: bool = await Sheet.confirm(host, "Not enough gems", "You need %s more gems for %s. You have %s." % [Fmt.coins_full(gems - have), title, Fmt.coins_full(have)], "Open Store", "Not now")
+		var open_store: bool = await Sheet.confirm(host, L10n.t("Not enough gems"), L10n.t("You need %s more gems for %s. You have %s.") % [Fmt.coins_full(gems - have), title, Fmt.coins_full(have)], L10n.t("Open Store"), L10n.t("Not now"))
 		return "store" if open_store and is_instance_valid(host) and not host._closing else ""
 	var online: bool = await Account.instance().ensure_session()
 	if not is_instance_valid(host) or host._closing:
@@ -780,7 +790,7 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		Haptics.error()
 		Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")
 		return ""
-	var yes: bool = await Sheet.confirm(host, "Buy %s?" % title, "%s gems. You’ll have %s left." % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], "Buy")
+	var yes: bool = await Sheet.confirm(host, L10n.t("Buy %s?") % title, L10n.t("%s gems. You’ll have %s left.") % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], L10n.t("Buy"))
 	if not yes or not is_instance_valid(host) or host._closing:
 		return ""
 	var err: String = await _purchase(kind, id, "gems")
@@ -793,7 +803,7 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		return "failed"
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(host, "%s %s yours!" % [title, "are" if kind == "dice" else "is"], host.card, 1.8, "good")
+	Toast.show(host, _yours(kind, title), host.card, 1.8, "good")
 	return "bought"
 
 ## Use: put an owned item in use. Through the server when there is an Account (the look is part of the profile it
@@ -802,7 +812,7 @@ func _on_use(kind: String, id: String) -> void:
 	if _closing or _busy:
 		return
 	var ok := false
-	var why := Collection.SAVE_FAILED_EQUIP
+	var why := tr(Collection.SAVE_FAILED_EQUIP)
 	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
 		_busy = true
 		var r: Dictionary = await Account.instance().equip("avatar" if kind == "char" else kind, id)
@@ -881,7 +891,7 @@ func open_earn() -> void:
 
 ## The Get coins sheet on its own (e.g. from the home coin chip): ShopSheet.make_earn().open(layer).
 static func make_earn() -> Sheet:
-	return RewardsSheet.new("Get coins", true)       # the Rewards sheet's rows, one experience; taps go to Main
+	return RewardsSheet.new(L10n.t("Get coins"), true)       # the Rewards sheet's rows, one experience; taps go to Main
 
 
 # =====================================================================================================================

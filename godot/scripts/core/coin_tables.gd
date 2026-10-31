@@ -90,20 +90,20 @@ static func pick(want: String, list: Array) -> String:
 
 ## "Entry 100 lost" for a coin-table match you didn't win a prize in; "" for Practice.
 static func lost_text(entry: int) -> String:
-	return "Entry %s lost" % Fmt.coins_full(entry) if entry > 0 else ""
+	return L10n.t("Entry %s lost") % Fmt.coins_full(entry) if entry > 0 else ""
 
 ## "Entry 100 refunded" for a match whose entry the server gave back; "" for Practice.
 static func refund_text(entry: int) -> String:
-	return "Entry %s refunded" % Fmt.coins_full(entry) if entry > 0 else ""
+	return L10n.t("Entry %s refunded") % Fmt.coins_full(entry) if entry > 0 else ""
 
 ## "Includes +38 house bonus".
 static func bonus_text(bonus_: int) -> String:
-	return "Includes +%s house bonus" % Fmt.coins_full(bonus_) if bonus_ > 0 else ""
+	return L10n.t("Includes +%s house bonus") % Fmt.coins_full(bonus_) if bonus_ > 0 else ""
 
 ## The note for a match the server ended because nobody was connected.
-const AWAY_TEXT := "The match ended while everyone was away: places by progress."
+const AWAY_TEXT := "The match ended while everyone was away: places by progress."  # l10n  (shown through L10n.t by the result screen)
 
 ## Short names for a table in a sentence ("the 500 table").
 static func label(id: String) -> String:
 	var t := info(id)
-	return "Practice" if int(t.get("entry", 0)) <= 0 else Fmt.coins_full(int(t.entry))
+	return L10n.t("Practice") if int(t.get("entry", 0)) <= 0 else Fmt.coins_full(int(t.entry))

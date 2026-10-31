@@ -186,7 +186,7 @@ func show_bar() -> void:
 
 ## [b]name[/b] in player c's name colour, for messages that mention someone other than the current player.
 static func who(name: String, c: int) -> String:
-	return "[b][color=#%s]%s[/color][/b]" % [PlayerTile.name_color(c).to_html(false), name]
+	return "[b][color=#%s]%s[/color][/b]" % [PlayerTile.name_color(c).to_html(false), L10n.seat_name(name)]
 
 ## Height of the row including the safe area (for laying out things under it).
 func bottom() -> float:

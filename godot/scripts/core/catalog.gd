@@ -9,6 +9,10 @@ extends RefCounted
 ## The profile is Save.profile at runtime. Tests (and tools) can set `profile_source` to their own Dictionary and
 ## `writer` to their own save function, so the real save file is never touched.
 
+## Names that are plain words, shown through L10n.t (the rest, Crema / Espresso / Pawn Pals ..., stay English). A new
+## item table only needs its plain names added here (or `## l10n-keys: name` when all its names are translated).
+const _NAMES := ["Classic", "Royal Gold", "Starter Set", "Friends Set", "Game Set"]  # l10n
+
 ## Dice skins (SKINS): body, edge shade, pips, the single pip of the 1. Classic is free and always owned.
 const DICE := [
 	{id = "classic", name = "Classic", price = 0, bg = Color("#fdfaf2"), edge = Color("#e1d7c3"), pip = Color("#22263f"), one = Color("#d8323a")},
@@ -35,7 +39,7 @@ const ROOM_GRADIENT := {
 	studio = [Color("#fff1a8"), Color("#ffb98a")],
 	cloud = [Color("#c4e8ff"), Color("#9ee8dc")],
 }
-const SAVE_FAILED := "Couldn’t save on this device. No coins were spent."
+const SAVE_FAILED := "Couldn’t save on this device. No coins were spent."  # l10n
 
 ## Set to a Dictionary to work on it instead of Save.profile (tests). null = Save.profile.
 static var profile_source: Variant = null
@@ -129,9 +133,9 @@ static func owned_dice() -> Array:
 static func buy_room(id: String, equip := true) -> String:
 	var r := room(id)
 	if r.is_empty():
-		return "That room isn’t in the shop."
+		return L10n.t("That room isn’t in the shop.")
 	if owns_room(id):
-		return "You already own %s." % r.name
+		return L10n.t("You already own %s.") % L10n.t(r.name)
 	var price := int(r.price)
 	if coins() < price:
 		return need_text(price - coins())
@@ -142,15 +146,15 @@ static func buy_room(id: String, equip := true) -> String:
 		p.rooms = owned
 		if equip:
 			p.room = id)
-	return "" if ok else SAVE_FAILED
+	return "" if ok else L10n.t(SAVE_FAILED)
 
 ## Buys a dice skin and equips it. "" when bought, else the reason (nothing changed then).
 static func buy_dice(id: String, equip := true) -> String:
 	var d := dice(id)
 	if d.is_empty():
-		return "Those dice aren’t in the shop."
+		return L10n.t("Those dice aren’t in the shop.")
 	if owns_dice(id):
-		return "You already own %s." % d.name
+		return L10n.t("You already own %s.") % L10n.t(d.name)
 	var price := int(d.price)
 	if coins() < price:
 		return need_text(price - coins())
@@ -163,15 +167,15 @@ static func buy_dice(id: String, equip := true) -> String:
 		p.dice_owned = owned
 		if equip:
 			p.dice = id)
-	return "" if ok else SAVE_FAILED
+	return "" if ok else L10n.t(SAVE_FAILED)
 
 ## Buys an emote pack and equips it. "" when bought, else the reason (nothing changed then).
 static func buy_emotes(id: String, equip := true) -> String:
 	var e := emote_pack(id)
 	if e.is_empty():
-		return "That emote pack isn’t in the shop."
+		return L10n.t("That emote pack isn’t in the shop.")
 	if owns_emotes(id):
-		return "You already own %s." % e.name
+		return L10n.t("You already own %s.") % L10n.t(e.name)
 	var price := int(e.price)
 	if coins() < price:
 		return need_text(price - coins())
@@ -184,7 +188,7 @@ static func buy_emotes(id: String, equip := true) -> String:
 		p.emote_sets = owned
 		if equip:
 			p.emote_set = id)
-	return "" if ok else SAVE_FAILED
+	return "" if ok else L10n.t(SAVE_FAILED)
 
 ## Equips an owned emote pack. False when it isn't owned (or the save failed); true when it is in use now.
 static func equip_emotes(id: String) -> bool:
@@ -218,7 +222,7 @@ static func gem_price(coins: int) -> int:
 	return 0 if coins <= 0 else (coins + 99) / 100
 
 static func need_text(short: int) -> String:
-	return "Not enough coins — you need %s more." % group(short)
+	return L10n.t("Not enough coins — you need %s more.") % group(short)
 
 ## 1234567 -> "1,234,567". Forwards to Fmt.coins_full.
 static func group(n: int) -> String:

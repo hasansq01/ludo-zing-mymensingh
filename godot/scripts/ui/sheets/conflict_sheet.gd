@@ -26,7 +26,7 @@ var _cards: Array[Control] = []
 
 
 func _init(info: Dictionary = {}, acc: Account = null) -> void:
-	super("Keep which progress?" if str(info.get("kind", "conflict")) == "conflict" else "Other Google account", UIKit.W.catalog, true, LOOK_PM)
+	super(L10n.t("Keep which progress?") if str(info.get("kind", "conflict")) == "conflict" else L10n.t("Other Google account"), UIKit.W.catalog, true, LOOK_PM)
 	_info = info
 	account_node = acc
 	kind = str(info.get("kind", "conflict"))
@@ -44,34 +44,34 @@ func _init(info: Dictionary = {}, acc: Account = null) -> void:
 	there_button.pressed.connect(func(): _pick("there" if is_conflict else "switch"))
 	for b in [here_button, there_button]:
 		UIKit.fit_text(b, 13)
-	list.add_child(_option(here, "This device" if is_conflict else "This account", here_text(kind), here_button))
-	list.add_child(_option(there if there is Dictionary else {}, "Google account" if is_conflict else "Other Google account",
+	list.add_child(_option(here, tr("This device") if is_conflict else tr("This account"), here_text(kind), here_button))
+	list.add_child(_option(there if there is Dictionary else {}, tr("Google account") if is_conflict else tr("Other Google account"),
 		there_text(kind, there is Dictionary), there_button, not (there is Dictionary)))
 	fit()
 
 
 static func intro_text(k: String) -> String:
 	if k == "conflict":
-		return "This Google account already has progress saved. Choose the one you want to keep playing with."
-	return "This device is linked to a different Google account than the one you just signed in with."
+		return L10n.t("This Google account already has progress saved. Choose the one you want to keep playing with.")
+	return L10n.t("This device is linked to a different Google account than the one you just signed in with.")
 
 static func here_label(k: String) -> String:
-	return "Keep this device’s progress" if k == "conflict" else "Stay on this account"
+	return L10n.t("Keep this device’s progress") if k == "conflict" else L10n.t("Stay on this account")
 
 static func there_label(k: String) -> String:
-	return "Use Google account’s progress" if k == "conflict" else "Switch to the other account"
+	return L10n.t("Use Google account’s progress") if k == "conflict" else L10n.t("Switch to the other account")
 
 static func here_text(k: String) -> String:
 	if k == "conflict":
-		return "Your Google account will use this progress from now on. The progress saved on the Google account is retired."
-	return "Nothing changes. This account stays linked to its own Google account."
+		return L10n.t("Your Google account will use this progress from now on. The progress saved on the Google account is retired.")
+	return L10n.t("Nothing changes. This account stays linked to its own Google account.")
 
 static func there_text(k: String, has_account: bool) -> String:
 	if k == "conflict":
-		return "This device switches to the progress saved on your Google account. The progress on this device is left behind."
+		return L10n.t("This device switches to the progress saved on your Google account. The progress on this device is left behind.")
 	if has_account:
-		return "This device switches to the other Google account’s progress. Your current account stays linked to its own."
-	return "This device starts a new account for the other Google player. Your current account stays linked to its own."
+		return L10n.t("This device switches to the other Google account’s progress. Your current account stays linked to its own.")
+	return L10n.t("This device starts a new account for the other Google player. Your current account stays linked to its own.")
 
 ## A progress summary {name, avatar, level, coins, wins}: the avatar, the name, "Level 9 · 55 wins", the coins.
 ## empty: the Google player has no account yet ("New account · starts at level 1").
@@ -90,13 +90,13 @@ static func summary_card(s: Dictionary, caption: String, empty := false) -> Cont
 	var col := UIKit.vbox(UIKit.SPACE.xxs)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var nm := UIKit.label("New account" if empty else str(s.get("name", "Player")), UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	var nm := UIKit.label(L10n.t("New account") if empty else str(s.get("name", L10n.t("Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	nm.name = "Name"
 	nm.clip_text = true
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(nm)
 	var wins := int(s.get("wins", 0))
-	var meta := "Starts at level 1" if empty else "Level %d · %d %s" % [maxi(1, int(s.get("level", 1))), wins, "win" if wins == 1 else "wins"]
+	var meta := L10n.t("Starts at level 1") if empty else L10n.tn("Level %d · %d win", "Level %d · %d wins", wins) % [maxi(1, int(s.get("level", 1))), wins]
 	var ml := UIKit.label(meta, UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
 	ml.name = "Meta"
 	col.add_child(ml)
@@ -137,16 +137,16 @@ func _pick(keep: String) -> void:
 		return
 	if r.get("ok", false):
 		Haptics.success()
-		var msg := "Welcome back, %s!" % str(Save.profile.get("name", "")) if keep in ["there", "switch"] else "Progress saved to your Google account."
+		var msg := tr("Welcome back, %s!") % str(Save.profile.get("name", "")) if keep in ["there", "switch"] else tr("Progress saved to your Google account.")
 		if keep == "stay":
-			msg = "Staying on this account."
+			msg = tr("Staying on this account.")
 		Toast.show(get_parent() if get_parent() else self, msg, null, 2.2, "good")
 		close()
 		return
 	_set_busy(false)
 	Haptics.error()
 	var why := Account.google_error_text(str(r.get("error", "")))
-	Toast.show(self, why if why != "" else "Couldn’t switch. Please try again.", card, 2.4, "bad")
+	Toast.show(self, why if why != "" else tr("Couldn’t switch. Please try again."), card, 2.4, "bad")
 	if str(r.get("error", "")) == "bad_ticket" or str(r.get("error", "")) == "no_conflict":
 		close()
 

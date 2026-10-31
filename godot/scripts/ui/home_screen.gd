@@ -44,6 +44,8 @@ signal open_tab(tab: String)             ## rewards | shop | leaderboard | inven
 
 const HI := "res://assets/ui/home/hi_%s.svg"
 const TROPHY := "res://assets/ui/ic_trophy.svg"
+# The table literals below ("Friends", "Computer", "Ranks"...) are shown through tr(); listed here for the extractor.
+const _TABLE_TEXT := ["Computer", "Pass & Play", "Ludo", "Home", "Shop", "Ranks", "Inventory"]  # l10n
 const REWARD_IDS := ["spin", "daily", "free"]
 const BAR_H := 52.0                      # top bar height
 const WALLET_W := 104.0                  # the coins-over-gems chip (grows with the numbers)
@@ -220,7 +222,7 @@ func _build_top_bar() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
 	_chip_text = col
-	_name = UIKit.label("You", UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
+	_name = UIKit.label(L10n.seat_name("You"), UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.clip_text = true
 	col.add_child(_name)
@@ -262,7 +264,7 @@ func _build_top_bar() -> void:
 	cr.add_child(plus)
 	_gems_button = _row_button()
 	_gems_button.name = "Gems"
-	_gems_button.tooltip_text = "Store"
+	_gems_button.tooltip_text = tr("Store")
 	_gems_button.custom_minimum_size.y = 22
 	_gems_button.pressed.connect(func(): open_tab.emit("store"))
 	wv.add_child(_gems_button)
@@ -305,12 +307,12 @@ func _build_dock() -> void:
 	add_child(quick_button)
 	_modes = UIKit.hbox(UIKit.SPACE.sm + 2)
 	_modes.name = "Modes"
-	friends_button = _tile_button("Friends", UIKit.ICON_DIR + "perk_friends.svg")
+	friends_button = _tile_button(tr("Friends"), UIKit.ICON_DIR + "perk_friends.svg")
 	friends_button.name = "Friends"
 	friends_button.pressed.connect(_friends)
 	_modes.add_child(friends_button)
 	for m in [["Computer", "cpu", "cpu"], ["Pass & Play", "pass_play", "local"]]:
-		var b := _tile_button(m[0], HI % m[1])
+		var b := _tile_button(tr(m[0]), HI % m[1])
 		b.name = str(m[0]).replace(" & ", "")
 		var mode: String = m[2]
 		b.pressed.connect(func(): _play(mode))
@@ -342,13 +344,13 @@ func _build_quick() -> void:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
-	_quick_title = UIKit.label("Continue match", UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
+	_quick_title = UIKit.label(tr("Continue match"), UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
 	col.add_child(_quick_title)
 	_quick_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
 	_quick_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_quick_sub.clip_text = true
 	col.add_child(_quick_sub)
-	_quick_go = UIKit.button("Resume", "teal", "xs")
+	_quick_go = UIKit.button(tr("Resume"), "teal", "xs")
 	_quick_go.mouse_filter = Control.MOUSE_FILTER_IGNORE      # the whole pill is the button
 	_quick_go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_quick_go.custom_minimum_size = Vector2(92, QUICK_INNER)
@@ -400,13 +402,13 @@ func _build_switch() -> void:
 		var ic := UIKit.icon(HI % g[2], SWITCH_ICON)
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		r.add_child(ic)
-		var l := UIKit.label(g[1], SWITCH_FS, Palette.INK, UIKit.font_body(900))
+		var l := UIKit.label(tr(g[1]), SWITCH_FS, Palette.INK, UIKit.font_body(900))
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		l.add_theme_constant_override("line_spacing", -3)
 		r.add_child(l)
 		var key: String = g[0]
-		_switch_parts[key] = {row = r, icon = ic, label = l, text = g[1]}
+		_switch_parts[key] = {row = r, icon = ic, label = l, text = tr(g[1])}
 		b.button_pressed = key == game
 		b.toggled.connect(func(v: bool): if v: _set_game(key))
 		row.add_child(b)
@@ -437,10 +439,10 @@ func _big_play() -> Button:
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
-	var t := UIKit.label("QUICK MATCH", 28, Palette.ON_HONEY, UIKit.font_display())
+	var t := UIKit.label(tr("QUICK MATCH"), 28, Palette.ON_HONEY, UIKit.font_display())
 	t.name = "Text"
 	col.add_child(t)
-	col.add_child(UIKit.label("Play online now", UIKit.FS.small + 1, Color(Palette.ON_HONEY, 0.72), UIKit.font_body(800)))
+	col.add_child(UIKit.label(tr("Play online now"), UIKit.FS.small + 1, Color(Palette.ON_HONEY, 0.72), UIKit.font_body(800)))
 	b.button_down.connect(func(): r.offset_top = lip - 2.0; r.offset_bottom = -2.0)
 	b.button_up.connect(func(): r.offset_top = 0.0; r.offset_bottom = -lip)
 	b.resized.connect(func() -> void:                     # a smaller bolt on a lower button (short screens)
@@ -493,7 +495,7 @@ func _build_nav() -> void:
 		var ic := UIKit.icon(t[2], 28)
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		col.add_child(ic)
-		col.add_child(UIKit.label(t[1], UIKit.FS.small, Palette.INK if on else Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(UIKit.label(tr(t[1]), UIKit.FS.small, Palette.INK if on else Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
 		var id: String = t[0]
 		if not on:
 			b.pressed.connect(func(): open_tab.emit(id))
@@ -639,7 +641,7 @@ func refresh() -> void:
 	if not is_inside_tree():
 		return
 	var p: Dictionary = Save.profile
-	_name.text = str(p.get("name", "You"))
+	_name.text = L10n.seat_name(str(p.get("name", "You")))
 	if _avatar and _avatar.has_method("refresh"):
 		_avatar.refresh()
 	var li := Save.level_info(int(p.get("xp", 0)))
@@ -708,7 +710,9 @@ func _refresh_quick() -> void:
 	var pk := MatchStore.peek()
 	var sub := str(pk.get("summary", ""))
 	if sub == "":
-		sub = "Snakes & Ladders" if str(pk.get("game", "ludo")) == "sl" else "Ludo"
+		sub = tr("Snakes & Ladders") if str(pk.get("game", "ludo")) == "sl" else tr("Ludo")
+	else:
+		sub = MatchStore.localize_summary(sub)       # (the file keeps the English line)
 	var ago := _ago(int(pk.get("saved_at", 0)))
 	_show_continue(sub + (" · " + ago if ago != "" and sub.length() + ago.length() <= 30 else ""))
 
@@ -734,13 +738,13 @@ static func _ago(unix: int) -> String:
 		return ""
 	var s := int(Time.get_unix_time_from_system()) - unix
 	if s < 60:
-		return "just now"
+		return L10n.t("just now")
 	if s < 3600:
-		return "%d min ago" % (s / 60)
+		return L10n.t("%d min ago") % (s / 60)
 	if s < 86400:
-		return "%dh ago" % (s / 3600)
+		return L10n.t("%dh ago") % (s / 3600)
 	var d := s / 86400
-	return "yesterday" if d == 1 else "%d days ago" % d
+	return L10n.t("yesterday") if d == 1 else L10n.t("%d days ago") % d
 
 
 ## Kept for older callers: the short coin form (Fmt.coins).

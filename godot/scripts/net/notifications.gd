@@ -22,8 +22,8 @@ const PROMOS := "promos"
 const OPENS_KEPT := 5                    # campaign opens kept until the server has them
 const ASK_GAP_SEC := 3 * 86400           # the soft prompt again after a "Not now": at least this long, ...
 const ASK_MAX := 3                       # ... and three times in all
-const ASK_TITLE := "Stay in the loop?"
-const ASK_TEXT := "Get a heads-up when your free spin and daily reward are ready?"
+const ASK_TITLE := "Stay in the loop?"  # l10n
+const ASK_TEXT := "Get a heads-up when your free spin and daily reward are ready?"  # l10n
 const TOAST_SEC := 4.0
 
 static var _inst: Notifications = null
@@ -341,7 +341,7 @@ func _ask() -> void:
 	Save.prefs.notif_asked = Save.as_int(Save.prefs.get("notif_asked"), 0) + 1
 	Save.prefs.notif_asked_at = _now()
 	Save.save()
-	if await Sheet.confirm(app, ASK_TITLE, ASK_TEXT, "Yes", "Not now"):
+	if await Sheet.confirm(app, tr(ASK_TITLE), tr(ASK_TEXT), tr("Yes"), tr("Not now")):
 		notifier.call("request_permission")
 
 

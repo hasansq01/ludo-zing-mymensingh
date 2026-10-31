@@ -10,6 +10,9 @@ signal changed                           ## the pack was bought or put in use
 signal store_requested                   ## "Open Store" after "not enough gems" (the Shop passes it on to Main)
 
 const SEAMLESS := ["happy", "party", "cheer"]
+## The emotes' display names (assets/emotes/emotes.json, shown through L10n.t), listed for the extractor.
+const _EMOTE_NAMES := ["Victory", "Laugh", "Cool", "Angry", "Love", "Celebrate", "Champ", "Sleepy", "Sob", "Gasp", "Confused", "Hi!",  # l10n
+	"Cry", "Shocked", "Facepalm", "Yay!", "Thinking", "Tease", "Roll it!", "Winner", "High five", "Give up", "Disappointed", "Peek-a-boo"]  # l10n
 const PAUSE_SEC := 0.9                   ## held on the last frame between two plays of a non-looping emote
 const MAX_W := 400.0
 
@@ -25,7 +28,7 @@ var _busy := false
 
 func _init(pack_id_ := "starter") -> void:
 	var pk := Emotes.pack(pack_id_)
-	super(str(pk.get("name", "Emotes")), MAX_W, true, LOOK_PM)
+	super(L10n.t(str(pk.get("name", "Emotes"))), MAX_W, true, LOOK_PM)
 	pack_id = pack_id_
 	var list := add_scroll_body(UIKit.SPACE.md)
 	var g := UIKit.grid(2, UIKit.SPACE.sm)
@@ -41,13 +44,13 @@ func _init(pack_id_ := "starter") -> void:
 	var slot := MarginContainer.new()
 	slot.custom_minimum_size.y = UIKit.TAP + 4
 	slot.add_theme_constant_override("margin_top", UIKit.SPACE.sm)
-	_buy = UIKit.button_with("Buy", CoinAmount.new(int(pk.get("price", 0)), "md", "plain"), "gold", "md")
+	_buy = UIKit.button_with(tr("Buy"), CoinAmount.new(int(pk.get("price", 0)), "md", "plain"), "gold", "md")
 	_buy.name = "Buy"
 	var row := _buy.get_node("Content") as HBoxContainer
 	row.move_child(row.get_child(0), -1)
 	_need = UIKit.btn("", "off", "md")
 	_need.name = "Need"
-	_use = UIKit.btn("Use", "teal", "md")
+	_use = UIKit.btn(tr("Use"), "teal", "md")
 	_use.name = "Use"
 	for b: Button in [_buy, _need, _use]:
 		b.pressed.connect(_on_act)
@@ -90,7 +93,7 @@ func _on_gems() -> void:
 	if _busy or _closing or Catalog.owns_emotes(pack_id):
 		return
 	_busy = true
-	var res: String = await ShopSheet.buy_with_gems(self, "emotes", pack_id, str(Emotes.pack(pack_id).get("name", "")))
+	var res: String = await ShopSheet.buy_with_gems(self, "emotes", pack_id, L10n.t(str(Emotes.pack(pack_id).get("name", ""))))
 	_busy = false
 	if not is_instance_valid(self) or _closing:
 		return
@@ -112,7 +115,7 @@ func _on_act() -> void:
 			return
 		_busy = true
 		var ok := false
-		var why := Collection.SAVE_FAILED_EQUIP
+		var why := tr(Collection.SAVE_FAILED_EQUIP)
 		if _wallet():
 			var r: Dictionary = await Account.instance().equip("emotes", pack_id)
 			ok = bool(r.get("ok", false))
@@ -125,7 +128,7 @@ func _on_act() -> void:
 			return
 		if ok:
 			Sound.sfx("select")
-			Toast.show(self, "%s is in use" % pk.name, card, 1.6, "good")
+			Toast.show(self, tr("%s is in use") % L10n.t(pk.name), card, 1.6, "good")
 			changed.emit()
 		else:
 			Sound.sfx("error")
@@ -138,7 +141,7 @@ func _on_act() -> void:
 	if short > 0:
 		Sound.sfx("error")
 		Haptics.error()
-		Toast.show(self, "Need %s more coins" % Fmt.coins(short), card, 1.8, "bad")
+		Toast.show(self, tr("Need %s more coins") % Fmt.coins(short), card, 1.8, "bad")
 		return
 	_busy = true
 	if _wallet():
@@ -151,7 +154,7 @@ func _on_act() -> void:
 			Haptics.error()
 			Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
 			return
-	var yes: bool = await Sheet.confirm(self, "Buy %s?" % pk.name, "%s coins. You’ll have %s left." % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], "Buy")
+	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % L10n.t(pk.name), tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
 	if not yes or not is_instance_valid(self) or _closing:
 		_busy = false
 		return
@@ -168,7 +171,7 @@ func _on_act() -> void:
 	if err == "":
 		Sound.sfx("buy")
 		Haptics.success()
-		Toast.show(self, "%s is yours!" % pk.name, card, 1.8, "good")
+		Toast.show(self, tr("%s is yours!") % L10n.t(pk.name), card, 1.8, "good")
 		changed.emit()
 	else:
 		Sound.sfx("error")
@@ -212,7 +215,7 @@ class EmoteCell extends VBoxContainer:
 		_rect.texture = EmoteArt.icon(id)
 		well.add_child(_rect)
 		add_child(well)
-		var nm := str(EmoteArt.info(id).get("name", id))
+		var nm := L10n.t(str(EmoteArt.info(id).get("name", id)))
 		var l := UIKit.label(nm, UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 		l.name = "Name"
 		add_child(l)

@@ -112,11 +112,11 @@ func _build_card() -> PanelContainer:
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var v := UIKit.vbox(UIKit.SPACE.md)
 	card.add_child(v)
-	var hello := UIKit.title("Welcome to Ludo Zing!", UIKit.FS.h1)
+	var hello := UIKit.title(tr("Welcome to Ludo Zing!"), UIKit.FS.h1)
 	hello.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hello.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hello)
-	var sub := UIKit.paragraph("Pick a name and a look. You can change both later in your profile.", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var sub := UIKit.paragraph(tr("Pick a name and a look. You can change both later in your profile."), UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(sub)
 	# name
 	name_edit = LineEdit.new()
@@ -124,7 +124,7 @@ func _build_card() -> PanelContainer:
 	name_edit.max_length = MAX_NAME
 	var cur := str(Save.profile.get("name", "You"))
 	name_edit.text = "" if cur == "You" else cur
-	name_edit.placeholder_text = "Your name"
+	name_edit.placeholder_text = tr("Your name")
 	name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_edit.custom_minimum_size = Vector2(0, UIKit.TAP + 4)
 	name_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
@@ -133,7 +133,7 @@ func _build_card() -> PanelContainer:
 	name_edit.text_submitted.connect(func(_t: String): name_edit.release_focus())
 	v.add_child(name_edit)
 	# avatars: one centred row of the free characters
-	var cap := UIKit.caption("Choose your avatar")
+	var cap := UIKit.caption(tr("Choose your avatar"))
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(UIKit.margin(cap, 0, UIKit.SPACE.xs, 0, 0))
 	var ids := free_avatars()
@@ -154,11 +154,11 @@ func _build_card() -> PanelContainer:
 		_tiles[str(ids[k])] = t
 	_pick(picked, false)
 	v.add_child(UIKit.spacer())
-	play_button = UIKit.btn("Let’s play", "honey", "lg")
+	play_button = UIKit.btn(tr("Let’s play"), "honey", "lg")
 	play_button.name = "Play"
 	play_button.pressed.connect(_continue)
 	v.add_child(play_button)
-	var note := UIKit.label("No sign-up needed. Your progress saves automatically.", UIKit.FS.small, Palette.MUTED, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
+	var note := UIKit.label(tr("No sign-up needed. Your progress saves automatically."), UIKit.FS.small, Palette.MUTED, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(note)
 	return card

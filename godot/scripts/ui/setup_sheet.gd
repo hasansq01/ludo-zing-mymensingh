@@ -16,9 +16,8 @@ extends Sheet
 
 signal start(config: Dictionary)
 
-const PAIR_NOTE := "Teams: Red + Yellow vs Green + Blue."     ## (old name kept for callers)
+const PAIR_NOTE := "Teams: Red + Yellow vs Green + Blue."     # l10n   (old name kept for callers; shown through L10n.t)
 const TEAMS_NOTE := PAIR_NOTE
-const LEVELS := [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]]
 const SWATCH_H := 76.0
 const MAX_NAME := 12                    ## Pass & Play names (they must fit the game's player tiles)
 
@@ -44,12 +43,12 @@ func _init(game_: String, mode_: String) -> void:
 	count = 3 if mode == "cpu" else 4
 	bot_level = _pref_level()
 	_load_last()
-	super(("Play vs computer" if mode == "cpu" else "Pass & Play"), UIKit.W.form, true, Sheet.LOOK_PM)
+	super((L10n.t("Play vs computer") if mode == "cpu" else L10n.t("Pass & Play")), UIKit.W.form, true, Sheet.LOOK_PM)
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	_box = add_scroll_body(UIKit.SPACE.sm)   # grows with its content; scrolls only on short screens (4 name rows, 320x568)
-	set_kicker("Snakes & Ladders" if game == "sl" else "Ludo")
+	set_kicker(tr("Snakes & Ladders") if game == "sl" else tr("Ludo"))
 	if mode == "cpu":
-		_section("Your colour")
+		_section(tr("Your colour"))
 		var row := UIKit.hbox(UIKit.SPACE.sm)
 		for c in 4:
 			var b := Swatch.new(c, _colorblind())
@@ -59,10 +58,10 @@ func _init(game_: String, mode_: String) -> void:
 			row.add_child(b)
 			_swatches.append(b)
 		_box.add_child(UIKit.margin(row, 0, 0, 0, UIKit.SPACE.xs))
-		_section("Opponents")
+		_section(tr("Opponents"))
 		_box.add_child(UIKit.segmented([[1, "1"], [2, "2"], [3, "3"]], count, func(v): count = v; _sync()))
 	else:
-		_section("Players")
+		_section(tr("Players"))
 		_box.add_child(UIKit.segmented([[2, "2"], [3, "3"], [4, "4"]], count, func(v): count = v; _sync()))
 		var seats := UIKit.vbox(UIKit.SPACE.sm)
 		for i in 4:
@@ -70,25 +69,25 @@ func _init(game_: String, mode_: String) -> void:
 		_box.add_child(UIKit.margin(seats, 0, UIKit.SPACE.xs, 0, 0))
 	if game == "ludo":
 		_mode_box = UIKit.vbox(UIKit.SPACE.sm)
-		var cap := _caption_row("Mode")
+		var cap := _caption_row(tr("Mode"))
 		_mode_info = Info.icon("team" if teams else "ind")
 		cap.add_child(_mode_info)
 		_mode_box.add_child(cap)
-		_mode_seg = UIKit.segmented([[false, "Individual"], [true, "Teams (2 v 2)"]], teams, func(v): teams = v; _sync())
+		_mode_seg = UIKit.segmented([[false, tr("Individual")], [true, tr("Teams (2 v 2)")]], teams, func(v): teams = v; _sync())
 		var tb := _mode_seg.get_child(1) as Button                # below 4 players: the same look, faded (see _sync)
 		tb.add_theme_stylebox_override("disabled", tb.get_theme_stylebox("normal"))
 		tb.add_theme_color_override("font_disabled_color", Palette.MUTED)
-		UIKit.deny_disabled(tb, func() -> String: return "Teams need 4 players.")
+		UIKit.deny_disabled(tb, func() -> String: return tr("Teams need 4 players."))
 		_mode_box.add_child(_mode_seg)
 		_box.add_child(_mode_box)
 		if mode == "cpu":
-			_section("Difficulty")
-			_box.add_child(UIKit.segmented(LEVELS, bot_level, func(v): bot_level = str(v); _sync()))
+			_section(tr("Difficulty"))
+			_box.add_child(UIKit.segmented([["easy", tr("Easy")], ["normal", tr("Normal")], ["hard", tr("Hard")]], bot_level, func(v): bot_level = str(v); _sync()))
 	_note = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_note.custom_minimum_size.y = 44.0          # two lines reserved: the card never jumps when the note changes
 	_box.add_child(_note)
-	add_button("Start game", "honey", _submit, "lg")
+	add_button(tr("Start game"), "honey", _submit, "lg")
 	_sync()
 
 func _ready() -> void:
@@ -121,7 +120,7 @@ func _seat_row(i: int) -> HBoxContainer:
 	e.custom_minimum_size = Vector2(0, UIKit.TAP)
 	e.add_theme_font_override("font", UIKit.font_body(800))
 	e.add_theme_font_size_override("font_size", UIKit.FS.h3)
-	e.placeholder_text = default_name(i)
+	e.placeholder_text = L10n.seat_name(default_name(i))
 	e.text = str(names[i]) if i < names.size() else ""
 	e.select_all_on_focus = true
 	e.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
@@ -192,7 +191,7 @@ func _sync() -> void:
 		var team_b := _mode_seg.get_child(1) as Button
 		team_b.disabled = not four
 		team_b.modulate.a = 1.0 if four else 0.45
-		team_b.tooltip_text = "" if four else "Teams need 4 players."
+		team_b.tooltip_text = "" if four else tr("Teams need 4 players.")
 		ind_b.set_pressed_no_signal(not (four and teams))
 		team_b.set_pressed_no_signal(four and teams)
 	if _mode_info:
@@ -208,14 +207,14 @@ func _sync() -> void:
 
 func _note_text() -> String:
 	if game == "sl":
-		return ("Roll a 1 to enter. " if _sl_need_one() else "") + "First to square 100 wins."
+		return ((tr("Roll a 1 to enter.") + " ") if _sl_need_one() else "") + tr("First to square 100 wins.")
 	if _four() and teams:
 		if mode == "cpu":
-			return "%s %s is your teammate." % [TEAMS_NOTE, Palette.NAMES[(color + 2) % 4]]
-		return TEAMS_NOTE + " Teammates share the win."
+			return tr("%s %s is your teammate.") % [tr(TEAMS_NOTE), tr(Palette.NAMES[(color + 2) % 4])]
+		return tr(TEAMS_NOTE) + " " + tr("Teammates share the win.")
 	if not _four():
-		return "First to get all four pawns home wins. Teams need 4 players."
-	return "First to get all four pawns home wins."
+		return tr("First to get all four pawns home wins.") + " " + tr("Teams need 4 players.")
+	return tr("First to get all four pawns home wins.")
 
 ## Pulse the Teams ⓘ while Teams is chosen and that explanation is unread (never the Individual one: the choice
 ## comes first, SET-UP-02).
@@ -336,7 +335,7 @@ class Swatch extends Button:
 		focus_mode = Control.FOCUS_NONE
 		custom_minimum_size = Vector2(0, SetupSheet.SWATCH_H)
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tooltip_text = Palette.NAMES[c]
+		tooltip_text = tr(Palette.NAMES[c])
 		var face: Color = Palette.PLAYER[c]
 		var deep: Color = Palette.PLAYER_DARK[c]
 		# a light tint of the colour with its colour as the rim, so the real pawn in that colour reads on it
@@ -368,7 +367,7 @@ class Swatch extends Button:
 		pawn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pawn.set_color(c)
 		row.add_child(pawn)
-		var l := UIKit.label(Palette.NAMES[c], UIKit.FS.label, deep, UIKit.font_body(900))
+		var l := UIKit.label(tr(Palette.NAMES[c]), UIKit.FS.label, deep, UIKit.font_body(900))
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -420,7 +419,7 @@ class SeatDot extends Control:
 
 	func set_color(c_: int) -> void:
 		c = c_
-		tooltip_text = Palette.NAMES[c]
+		tooltip_text = tr(Palette.NAMES[c])
 		if _sym:
 			_sym.texture = UIKit.svg("sym_" + str(Palette.SYMBOL[c]))
 		queue_redraw()

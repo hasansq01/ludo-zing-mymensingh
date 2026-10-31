@@ -22,6 +22,7 @@ extends RefCounted
 ## Copy: "Teams (2 v 2)" is the team mode and "Help your teammate" its finishing rule; "pairs" are two of your own
 ## pawns joined (PLAN Decision 1).
 
+# l10n:begin
 const INFO := {
 	ind = {t = "Individual mode", b = [
 		"Everyone plays for themselves. There are no teams.",
@@ -76,8 +77,10 @@ const INFO := {
 		"A scene you buy is put to use straight away. Switch between your scenes with [b]Use[/b].",
 		"Not enough coins? Nothing is spent; the shop tells you how many more you need."]},
 }
+# l10n:end
 
 ## The Snakes & Ladders texts while the "Need a 1 to start" house rule is on (Settings, pref sl_need_one).
+# l10n:begin
 const INFO_NEED_ONE := {
 	slEntry = {t = "Entering the board", b = [
 		"Everyone starts off the board. You need to roll a [b]1[/b] to step onto square 1.",
@@ -89,6 +92,7 @@ const INFO_NEED_ONE := {
 		"A 6 gives you another roll. Three 6s in a row end your turn.",
 		"You need the exact roll to land on 100. A bigger roll leaves you where you are."]},
 }
+# l10n:end
 
 const MAX_SHOWINGS := 3                 # an unread icon pulses on at most this many showings
 const BEATS := 4                        # one showing pulses 4 beats of 1.5 s (infoPulse 1.5s × 4)
@@ -513,15 +517,16 @@ class Bubble extends CanvasLayer:
 		var col := UIKit.vbox(UIKit.SPACE.sm)
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(col)
-		var title := UIKit.label(str(d.get("t", "")), TITLE_FS, Palette.INK, UIKit.font_display())
+		var title := UIKit.label(tr(str(d.get("t", ""))), TITLE_FS, Palette.INK, UIKit.font_display())
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		title.add_theme_constant_override("line_spacing", -2)
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(UIKit.margin(title, 0, 1, 38, 0))
 		var f_body := UIKit.font_body(700)
 		var f_bold := UIKit.font_body(900)
-		_natural_w = UIKit.font_display().get_string_size(str(d.get("t", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FS).x + 38.0
-		for line: String in d.get("b", []):
+		_natural_w = UIKit.font_display().get_string_size(tr(str(d.get("t", ""))), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FS).x + 38.0
+		for src_line: String in d.get("b", []):
+			var line := tr(src_line)
 			var row := UIKit.hbox(0)
 			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			row.add_child(UIKit.bullet(Info.PLUM))
@@ -550,7 +555,7 @@ class Bubble extends CanvasLayer:
 		_natural_w += 2.0 * UIKit.SPACE.lg + 6.0 + 4.0      # card padding, border, ring
 		x_btn = UIKit.close_button("soft")
 		x_btn.name = "Close"
-		x_btn.tooltip_text = "Close"
+		x_btn.tooltip_text = tr("Close")
 		x_btn.pressed.connect(func() -> void: Info.close())
 		holder.add_child(x_btn)
 		caret = Control.new()

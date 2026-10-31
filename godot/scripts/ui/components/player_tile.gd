@@ -77,7 +77,7 @@ func _init(color_index_ := 0, side_ := "left") -> void:
 	_name = UIKit.label("", UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_cpu_tag = _small_tag("CPU", Palette.INK, Color.WHITE)
+	_cpu_tag = _small_tag(tr("CPU"), Palette.INK, Color.WHITE)
 	var nrow := UIKit.hbox(UIKit.SPACE.xs)
 	nrow.alignment = BoxContainer.ALIGNMENT_CENTER
 	nrow.add_child(_name)
@@ -127,7 +127,7 @@ func set_player(name_: String, kind_: String, cpu_id_ := "") -> void:
 	_ava = make_avatar(color_index, kind, AVA, cpu_id if cpu_id != "" else name_)
 	add_child(_ava)
 	move_child(_ava, 0)
-	_name.text = name_
+	_name.text = L10n.seat_name(name_)
 	_cpu_tag.visible = kind == "cpu"
 	_refresh_symbol()
 	_layout()
