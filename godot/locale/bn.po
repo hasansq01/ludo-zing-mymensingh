@@ -1,0 +1,13 @@
+# Ludo Zing: the Bangla interface text.
+# msgid = the English text in the scripts; msgstr = the Bangla shown when the phone (or Settings) picks বাংলা.
+# Each entry: #. where it is shown, #: the script lines, # notes for the reviewer.
+# Keep %s / %d placeholders in the same order, digits Latin, "Ludo Zing" in Latin letters.
+# Regenerate with: godot --headless --path godot -s res://tools/l10n_sync.gd (keeps every translation).
+msgid ""
+msgstr ""
+"Project-Id-Version: Ludo Zing\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: bn\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"

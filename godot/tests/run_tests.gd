@@ -55,6 +55,7 @@ const SUITES := [
 	"res://tests/test_sheet_stack.gd",
 	"res://tests/test_crash_watch.gd",
 	"res://tests/test_pair_online.gd",
+	"res://tests/test_l10n.gd",
 ]
 
 ## Suites whose run() is a coroutine that the runner waits for (the others run to their first wait, as before).
@@ -62,6 +63,7 @@ const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_sta
 
 func _initialize() -> void:
 	await process_frame                       # the info-bubble checks need a live scene tree
+	TranslationServer.set_locale("en")        # the checks read English UI text, whatever this computer's language
 	var failed := 0
 	var total := 0
 	for path in SUITES:

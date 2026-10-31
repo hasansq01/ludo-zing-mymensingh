@@ -47,6 +47,11 @@ enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/billing
 pointing/emulate_touch_from_mouse=false
 pointing/emulate_mouse_from_touch=true
 
+[internationalization]
+
+locale/translations=PackedStringArray("res://locale/bn.po")
+locale/fallback="en"
+
 [ludo_zing]
 
 push/project_id="ludo-zing-a1b7c"

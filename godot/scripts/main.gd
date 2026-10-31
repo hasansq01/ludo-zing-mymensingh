@@ -74,6 +74,7 @@ func _ready() -> void:
 	PerfOverlay.install(self)                # debug builds only: --perf / three-finger tap / F3
 	Engine.max_fps = Quality.game_fps()      # the splash bar and the first frames run smooth
 	speed = float(Save.prefs.speed)
+	L10n.apply(Save.prefs.lang)              # the interface language (Settings; Auto: the phone's), before any text
 	_apply_sound()
 	account = Account.new()                  # guest sign-in, wallet, claims; started after the splash (_start_account)
 	account.name = "Account"
@@ -284,13 +285,7 @@ func _until_quiet(sec: float) -> void:
 		await get_tree().process_frame
 
 func _build_screens() -> void:
-	home = HomeScreen.new()
-	home.name = "Home"
-	screens.add_child(home)
-	home.open_tab.connect(_on_tab)
-	home.play_game.connect(_open_setup)          # the game cards: (game "ludo" | "sl", mode "cpu" | "local") -> setup
-	home.continue_match.connect(continue_match)
-	home.game_switched.connect(_on_game_switched)  # Ludo / Snakes & Ladders: the backdrop follows
+	_new_home()
 	hud = LudoHUD.new()
 	hud.name = "LudoHUD"
 	hud.visible = false
@@ -314,6 +309,17 @@ func _build_screens() -> void:
 	online.name = "Online"
 	add_child(online)
 	_on_resize()
+
+
+## A fresh HomeScreen, wired, as `home` (the first one, or the one that replaces it in set_language).
+func _new_home() -> void:
+	home = HomeScreen.new()
+	home.name = "Home"
+	screens.add_child(home)
+	home.open_tab.connect(_on_tab)
+	home.play_game.connect(_open_setup)          # the game cards: (game "ludo" | "sl", mode "cpu" | "local") -> setup
+	home.continue_match.connect(continue_match)
+	home.game_switched.connect(_on_game_switched)  # Ludo / Snakes & Ladders: the backdrop follows
 
 
 # ---------- layout, frame rate ----------
@@ -876,13 +882,44 @@ func _home_side(id: String) -> Control:
 func toast(text: String) -> void:
 	Toast.show(ui_root, text)
 
-func open_settings() -> void:
+func open_settings() -> SettingsSheet:
 	var s := SettingsSheet.new()
 	s.prefs_changed.connect(_on_prefs_changed)
+	s.language_picked.connect(set_language)
 	if screen in ["ludo", "sl"]:               # opened from a game: computer turns wait
 		paused = true
 		s.closed.connect(func(): paused = _pause_sheet != null)
 	s.open(sheet_layer)
+	return s
+
+## Settings' language switch (pref "auto" | "en" | "bn", Save.prefs.lang). Text made with tr() keeps the language
+## it was made in, so what is on screen is built again: Home (a fresh HomeScreen in the old one's place) and the
+## open sheets (all closed; Settings opens again, over the pause menu when in a game). Local
+## notifications are planned again in the new language. In a match, the HUD's turn lines, toasts and every sheet
+## opened later follow at once; its few fixed labels (seat names, buttons) follow from the next match.
+func set_language(pref: String) -> void:
+	Save.prefs.lang = pref if pref in L10n.LANGS else "auto"
+	Save.save()
+	var before := L10n.lang()
+	if L10n.apply(Save.prefs.lang) == before:
+		return
+	var in_game := screen in ["ludo", "sl"]
+	var had_pause := _pause_sheet != null
+	close_all_sheets()
+	Info.close()
+	var old := home
+	var at := old.get_index()
+	old.name = "HomeOld"
+	_new_home()
+	screens.move_child(home, at)
+	home.visible = old.visible
+	old.queue_free()
+	online._wire_home()
+	_on_resize()
+	_set_screen(screen)
+	if in_game and had_pause:
+		open_pause()
+	open_settings()                              # (the Language row is near its top)
 
 func _on_prefs_changed() -> void:
 	speed = float(Save.prefs.speed)

@@ -1,6 +1,8 @@
 class_name SettingsSheet
 extends Sheet
 ## Settings (index.html #settingsSheet; PM look with the "Settings" ribbon and the single close X). Sections:
+##   Language       Auto (<the phone's>) / English / বাংলা (Save.prefs.lang; Main.set_language switches and rebuilds
+##                  the screen, this sheet included)
 ##   Sound & vibration  Sound on / off, Music / Effects volume ("70%"), Vibration on / off (no master slider: Save
 ##                      folded the old master level into the two channels once, Save.prefs.vol.master stays 100)
 ##   Game           Game speed (Relaxed / Fast), Graphics (Auto (<detected>) / Low / Medium / High: Save.prefs.quality,
@@ -22,6 +24,7 @@ extends Sheet
 ## label toggles it too.
 
 signal prefs_changed
+signal language_picked(pref: String)     ## "auto" | "en" | "bn" (main switches the language and reopens Settings)
 
 const VERSION_LINE := "Ludo Zing Mymensingh · v%s · Flipfold Studio"
 ## Web pages for the Help rows. A row shows only when its URL is set (no dead "Coming soon" rows).
@@ -65,6 +68,10 @@ func _build() -> void:
 	if acc != null and acc.enabled:
 		_caption("Account")
 		_group().add_child(_account_line(acc))
+
+	# --- Language
+	_caption("Language")
+	_group().add_child(_language_line())
 
 	# --- Sound
 	_caption("Sound & vibration")
@@ -354,6 +361,31 @@ func _graphics_line() -> Control:
 	v.add_child(seg)
 	_gfx_hint(Quality.saved_pref())
 	return row
+
+## Language: Auto (the phone's language, named in itself) / English / বাংলা, the full row wide. Each language is
+## named in its own script, so it can be found whatever the interface shows now.
+func _language_line() -> Control:
+	var row := Row.new()
+	row.name = "Language"
+	row.custom_minimum_size.y = ROW_H
+	var opts := [["auto", "Auto (%s)" % L10n.NATIVE[L10n.phone()]], ["en", L10n.NATIVE.en], ["bn", L10n.NATIVE.bn]]
+	var seg := UIKit.segmented(opts, str(Save.prefs.get("lang", "auto")), _on_language, "sm")
+	seg.name = "LanguageSeg"
+	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	seg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UIKit.fit_segmented(seg)
+	row.add_child(seg)
+	return row
+
+## Main switches the language and opens Settings again; on its own (previews) the sheet switches and rebuilds itself.
+func _on_language(v: Variant) -> void:
+	if language_picked.get_connections().size():
+		language_picked.emit(str(v))
+		return
+	Save.prefs.lang = str(v)
+	Save.save()
+	L10n.apply(v)
+	_build()
 
 ## The launch note under Graphics: only when the pick changes something read at startup (Quality.needs_restart).
 func _gfx_hint(t: String) -> void:
