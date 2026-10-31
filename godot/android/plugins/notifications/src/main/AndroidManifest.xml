@@ -49,6 +49,17 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="game" />
 
+        <!-- share(): serves the picture in the share sheet to the app the player picks (a read grant per share) -->
+        <provider
+            android:name="com.flipfold.ludozing.notifications.ShareFileProvider"
+            android:authorities="${applicationId}.lzshare"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/lz_share_paths" />
+        </provider>
+
         <!-- FirebaseInitProvider (firebase-common) is removed by the export plugin (app manifest, so the removal wins
              the merge): there is no google-services.json, FirebaseApp is initialised by push_init() instead. -->
     </application>

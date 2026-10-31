@@ -73,6 +73,7 @@ Logcat tag `Notifications`: `plugin loaded: sdk 35, permission ask, 0 scheduled,
 | --- | --- |
 | `permission_state(): String` | `granted` \| `denied` \| `ask` \| `unsupported` (synchronous). `ask` = the system dialog can be shown (never asked, or refused once: Android 13+ allows a second ask). `denied` = it can't any more, or the app's notifications are off in the settings. Below Android 13: `granted` unless they are off (`denied`). |
 | `request_permission()` | `permission_result(granted)`; at once below Android 13 or when already granted. |
+| `share(text, image_path): bool` | The system share sheet (`Share.kt`: `ACTION_SEND` + `createChooser`). `image_path` is an absolute PNG path ("" = text only); it is copied to `cache/lz_share/` and served by `ShareFileProvider` (authority `<applicationId>.lzshare`, own provider: Godot's template declares none). Returns true when the chooser was started. GDScript side: `scripts/net/share.gd` (falls back to the clipboard; detects the method with `has_java_method`). Not in the Android Emulator preset (no plugin there). |
 | `schedule(id, at_unix: long, channel, title, body, link)` | none (replaces the same id) |
 | `cancel(id)`, `cancel_all()` | none (local only) |
 | `scheduled(): PackedStringArray` | ids still to come |

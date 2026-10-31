@@ -55,4 +55,6 @@ dependencies {
     // GoogleApiAvailability: a runtime dependency of firebase-messaging 26.0.1 (same version), so the app has it
     // anyway; only compiled against here.
     compileOnly "com.google.android.gms:play-services-base:18.9.0"
+    // FileProvider (the share picture): the app has androidx.core through the Godot template's AndroidX libraries.
+    compileOnly "androidx.core:core:1.9.0"
 }

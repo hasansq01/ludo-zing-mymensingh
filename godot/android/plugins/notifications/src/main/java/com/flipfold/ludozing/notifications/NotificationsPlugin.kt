@@ -184,6 +184,21 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
         }
     }
 
+    // ---------- share ----------
+
+    /**
+     * The system share sheet with [text] and, when [imagePath] (an absolute path to a PNG) is not empty, that picture.
+     * Returns true when the chooser is being started (the player may still cancel it), false when there is no activity.
+     */
+    @UsedByGodot
+    fun share(text: String, imagePath: String): Boolean {
+        val act = activity ?: return false
+        runOnUiThread {
+            guard("share") { Share.send(act, text, imagePath) }
+        }
+        return true
+    }
+
     override fun onMainRequestPermissionsResult(requestCode: Int, permissions: Array<String>?, grantResults: IntArray?) {
         super.onMainRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != RC_PERMISSION) return

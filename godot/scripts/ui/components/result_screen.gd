@@ -4,7 +4,7 @@ extends Control
 ## win the winner's avatar with a crown in a burst of gold rays; on a loss your own avatar with your place badge
 ## ("You finished 3rd", soft rays), the .pm card with the title ribbon, the finish order (1st–4th: place badges, avatars, names, a teal check + "Finished"
 ## or the progress of the unfinished), the rewards (coins counting up, XP filling the Meter, "Level up!") and the
-## buttons Play again (honey, lg) and Home (ghost). Back = Home. Confetti only when the human (or their team) won.
+## buttons Play again (honey, lg), Share (teal; a win or a podium finish only) and Home (ghost). Back = Home. Confetti only when the human (or their team) won.
 ##
 ##   var r := ResultScreen.new({
 ##       game = "ludo",                     # "ludo" | "sl"
@@ -31,7 +31,8 @@ extends Control
 ## line says "Includes +38 house bonus"); a refund says "Entry 100 refunded"; a payout of 0 without a refund says
 ## "Entry 100 lost"; ended = "away" adds "The match ended while everyone was away: places by progress."; a payout > 0 with a video available offers
 ## "Double it with a video" (AdFlow "double", ref = match_id; the server grants the same payout again) and toasts the
-## extra coins. Tests and previews: data.ads (bool) replaces AdFlow.available(), flow (an AdFlow) a new AdFlow.
+## extra coins. Share draws the WinCard (your avatar, name, place, coins, game, the logo) and opens the phone's share
+## sheet with it (Share; without one the text is copied). Tests and previews: data.ads (bool) replaces AdFlow.available(), flow (an AdFlow) a new AdFlow.
 
 signal play_again
 signal home
@@ -50,6 +51,7 @@ var title_ribbon: Control
 var content: VBoxContainer
 var again_button: Button
 var home_button: Button
+var share_button: Button                 ## a win, or 2nd of 4 with coins: draws the WinCard and opens the share sheet
 var double_button: Button                ## coin table, prize > 0, a video can run: "Double it with a video"
 var table_note: Label                    ## coin table, no prize: "Entry 100 lost" / "Entry 100 refunded"
 var bonus_note: Label                    ## coin table, bonus > 0: "Includes +38 house bonus"
@@ -72,6 +74,8 @@ var _level_up: Control
 var _buttons: VBoxContainer
 var _closing := false
 var _done := false
+var _sharing := false
+var _extra := 0                          # coins the "double" video added (the shared card counts them)
 
 static var _blur: Shader
 
@@ -330,6 +334,11 @@ func _build() -> void:
 	again_button = UIKit.btn("Play again", "honey", "lg")
 	again_button.pressed.connect(_pick.bind("again"))
 	_buttons.add_child(again_button)
+	if can_share():
+		share_button = UIKit.btn("Share", "teal", "md")
+		share_button.name = "Share"
+		share_button.pressed.connect(share)
+		_buttons.add_child(share_button)
 	home_button = UIKit.btn("Home", "ghost", "md")
 	home_button.pressed.connect(_pick.bind("home"))
 	_buttons.add_child(home_button)
@@ -417,6 +426,7 @@ func _double() -> void:
 		var extra := int(info.get("amount", table_payout()))
 		double_button.text = "Doubled!"
 		Toast.show(self, "+%s coins" % Fmt.coins_full(extra), null, 2.0, "coin")
+		_extra += extra
 		doubled.emit(extra)
 		return
 	double_button.text = "Double it with a video"
@@ -708,6 +718,8 @@ func _play() -> void:
 		r.modulate.a = 0.0
 	again_button.disabled = true
 	home_button.disabled = true
+	if share_button:
+		share_button.disabled = true
 	var tw := create_tween()
 	tw.tween_property(_backdrop, "modulate:a", 1.0, 0.25)
 	await tw.finished
@@ -752,6 +764,8 @@ func _play() -> void:
 	if not _alive():
 		return
 	home_button.disabled = false
+	if share_button:
+		share_button.disabled = _sharing
 	again_button.disabled = is_online() and not bool(data.get("host", false))
 	await _count_rewards()
 	_done = true
@@ -798,6 +812,43 @@ func _after_rewards(reward: int) -> void:
 		await _wait(0.25)
 		if _alive():
 			CoinFly.run(self, coins.coin_center(), target, reward, Callable(), int(data.get("coin_total", -1)))
+
+## The Share button shows for a win, and for 2nd place of a four-player game that paid coins (a podium finish): 3rd and
+## 4th, losses, teams' runners-up and Pass & Play (no "you") have nothing to brag about.
+func can_share() -> bool:
+	var me := you()
+	if me.is_empty():
+		return false
+	var place := int(me.get("place", 0))
+	if bool(data.get("human_won", false)):
+		return place == 1
+	return place == 2 and not is_teams() and standings().size() >= 4 and int(data.get("reward", 0)) > 0
+
+## The coins the card and the text name: the prize, plus what the "double" video added.
+func share_coins() -> int:
+	return int(data.get("reward", 0)) + _extra
+
+## What the card says: your name, the place, the title, the coins, the game (the live profile supplies the avatar).
+func card_data() -> Dictionary:
+	var n := str(Save.profile.get("name", ""))
+	return {name = n if n != "" else "You", place = int(you().get("place", 1)), title = title_text(), coins = share_coins(),
+		game = str(data.get("game", "ludo"))}
+
+## Draws the WinCard once and opens the share sheet with it and the text ("I just won 228 coins in Ludo Zing! ...");
+## with no share sheet the text is copied and a toast says so. Coroutine; the button waits meanwhile.
+func share() -> void:
+	if _sharing or _closing or share_button == null:
+		return
+	_sharing = true
+	share_button.disabled = true
+	var cd := card_data()
+	var path := ""
+	if Share.available():
+		path = await WinCard.render(self, cd)
+	if is_instance_valid(self) and not _closing:
+		Share.send(self, Share.win_text(int(cd.coins), str(cd.game), int(cd.place)), path)
+		share_button.disabled = false
+	_sharing = false
 
 func _wait(sec: float) -> void:
 	if is_inside_tree():

@@ -1,7 +1,7 @@
 class_name LobbySheet
 extends Sheet
-## A friends room before the match (PROTOCOL.md `lobby`): the big room code with Copy and Share (Share copies an
-## invite line; Android has no share intent from here), the game (Ludo / Snakes & Ladders: lobby.settings.game),
+## A friends room before the match (PROTOCOL.md `lobby`): the big room code with Copy and Share (Share opens the
+## phone's share sheet with an invite line, or copies it where there is none), the game (Ludo / Snakes & Ladders: lobby.settings.game),
 ## the members in join order (avatar, level, name, online dot, the seat colour they will play), the house rules
 ## (Ludo only, one grouped card as in Settings) and the way out. All but the way out scroll; on a phone 4 members and
 ## the rules don't fit, so the sheet shows the scroll_hint chevron while there is more below.
@@ -179,7 +179,7 @@ func _code_card() -> Control:
 static func spaced(c: String) -> String:
 	return c.substr(0, 3) + " " + c.substr(3) if c.length() == 6 else c
 
-## The line Share copies.
+## The room line of the invite (Share adds the store link).
 static func invite_text(c: String) -> String:
 	return "Join my Ludo Zing room: %s" % c
 
@@ -385,9 +385,10 @@ func copy_code() -> void:
 	DisplayServer.clipboard_set(code)
 	Toast.show(self, "Code copied", null, 1.6, "info")
 
-func share() -> void:
-	DisplayServer.clipboard_set(invite_text(code))
-	Toast.show(self, "Invite copied. Paste it in a chat.", null, 2.0, "info")
+## The phone's share sheet with the invite (room line and store link); without one, copied with a toast. Returns
+## "shared" | "copied" (Share.send).
+func share() -> String:
+	return Share.send(self, Share.invite_text(code))
 
 
 ## The green / grey presence dot on an avatar's corner.
