@@ -1,6 +1,7 @@
 // Public pages linked from Google Play and the game: the privacy policy (/privacy) and how to have an account deleted
 // (/delete-account). Plain HTML, no scripts, no tracking; the text describes what src/ actually stores (see the D1
-// migrations) and what the Android build's SDKs (AdMob, Play Billing, Firebase Messaging, Play Games) collect.
+// migrations) and what the Android build's SDKs (LevelPlay with ironSource Ads and Unity Ads, AdMob, Play Billing,
+// Firebase Messaging, Play Games) collect.
 
 const CONTACT = "Hello@oclasp.com";
 const UPDATED = "26 October 2026";
@@ -52,7 +53,7 @@ Questions: <a href="mailto:${CONTACT}">${CONTACT}</a>.</p>
   so we can check the purchase with Google and handle refunds. We never see your card or payment details; Google
   Play handles payment.</li>
   <li><b>Rewarded videos.</b> When you choose to watch a video for a reward, a one-time code and the reward granted.
-  The ads themselves are served by Google AdMob (see below).</li>
+  The ads themselves are served by Unity LevelPlay (ironSource Ads and Unity Ads) or Google AdMob (see below).</li>
   <li><b>Notifications.</b> If you allow notifications: your device's Firebase push token, your notification choices
   (game alerts, news and offers) and your time-zone offset, so reminders don't arrive at night.</li>
   <li><b>Crash reports.</b> When the app closes unexpectedly, it sends a diagnostic report (device model, Android version, memory use, which screen was open and the app's own log) that we use only to fix crashes and keep for 90 days.</li>
@@ -79,6 +80,11 @@ communicate only with preset emotes.</p>
   and the advertising ID to show and measure ads; in the EEA and UK the game asks for consent first, and
   "Privacy choices" in Settings lets you change it. See
   <a href="https://policies.google.com/technologies/partner-sites">how Google uses information from apps</a>.</li>
+  <li><b>Unity LevelPlay, ironSource Ads and Unity Ads</b> (Unity Technologies) show rewarded videos only when you
+  tap to watch one. They collect device information (such as the device model, Android version and network), the
+  advertising ID and app set ID, an approximate location worked out from your IP address, and which ads were shown,
+  to show, measure and check the quality of ads. The same consent and "Privacy choices" apply. See
+  <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy">Unity's privacy policy for players</a>.</li>
   <li><b>Google Play</b> (billing, Play Games sign-in) and <b>Firebase Cloud Messaging</b> (notifications), under
   <a href="https://policies.google.com/privacy">Google's privacy policy</a>.</li>
   <li><b>Cloudflare</b> hosts our servers and database.</li>

@@ -5,8 +5,9 @@ extends EditorExportPlugin
 ## For an Android preset with the export option "plugins/levelplay" on and "Use Gradle Build" on, it adds:
 ## - the plugin AAR (bin/debug or bin/release, built by tools/build-levelplay-plugin.sh). Its own manifest brings the
 ##   plugin registration (singleton "LevelPlay") and the AD_ID permission,
-## - the Maven dependencies: the LevelPlay SDK (com.unity3d.ads-mediation:mediation-sdk, ironSource Ads only: no
-##   mediation adapters), Google's UMP consent SDK and the Play services LevelPlay asks for (app set id, ads id),
+## - the Maven dependencies: the LevelPlay SDK (com.unity3d.ads-mediation:mediation-sdk: ironSource Ads), the Unity Ads
+##   adapter (it brings the Unity Ads SDK), Google's UMP consent SDK and the Play services LevelPlay asks for (app set
+##   id, ads id),
 ## - the <meta-data com.flipfold.ludozing.levelplay.APP_KEY> element in <application>, with the value of the project
 ##   setting ludo_zing/ads/levelplay_app_key (the plugin reads it to start the SDK),
 ## - when the AdMob plugin is off for the preset: <meta-data com.google.android.gms.ads.APPLICATION_ID> from
@@ -34,6 +35,11 @@ const DEFAULTS := {
 ## Keep in sync with levelPlayVersion / umpVersion in godot/android/plugins/levelplay/build.gradle.
 const LEVELPLAY_DEPENDENCY := "com.unity3d.ads-mediation:mediation-sdk:9.7.0"
 const UMP_DEPENDENCY := "com.google.android.ump:user-messaging-platform:4.0.0"
+## Mediation adapters, one per network turned on in the LevelPlay dashboard (Setup > Networks). Unity Ads: adapter
+## 5.15.0, which depends on com.unity3d.ads:unity-ads 4.21.0.
+const ADAPTER_DEPENDENCIES := [
+	"com.unity3d.ads-mediation:unityads-adapter:5.15.0",
+]
 ## LevelPlay's integration guide (step 2): the app set id and the advertising id.
 const PLAY_DEPENDENCIES := [
 	"com.google.android.gms:play-services-appset:16.1.0",
@@ -84,7 +90,7 @@ func _get_android_libraries(platform: EditorExportPlatform, debug: bool) -> Pack
 func _get_android_dependencies(platform: EditorExportPlatform, debug: bool) -> PackedStringArray:
 	if not _active():
 		return PackedStringArray()
-	return PackedStringArray([LEVELPLAY_DEPENDENCY, UMP_DEPENDENCY] + PLAY_DEPENDENCIES)
+	return PackedStringArray([LEVELPLAY_DEPENDENCY, UMP_DEPENDENCY] + ADAPTER_DEPENDENCIES + PLAY_DEPENDENCIES)
 
 func _get_android_manifest_application_element_contents(platform: EditorExportPlatform, debug: bool) -> String:
 	if not _active():

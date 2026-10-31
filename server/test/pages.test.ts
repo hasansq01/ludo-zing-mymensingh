@@ -16,6 +16,11 @@ describe("public pages", () => {
     expect((await SELF.fetch("https://x/privacy", { method: "POST" })).status).toBe(405);
   });
 
+  it("/privacy names the rewarded-video networks", async () => {
+    const t = await (await SELF.fetch("https://x/privacy")).text();
+    for (const n of ["Unity LevelPlay", "ironSource Ads", "Unity Ads", "Google AdMob", "advertising ID"]) expect(t).toContain(n);
+  });
+
   it("/privacy says what the crash report holds and how long it is kept", async () => {
     const t = await (await SELF.fetch("https://x/privacy")).text();
     expect(t).toContain(

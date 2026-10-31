@@ -2,7 +2,7 @@
 
 Godot Android v2 plugin, Kotlin, Engine singleton **`LevelPlay`**. Unity LevelPlay mediation SDK
 (`com.unity3d.ads-mediation:mediation-sdk` 9.7.0, ad-unit API: `LevelPlay.init`, `LevelPlayRewardedAd`) with
-**ironSource Ads only** (no mediation adapters yet), and Google's UMP consent SDK (`user-messaging-platform` 4.0.0,
+**ironSource Ads** and the **Unity Ads** adapter (`unityads-adapter` 5.15.0, set in `export_plugin.gd`), and Google's UMP consent SDK (`user-messaging-platform` 4.0.0,
 the same form as the AdMob plugin). Rewarded ads only, shown only inside `show_rewarded()`. Contract:
 `server/ECONOMY_V1.md` section 5. GDScript wrapper: `godot/scripts/net/ads.gd` (`Ads`).
 
