@@ -19,7 +19,7 @@ PLAY YOUR WAY
 
 TWO CLASSIC GAMES
 - Ludo for 2 to 4 players, with Pair rules: land two pawns together to block single opponents. Play on after the first finish to decide 2nd, 3rd and 4th place.
-- Snakes & Ladders with colourful 3D snakes and ladders. Climb, slide and race to square 100.
+- Snakes & Ladders on a colourful painted board. Climb the ladders, watch out for hungry snakes and race to square 100.
 
 A CAFE FOR EVERY MOOD
 - Play in several cafe rooms and Snakes & Ladders scenes, from a cozy cafe to a jungle clearing and a frosty wonderland.

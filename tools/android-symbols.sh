@@ -10,8 +10,9 @@
 # with the ABI folders at the zip root as Play expects.
 #
 # Usage: tools/android-symbols.sh [--symtab] [--abi <abi>]
-#   --symtab     strip DWARF, keep the symbol table: function names but no file / line numbers (54 MB for both ABIs
-#                instead of 367 MB; Play reportedly refuses symbol files over 300 MB).
+#   --symtab     keep only the symbol table and the BuildId: function names but no file / line numbers, and no code
+#                sections (llvm-objcopy --only-keep-debug --strip-debug): ~7 MB for both ABIs instead of 367 MB, small
+#                enough for a browser upload (Play reportedly refuses symbol files over 300 MB).
 #   --abi <abi>  only this ABI (e.g. arm64-v8a: full symbols ~195 MB), default: every ABI the preset exports.
 # Upload: Play Console > Test and release > App bundle explorer (or Latest releases and bundles) > the bundle with
 # this version code > Downloads > Assets > Native debug symbols > upload. Once per uploaded AAB (every version code).
@@ -83,7 +84,7 @@ if [ "$SYMTAB" -eq 1 ]; then
 	ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
 	OBJCOPY="$(ls "$ANDROID_HOME"/ndk/*/toolchains/llvm/prebuilt/*/bin/llvm-objcopy 2>/dev/null | tail -1)"
 	[ -x "$OBJCOPY" ] || { echo "android-symbols: llvm-objcopy not found under $ANDROID_HOME/ndk" >&2; exit 1; }
-	for so in "$TMP"/syms/*/*.so; do "$OBJCOPY" --strip-debug "$so"; done
+	for so in "$TMP"/syms/*/*.so; do "$OBJCOPY" --only-keep-debug --strip-debug "$so"; done
 fi
 
 OUT="$REPO/build/android/native-debug-symbols-$CODE.zip"
