@@ -41,6 +41,7 @@ signal emote(msg: Dictionary)            ## another member's emote {c, id} (lobb
 signal reroll_offer(msg: Dictionary)     ## your bad roll may be rolled again {n, until, now, free, gems, cost} (ECONOMY_V1.md 4)
 signal hold(msg: Dictionary)             ## the next roll waits for colour c's re-roll {c, until}
 signal rerolled(msg: Dictionary)         ## colour c rolled again {c, paid}; a `sync` and the new roll's `act` follow
+signal rematch(msg: Dictionary)          ## the Play again vote {by, until, now, players [{id, name, avatar, frame, vote}], result?, ffa?}
 
 const PROD_URL := "wss://ludo-zing-rooms.flipfold.workers.dev"
 const VERSION := 1
@@ -54,7 +55,8 @@ const CHECK_EVERY := 3                   ## while reconnecting, ask GET /v1/room
 const CODE_LEN := 6
 const ALPHABET := "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 const FATAL := ["version", "not_found", "full", "started", "banned"]   ## errors that end the connection attempt
-const REMOVED := ["kicked", "banned"]    ## an admin removed us from the room (even mid-match): never reconnect
+## we are out of the room (an admin, even mid-match; a Play again vote that closed without our yes): never reconnect
+const REMOVED := ["kicked", "banned", "rematch_out"]
 const NAME_MAX := 16
 
 var url_base := ""                       ## ws(s)://host[:port], no trailing slash (resolve_url() when empty)
@@ -202,6 +204,8 @@ static func error_text(code_: String) -> String:
 			return L10n.t("You can’t play online right now.")
 		"kicked":
 			return L10n.t("You were removed from the room.")
+		"rematch_out":
+			return L10n.t("The others started a new game.")
 		"session":
 			return L10n.t("We couldn’t sign you in. Check your internet and try again.")
 		"replaced":
@@ -547,6 +551,9 @@ func handle(msg: Dictionary) -> void:
 			hold.emit(msg)
 		"rerolled":
 			rerolled.emit(msg)
+		"rematch":
+			_take_server_now(msg)                 # (its countdown runs on the server clock)
+			rematch.emit(msg)
 		"pong":
 			var now := Time.get_unix_time_from_system() * 1000.0
 			if _ping_at > 0.0:

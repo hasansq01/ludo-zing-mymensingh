@@ -9,12 +9,15 @@ extends Node
 ##                           coins" sheet first), then "Finding players…", then the match
 ##   try_resume()            after launch: a room kept in Save.prefs.net_room is taken back (lobby or match)
 ##   leave()                 Leave match / Home from the result / Leave in the lobby
-##   rematch()               the result's Play again: the host's rematch (friend rooms), queue again (quick match)
-##   is_host()               the result may offer Play again (the host of a friend room; anyone in a quick room)
+##   rematch()               the result's Play again (and Play on its prompt): a yes in the friend room's vote; queue
+##                           again in a quick match
+##   can_rematch()           the result may offer Play again (anyone in a room)
+##   is_host()               the host of a friend room, or anyone in a quick room
 ## and uses on main: start_online(msg, net) (Ludo: enter the Ludo screen with the server's start / sync),
 ## _enter_sl() + sl.start_online(msg, net) (Snakes & Ladders; start_online_sl(msg, net) when main has it),
-## online_host_changed(can_rematch) and online_closed(). When main has a `home` with the quick_match /
-## play_friends signals, Online listens to them itself.
+## online_host_changed(can_rematch), online_vote(vote) (when main has it: true when a result shows the vote, or will
+## when it opens) and online_closed(). When main has a `home` with the quick_match / play_friends signals, Online
+## listens to them itself.
 ## state: "idle" | "joining" | "resuming" | "lobby" | "searching" | "match" | "over".
 ## Quick match: the matchmaker's `matched` joins the room with its token (NetClient.join(code, token, true)); no lobby
 ## comes; at `start` the sheet reveals the players, then the match opens (room messages meanwhile are held and
@@ -27,6 +30,13 @@ extends Node
 ## reroll_closed, gems) to its net_error.
 ## Emotes (server/EMOTES.md): another member's {t: "emote", c, id} goes to the match's net_emote while it is up
 ## (dropped while it opens: a reaction is only worth showing now); emote_locked / emote_rate are ignored quietly.
+## Play again in friend rooms (server/PROTOCOL.md "Play again"; the server runs the vote, this only shows it): Play
+## again sends `rematch` (a yes; the first opens the vote). Every `rematch` message is kept in `vote` and shown by the
+## result screen (main.online_vote; the prompt "Rafi wants to play again" with Play / Leave for those still deciding,
+## the ticks, the countdown), by the lobby sheet for someone who joined meanwhile, and elsewhere by a small prompt
+## sheet. Leave is `leave` (a no): home, with a toast naming the code to come back with. At the close: "go" -> the
+## next `start` (a free-for-all toast when Teams fell back, ffa); "few" -> the yes-sayer is back in the lobby (its
+## note says why); anyone left out gets error rematch_out: home, with a toast.
 
 signal state_changed(state: String)
 
@@ -43,6 +53,7 @@ var lobby_sheet: LobbySheet
 var quick_sheet: QuickSheet
 var game := "ludo"                         ## the game of the room we are in (or joining)
 var quick_cfg := {}                        ## {game, players, table} of the last quick search (Play again queues it again)
+var vote := {}                             ## the Play again vote as the server last sent it ({} = none open)
 var last_tables := {}                      ## the last GET /v1/tables answer (the picker's flags, the broke bonus)
 var broke_sheet: BrokeSheet
 var coins_fn := Callable()                 ## tests, dev: () -> int in place of Save.profile.coins (the broke check, the picker)
@@ -54,6 +65,8 @@ var _friends_game := "ludo"                # the game a room we create starts wi
 var _held: Array = []                      # [method, msg] for the match, held while it opens / the players reveal
 var _holding := false
 var _stopped_in_bg := false                # a search was stopped because the app went to the background
+var _last_result := ""                     # the result of the last vote that closed ("go" | "few"; "" while open)
+var _prompt: Sheet                         # the Play again prompt shown elsewhere (_vote_prompt)
 
 func _init(app_: Node = null, client: NetClient = null) -> void:
 	app = app_
@@ -80,6 +93,7 @@ func _ready() -> void:
 	net.reroll_offer.connect(func(m: Dictionary): _deliver("net_reroll_offer", m))
 	net.hold.connect(func(m: Dictionary): _deliver("net_hold", m))
 	net.rerolled.connect(func(m: Dictionary): _deliver("net_rerolled", m))
+	net.rematch.connect(_on_rematch)
 	net.error.connect(_on_error)
 	net.status_changed.connect(_on_status)
 	quick_q.queued.connect(_on_queued)
@@ -110,9 +124,13 @@ func in_match() -> bool:
 func in_quick() -> bool:
 	return net.quick and net.in_room()
 
-## The result may offer Play again: the host of a friend room, anyone in a quick room (it queues again).
+## The host of a friend room; anyone in a quick room.
 func is_host() -> bool:
 	return net.is_host() or net.quick
+
+## The result may offer Play again: anyone in a room (friend rooms: a yes in the vote; quick rooms: queue again).
+func can_rematch() -> bool:
+	return net.quick or net.in_room()
 
 
 # ---------- friend rooms ----------
@@ -358,17 +376,23 @@ func _on_quick_failed(code: String, msg: String) -> void:
 
 # ---------- the room ----------
 
-## Leave the room for good (lobby, match or result). A search stops too.
+## Leave the room for good (lobby, match or result). A search stops too. Leaving while a Play again vote is open
+## (Leave on its prompt, Home) is a no: a toast names the room's code, to come back with later.
 func leave() -> void:
 	if quick_q.searching():
 		quick_q.cancel()
+	var code := net.code
+	if not vote.is_empty() and not net.quick and NetClient.valid_code(code):
+		toast(tr("You left the room. Join again later with code %s.") % LobbySheet.spaced(code))
+	vote = {}
 	net.leave()
 	_close_lobby()
 	_held.clear()
 	_holding = false
 	_set_state("idle")
 
-## The result's Play again: the host's rematch in a friend room; queue again with the same table in a quick room.
+## The result's Play again (or Play on its prompt): a yes in a friend room's vote (the server opens it, or counts it;
+## the next `start` replaces the result); queue again with the same table in a quick room.
 func rematch() -> void:
 	if net.quick:
 		var cfg := quick_cfg
@@ -384,8 +408,8 @@ func rematch() -> void:
 			return                             # can't pay or unlock that table now: the picker, to choose again
 		search(str(cfg.game), int(cfg.players), tbl)
 		return
-	if net.is_host():
-		net.send_msg({t = "start"})
+	if net.in_room():
+		net.send_msg({t = "rematch"})
 
 ## The table can be played now (level and coins, as the picker would say).
 func _table_playable(id: String, size: int) -> bool:
@@ -429,6 +453,7 @@ func _on_lobby(m: Dictionary) -> void:
 		lobby_sheet.update(m, net.is_host())
 
 func _on_start(m: Dictionary) -> void:
+	vote = {}
 	_close_lobby()
 	if is_instance_valid(friends):
 		friends.close()
@@ -488,6 +513,69 @@ func _on_emote(m: Dictionary) -> void:
 		return
 	_match_call("net_emote", m)
 
+## The Play again vote (every change, and its close): to the result (main.online_vote), the lobby sheet, or the
+## small prompt sheet when neither shows it.
+func _on_rematch(m: Dictionary) -> void:
+	if net.quick or state not in ["lobby", "over"]:
+		return
+	var res := str(m.get("result", ""))
+	var mine := vote_of(m, net.member_id)
+	_last_result = res
+	vote = m if res == "" else {}
+	if res == "few":
+		if mine == "yes":                     # nobody else is in: back in the lobby, as host, to invite friends
+			if app and app.has_method("go_home"):
+				app.call("go_home")
+			_set_state("lobby")
+			_open_lobby()
+			if is_instance_valid(lobby_sheet):     # (said in the lobby's note: a toast would cover its buttons)
+				lobby_sheet.set_notice(tr("Not enough players said yes. Invite friends with the code."))
+		return                                 # (the others: rematch_out follows)
+	if res == "go" and mine == "yes" and bool(m.get("ffa", false)):
+		toast(tr("Teams need 4 players: this game is everyone for themselves."), "info")
+	if is_instance_valid(lobby_sheet):
+		lobby_sheet.set_vote(m)
+	var shown := false
+	if app and app.has_method("online_vote"):
+		shown = bool(app.call("online_vote", m))
+	if not shown and state == "over" and res == "" and mine == "wait":
+		_vote_prompt(m)
+
+## Elsewhere in the app when the vote opens (no result to show it): a small sheet with Play / Leave. It goes away by
+## itself when the vote closes or a match starts (only a tap answers).
+func _vote_prompt(m: Dictionary) -> void:
+	if is_instance_valid(_prompt):
+		return
+	var by := vote_by_name(m)
+	var s := Sheet.make_confirm(tr("%s wants to play again") % by, tr("The next game starts with everyone who taps Play."), "Play", "Leave")
+	s.dismissable = false
+	(s.find_child("Yes", true, false) as Button).pressed.connect(rematch)
+	(s.find_child("No", true, false) as Button).pressed.connect(func():
+		leave()
+		if app and app.has_method("go_home"):
+			app.call("go_home"))
+	_prompt = s
+	s.open(_layer())
+	Haptics.medium()
+	state_changed.connect(func(_st: String):
+		if is_instance_valid(s) and not s.is_queued_for_deletion() and vote.is_empty():
+			s.close(), CONNECT_ONE_SHOT)
+
+## A member's answer in a vote message: "yes" | "no" | "wait", or "" when they aren't in it.
+static func vote_of(m: Dictionary, member_id: String) -> String:
+	for p: Dictionary in m.get("players", []) if m.get("players") is Array else []:
+		if NetClient.id_str(p.get("id", "")) == member_id:
+			return str(p.get("vote", "wait"))
+	return ""
+
+## The name of who asked first ("Player" when unknown).
+static func vote_by_name(m: Dictionary) -> String:
+	var by := NetClient.id_str(m.get("by", ""))
+	for p: Dictionary in m.get("players", []) if m.get("players") is Array else []:
+		if NetClient.id_str(p.get("id", "")) == by:
+			return L10n.seat_name(str(p.get("name", "Player")))
+	return L10n.seat_name("Player")
+
 func _on_error(m: Dictionary) -> void:
 	var code := str(m.get("code", ""))
 	if code in QUIET_EMOTE:
@@ -504,6 +592,16 @@ func _on_error(m: Dictionary) -> void:
 			return
 	if code in QUIET:
 		_match_call("net_error", m)
+		return
+	if code == "rematch_out" and state in ["lobby", "over"]:
+		# a Play again vote closed without our yes: out of the room (the code works again once it is open)
+		var c := LobbySheet.spaced(net.code) if NetClient.valid_code(net.code) else ""
+		toast(tr("The others started a new game. Join again later with code %s.") % c if str(_last_result) == "go" and c != ""
+			else tr("Not enough players wanted to play again."), "info")
+		vote = {}
+		_close_lobby()
+		_set_state("idle")
+		_closed()
 		return
 	if code in NetClient.REMOVED and state in ["lobby", "match", "over"]:
 		var why := str(m.get("msg", "")) if code == "banned" else ""
@@ -530,9 +628,10 @@ func _on_status(s: String) -> void:
 		lobby_sheet.set_status(s)
 	_match_call("net_status", s)
 
+## The result's Play again follows whether it can be offered (main.online_host_changed).
 func _host_changed() -> void:
 	if app and app.has_method("online_host_changed"):
-		app.call("online_host_changed", is_host())
+		app.call("online_host_changed", can_rematch())
 
 ## The room is gone under us: back home (main.online_closed for Ludo; an S&L match goes home here when main
 ## doesn't know about it).
