@@ -30,6 +30,7 @@ import { ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, gh
 import type { Matchmaker } from "./matchmaker";
 import { EVENT_TTL_S, pushAccount, pushConfigured, type PushKind } from "./push";
 import type { Pusher } from "./pusher";
+import { newUid, playedStmts, type GhostPerson, type Played } from "./social";
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
@@ -152,6 +153,11 @@ interface Member {
   persona?: Persona;
   /** Ghosts only: what the ghost remembers about the chat (spam heat, conversations, recent emotes); never sent. */
   emo?: GhostMemory;
+  /**
+   * Ghosts only: the public handle this ghost has in recent / friends lists (social.ts), shaped like a person's;
+   * never sent in a room message. Missing in rooms stored before it: made at the match start.
+   */
+  gid?: string;
   /**
    * The person's own "Ask before pairing" (Settings), from `hello.pair_ask`, dealt to their colour at the start
    * (state.pair_ask_by), in friend and quick rooms alike. Missing: off (clients before it sent nothing).
@@ -626,7 +632,7 @@ export class Room extends DurableObject<Env> {
         level: Math.max(1, Math.trunc(h.level) || 1),
         ...(h.entry_id ? { entry: h.entry_id } : {}),
       })),
-      ...ghosts.map((gh, k) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, pawn: gh.pawn, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g), persona: personas[k], emo: newGhostMemory() })),
+      ...ghosts.map((gh, k) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, pawn: gh.pawn, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g), persona: personas[k], emo: newGhostMemory(), gid: newUid() })),
     ];
     for (let k = entries.length - 1; k > 0; k--) {
       const j = cryptoInt(k + 1);
@@ -1490,10 +1496,63 @@ export class Room extends DurableObject<Env> {
       ghosts,
     };
     this.db("match start", [D.insertMatch(this.env.DB, row)]);
+    this.recordPlayed(m);
     this.broadcast({ t: "start", n: 0, game, seats: this.seatsOut(), state: s, h: this.ops.hash(s) });
     this.ctx.waitUntil(this.loadRerollMeans());
     // members offline at the start keep their grace; it now turns their seat into a bot
     this.planStep();
+  }
+
+  /** Recent players (social.ts): everyone at this table goes on each person's list; the room's open invites end. */
+  private recordPlayed(m: Match): void {
+    const r = this.room!;
+    const seats: Played[] = m.seats.map((st) => {
+      const mem = st.ghost ? r.members.find((x) => x.id === st.id) : undefined;
+      return mem ? { ghost: this.ghostPerson(mem) } : { account: st.account ?? null };
+    });
+    const stmts = playedStmts(this.env.DB, seats, m.game ?? "ludo", m.startedAt ?? Date.now(), r.quick ? null : r.code);
+    // beside the telemetry chain (this.db), not in it: nothing there waits for these rows, nor these for it
+    if (this.env.DB && stmts.length) this.ctx.waitUntil(this.env.DB.batch(stmts).then(() => undefined, (e) => console.error("D1 write failed (recent players):", e)));
+  }
+
+  /** A ghost member's identity for the lists (its handle made now when it has none: saved with the next commit). */
+  private ghostPerson(mem: Member): GhostPerson {
+    mem.gid ??= newUid();
+    return { uid: mem.gid, name: mem.name, avatar: mem.avatar, frame: mem.frame, level: mem.level ?? 1 };
+  }
+
+  // ---------- social (social.ts: friends from a room, invites into it) ----------
+
+  /**
+   * POST /v1/social/friends {code, member}: the person at member (or seat) `id`, asked for `account`, a person in
+   * this room: their account, or a ghost's identity (social.ts answers both alike). null when the caller isn't here
+   * or the seat has nobody to add.
+   */
+  async socialSeat(account: string, id: number): Promise<{ account: string } | { ghost: GhostPerson } | null> {
+    const r = this.room;
+    if (!r || !account || !r.members.some((x) => !x.ghost && x.account === account)) return null;
+    const mem = r.members.find((x) => x.id === id);
+    if (mem?.ghost) {
+      const fresh = !mem.gid;
+      const g = this.ghostPerson(mem);
+      if (fresh) this.commit();
+      return { ghost: g };
+    }
+    const acc = mem?.account ?? r.match?.seats.find((st) => st.id === id && !st.ghost)?.account ?? null;
+    return acc && acc !== account ? { account: acc } : null;
+  }
+
+  /**
+   * POST /v1/social/invites: may `account` invite someone into this room now? A person in a friend room that isn't
+   * playing and has a free seat: the room's game and the name they have here go with the invite.
+   */
+  async inviteCheck(account: string): Promise<{ ok: true; game: GameKind; name: string } | { ok: false; error: "not_in_room" | "room_full" | "started" }> {
+    const r = this.room;
+    const mem = r && !r.quick && account ? r.members.find((x) => !x.ghost && x.account === account) : undefined;
+    if (!r || !mem) return { ok: false, error: "not_in_room" };
+    if (r.status === "playing") return { ok: false, error: "started" };
+    if (r.members.length >= LIMITS.maxMembers) return { ok: false, error: "room_full" };
+    return { ok: true, game: r.settings.game ?? "ludo", name: mem.name };
   }
 
   // ---------- match ----------

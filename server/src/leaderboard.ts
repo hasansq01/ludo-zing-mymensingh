@@ -74,6 +74,8 @@ export function periodKey(p: PeriodArg, now: number, week?: string): string {
 export interface TopRow {
   rank: number;
   account_id: string;
+  /** The public handle (social.ts: long-press to add a friend); "" when the account has none yet. */
+  uid: string;
   name: string;
   avatar: string;
   frame: string;
@@ -92,19 +94,20 @@ const LIVE = `a.banned = 0 AND a.merged_into IS NULL AND a.completed_matches >= 
 export async function topScores(db: D1Database, board: Board, period: string, limit = TOP_N): Promise<TopRow[]> {
   const { results } = await db
     .prepare(
-      `SELECT s.account_id, s.value, s.updated_at, a.name, a.avatar, a.frame, a.xp
+      `SELECT s.account_id, s.value, s.updated_at, a.uid, a.name, a.avatar, a.frame, a.xp
        FROM scores s JOIN accounts a ON a.id = s.account_id
        WHERE s.board = ? AND s.period = ? AND s.value > 0 AND ${LIVE}
        ORDER BY s.value DESC, s.updated_at ASC, s.account_id ASC LIMIT ?`,
     )
     .bind(board, period, limit)
-    .all<{ account_id: string; value: number; updated_at: number; name: string | null; avatar: string | null; frame: string | null; xp: number }>();
+    .all<{ account_id: string; value: number; updated_at: number; uid: string | null; name: string | null; avatar: string | null; frame: string | null; xp: number }>();
   const out: TopRow[] = [];
   results.forEach((r, i) => {
     const prev = out[i - 1];
     out.push({
       rank: prev && prev.value === r.value ? prev.rank : i + 1,
       account_id: r.account_id,
+      uid: r.uid ?? "",
       name: r.name || "Player",
       avatar: r.avatar ?? "",
       frame: r.frame ?? "",
@@ -151,12 +154,12 @@ export async function countScores(db: D1Database, board: Board, period: string):
 }
 
 function publicRow(r: TopRow) {
-  return { rank: r.rank, name: r.name, avatar: r.avatar, frame: r.frame, level: r.level, value: r.value };
+  return { rank: r.rank, uid: r.uid, name: r.name, avatar: r.avatar, frame: r.frame, level: r.level, value: r.value };
 }
 
 /**
- * GET /v1/leaderboard?board=xp|wins&period=all|week -> {board, period, week?, min_matches, top: [{rank, name, avatar,
- * frame, level, value}], me: {rank, value, listed} | null}. Only accounts with MIN_MATCHES completed matches are
+ * GET /v1/leaderboard?board=xp|wins&period=all|week -> {board, period, week?, min_matches, top: [{rank, uid, name,
+ * avatar, frame, level, value}], me: {rank, value, listed} | null} (uid: the public handle, social.ts). Only accounts with MIN_MATCHES completed matches are
  * listed; `me` still has the caller's rank among them (listed: false until then). The top list is cached 30 s (Cache
  * API, per board + period); `me` is read per request (null without a session). `nocache=1` skips the cache, only
  * under TEST_MODE.

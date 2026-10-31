@@ -3,7 +3,7 @@
 // per token as told (ok / unregistered / invalid token / bad payload / unavailable / sender mismatch).
 import { SELF, env } from "cloudflare:test";
 import { expect } from "vitest";
-import { FCM_SCOPE, TOKEN_URL, sendUrl, setPushFetcher, setPushServiceAccount } from "../src/push";
+import { FCM_SCOPE, TOKEN_URL, sendUrl, setPushFetcher, setPushServiceAccount, type Fetcher } from "../src/push";
 import type { Env } from "../src/room";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,6 +47,8 @@ export interface FakeFcm {
   revoked: Set<string>;
   /** The OAuth endpoint refuses (invalid_grant). */
   oauthDown: boolean;
+  /** The fake itself (the fetcher installed): a test may wrap it, e.g. to make FCM slow. */
+  fetch: Fetcher;
   reset(): void;
 }
 
@@ -79,6 +81,7 @@ export async function installFakeFcm(): Promise<FakeFcm> {
     expiresIn: 3600,
     revoked: new Set(),
     oauthDown: false,
+    fetch: async () => new Response("unexpected", { status: 599 }),
     reset() {
       f.oauth.length = 0;
       f.sends.length = 0;
@@ -89,7 +92,7 @@ export async function installFakeFcm(): Promise<FakeFcm> {
       f.oauthDown = false;
     },
   };
-  setPushFetcher(async (url, init) => {
+  f.fetch = async (url, init) => {
     if (url === TOKEN_URL) {
       const body = new URLSearchParams(String(init?.body ?? ""));
       const jwt = body.get("assertion") ?? "";
@@ -137,7 +140,8 @@ export async function installFakeFcm(): Promise<FakeFcm> {
       return Response.json({ name: `projects/${PROJECT}/messages/${f.sends.length}` });
     }
     return new Response("unexpected", { status: 599 });
-  });
+  };
+  setPushFetcher(f.fetch);
   setPushServiceAccount(serviceAccount);
   return f;
 }

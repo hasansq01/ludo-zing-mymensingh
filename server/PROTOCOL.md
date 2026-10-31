@@ -344,6 +344,45 @@ progress at the end), **left** (you were away, i.e. had left or a bot was playin
 ranked: 0; finishing and then leaving keeps win / finish). Amounts: ONLINE_V2.md "Economy decisions". The client refreshes its
 profile (`GET /v1/me`) after `over`; rewards are not part of any room message.
 
+## Recent players, friends and invites
+
+HTTP only (`src/social.ts`, D1 migration `0007_social.sql`); no room message changes. Authed like ONLINE_V2.md
+"Common" (session required: guests have accounts too, so everything works for them).
+
+- **Who played** is recorded by the Room when a match **starts** (friend rooms and quick matches): each seat with an
+  account gets every other seat on its recent list (one row per person, newest 30, with the game and when). Quick
+  matches' ghosts go on the list exactly like people: each ghost seat gets a handle when it is seated and keeps the
+  name / avatar / frame / level it had at the table (its level in a list creeps up a little as days pass, as people's
+  do); nothing in any answer tells it from a person.
+- **People** are known by `uid`, a public handle (16 hex chars), never by account id. A person in an answer is always
+  `{uid, name, avatar, frame, level}` (live from the account; "You" / empty names shown as "Player").
+  `GET /v1/leaderboard` rows carry `uid` too (long-press to add a friend).
+- **Friends are one-way** (a favourites list): adding someone neither asks nor tells them; at most 100.
+- **Invites**: only to someone on your recent or friends list, only into the friend room you are in (lobby or
+  between matches, with a free seat). The person gets a push (`kind: "invite"`, channel `game`, link `room:<CODE>`,
+  tag `invite:<CODE>`, TTL 10 min; at most 6 invite pushes per person per hour) and the invite in
+  `GET /v1/social/invites`. An invite **expires** after 10 minutes, or as soon as the room's match starts.
+  **Limits**: one invite from the same person to the same person per 10 minutes (`scope: "person"`), 20 per hour and
+  60 per day per inviter (`scope: "total"`). **Privacy**: an invite to someone whose "Invites from players" is off,
+  or to a ghost, is answered, stored and rate-limited exactly like one a person ignores (the push is sent after the
+  answer); decline ("Not now") is never reported to the inviter.
+
+| method | path | body → result |
+|---|---|---|
+| GET | `/v1/social` | → `{recent: [{uid, name, avatar, frame, level, game, played_at, friend}], friends: [{uid, name, avatar, frame, level, added_at, game, played_at}], prefs: {invites}, max: {recent: 30, friends: 100}}` (times unix s; a friend never played with has `game` / `played_at` null; newest first) |
+| POST | `/v1/social/friends` | `{uid}` (from a list or the leaderboard) or `{code, member}` (a member id of the room you are in: the lobby, a match) → `{ok, friend: person}` (idempotent); `404 not_found`, `400` yourself, `409 {error: "friends_full", max}` |
+| DELETE | `/v1/social/friends` | `{uid}` → `{ok}` |
+| POST | `/v1/social/invites` | `{uid, code}` → `{ok, expires_at}`; `404 not_found` (not on your lists), `409 not_in_room \| room_full \| started` (your room can't take them), `429 {error: "rate", scope: "person" \| "total", retry_at}` |
+| GET | `/v1/social/invites` | → `{invites: [{id, from: person, code, game, sent_at, expires_at}]}` (pending, newest first, at most 10) |
+| POST | `/v1/social/invites/accept` | `{id}` or `{code}` (a tapped push knows only the room) → `{ok, code, game}`, then join the room as with a code; `410 {error: "gone"}` when it expired, the inviter left or the room can't take you |
+| POST | `/v1/social/invites/decline` | `{id}` or `{code}` → `{ok}` |
+| POST | `/v1/social/prefs` | `{invites: bool}` → `{ok, prefs}` (off also ends the pending ones) |
+
+Room RPC for these (not client messages): `socialSeat(account, member)` (the account or ghost at a seat, for a
+member of the room) and `inviteCheck(account)` (a member of an open friend room: its game and the member's name).
+The daily cron deletes invites after 2 days and ghost rows no list refers to after 30 days. Account erase removes the
+account's lists, prefs and invites, and its handle from everyone else's lists.
+
 ## Errors (`error.code`)
 
 `version` (unsupported v), `not_found`, `full` (4 members), `started` (match in progress and you have no seat),
