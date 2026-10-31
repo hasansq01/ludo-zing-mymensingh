@@ -103,7 +103,8 @@ describe("S&L friend rooms", () => {
     expect(cs[0].state.players.find((p: Msg) => p.c === over.winner).pos).toBe(100);
     const l = await cs[0].waitFor((m) => m.t === "lobby");
     expect(l).toMatchObject({ status: "over", settings: { game: "sl" } });
-    cs[0].send({ t: "start" });
+    cs[0].send({ t: "rematch" });
+    cs[1].send({ t: "rematch" });
     const again = await cs[1].wait("start");
     expect(again).toMatchObject({ n: 0, game: "sl" });
     await finishAll(cs, 28_000);

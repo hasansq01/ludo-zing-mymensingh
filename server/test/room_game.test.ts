@@ -69,14 +69,14 @@ describe("full games", () => {
     sameReplicas(cs);
   }, 30_000);
 
-  it("rematch: the host starts again after over", async () => {
+  it("rematch: both say Play again after over (room_rematch.test.ts has the vote)", async () => {
     const { cs } = await lobbyOf(2, { tok: NEAR_GOAL });
     for (const c of cs) c.autoplay = true;
     await startAll(cs);
     await finishAll(cs);
-    cs[1].send({ t: "start" });
-    expect(await cs[1].wait("error")).toMatchObject({ code: "not_host" });
-    cs[0].send({ t: "start" });
+    cs[1].send({ t: "rematch" }); // (anyone may ask, not only the host)
+    await cs[0].wait("rematch");
+    cs[0].send({ t: "rematch" });
     const again = await Promise.all(cs.map((c) => c.wait("start")));
     expect(again[0].n).toBe(0);
     expect(again[0].state.phase).toBe("roll");
