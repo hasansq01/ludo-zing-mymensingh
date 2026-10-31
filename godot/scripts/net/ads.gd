@@ -1,10 +1,13 @@
 class_name Ads
 extends Node
-## Rewarded ads (server/ECONOMY_V1.md section 5): a thin wrapper over the "AdMob" Android plugin singleton
-## (godot/android/plugins/admob). Everywhere the plugin is missing (desktop, headless, web, the non-Gradle "Android
-## Emulator" preset) it is a safe stub: available() is false, is_ready() is false, nothing is ever shown, and the
-## asking calls answer later (deferred) with consent_done(false, false) / failed(-1, "unavailable") /
-## show_failed(-1, "unavailable"). Answers never arrive inside the call that asked.
+## Rewarded ads (server/ECONOMY_V1.md section 5): a thin wrapper over one ads Android plugin singleton, "LevelPlay"
+## (godot/android/plugins/levelplay, Unity LevelPlay mediation) or "AdMob" (godot/android/plugins/admob). Both have
+## the same methods and signals (and the same UMP consent form). Which one: the project setting ludo_zing/ads/provider,
+## "auto" (default) = LevelPlay when its plugin is in the build, else AdMob; "levelplay" / "admob" = only that one
+## (see pick()). Everywhere no plugin is there (desktop, headless, web, the non-Gradle "Android Emulator" preset) it
+## is a safe stub: available() is false, is_ready() is false, nothing is ever shown, and the asking calls answer
+## later (deferred) with consent_done(false, false) / failed(-1, "unavailable") / show_failed(-1, "unavailable").
+## Answers never arrive inside the call that asked.
 ##
 ## How the UI is expected to use it (rewarded only, never without a tap):
 ##   var ads := Ads.new(); add_child(ads)                  # once, e.g. in main.gd; keep it for the whole run
@@ -14,7 +17,7 @@ extends Node
 ##   # An ad button (Rewards sheet, broke popup, coin-table result card) is enabled only while ads.available() and
 ##   # ads.is_ready() (listen to `loaded` / `closed` to refresh it). On tap:
 ##   #   1. POST /v1/ads/start {kind, ref?} -> {nonce, user_id, custom_data}   (server checks the daily cap first)
-##   #   2. ads.show_rewarded(user_id, custom_data)
+##   #   2. ads.show_rewarded(user_id, custom_data)   (AdMob: SSV options; LevelPlay: custom_uid / custom_nonce)
 ##   #   3. `earned` = the player watched enough; only now start polling GET /v1/ads/status?nonce= (every 1.5 s, up
 ##   #      to 20 s) and show the reward when the server says "granted". Nothing is granted from `earned` alone.
 ##   #   4. `closed` = the ad is gone (after `earned`, or the player quit early: no reward). `show_failed` = no ad
@@ -25,8 +28,8 @@ extends Node
 ## (so no ad traffic before consent) and only while the plugin exists. A load that fails with "consent" (code -2)
 ## is retried the same way, so the first ad comes as soon as the consent form has been answered.
 ##
-## `failed` is about LOADING (code = AdMob's error code; -1 no activity, -2 consent not given yet); `show_failed` is
-## about showing (code -1: nothing loaded or already showing).
+## `failed` is about LOADING (code = the network's error code; -1 no activity, -2 consent not given yet, -3 LevelPlay
+## has no app key); `show_failed` is about showing (code -1: nothing loaded or already showing).
 
 ## The consent form was answered (or not needed). can_request_ads false = no ads (consent refused / unavailable).
 signal consent_done(can_request_ads: bool, privacy_options_required: bool)
@@ -40,11 +43,19 @@ signal closed
 ## show_rewarded() could not show an ad.
 signal show_failed(code: int, message: String)
 
-const SINGLETON := "AdMob"
+## The plugin singletons (never "Ads": that would shadow this class_name).
+const LEVELPLAY := "LevelPlay"
+const ADMOB := "AdMob"
+## "auto" | "levelplay" | "admob" (godot/addons/levelplay registers it).
+const PROVIDER_SETTING := "ludo_zing/ads/provider"
 const UNIT_SETTING := "ludo_zing/ads/rewarded_unit"
+const LEVELPLAY_UNIT_SETTING := "ludo_zing/ads/levelplay_rewarded_unit"
+## Dev only: LevelPlay's integration test suite opens once the SDK is ready (never on in a committed project.godot).
+const TEST_SUITE_SETTING := "ludo_zing/ads/levelplay_test_suite"
 ## Optional: a UMP test device hashed id (logcat prints it), to force the consent form in dev. Empty = none.
 const TEST_DEVICE_SETTING := "ludo_zing/ads/test_device"
-## Phones that get test ads from the real units (comma-separated hashed ids from the SDK's log line).
+## AdMob: phones that get test ads from the real units (comma-separated hashed ids from the SDK's log line).
+## (LevelPlay test devices are set in the LevelPlay dashboard.)
 const TEST_ADS_SETTING := "ludo_zing/ads/test_ad_devices"
 const UNAVAILABLE := "unavailable"
 ## Seconds before the next automatic load, by number of failures in a row (the last one repeats).
@@ -54,6 +65,8 @@ const BACKOFF := [5.0, 15.0, 60.0]
 var reload_in := -1.0
 ## Failures in a row since the last good load (drives BACKOFF).
 var failures := 0
+## The plugin in use: LEVELPLAY, ADMOB, or "" (the stub).
+var provider := ""
 
 static var _inst: Ads = null
 
@@ -63,19 +76,30 @@ var _wanted := false            # load_rewarded() was called: keep an ad ready
 var _privacy := false
 var _timer: SceneTreeTimer = null
 
-## `singleton`: the Android plugin object; null = Engine.get_singleton("AdMob") when it exists. Tests pass a fake with
-## the same methods and signals, and `deferred` false to get the answers inside the call.
-func _init(singleton: Object = null, deferred := true) -> void:
+## `singleton`: the Android plugin object; null = the one pick() chooses among the singletons that exist. Tests pass a
+## fake with the same methods and signals (`kind` = which plugin it plays, default AdMob), and `deferred` false to
+## get the answers inside the call.
+func _init(singleton: Object = null, deferred := true, kind := "") -> void:
 	_deferred = deferred
-	if singleton == null and Engine.has_singleton(SINGLETON):
-		singleton = Engine.get_singleton(SINGLETON)
+	var real := singleton == null
+	if real:
+		kind = pick(str(ProjectSettings.get_setting(PROVIDER_SETTING, "auto")), Engine.has_singleton(LEVELPLAY),
+			Engine.has_singleton(ADMOB))
+		if kind != "":
+			singleton = Engine.get_singleton(kind)
+	elif kind == "":
+		kind = ADMOB
 	_pg = singleton
-	var test_ads := str(ProjectSettings.get_setting(TEST_ADS_SETTING, "")).strip_edges()
-	# (an Android plugin singleton answers has_method false for its methods: the real plugin always has this one)
-	if _pg != null and test_ads != "" and (Engine.has_singleton(SINGLETON) or _pg.has_method("set_test_devices")):
-		_pg.call("set_test_devices", test_ads)
 	if _pg == null:
 		return
+	provider = kind
+	# (an Android plugin singleton answers has_method false for its methods: the real plugins always have these)
+	var test_ads := str(ProjectSettings.get_setting(TEST_ADS_SETTING, "")).strip_edges()
+	if provider == ADMOB and test_ads != "" and (real or _pg.has_method("set_test_devices")):
+		_pg.call("set_test_devices", test_ads)
+	if provider == LEVELPLAY and bool(ProjectSettings.get_setting(TEST_SUITE_SETTING, false)) \
+			and (real or _pg.has_method("set_test_suite")):
+		_pg.call("set_test_suite", true)
 	_connect("consent_done", _on_consent)
 	_connect("rewarded_loaded", _on_loaded)
 	_connect("rewarded_failed", _on_failed)
@@ -98,15 +122,28 @@ static func instance() -> Ads:
 static func set_instance(a: Ads) -> void:
 	_inst = a
 
-## True on Android with the plugin built in.
+## True on Android with an ads plugin built in.
 func available() -> bool:
 	return _pg != null
 
-## The rewarded ad unit id (project setting; Google's test unit until the owner's AdMob account exists).
-static func unit_id() -> String:
-	return str(ProjectSettings.get_setting(UNIT_SETTING, "")).strip_edges()
+## Which plugin to drive: `setting` "auto" (or anything else) = LevelPlay when it is there, else AdMob; "levelplay" /
+## "admob" = only that one. "" = none (the stub).
+static func pick(setting: String, has_levelplay: bool, has_admob: bool) -> String:
+	match setting.strip_edges().to_lower():
+		"levelplay":
+			return LEVELPLAY if has_levelplay else ""
+		"admob":
+			return ADMOB if has_admob else ""
+	if has_levelplay:
+		return LEVELPLAY
+	return ADMOB if has_admob else ""
 
-## Starts the Mobile Ads SDK when consent allows (request_consent / load_rewarded do it too; rarely needed).
+## The rewarded ad unit id of a provider (project settings: the LevelPlay unit, or the AdMob unit).
+static func unit_id(kind := ADMOB) -> String:
+	var key := LEVELPLAY_UNIT_SETTING if kind == LEVELPLAY else UNIT_SETTING
+	return str(ProjectSettings.get_setting(key, "")).strip_edges()
+
+## Starts the ads SDK when consent allows (request_consent / load_rewarded do it too; rarely needed).
 func initialize() -> void:
 	if _pg != null:
 		_pg.call("initialize")
@@ -134,7 +171,7 @@ func load_rewarded() -> void:
 		_later(failed.emit.bind(-1, UNAVAILABLE))
 		return
 	_cancel_reload()
-	_pg.call("load_rewarded", unit_id())
+	_pg.call("load_rewarded", unit_id(provider))
 
 ## True when an ad is loaded and can be shown right now.
 func is_ready() -> bool:
@@ -201,7 +238,7 @@ func _on_reload_timer() -> void:
 	_timer = null
 	reload_in = -1.0
 	if _wanted and _pg != null and not is_ready():
-		_pg.call("load_rewarded", unit_id())
+		_pg.call("load_rewarded", unit_id(provider))
 
 func _cancel_reload() -> void:
 	reload_in = -1.0

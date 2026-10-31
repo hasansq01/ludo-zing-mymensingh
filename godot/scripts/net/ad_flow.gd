@@ -44,7 +44,7 @@ func _init(ads: Ads = null, acc: Account = null) -> void:
 	_ads = ads
 	_acc = acc
 
-## True when rewarded ads can run here: the AdMob plugin is there and an Account (wallet) is active.
+## True when rewarded ads can run here: an ads plugin (LevelPlay or AdMob) is there and an Account (wallet) is active.
 static func available() -> bool:
 	var a := Ads.instance()
 	return a != null and a.available() and Account.wallet_active()

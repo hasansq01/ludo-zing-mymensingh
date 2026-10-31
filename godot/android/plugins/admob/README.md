@@ -5,6 +5,9 @@ the UMP consent SDK (`user-messaging-platform` 4.0.0). Rewarded ads only: no ban
 shown only inside `show_rewarded()`. Contract: `server/ECONOMY_V1.md` section 5. GDScript wrapper:
 `godot/scripts/net/ads.gd` (`Ads`, a safe stub off Android; its header says how the UI should use it).
 
+LevelPlay (`godot/android/plugins/levelplay`) is the primary network: `Ads` uses this plugin only when LevelPlay's
+isn't in the build, or when `ludo_zing/ads/provider` is `admob`. Both plugins have the same methods and signals.
+
 ## Methods (called by name from GDScript, run on the UI thread, never throw)
 
 | Method | What it does |

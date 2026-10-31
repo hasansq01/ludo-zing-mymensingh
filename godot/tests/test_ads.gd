@@ -1,11 +1,13 @@
 extends "res://tests/test_suite.gd"
-## Rewarded ads wrapper (res://scripts/net/ads.gd): the stub everywhere the AdMob plugin is missing (desktop /
-## headless: nothing available or ready, answers deferred), the mapping onto the plugin through a fake singleton
-## with the Kotlin plugin's methods and signals, the automatic reload with backoff (5 s, 15 s, 60 s), the project
-## settings and the export plugin (manifest snippet, dependencies).
+## Rewarded ads wrapper (res://scripts/net/ads.gd): the stub everywhere no ads plugin is there (desktop / headless:
+## nothing available or ready, answers deferred), the provider choice (LevelPlay first, AdMob as fallback, the
+## setting forcing one), the mapping onto the plugin through a fake singleton with the Kotlin plugins' methods and
+## signals (as AdMob and as LevelPlay: its own unit, no AdMob test devices, the dev test suite), the automatic reload
+## with backoff (5 s, 15 s, 60 s), the project settings and both export plugins (manifest snippets, dependencies).
 
 const A := preload("res://scripts/net/ads.gd")
 const Export := preload("res://addons/admob/export_plugin.gd")
+const LPExport := preload("res://addons/levelplay/export_plugin.gd")
 
 ## Stands in for the Kotlin AdMobPlugin singleton: same method and signal names, answers synchronously.
 class FakePlugin extends RefCounted:
@@ -48,12 +50,22 @@ class FakePlugin extends RefCounted:
 		rewarded_earned.emit("coins", 10)
 		rewarded_closed.emit()
 
+## The LevelPlay plugin seen through the fake: the same, plus its dev test-suite switch (and an AdMob-only method, to
+## see it is never called on LevelPlay).
+class FakeLevelPlay extends FakePlugin:
+	func set_test_suite(on: bool) -> void:
+		calls.append("set_test_suite:%s" % on)
+	func set_test_devices(ids: String) -> void:
+		calls.append("set_test_devices:" + ids)
+
 var _log: Array = []
 
 func run() -> void:
 	_stub()
 	_stub_is_deferred()
+	_provider_choice()
 	_plugin_mapping()
+	_levelplay_mapping()
 	_plugin_show_failed()
 	_reload_backoff()
 	_no_reload_unasked()
@@ -69,12 +81,13 @@ func watch(a: A) -> void:
 	a.show_failed.connect(func(c, m): _log.append(["show_failed", c, m]))
 
 func _stub() -> void:
-	check("stub: no AdMob singleton on desktop / headless", not Engine.has_singleton(A.SINGLETON))
-	check("singleton name never shadows the class_name Ads", A.SINGLETON != "Ads")
+	check("stub: no LevelPlay / AdMob singleton on desktop / headless", not Engine.has_singleton(A.LEVELPLAY)
+		and not Engine.has_singleton(A.ADMOB))
+	check("singleton names never shadow the class_name Ads", A.LEVELPLAY != "Ads" and A.ADMOB != "Ads")
 	var a := A.new(null, false)
 	watch(a)
-	check("stub: not available, not ready, no privacy options", not a.available() and not a.is_ready()
-		and not a.privacy_options_required())
+	check("stub: not available, not ready, no privacy options, no provider", not a.available() and not a.is_ready()
+		and not a.privacy_options_required() and a.provider == "")
 	a.initialize()
 	a.show_privacy_options()
 	check("stub: initialize / show_privacy_options do nothing", _log.is_empty(), _log)
@@ -97,6 +110,21 @@ func _stub_is_deferred() -> void:
 	a.load_rewarded()
 	a.show_rewarded("a", "n")
 	check("stub (default): answers are deferred, never inside the call", _log.is_empty(), _log)
+	a.free()
+
+func _provider_choice() -> void:
+	check("provider: auto prefers LevelPlay, falls back to AdMob, else none",
+		A.pick("auto", true, true) == A.LEVELPLAY and A.pick("auto", false, true) == A.ADMOB
+		and A.pick("auto", true, false) == A.LEVELPLAY and A.pick("auto", false, false) == "")
+	check("provider: an unknown or empty setting is auto", A.pick("", true, true) == A.LEVELPLAY
+		and A.pick("ironsource", false, true) == A.ADMOB)
+	check("provider: \"admob\" forces AdMob even with LevelPlay there; never LevelPlay",
+		A.pick("admob", true, true) == A.ADMOB and A.pick("AdMob ", true, false) == "")
+	check("provider: \"levelplay\" forces LevelPlay; never AdMob",
+		A.pick("levelplay", true, true) == A.LEVELPLAY and A.pick("levelplay", false, true) == "")
+	check("provider: the project uses auto", str(ProjectSettings.get_setting(A.PROVIDER_SETTING, "")) == "auto")
+	var a := A.new(FakePlugin.new(), false)
+	check("provider: a fake plays AdMob unless told otherwise", a.provider == A.ADMOB)
 	a.free()
 
 func _plugin_mapping() -> void:
@@ -123,6 +151,42 @@ func _plugin_mapping() -> void:
 		and _log == [["earned", "coins", 10], ["closed"]] and not a.is_ready(), [fake.calls, _log])
 	check("plugin: a closed ad queues the next load after the first delay (5 s)", a.reload_in == 5.0, a.reload_in)
 	a.free()
+
+func _levelplay_mapping() -> void:
+	var fake := FakeLevelPlay.new()
+	var a := A.new(fake, false, A.LEVELPLAY)
+	watch(a)
+	check("levelplay: provider, available; no AdMob test devices, no test suite (setting off)",
+		a.provider == A.LEVELPLAY and a.available() and fake.calls.is_empty(), fake.calls)
+	a.request_consent()
+	check("levelplay: the same consent call and relay", fake.calls == ["request_consent:"]
+		and _log == [["consent_done", true, true]] and a.privacy_options_required(), [fake.calls, _log])
+	a.show_privacy_options()
+	check("levelplay: Privacy choices pass through", fake.calls.back() == "show_privacy_options", fake.calls)
+	_log.clear()
+	a.load_rewarded()
+	check("levelplay: load_rewarded uses the LevelPlay unit -> loaded",
+		fake.calls.back() == "load_rewarded:" + A.unit_id(A.LEVELPLAY)
+		and A.unit_id(A.LEVELPLAY) == LPExport.DEFAULTS[A.LEVELPLAY_UNIT_SETTING] and _log == [["loaded"]]
+		and a.is_ready(), [fake.calls, _log])
+	_log.clear()
+	a.show_rewarded("acc_x", "ad_y")
+	check("levelplay: show_rewarded passes the account id + nonce (the S2S custom parameters); earned, closed",
+		fake.calls.back() == "show_rewarded:acc_x:ad_y" and _log == [["earned", "coins", 10], ["closed"]]
+		and a.reload_in == 5.0, [fake.calls, _log, a.reload_in])
+	a.free()
+	ProjectSettings.set_setting(A.TEST_SUITE_SETTING, true)
+	var fake2 := FakeLevelPlay.new()
+	var b := A.new(fake2, false, A.LEVELPLAY)
+	var c := A.new(FakeLevelPlay.new(), false, A.ADMOB)
+	ProjectSettings.set_setting(A.TEST_SUITE_SETTING, false)
+	check("levelplay: the dev test-suite setting turns the suite on (LevelPlay only)",
+		fake2.calls == ["set_test_suite:true"] and not str(c.get("_pg").calls).contains("set_test_suite"),
+		[fake2.calls, c.get("_pg").calls])
+	check("admob: its test devices are set from the project setting", c.get("_pg").calls
+		== ["set_test_devices:" + str(ProjectSettings.get_setting(A.TEST_ADS_SETTING, ""))], c.get("_pg").calls)
+	b.free()
+	c.free()
 
 func _plugin_show_failed() -> void:
 	var fake := FakePlugin.new()
@@ -197,3 +261,23 @@ func _settings_and_export() -> void:
 		"com.google.android.ump:user-messaging-platform:"))
 	check("export: AARs exist", FileAccess.file_exists("res://addons/admob/bin/debug/AdMob-debug.aar")
 		and FileAccess.file_exists("res://addons/admob/bin/release/AdMob-release.aar"))
+	# LevelPlay
+	for key in LPExport.DEFAULTS:
+		var v: Variant = ProjectSettings.get_setting(key, LPExport.DEFAULTS[key])  # (the test-suite one isn't stored)
+		check("levelplay settings: %s matches the addon default" % key, v == LPExport.DEFAULTS[key], v)
+	check("levelplay settings: the app key and rewarded unit", LPExport.app_key() == "2928a1d3d"
+		and A.unit_id(A.LEVELPLAY) == "ij2h0kzjw5bnxhll", [LPExport.app_key(), A.unit_id(A.LEVELPLAY)])
+	var lm := LPExport.manifest_contents("2928a1d3d")
+	check("levelplay export: manifest meta-data carries the app key, no AdMob id while AdMob adds its own",
+		lm.contains("android:name=\"%s\"" % LPExport.APP_KEY_META) and lm.contains("android:value=\"2928a1d3d\"")
+		and not lm.contains("APPLICATION_ID"), lm)
+	var lm2 := LPExport.manifest_contents("k<\"", "ca-app-pub-1~2")
+	check("levelplay export: with AdMob off, the AdMob app id for UMP; values escaped",
+		lm2.contains("android:value=\"k&lt;&quot;\"") and lm2.contains("com.google.android.gms.ads.APPLICATION_ID")
+		and lm2.contains("android:value=\"ca-app-pub-1~2\""), lm2)
+	check("levelplay export: LevelPlay SDK + UMP + Play services only (no mediation adapters)",
+		LPExport.LEVELPLAY_DEPENDENCY.begins_with("com.unity3d.ads-mediation:mediation-sdk:")
+		and LPExport.UMP_DEPENDENCY == Export.UMP_DEPENDENCY
+		and not str(LPExport.PLAY_DEPENDENCIES).contains("adapter"))
+	check("levelplay export: AARs exist", FileAccess.file_exists("res://addons/levelplay/bin/debug/LevelPlay-debug.aar")
+		and FileAccess.file_exists("res://addons/levelplay/bin/release/LevelPlay-release.aar"))

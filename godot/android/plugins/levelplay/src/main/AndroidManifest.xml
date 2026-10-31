@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- INTERNET / ACCESS_NETWORK_STATE / ACCESS_ADSERVICES_ATTRIBUTION and the SDK's activities come from the LevelPlay
+         SDK's own manifest. AD_ID: LevelPlay's docs ask apps targeting API 33+ to declare it (the advertising id).
+         The app key meta-data (com.flipfold.ludozing.levelplay.APP_KEY) is added by the export plugin
+         (godot/addons/levelplay/export_plugin.gd) from the project setting ludo_zing/ads/levelplay_app_key. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
+    <application>
+        <!-- Godot v2 plugin registration: org.godotengine.plugin.v2.<singleton name> = init class -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.LevelPlay"
+            android:value="com.flipfold.ludozing.levelplay.LevelPlayPlugin" />
+    </application>
+
+</manifest>

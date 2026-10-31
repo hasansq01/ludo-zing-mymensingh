@@ -10,7 +10,7 @@ extends Sheet
 ## The Shop's "Get coins" is this same sheet (RewardsSheet.new("Get coins", true)): same rows, names, countdowns and
 ## taps, plus a "Win vs computer" info row under them (what a win pays).
 ##
-## Economy v1: under them a "Free with a video" section (only where AdFlow.available(): Android with the AdMob plugin):
+## Economy v1: under them a "Free with a video" section (only where AdFlow.available(): Android with an ads plugin):
 ## "Free re-roll" (kind reroll) and "+2 gems" (kind gems), each with "N left today" (GET /v1/ads/today). A tap runs
 ## AdFlow.watch(kind); the reward is shown from the server's answer, and the counts refresh after.
 ##
