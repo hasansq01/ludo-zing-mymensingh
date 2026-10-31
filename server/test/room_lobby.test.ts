@@ -57,7 +57,7 @@ describe("hello and lobby", () => {
     expect(typeof w.token).toBe("string");
     const l1 = await a.wait("lobby");
     expect(l1).toMatchObject({ code, host: w.id, max: 4, settings: { teams: false, game: "ludo" } });
-    expect(l1.members).toEqual([{ id: w.id, name: "Alice", avatar: "a1", frame: "f1", level: 1, online: true, color: 0 }]);
+    expect(l1.members).toEqual([{ id: w.id, name: "Alice", avatar: "a1", frame: "f1", pawn: "", level: 1, online: true, color: 0 }]);
 
     const b = await Client.join(code, { name: "Bob" });
     const l2 = await a.waitFor((m) => m.t === "lobby" && m.members.length === 2);

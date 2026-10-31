@@ -8,6 +8,7 @@ import {
   DEFAULT_AVATAR,
   DEFAULT_FRAME,
   ECON_V1,
+  FREE_PAWN,
   ONLINE_REWARDS,
   addCoins,
   tablePayouts,
@@ -106,6 +107,8 @@ export function rowToProfile(r: AccountRow): Profile {
     room: eq.room,
     dice_owned: owned.dice_owned,
     dice: eq.dice,
+    pawns_owned: owned.pawns_owned,
+    pawn: eq.pawn,
     emote_sets: owned.emote_sets,
     emote_set: eq.emote_set,
     scenes: owned.scenes,
@@ -126,9 +129,9 @@ export function rowToProfile(r: AccountRow): Profile {
 
 /** The profile -> the accounts columns it is stored in. */
 export function profileColumns(p: Profile): Record<string, string | number | null> {
-  const owned: Record<string, unknown> = { rooms: p.rooms, dice_owned: p.dice_owned, av_owned: p.av_owned, emote_sets: p.emote_sets };
+  const owned: Record<string, unknown> = { rooms: p.rooms, dice_owned: p.dice_owned, pawns_owned: p.pawns_owned, av_owned: p.av_owned, emote_sets: p.emote_sets };
   if (p.scenes !== undefined) owned.scenes = p.scenes;
-  const eq: Record<string, unknown> = { room: p.room, dice: p.dice, emote_set: p.emote_set };
+  const eq: Record<string, unknown> = { room: p.room, dice: p.dice, pawn: p.pawn, emote_set: p.emote_set };
   if (p.scene !== undefined) eq.scene = p.scene;
   return {
     public_id: typeof p.id === "string" ? p.id : String(p.id ?? ""),
@@ -461,12 +464,16 @@ export async function accountForPid(env: AccEnv, pid: string): Promise<{ account
   return { account_id: r.id, banned: r.banned === 1 || r.pid_banned === 1 };
 }
 
-/** What other players see (rooms, leaderboards). Unknown accounts get the defaults. */
-export async function getPublicProfile(env: AccEnv, accountId: string): Promise<{ name: string; avatar: string; frame: string; level: number }> {
+/**
+ * What other players see (rooms, leaderboards). Unknown accounts get the defaults. `pawn` / `pawns`: the pawn skin in
+ * use and the owned ones (Classic first), what a room checks a hello's pawn skin against.
+ */
+export async function getPublicProfile(env: AccEnv, accountId: string): Promise<{ name: string; avatar: string; frame: string; level: number; pawn: string; pawns: string[] }> {
   const row = ACCOUNT_RE.test(accountId) ? await getAccount(env.DB, accountId) : null;
-  if (!row) return { name: "Player", avatar: DEFAULT_AVATAR, frame: DEFAULT_FRAME, level: 1 };
+  if (!row) return { name: "Player", avatar: DEFAULT_AVATAR, frame: DEFAULT_FRAME, level: 1, pawn: FREE_PAWN, pawns: [FREE_PAWN] };
   const p = rowToProfile(row);
-  return { name: p.name, avatar: equipped("avatar", p), frame: equipped("frame", p), level: levelInfo(Math.max(0, p.xp)).level };
+  const pawns = (p.pawns_owned as unknown[]).filter((x): x is string => typeof x === "string");
+  return { name: p.name, avatar: equipped("avatar", p), frame: equipped("frame", p), level: levelInfo(Math.max(0, p.xp)).level, pawn: equipped("pawn", p), pawns };
 }
 
 /**

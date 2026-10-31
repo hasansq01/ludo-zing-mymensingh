@@ -3,8 +3,8 @@
 // Server-only rules that have no GDScript counterpart (online rewards, claim limits, import caps) live in rules.ts.
 import data from "./catalog.json";
 
-export type ItemKind = "dice" | "emotes" | "room" | "scene" | "char" | "avatar" | "frame" | "plate" | "badge";
-export const ITEM_KINDS: readonly ItemKind[] = ["dice", "emotes", "room", "scene", "char", "avatar", "frame", "plate", "badge"];
+export type ItemKind = "dice" | "pawn" | "emotes" | "room" | "scene" | "char" | "avatar" | "frame" | "plate" | "badge";
+export const ITEM_KINDS: readonly ItemKind[] = ["dice", "pawn", "emotes", "room", "scene", "char", "avatar", "frame", "plate", "badge"];
 
 export interface Unlock {
   level?: number;
@@ -15,11 +15,11 @@ export interface CatalogItem {
   kind: ItemKind;
   id: string;
   name: string;
-  /** Coins; 0 for free and unlock-only items. */
+  /** Coins; 0 for free and unlock-only items (and the pawn skins sold for gems only). */
   price: number;
-  /** Gem price, ceil(price / 100); only on items the Shop sells (buy: true). */
+  /** Gem price, ceil(price / 100); only on items the Shop sells (buy: true), and the gem-only pawn skins' own. */
   gems?: number;
-  /** Sold for coins in the Shop (rooms, dice, scenes, characters with a price). */
+  /** Sold for coins in the Shop (rooms, dice, pawns, scenes, characters with a price). */
   buy: boolean;
   /** Owned / usable by everyone from the start. */
   free: boolean;
@@ -58,6 +58,8 @@ export interface CatalogData {
     room: string;
     dice_owned: string[];
     dice: string;
+    pawns_owned: string[];
+    pawn: string;
     emote_sets: string[];
     emote_set: string;
     scenes: string[];
@@ -125,6 +127,8 @@ export const DEFAULTS = CATALOG.defaults;
 export const STAT_KEYS = CATALOG.defaults.stats;
 export const FREE_ROOMS = CATALOG.defaults.rooms;
 export const FREE_DICE = CATALOG.defaults.dice;
+/** Classic, the pawn skin everyone owns (Catalog.FREE_PAWN). */
+export const FREE_PAWN = CATALOG.defaults.pawn;
 export const FREE_EMOTES = CATALOG.defaults.emote_set;
 export const DEFAULT_ROOM = CATALOG.defaults.room;
 export const DEFAULT_SCENE = CATALOG.defaults.scene;

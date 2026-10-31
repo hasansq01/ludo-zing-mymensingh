@@ -10,6 +10,7 @@ import {
   DEFAULTS,
   FREE_DICE,
   FREE_EMOTES,
+  FREE_PAWN,
   FREE_ROOMS,
   STAT_KEYS,
   achievement,
@@ -48,6 +49,9 @@ export interface Profile {
   room: string;
   dice_owned: unknown[];
   dice: string;
+  /** Owned pawn skins (Classic always, first) and the equipped skin (Catalog.PAWNS). */
+  pawns_owned: unknown[];
+  pawn: string;
   /** Owned emote packs (Starter always) and the equipped pack. */
   emote_sets: unknown[];
   emote_set: string;
@@ -131,6 +135,10 @@ export function normalizeProfile(raw: unknown, newId: () => string = newPlayerId
   if (!dice.includes(FREE_DICE)) dice.unshift(FREE_DICE);
   p.dice_owned = dice;
   if (typeof p.dice !== "string" || !dice.includes(p.dice)) p.dice = FREE_DICE;
+  const pawns = isArray(p.pawns_owned) ? p.pawns_owned : [];
+  if (!pawns.includes(FREE_PAWN)) pawns.unshift(FREE_PAWN);
+  p.pawns_owned = pawns;
+  if (typeof p.pawn !== "string" || !pawns.includes(p.pawn)) p.pawn = FREE_PAWN;
   const emo = isArray(p.emote_sets) ? p.emote_sets : [];
   if (!emo.includes(FREE_EMOTES)) emo.unshift(FREE_EMOTES);
   p.emote_sets = emo;
@@ -207,6 +215,12 @@ export function ownsRoom(p: Dict, id: string): boolean {
 export function ownsDice(p: Dict, id: string): boolean {
   if (!item("dice", id)) return false;
   return id === FREE_DICE || list(p, "dice_owned").includes(id);
+}
+
+/** Catalog.owns_pawn. */
+export function ownsPawn(p: Dict, id: string): boolean {
+  if (!item("pawn", id)) return false;
+  return id === FREE_PAWN || list(p, "pawns_owned").includes(id);
 }
 
 /** Catalog.owns_emotes. */
@@ -297,6 +311,10 @@ export function equipped(kind: string, p: Dict): string {
     case "dice": {
       const id = str(p.dice);
       return ownsDice(p, id) ? id : FREE_DICE;
+    }
+    case "pawn": {
+      const id = str(p.pawn);
+      return ownsPawn(p, id) ? id : FREE_PAWN;
     }
     case "emotes": {
       const id = str(p.emote_set);

@@ -1,7 +1,7 @@
 // The one-time import of the local (pre-v2) profile into a new account (POST /v1/auth/guest {pid, import}).
 // Only known fields are taken; numbers are capped, owned items must exist, equipped items must be owned or
 // unlocked, reward timers may only make the player wait (never claim twice). Every change is listed in `notes`.
-import { DEFAULT_SCENE, FREE_DICE, FREE_EMOTES, FREE_ROOMS, STAT_KEYS, achievement, item } from "./catalog";
+import { DEFAULT_SCENE, FREE_DICE, FREE_EMOTES, FREE_PAWN, FREE_ROOMS, STAT_KEYS, achievement, item } from "./catalog";
 import { IMPORT_CAPS } from "./rules";
 import { type Dict, clamp, clone, isArray, isDict, isGdInt, stripEdges } from "./gd";
 import { type Delta, type Profile, achDone, equipped, isPlayerId } from "./profile";
@@ -33,7 +33,7 @@ export function cleanName(v: unknown): string {
   return stripEdges(v).split(" ").filter((s) => s !== "").join(" ").slice(0, IMPORT_CAPS.name_max);
 }
 
-function ownedIds(v: unknown, kind: "room" | "dice" | "emotes" | "scene" | "char", field: string, notes: string[]): string[] {
+function ownedIds(v: unknown, kind: "room" | "dice" | "pawn" | "emotes" | "scene" | "char", field: string, notes: string[]): string[] {
   const out: string[] = [];
   if (v === undefined) return out;
   if (!isArray(v)) {
@@ -42,7 +42,8 @@ function ownedIds(v: unknown, kind: "room" | "dice" | "emotes" | "scene" | "char
   }
   for (const x of v) {
     const it = typeof x === "string" ? item(kind, x) : undefined;
-    if (!it || (kind === "char" && it.price <= 0)) {
+    // characters: paid ones only; pawn skins: only the coin ones (the gem-only skins were never sold offline)
+    if (!it || (kind === "char" && it.price <= 0) || (kind === "pawn" && !it.buy && it.id !== FREE_PAWN)) {
       notes.push(`${field}: dropped ${JSON.stringify(x)}`);
       continue;
     }
@@ -87,6 +88,8 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   p.rooms = [...FREE_ROOMS, ...rooms.filter((r) => !FREE_ROOMS.includes(r))];
   const dice = ownedIds(raw.dice_owned, "dice", "dice_owned", notes);
   p.dice_owned = [FREE_DICE, ...dice.filter((d) => d !== FREE_DICE)];
+  const pawns = ownedIds(raw.pawns_owned, "pawn", "pawns_owned", notes);
+  p.pawns_owned = [FREE_PAWN, ...pawns.filter((d) => d !== FREE_PAWN)];
   const emo = ownedIds(raw.emote_sets, "emotes", "emote_sets", notes);
   p.emote_sets = [FREE_EMOTES, ...emo.filter((e) => e !== FREE_EMOTES)];
   const scenes = ownedIds(raw.scenes, "scene", "scenes", notes);
@@ -105,7 +108,7 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   p.claimed = claimed;
 
   // equipped: owned / unlocked, else the default
-  const fields: [string, string][] = [["room", "room"], ["dice", "dice"], ["emotes", "emote_set"], ["scene", "scene"], ["avatar", "avatar"], ["frame", "frame"], ["plate", "plate"], ["badge", "badge"]];
+  const fields: [string, string][] = [["room", "room"], ["dice", "dice"], ["pawn", "pawn"], ["emotes", "emote_set"], ["scene", "scene"], ["avatar", "avatar"], ["frame", "frame"], ["plate", "plate"], ["badge", "badge"]];
   for (const [kind, field] of fields) {
     const v = raw[field];
     if (v === undefined) continue;

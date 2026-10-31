@@ -89,7 +89,7 @@ describe("the one-time import", () => {
     expect(await row("SELECT value FROM scores WHERE account_id = ? AND board = 'xp' AND period = 'all'", g.id)).toEqual({ value: 12_345 });
     // imported XP is not "this week's" XP
     expect(await row("SELECT value FROM scores WHERE account_id = ? AND board = 'xp' AND period LIKE 'week:%'", g.id)).toBeNull();
-    expect(await getPublicProfile(ENV, g.id)).toEqual({ name: "Shihab", avatar: "ch-rafi", frame: "classic", level: 21 });
+    expect(await getPublicProfile(ENV, g.id)).toEqual({ name: "Shihab", avatar: "ch-rafi", frame: "classic", level: 21, pawn: "classic", pawns: ["classic"] });
   });
 
   it("caps XP at 200,000 and happens once per account", async () => {

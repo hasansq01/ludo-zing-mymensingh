@@ -26,9 +26,10 @@ describe("gems and rerolls on the profile", () => {
 });
 
 describe("catalog gem prices", () => {
-  it("every item sold for coins has ceil(price / 100) gems, others none", () => {
+  it("every item sold for coins has ceil(price / 100) gems, gem-only pawn skins their own, others none", () => {
     for (const it of CATALOG.items) {
       if (it.buy && it.price > 0) expect(it.gems, `${it.kind}:${it.id}`).toBe(Math.ceil(it.price / 100));
+      else if (it.kind === "pawn" && !it.free) expect(it.gems, `${it.kind}:${it.id}`).toBeGreaterThan(0);
       else expect(it.gems, `${it.kind}:${it.id}`).toBeUndefined();
     }
     expect(CATALOG.items.some((it) => it.gems !== undefined)).toBe(true);

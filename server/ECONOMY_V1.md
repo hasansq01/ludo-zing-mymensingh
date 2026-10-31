@@ -21,7 +21,7 @@ rules stay as written in ONLINE_V2.md and `src/econ/README.md` unless this file 
 | Re-roll | Once per player per match, online matches only (quick and friend rooms). Costs **1 free re-roll** (if you have one) else **5 gems** |
 | Rewarded ads (max 8 a day) | `reroll` +1 free re-roll (3/day) · `refill` +500 coins, only while broke (2/day) · `double` the coin payout of a won coin-table match again (2/day) · `gems` +2 gems (1/day) |
 | Gems earned | Level-up +5 per level · weekly boards (XP and wins, last week): 1st 50, 2nd 30, 3rd 20, 4th–10th 10 · each achievement +10 · `gems` ad +2 |
-| Gem prices in the shop | Every paid item can also be bought for `ceil(price / 100)` gems (rooms, dice, scenes, characters, emote packs) |
+| Gem prices in the shop | Every paid item can also be bought for `ceil(price / 100)` gems (rooms, dice, pawn skins, scenes, characters, emote packs). The premium pawn skins are sold for gems only (Glitter 80, Royal Crown 120, Chess Knight 150; buying them with coins answers 409 `gems_only`) |
 | Gems → Coins exchange | 10 → 1,000 · 50 → 5,500 · 120 → 14,000 (one way) |
 | Gem packs (Google Play, consumable) | `gems_80` 80 · `gems_220` 220 · `gems_500` 500 · `gems_1200` 1,200. Prices are set in Play Console (Bangladesh taka tiers), not here |
 

@@ -1,7 +1,7 @@
-// Buying and equipping (Catalog.buy_room / buy_dice, SLScenes.buy_scene, Collection.buy_char, the equip functions).
-// The checks run in the game's order; nothing changes on an error. Purchases equip the item, as the Shop does
-// (rooms, dice and scenes by default, characters with equip_it = true).
-import { type CatalogItem, FREE_DICE, FREE_EMOTES, item } from "./catalog";
+// Buying and equipping (Catalog.buy_room / buy_dice / buy_pawn, SLScenes.buy_scene, Collection.buy_char, the equip
+// functions). The checks run in the game's order; nothing changes on an error. Purchases equip the item, as the Shop
+// does (rooms, dice, pawn skins and scenes by default, characters with equip_it = true).
+import { type CatalogItem, FREE_DICE, FREE_EMOTES, FREE_PAWN, item } from "./catalog";
 import { clone, getInt, list, str } from "./gd";
 import {
   type Delta,
@@ -10,12 +10,13 @@ import {
   isUnlocked,
   ownsDice,
   ownsEmotes,
+  ownsPawn,
   ownsRoom,
   ownsScene,
   sceneIds,
 } from "./profile";
 
-export type BuyError = "unknown" | "owned" | "coins" | "gems" | "locked";
+export type BuyError = "unknown" | "owned" | "coins" | "gems" | "gems_only" | "locked";
 
 export type BuyResult =
   | { ok: true; profile: Profile; delta: Delta; price: number }
@@ -27,6 +28,7 @@ export type BuyResult =
  *   owned    already owned, or free for everyone (Arif, Nadia, the free rooms / dice / scene)
  *   coins    not enough coins
  *   gems     not enough gems (currency "gems": the item's gem price is paid from profile.gems)
+ *   gems_only  currency "coins" for a pawn skin sold for gems only (no coin price: nothing is ever free by mistake)
  *   locked   an unlock-only item (avatar, frame, plate, badge) that isn't unlocked yet; when it is, "owned"
  */
 export function buy(profile: Profile, kind: string, id: string, currency: "coins" | "gems" = "coins"): BuyResult {
@@ -63,6 +65,19 @@ export function buy(profile: Profile, kind: string, id: string, currency: "coins
           p.scenes = scenes;
           p.scene = id;
         }
+      });
+    }
+    case "pawn": {
+      const it = item("pawn", id);
+      if (!it) return { ok: false, error: "unknown" };
+      if (ownsPawn(profile, id)) return { ok: false, error: "owned" };
+      if (currency === "coins" && (!it.buy || it.price <= 0)) return { ok: false, error: "gems_only" };
+      return pay(profile, kind, id, it, currency, (p) => {
+        const pawns = list(p, "pawns_owned");
+        if (!pawns.includes(FREE_PAWN)) pawns.unshift(FREE_PAWN);
+        pawns.push(id);
+        p.pawns_owned = pawns;
+        p.pawn = id;
       });
     }
     case "char": {
@@ -111,7 +126,7 @@ function pay(profile: Profile, kind: string, id: string, it: CatalogItem, curren
 
 // ---------- equipping ----------
 
-export type EquipKind = "room" | "dice" | "emotes" | "scene" | "avatar" | "char" | "frame" | "plate" | "badge";
+export type EquipKind = "room" | "dice" | "pawn" | "emotes" | "scene" | "avatar" | "char" | "frame" | "plate" | "badge";
 
 export type EquipResult = { ok: true; profile: Profile; changed: boolean } | { ok: false; error: "unknown" | "locked" };
 
@@ -126,9 +141,11 @@ export function equip(profile: Profile, kind: string, id: string): EquipResult {
   switch (kind) {
     case "room":
     case "dice":
+    case "pawn":
     case "emotes": {
       if (!item(kind, id)) return { ok: false, error: "unknown" };
-      if (!(kind === "room" ? ownsRoom(p, id) : kind === "dice" ? ownsDice(p, id) : ownsEmotes(p, id))) return { ok: false, error: "locked" };
+      const owns = kind === "room" ? ownsRoom(p, id) : kind === "dice" ? ownsDice(p, id) : kind === "pawn" ? ownsPawn(p, id) : ownsEmotes(p, id);
+      if (!owns) return { ok: false, error: "locked" };
       const field = kind === "emotes" ? "emote_set" : kind;
       if (str(p[field]) === id) return { ok: true, profile: p, changed: false };
       const q = clone(p);
