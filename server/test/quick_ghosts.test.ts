@@ -73,7 +73,7 @@ function audit(p: Played, game: string, humanNames: string[]): void {
         expect(m.game).toBe(game);
         const keys = m.seats.map((s: Msg) => Object.keys(s).sort().join(","));
         expect(new Set(keys).size).toBe(1); // every seat has exactly the same fields
-        expect(keys[0]).toBe("avatar,bot,color,frame,id,level,name,online");
+        expect(keys[0]).toBe("avatar,bot,color,frame,id,level,name,online,pawn");
         const ghostSeats = m.seats.filter((s: Msg) => p.ghostColors.has(s.color));
         expect(ghostSeats.length).toBe(p.ghostColors.size);
         const names = m.seats.map((s: Msg) => s.name.toLowerCase());

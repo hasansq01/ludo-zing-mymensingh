@@ -50,10 +50,20 @@ export const DEFAULT_AVATAR: string = data.defaults.avatar;
 /** Characters that read as one gender (a ghost's avatar should not contradict its name). */
 const FEMALE_CHARS = new Set(["ch-nadia", "ch-riya", "ch-tania", "ch-mim", "ch-sumaiya", "ch-priya", "ch-lamia", "ch-fariha", "ch-nusrat", "ch-ayesha"]);
 
+/**
+ * The pawn skins ghosts wear (Catalog.PAWNS), weighted: about half keep Classic, the coin skins are common, the
+ * gem-only ones rare, so a table looks lived-in without every seat dressed up. "" = Classic. Only skins that exist.
+ */
+export const GHOST_PAWNS: readonly (readonly [string, number])[] = (
+  [["", 50], ["trim", 12], ["marble", 10], ["kitty", 9], ["teacup", 8], ["glitter", 5], ["crown", 4], ["knight", 2]] as const
+).filter(([id]) => id === "" || (data.items as CatalogItemLite[]).some((it) => it.kind === "pawn" && it.id === id));
+
 export interface GhostIdentity {
   name: string;
   avatar: string;
   frame: string;
+  /** Pawn skin ("" = Classic). */
+  pawn: string;
   level: number;
 }
 
@@ -72,9 +82,21 @@ function intIn(lo: number, hi: number, rng: Rng): number {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
+/** A ghost's pawn skin, drawn from GHOST_PAWNS by weight. */
+export function ghostPawn(rng: Rng): string {
+  const total = GHOST_PAWNS.reduce((s, [, w]) => s + w, 0);
+  let r = rng.randf() * total;
+  for (const [id, w] of GHOST_PAWNS) {
+    r -= w;
+    if (r < 0) return id;
+  }
+  return "";
+}
+
 /**
  * n ghost identities for a room with these humans: names unique in the room and never a human's name
- * (case-insensitive), a free avatar that fits the name, the default frame, a level within ±3 of a human's.
+ * (case-insensitive), a free avatar that fits the name, the default frame, a pawn skin (ghostPawn), a level within ±3
+ * of a human's.
  */
 export function makeGhosts(n: number, humans: readonly HumanLite[], rng: Rng): GhostIdentity[] {
   const taken = new Set(humans.map((h) => norm(h.name)));
@@ -91,7 +113,7 @@ export function makeGhosts(n: number, humans: readonly HumanLite[], rng: Rng): G
     const avatar = rng.randf() < 0.35 ? DEFAULT_AVATAR : pick(fits.length ? fits : FREE_AVATARS, rng);
     const base = pick(levels, rng);
     const level = Math.max(1, base + intIn(-3, 3, rng));
-    out.push({ name, avatar, frame: "classic", level });
+    out.push({ name, avatar, frame: "classic", pawn: ghostPawn(rng), level });
   }
   return out;
 }

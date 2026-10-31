@@ -19,6 +19,8 @@ var resolve_body: Dictionary = {}
 var drop_session := false                ## authed calls answer 401 unauthorized
 var board := {top = [], me = null, min_matches = 3}
 var prices := {room_neon = 3000, dice_gold = 900, emotes_pawns = 2500, emotes_friends = 4000, emotes_game = 3500}
+## Items sold for gems only (pawn skins): key -> gems. Bought with coins: 409 gems_only.
+var gem_only := {}
 var daily_taken := false
 var broke_taken := false
 var rewards_next := {daily = 1793000000, spin = 1793000000, free = 1793003600}   ## GET /v1/rewards next_at per reward
@@ -41,6 +43,7 @@ static func base_profile() -> Dictionary:
 	return {name = "You", id = "LZM-TEST-0001", coins = 5000, gems = 0, rerolls = 0, xp = 0,
 		stats = {played = 0, wins = 0, losses = 0, streak = 0, bestStreak = 0, coinsEarned = 0, pairsFormed = 0, ppGames = 0, slPlayed = 0, slWins = 0},
 		rooms = ["night", "cafe"], room = "night", dice_owned = ["classic"], dice = "classic", emote_sets = ["starter"], emote_set = "starter", scenes = ["jungle"], scene = "jungle",
+		pawns_owned = ["classic"], pawn = "classic",
 		daily = {}, last_spin = "", last_free = 0, avatar = "pawn-red", av_owned = [], frame = "classic", plate = "plain", badge = "", claimed = []}
 
 func count(path: String) -> int:
@@ -108,10 +111,14 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 		"/v1/shop/buy":
 			var key := "%s_%s" % [b.get("kind"), b.get("id")]
 			var price := int(prices.get(key, -1))
+			if gem_only.has(key):
+				if str(b.get("currency", "coins")) != "gems":
+					return _ok({error = "gems_only"}, 409)
+				price = 0
 			if price < 0:
 				return _ok({error = "unknown"}, 404)
 			if str(b.get("currency", "coins")) == "gems":
-				price = (price + 99) / 100
+				price = int(gem_only[key]) if gem_only.has(key) else (price + 99) / 100
 				if int(profile.gems) < price:
 					return _ok({error = "gems", short = price - int(profile.gems)}, 409)
 				profile.gems = int(profile.gems) - price
@@ -125,6 +132,9 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 			elif b.kind == "emotes":
 				profile.emote_sets.append(b.id)
 				profile.emote_set = b.id
+			elif b.kind == "pawn":
+				profile.pawns_owned.append(b.id)
+				profile.pawn = b.id
 			else:
 				profile.dice_owned.append(b.id)
 			return _ok({ok = true, profile = _prof(), price = price, currency = str(b.get("currency", "coins"))})

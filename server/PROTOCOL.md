@@ -30,6 +30,10 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 - Each client has a random **player id** (`pid`, 16+ chars, generated once and kept on the device) and per-room
   **token** issued by the server in `welcome`. Reconnecting with the token (same room) takes back the same seat.
 - Names are trimmed, 1–16 characters (default "Player"); avatar and frame are catalog ids (strings ≤ 32 chars).
+- **Pawn skins** (`pawn`, Catalog.PAWNS: `trim`, `marble`, `crown` ...; `""` = Classic): everyone at the table sees
+  each player's skin. The server keeps a hello's `pawn` only when it is a known skin the member's account owns
+  (`pawns_owned`); anything else (no account, not owned, unknown, Classic) is sent as `""`. A hello without `pawn`
+  (an older client) gets the account's equipped skin. Ghosts wear a weighted mix (`ghosts.ts GHOST_PAWNS`).
 - **Accounts** (ONLINE_V2.md §1): `hello` may carry `session` (from `POST /v1/auth/guest`). The member then belongs
   to that account (rewards at `over`, bans, level). Without a session (old clients) the server looks up the pid's
   account (`devices`); a pid with no account still plays, but earns nothing. An invalid or expired session is not an
@@ -40,7 +44,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 
 | t | fields | when |
 |---|---|---|
-| `hello` | `v: 1, pid, name, avatar, frame, token?, session?, pair_ask?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
+| `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
 | `settings` | `teams?: bool, game?: "ludo" \| "sl"` | host, lobby only (friend rooms). A `pair_ask` from older clients is accepted and ignored |
 | `start` | – | host, lobby (or after `over` for a rematch); needs ≥ 2 members (teams: exactly 4) |
 | `roll` | `n` | your turn, phase `roll` |
@@ -62,7 +66,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | t | fields |
 |---|---|
 | `welcome` | `token, id` (your member id), `code`, `host` (member id) |
-| `lobby` | `code, host, members: [{id, name, avatar, frame, level, online, color}], settings: {teams, game}, max: 4` |
+| `lobby` | `code, host, members: [{id, name, avatar, frame, pawn, level, online, color}], settings: {teams, game}, max: 4` |
 | `start` | `n: 0, game, seats, state, h` |
 | `act` | `n, a, h` (one action, see below; `n` = its index, `h` = server state hash after applying it) |
 | `sync` | `n, game, seats, state, h` (full snapshot; replaces the client state) |
@@ -73,7 +77,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | `emote` | `c, id` (+ `member` when `c` = -1; see "Emotes") |
 | `pong` | `now` (only from other ping shapes; the exact `{"t":"ping"}` gets `{"t":"pong"}`, see "Keep-alive") |
 
-`seats`: `[{color, id, name, avatar, frame, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
+`seats`: `[{color, id, name, avatar, frame, pawn, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
 LudoRules state (JSON) with `players[c]` = `"human"` (a member), `"cpu"` (a bot) or `"off"`, and `names[c]` = the
 member's name. Clients replace their own seat's display name with "You" locally (presentation only; never hashed).
 
@@ -264,7 +268,7 @@ What changes for `"sl"`:
 
 | dir | t | fields |
 |---|---|---|
-| → | `hello` | `v: 1, session, pid, name?, avatar?, frame?` (first message; `session` may instead be the `?session=` query parameter). name / avatar / frame default to the account's profile; they are what the others see in the match |
+| → | `hello` | `v: 1, session, pid, name?, avatar?, frame?, pawn?` (first message; `session` may instead be the `?session=` query parameter). name / avatar / frame / pawn default to the account's profile; they are what the others see in the match (`pawn` only when the account owns it) |
 | ← | `queued` | `position` (1-based, first come first served), `eta_s` (rough seconds until the match). Sent after hello and whenever your position changes |
 | ← | `matched` | `code`, `token`: your seat in room `code`. The last message: the **client** closes this socket (the server leaves it open, because a close right behind a frame can make some clients drop it; later messages are ignored) |
 | → | `cancel` | leave the queue; answered by `cancelled`, then close 1000. Closing the socket also leaves the queue |

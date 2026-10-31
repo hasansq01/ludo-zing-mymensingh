@@ -1,7 +1,7 @@
 // The Room / Matchmaker side of the accounts interface agreed with the accounts work (src/accounts.ts, W2-ACC):
 //   verifySession(env, token) -> {account_id} | null
 //   accountForPid(env, pid) -> {account_id, banned} | null
-//   getPublicProfile(env, account_id) -> {name, avatar, frame, level}
+//   getPublicProfile(env, account_id) -> {name, avatar, frame, level, pawn, pawns}
 //   grantOnlineMatch(env, {match_id, game, results: [{account_id, outcome: "win" | "finish" | "left"}]})  (idempotent)
 // plus the D1 helper db.ts gets for quick-match stats: recordQuickStat(env, {...}).
 //
@@ -32,6 +32,9 @@ export interface PublicProfile {
   avatar: string;
   frame: string;
   level: number;
+  /** The pawn skin in use and the owned ones (a hello's pawn is checked against them); missing: unknown. */
+  pawn?: string;
+  pawns?: string[];
 }
 
 export interface OnlineMatchGrant {

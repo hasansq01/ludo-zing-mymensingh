@@ -478,6 +478,8 @@ static func error_text(code: String, action := "claim") -> String:
 			return L10n.t("You already own that.")
 		"gems":
 			return L10n.t("Not enough gems.")
+		"gems_only":
+			return L10n.t("That’s sold for gems only.")
 		"locked":
 			return L10n.t("That’s still locked.")
 		"cap":

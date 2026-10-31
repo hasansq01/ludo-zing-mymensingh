@@ -112,6 +112,7 @@ const CAT := {
 	chars = [Color("#e09478"), Color("#b5624a")],
 	scenes = [Color("#8fb8de"), Color("#5a86b0")],
 	dice = [Color("#91b58a"), Color("#5f8a57")],
+	pawns = [Color("#e58f8f"), Color("#b35b5b")],
 	emotes = [Color("#d6a3d0"), Color("#a56d9f")],
 	coins = [Color("#e7b85f"), Color("#b98a2e")],
 	avatars = [Color("#e7b85f"), Color("#b98a2e")],

@@ -416,6 +416,29 @@ func resume(state: Dictionary) -> void:
 		G.phase = "roll"
 	await _open()
 
+## Each player's pawn skin (Catalog.PAWNS ids, "" = Classic), in G.players order: online each seat's own (the server
+## only seats a skin its account owns); offline your skin on the first player who isn't the computer (you, or Pass &
+## Play's first player), Classic for the rest. As LudoMatch.pawn_skins.
+func pawn_skins() -> Array:
+	return skins_of(G.players, ns.seats if online and ns != null else null, Catalog.pawn_in_use())
+
+## pawn_skins() as a pure function over the rules' players: `seats` the online seats (null offline), `mine` this
+## device's skin.
+static func skins_of(players: Array, seats: Variant, mine: String) -> Array:
+	var out := []
+	var given := false
+	for p: Dictionary in players:
+		var id := ""
+		if seats is Array:
+			for st: Dictionary in seats:
+				if int(st.get("color", -1)) == int(p.c):
+					id = str(st.get("pawn", ""))
+		elif not given and not bool(p.cpu):
+			id = mine
+			given = true
+		out.append(id)
+	return out
+
 func _open() -> void:
 	_id += 1
 	_busy = false
@@ -431,7 +454,7 @@ func _open() -> void:
 	var cols := []
 	for p in G.players:
 		cols.append(int(p.c))
-	board.setup_players(cols)
+	board.setup_players(cols, pawn_skins())
 	board.place(_positions())
 	if scenes:
 		scenes.play(true, Save.prefs.sl_cam)

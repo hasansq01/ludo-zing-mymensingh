@@ -75,6 +75,7 @@ static var _display: Font
 static var _body := {}
 static var _caps := {}
 static var _bangla := {}
+static var _under := []                 # [FontVariation, Bangla weight] pairs: the faces with a Bangla fallback (_bangla_under)
 static var _theme: Theme
 static var _tex := {}
 static var _surf := {}
@@ -89,7 +90,7 @@ static func font_display() -> Font:
 	if _display == null:
 		var fv := FontVariation.new()
 		fv.base_font = load("res://assets/fonts/LilitaOne.woff2")
-		fv.fallbacks = [bangla_font(0)]
+		_bangla_under(fv, 0)
 		_display = fv
 	return _display
 
@@ -104,7 +105,7 @@ static func font_body(weight := 700, tnum := false) -> Font:
 		fv.variation_opentype = {ts.name_to_tag("wght"): weight}
 		if tnum:
 			fv.opentype_features = {ts.name_to_tag("tnum"): 1}
-		fv.fallbacks = [bangla_font(weight)]
+		_bangla_under(fv, weight)
 		_body[key] = fv
 	return _body[key]
 
@@ -119,7 +120,7 @@ static func font_caps(weight := 900, spacing := 1) -> Font:
 		fv.base_font = load("res://assets/fonts/Nunito.woff2")
 		fv.variation_opentype = {ts.name_to_tag("wght"): weight}
 		fv.spacing_glyph = spacing
-		fv.fallbacks = [bangla_font(weight)]
+		_bangla_under(fv, weight)
 		_caps[key] = fv
 	return _caps[key]
 
@@ -142,6 +143,19 @@ static func bangla_font(weight := 700) -> Font:
 		fv.spacing_bottom = -3
 		_bangla[weight] = fv
 	return _bangla[weight]
+
+## Puts the Bangla face under a Latin one, only while the interface is in Bangla: a line's height is the tallest
+## font of its fallback chain, and Baloo Da 2 under Lilita One made every English title ~45 % taller (28 px: 48
+## px instead of 33) even with no Bangla in it. sync_bangla() follows a language switch.
+static func _bangla_under(fv: FontVariation, weight: int) -> void:
+	_under.append([fv, weight])
+	fv.fallbacks = [bangla_font(weight)] if L10n.is_bn() else []
+
+## After the interface language changes (L10n.apply): the Bangla fallbacks on, or off for English.
+static func sync_bangla() -> void:
+	var bn := L10n.is_bn()
+	for u: Array in _under:
+		(u[0] as FontVariation).fallbacks = [bangla_font(int(u[1]))] if bn else []
 
 ## The app-wide theme (cached; don't modify it): Nunito body text in plum, no focus rings over the cozy buttons,
 ## cream LineEdits with a honey focus ring, slim honey scrollbars.

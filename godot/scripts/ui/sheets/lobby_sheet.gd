@@ -291,6 +291,7 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	if c >= 0:
 		var seat := SetupSheet.SeatDot.new(PlayerTile._pref("colorblind"))
 		seat.custom_minimum_size = Vector2(28, 28)
+		seat.skin = str(m.get("pawn", ""))           # their pawn skin, as it will stand on the board
 		seat.set_color(c)
 		row.add_child(seat)
 	return p

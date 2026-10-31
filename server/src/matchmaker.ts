@@ -23,6 +23,7 @@ import {
   cleanName,
   isGame,
   isSessionShape,
+  pawnFor,
   randomCode,
   withTimeout,
   type Env,
@@ -57,6 +58,8 @@ interface MmAtt {
   name?: string;
   avatar?: string;
   frame?: string;
+  /** Pawn skin, one the account owns ("" = Classic). */
+  pawn?: string;
   level?: number;
   since?: number;
   seq?: number;
@@ -238,7 +241,7 @@ export class Matchmaker extends DurableObject<Env> {
     let account: string | null = null;
     let ban: string | null = null;
     let level = 1;
-    let prof: { name: string; avatar: string; frame: string } | null = null;
+    let prof: { name: string; avatar: string; frame: string; pawn?: string; pawns?: string[] } | null = null;
     let maintenance: string | null = null;
     try {
       const cfg = await withTimeout(D.readConfig(env.DB), MM.readTimeout);
@@ -351,6 +354,7 @@ export class Matchmaker extends DurableObject<Env> {
       name: cleanName(msg.name ?? prof?.name),
       avatar: cleanId(msg.avatar ?? prof?.avatar ?? ""),
       frame: cleanId(msg.frame ?? prof?.frame ?? ""),
+      pawn: pawnFor(msg.pawn ?? prof?.pawn, prof?.pawns), // only a skin the account owns
       level,
       since,
       seq,
@@ -436,6 +440,7 @@ export class Matchmaker extends DurableObject<Env> {
         name: e.att.name ?? "Player",
         avatar: e.att.avatar ?? "",
         frame: e.att.frame ?? "",
+        pawn: e.att.pawn ?? "",
         level: e.att.level ?? 1,
         entry_id: e.att.ent,
       })),

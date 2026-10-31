@@ -404,7 +404,7 @@ class Tile extends Control:
 			_caps.base_font = load("res://assets/fonts/Nunito.woff2")
 			_caps.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 900}
 			_caps.spacing_glyph = 1
-			_caps.fallbacks = [UIKit.bangla_font(900)]
+			UIKit._bangla_under(_caps, 900)
 		return _caps
 
 	func _init(index: int) -> void:

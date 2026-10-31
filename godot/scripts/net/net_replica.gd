@@ -20,7 +20,7 @@ extends RefCounted
 var game := "ludo"
 var S := {}
 var me := -1                              ## your colour (-1: watching)
-var seats: Array = []                     ## [{color, id, name, avatar, frame, level, bot, online}]
+var seats: Array = []                     ## [{color, id, name, avatar, frame, pawn, level, bot, online}]
 var n := 0                                ## actions applied
 var awaiting_sync := false
 var q: Array = []

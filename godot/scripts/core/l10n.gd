@@ -46,6 +46,7 @@ static func apply(pref: Variant) -> String:
 	var code := resolve(pref)
 	if TranslationServer.get_locale() != code:
 		TranslationServer.set_locale(code)
+		UIKit.sync_bangla()
 	return code
 
 ## The language in use: "bn" or "en".

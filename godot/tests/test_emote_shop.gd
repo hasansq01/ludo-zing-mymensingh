@@ -123,7 +123,7 @@ func _shop_ui() -> void:
 	Save.profile.coins = 3000
 	var shop := ShopSheet.new("emotes")
 	_root.add_child(shop)
-	check("shop: an Emotes tab, between Dice and Look", ShopSheet.TABS.map(func(t): return t.key).slice(2, 5) == ["dice", "emotes", "look"])
+	check("shop: an Emotes tab, between Pawns and Look", ShopSheet.TABS.map(func(t): return t.key).slice(2, 6) == ["dice", "pawns", "emotes", "look"])
 	shop.show_tab("frames")
 	check("shop: Frames sit under the Look tab (its Avatars | Frames | Plates | Badges filter shows)", shop.tab == "frames" and shop._look.get_parent().visible and ShopSheet.strip_key("badges") == "look")
 	shop.show_tab("emotes")

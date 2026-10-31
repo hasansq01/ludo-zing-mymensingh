@@ -227,6 +227,7 @@ func _make() -> void:
 	_pad_lip.visible = false
 	fx = Node3D.new()
 	add_child(fx)
+	PawnSkins.warm_swatch(self, Vector3(0, 0.0, 0))  # inside the frame: never seen, keeps the finish shader compiled
 	_bite = SnakeBite.new()                 # (built with the board, hidden: the first snake doesn't hitch)
 	add_child(_bite)
 
@@ -549,33 +550,30 @@ static func _paint_snakes(c: CanvasItem, u: float, st: Dictionary) -> void:
 
 # ---------- pawns ----------
 
-## One pawn per player; colors are LudoRules colour indices (0..3). Everyone starts at their waiting spot.
-func setup_players(colors: Array) -> void:
+## One pawn per player; colors are LudoRules colour indices (0..3), skins[pi] each player's pawn skin
+## (Catalog.PAWNS; missing / "" / unknown = Classic). Everyone starts at their waiting spot.
+func setup_players(colors: Array, skins: Array = []) -> void:
 	_make()
 	for p in pawns:
 		_stop(p)
 		p.node.queue_free()
 	pawns.clear()
 	current = -1
-	var prof := PackedVector2Array()
-	for q in LudoBoard.PAWN_PROFILE:
-		prof.append(Vector2(q[0], q[1]))
-	var body_mesh := MeshKit.lathe(prof, 36)
-	var head_mesh := MeshKit.sphere(0.19, 28, 18)
 	var ring_mesh := MeshKit.torus(0.5, 0.045, 48, 8)
 	for pi in colors.size():
 		var ci: int = colors[pi]
-		var m := LudoBoard.pawn_material(Palette.PLAYER[ci])
 		var g := Node3D.new()
 		g.name = "SLPawn%d" % pi
 		add_child(g)
-		MeshKit.put(g, body_mesh, m, Vector3.ZERO)
-		MeshKit.put(g, head_mesh, m, Vector3(0, 0.74, 0))
+		var skin := str(skins[pi]) if pi < skins.size() else ""
+		var look := PawnSkins.dress(g, skin, Palette.PLAYER[ci])
+		var m: StandardMaterial3D = look.mat
 		var rm := MeshKit.unlit(Color(1, 1, 1, 0.9))
 		rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		var ring := MeshKit.put(g, ring_mesh, rm, Vector3(0, 0.03, 0), Vector3.ZERO, Vector3.ONE, false)
 		ring.visible = false
-		var t := {node = g, mat = m, ring = ring, target = wait_spot(pi), scale = PAWN_SCALE * WAIT_SCALE, anim = false, pos = 0}
+		var t := {node = g, mat = m, ring = ring, target = wait_spot(pi), scale = PAWN_SCALE * WAIT_SCALE, anim = false, pos = 0,
+			skin = Catalog.pawn(skin).get("id", Catalog.FREE_PAWN), over = float(look.top) - PawnSkins.CLASSIC_TOP}
 		g.position = t.target
 		g.scale = Vector3.ONE * float(t.scale)
 		pawns.append(t)
@@ -683,21 +681,25 @@ func pawn_top(pi: int) -> Vector3:
 	if pi < 0 or pi >= pawns.size():
 		return global_position
 	var g: Node3D = pawns[pi].node
-	return g.global_position + Vector3(0, 1.1 * g.scale.y, 0)
+	return g.global_position + Vector3(0, (1.1 + float(pawns[pi].get("over", 0.0))) * g.scale.y, 0)
 
 func _process(delta: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	var pulse := (sin(now * 1000.0 / 180.0) + 1.0) / 2.0
 	var k := 1.0 - pow(0.78, delta * 60.0)
 	var ks := 1.0 - pow(0.8, delta * 60.0)
+	var cam := get_viewport().get_camera_3d()
+	var still := not PawnSkins.moving(_reduced())
 	for pi in pawns.size():
 		var t: Dictionary = pawns[pi]
 		var g: Node3D = t.node
 		if not t.anim:
 			g.position = g.position.lerp(t.target, k)
-		if not t.get("bitten", false):                  # (the snake's gulp scales the pawn itself)
+		if not t.get("bitten", false):                  # (the snake's gulp scales and turns the pawn itself)
 			var s: float = g.scale.x + (float(t.scale) - g.scale.x) * ks
 			g.scale = Vector3(s, s, s)
+			PawnSkins.face(g, self, cam)                # the skin's front towards the camera
+		PawnSkins.animate(t.mat, now, still)
 		var on := pi == current
 		t.ring.visible = on
 		t.mat.emission_energy_multiplier = (0.08 + pulse * 0.16) if on else 0.0
@@ -721,7 +723,7 @@ func _stop(t: Dictionary) -> void:
 		old.kill()
 	t.tw = null
 	if t.has("node") and is_instance_valid(t.node):
-		(t.node as Node3D).rotation = Vector3.ZERO
+		(t.node as Node3D).rotation = Vector3(0, (t.node as Node3D).rotation.y, 0)   # (the turn to the camera stays)
 	if t.get("bitten", false):                          # cut off mid-gulp: the pawn is back, the snake gone
 		t.bitten = false
 		if is_instance_valid(t.node):
@@ -862,7 +864,7 @@ func slide(pi: int, head: int, tail: int, speed := 1.0) -> void:
 	_bite.finish()
 	g.visible = true
 	g.position = b
-	g.rotation = Vector3.ZERO
+	g.rotation = Vector3(0, g.rotation.y, 0)
 	g.scale = Vector3.ONE * float(t.scale)
 	t.anim = false
 
@@ -878,7 +880,7 @@ func _gulp_pose(t: Dictionary, u: float, a: Vector3, m: Vector3, q: Vector3, b: 
 		var p := a.lerp(into, _ease(k))
 		p.y = lerpf(a.y, into.y, k) + sin(k * PI) * 1.25 + maxf(0.0, (u - SnakeBite.CHOMP_AT)) * -3.0
 		g.position = p
-		g.rotation = Vector3(sin(k * PI) * 0.5, 0, sin(k * TAU) * 0.25)
+		g.rotation = Vector3(sin(k * PI) * 0.5, g.rotation.y, sin(k * TAU) * 0.25)
 		var shrink := lerpf(1.0, 0.48, clampf((k - 0.35) / 0.65, 0.0, 1.0))
 		g.scale = Vector3.ONE * sc0 * shrink
 	elif u < _bite.pop_at:
@@ -890,7 +892,7 @@ func _gulp_pose(t: Dictionary, u: float, a: Vector3, m: Vector3, q: Vector3, b: 
 		var p := Vector3(q.x, TOP - 0.25, q.z).lerp(b, _ease(hop))
 		p.y += sin(hop * PI) * 0.85
 		g.position = p
-		g.rotation = Vector3(0, 0, sin(hop * PI) * -0.35)
+		g.rotation = Vector3(0, g.rotation.y, sin(hop * PI) * -0.35)
 		var grow := 0.35 + 0.65 * minf(hop * 1.6, 1.0) + sin(minf(hop * 1.6, 1.0) * PI) * 0.18
 		var sq := sin(clampf((k - 0.75) / 0.25, 0.0, 1.0) * PI)
 		g.scale = Vector3(1.0 + 0.14 * sq, 1.0 - 0.2 * sq, 1.0 + 0.14 * sq) * sc * grow

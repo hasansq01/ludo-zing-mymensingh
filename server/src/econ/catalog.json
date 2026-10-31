@@ -46,6 +46,93 @@
       "gems": 60
     },
     {
+      "kind": "pawn",
+      "id": "classic",
+      "name": "Classic",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "pawn",
+      "id": "trim",
+      "name": "Gold Trim",
+      "price": 2000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 20
+    },
+    {
+      "kind": "pawn",
+      "id": "marble",
+      "name": "Marble",
+      "price": 3500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 35
+    },
+    {
+      "kind": "pawn",
+      "id": "kitty",
+      "name": "Kitty Ears",
+      "price": 5000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 50
+    },
+    {
+      "kind": "pawn",
+      "id": "teacup",
+      "name": "Teacup",
+      "price": 6000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 60
+    },
+    {
+      "kind": "pawn",
+      "id": "glitter",
+      "name": "Glitter",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 80
+    },
+    {
+      "kind": "pawn",
+      "id": "crown",
+      "name": "Royal Crown",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 120
+    },
+    {
+      "kind": "pawn",
+      "id": "knight",
+      "name": "Chess Knight",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 150
+    },
+    {
       "kind": "emotes",
       "id": "starter",
       "name": "Starter Set",
@@ -745,6 +832,10 @@
       "classic"
     ],
     "dice": "classic",
+    "pawns_owned": [
+      "classic"
+    ],
+    "pawn": "classic",
     "scenes": [
       "jungle"
     ],
