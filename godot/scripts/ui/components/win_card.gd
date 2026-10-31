@@ -16,8 +16,8 @@ const W := 1080
 const H := 1350
 const DIR := "user://share"
 const FILE := "win_card.png"
-const AVA := 320.0
-const AVA_TOP := 440.0
+const AVA := 340.0
+const AVA_TOP := 428.0
 
 var data := {}
 
@@ -71,23 +71,23 @@ func _build() -> void:
 	crown.size = Vector2(150, 150)
 	crown.pivot_offset = Vector2(75, 115)
 	crown.rotation = deg_to_rad(-8.0)
-	crown.position = Vector2(cx - 75.0, ava_top - 104.0)
+	crown.position = Vector2(cx - 75.0, ava_top - 98.0)
 	crown.visible = int(data.get("place", 1)) == 1
 	add_child(crown)
-	_text(eyebrow_text().to_upper(), Vector2(60, 778), W - 120, 44, Palette.CREMA, UIKit.font_caps(900, 4))
+	_text(eyebrow_text().to_upper(), Vector2(60, 792), W - 120, 44, Palette.CREMA, UIKit.font_caps(900, 4))
 	var who := str(data.get("name", ""))
 	var px := 92
 	while px > 56 and UIKit.font_display().get_string_size(who, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > W - 140:
 		px -= 4                              # a long name shrinks before it is cut
-	var nm := _text(who, Vector2(60, 828), W - 120, px, Palette.INK_STRONG, UIKit.font_display())
+	var nm := _text(who, Vector2(60, 838), W - 120, px, Palette.INK_STRONG, UIKit.font_display())
 	nm.size.y = 92.0 * 1.25
-	nm.position.y = 828.0 + (92 - px) * 0.4
+	nm.position.y = 838.0 + (92 - px) * 0.4
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_ribbon(title_text(), 962.0)
+	_ribbon(title_text(), 948.0)
 	if int(data.get("coins", 0)) > 0:
-		_coins(1132.0)
-	else:
-		_text(TranslationServer.translate("Play with me on Google Play"), Vector2(60, 1160), W - 120, 46, Palette.CREMA, UIKit.font_body(900))
+		_coins(1096.0)
+	var foot := 1244.0 if int(data.get("coins", 0)) > 0 else 1170.0
+	_text(TranslationServer.translate("Play with me on Google Play"), Vector2(60, foot), W - 120, 44, Palette.CREMA, UIKit.font_body(900))
 
 ## A one-line centred label of `px` at `pos` in a box `w` wide.
 func _text(t: String, pos: Vector2, w: float, px: int, color: Color, font: Font) -> Label:
@@ -105,7 +105,7 @@ func _ribbon(t: String, y: float) -> void:
 	var px := 76
 	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
 	var w := clampf(tw + 150.0, 520.0, W - 120.0)
-	var h := 128.0
+	var h := 120.0
 	var x := (W - w) / 2.0
 	var lip := Panel.new()
 	lip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -140,7 +140,7 @@ func _coins(y: float) -> void:
 	var coin := 96.0
 	var content := coin + 22.0 + nw + 18.0 + ww
 	var w := minf(content + 110.0, W - 120.0)
-	var h := 138.0
+	var h := 128.0
 	var x := (W - w) / 2.0
 	var p := Panel.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -186,7 +186,7 @@ func _draw() -> void:
 	for k in 6:
 		draw_circle(c, 330.0 - k * 36.0, Color(Color.WHITE, 0.10 + k * 0.05), true, -1.0, true)
 	var dots := [[120, 150, 0], [940, 120, 3], [70, 520, 2], [1010, 560, 1], [150, 660, 1], [950, 690, 0], [88, 1080, 3], [996, 1060, 2],
-		[170, 1290, 2], [900, 1296, 1]]
+		[100, 1200, 2], [985, 1220, 1]]
 	for d: Array in dots:
 		draw_circle(Vector2(d[0], d[1]), 16.0, Color(Palette.PLAYER[d[2]], 0.75), true, -1.0, true)
 	var rim := StyleBoxFlat.new()
