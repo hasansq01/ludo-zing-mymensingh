@@ -127,9 +127,11 @@ static func font_caps(weight := 900, spacing := 1) -> Font:
 ## The Bangla under the Latin faces (neither Lilita One nor Nunito has Bengali glyphs): weight 0 = Baloo Da 2
 ## ExtraBold under Lilita's titles, else Noto Sans Bengali at the same weight as the Nunito above it, so mixed
 ## Latin / Bangla text keeps one look. Both are OFL (assets/fonts/OFL-*.txt), cut to the Bengali block with
-## pyftsubset (layout features kept: the advanced text server shapes the conjuncts and vowel signs). Their lines
-## are a little trimmed (spacing_top / spacing_bottom): Bengali fonts are taller, and a Bangla line would
-## otherwise stand ~3 px taller than a Latin one in the same Label. Cached. A FontVariation keeps its own
+## pyftsubset (layout features kept: the advanced text server shapes the conjuncts and vowel signs). Baloo Da 2's
+## vertical metrics are cut to what its Bengali marks reach (ascent 960 / descent 420 per 1000, from 1095 / 589:
+## ি ী ৈ ৌ ঁ top out at 958, ু ূ ৃ go down to -416), else a Bangla title stood 1.68 em tall and pushed what sits
+## under it off the card (Quick match). Their lines are also a little trimmed (spacing_top / spacing_bottom):
+## Bengali fonts are taller, and a Bangla line would otherwise stand ~3 px taller than a Latin one in the same Label. Cached. A FontVariation keeps its own
 ## fallbacks: one built on another font only hands the base font's fallbacks on, without the weight.
 static func bangla_font(weight := 700) -> Font:
 	if not _bangla.has(weight):
