@@ -222,6 +222,17 @@ func ask_friend(host: Node, p: Dictionary) -> void:
 	var r2 := await add_friend(p)
 	_added_toast(host, name, r2)
 
+## A row's star: a friend already -> the Remove question (as a long-press); else added at once (one tap), then a toast.
+func star(host: Node, p: Dictionary) -> void:
+	var uid := str(p.get("uid", ""))
+	if uid == "" or not available():
+		return
+	if is_friend(uid):
+		await ask_friend(host, p)
+		return
+	var r := await add_friend(p)
+	_added_toast(host, L10n.seat_name(str(p.get("name", "Player"))), r)
+
 ## The same for someone in the room you are in (a lobby member, a match tile): the server finds who sits there.
 func ask_seat(host: Node, code: String, member: int, name_: String) -> void:
 	if code == "" or member < 1 or not available():

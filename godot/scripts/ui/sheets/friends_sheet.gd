@@ -7,11 +7,13 @@ extends Sheet
 ##            (Online) does the network work and calls set_busy() / set_busy("") around it.
 ##   Friends  your friends list (one-way, like favourites: the people you added; they aren't told), each with Invite.
 ##   Recent   the last 30 people you played online with (friend rooms and quick matches), newest first, with when and
-##            the game, a star on your friends, and Invite.
+##            the game, and Invite.
+## Every row has a star button before Invite: filled on a friend (a tap asks Remove from friends?), an outline on anyone
+## else (a tap adds them at once; Social.star).
 ## The lists come from Social (server/PROTOCOL.md "Recent players, friends and invites"): Loading…, the offline note
 ## with Try again, an empty note saying how people get there, or the rows (UIKit.list_row: avatar in its frame with the
 ## level star, name, the line under it, Invite). Long-press a row to add the person to friends or remove them
-## (Social.ask_friend). Invite asks Social, which brings them into the room you are in (in none, a new room is made
+## (Social.ask_friend) too. Invite asks Social, which brings them into the room you are in (in none, a new room is made
 ## first and its lobby opens, closing this sheet); the button then says "Invited" for as long as the invite lasts.
 ## invite mode (the lobby's "Invite friends"): only Friends and Recent, under the title "Invite friends".
 ##
@@ -242,7 +244,7 @@ func _render() -> void:
 				if people.is_empty():
 					l.add_child(_empty(key))
 					continue
-				var hint := UIKit.label(tr("Long-press a player to add or remove a friend."), UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+				var hint := UIKit.label(tr("Tap the star to add or remove a friend."), UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
 				hint.name = "Hint"
 				hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				hint.custom_minimum_size.x = 60
@@ -281,15 +283,15 @@ func _empty(key: String) -> Control:
 	v.add_child(ic)
 	var t := UIKit.label(tr("No friends yet") if key == "friends" else tr("No one here yet"), UIKit.FS.h3, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(t)
-	var msg := tr("Long-press a player in Recent, the lobby, a match or the leaderboard to add them.") if key == "friends" \
+	var msg := tr("Tap the star next to a player in Recent, or long-press them in the lobby, a match or the leaderboard.") if key == "friends" \
 		else tr("Play an online match, and the people you meet show up here.")
 	var l := UIKit.paragraph(msg, UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	l.name = "Message"
 	v.add_child(l)
 	return v
 
-## One person: avatar in its frame with the level star, the name (a star when a friend, on Recent), the line under it,
-## and Invite. Long-press: add / remove.
+## One person: avatar in its frame with the level star, the name, the line under it, the friend star and Invite.
+## Long-press: add / remove (as the star).
 func _person_row(p: Dictionary, key: String) -> Control:
 	var s := _social()
 	var uid := str(p.get("uid", ""))
@@ -319,12 +321,6 @@ func _person_row(p: Dictionary, key: String) -> Control:
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(nm)
-	if key == "recent" and bool(p.get("friend", false)):
-		var star := UIKit.icon("ic_star", 16)
-		star.name = "Friend"
-		star.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		top.add_child(star)
-		top.move_child(star, 0)
 	col.add_child(top)
 	var sub := UIKit.label(sub_text(p, key, s.now() if s != null else 0), UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
 	sub.name = "Sub"
@@ -332,6 +328,14 @@ func _person_row(p: Dictionary, key: String) -> Control:
 	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(sub)
 	h.add_child(col)
+	var fav := key == "friends" or bool(p.get("friend", false)) or (s != null and s.is_friend(uid))
+	var star := UIKit.icon_button("ic_star" if fav else "ic_star_outline", "glass", UIKit.TAP, 26)
+	star.name = "Star"
+	star.set_meta("friend", fav)
+	star.tooltip_text = tr("Remove from friends") if fav else tr("Add to friends")
+	star.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	star.pressed.connect(_star.bind(p, star))
+	h.add_child(star)
 	var inv := UIKit.btn(tr("Invited") if s != null and s.was_invited(uid) else tr("Invite"), "honey", "xs")   # dense (a 48 px target): the name and its line keep the room
 	inv.name = "Invite"
 	inv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -362,6 +366,16 @@ static func sub_text(p: Dictionary, key: String, now := 0) -> String:
 		var added := int(p.get("added_at", 0)) if p.get("added_at") is int or p.get("added_at") is float else 0
 		return L10n.t("Added %s") % Fmt.ago(added, now) if added > 0 else ""
 	return ""
+
+## The star: Social adds (or asks to remove) and says so; its `changed` redraws the lists with the new star.
+func _star(p: Dictionary, b: Button) -> void:
+	var s := _social()
+	if s == null or b.disabled:
+		return
+	b.disabled = true
+	await s.star(self, p)
+	if is_instance_valid(b):
+		b.disabled = false                   # (kept when Remove was cancelled; else the redraw replaced the row)
 
 func _invite(p: Dictionary, b: Button) -> void:
 	var s := _social()

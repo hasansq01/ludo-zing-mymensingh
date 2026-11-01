@@ -121,6 +121,16 @@ func confirm_yes(host: Node) -> bool:
 			return true
 	return false
 
+func confirm_no(host: Node) -> bool:
+	for k in 10:
+		await frames(1)
+		var q := _confirm_in((Engine.get_main_loop() as SceneTree).root)
+		if q != null:
+			(q.find_child("No", true, false) as Button).pressed.emit()
+			await frames(4)
+			return true
+	return false
+
 func _confirm_in(n: Node) -> Sheet:
 	for c in n.get_children():
 		if c is Sheet and (c as Sheet).has_meta("confirm") and not (c as Sheet)._closing:
@@ -244,14 +254,17 @@ func _sheet() -> void:
 	var rows: Array = (f.lists.recent as Node).get_children().filter(func(n: Node) -> bool: return n.name.begins_with("Row_"))
 	check("sheet recent: a row per person with the hint above", rows.size() == 5 and (f.lists.recent as Node).get_child(0).name == "Hint", rows.size())
 	var first: Control = rows[0]
-	check("sheet recent: name, game and when, a star on a friend", (first.find_child("Name", true, false) as Label).text == "Rafi"
-		and (first.find_child("Sub", true, false) as Label).text == "4 min ago · Ludo" and first.find_child("Friend", true, false) != null
-		and (rows[1] as Control).find_child("Friend", true, false) == null)
+	check("sheet recent: name, game and when, a filled star on a friend, an outline on anyone else", (first.find_child("Name", true, false) as Label).text == "Rafi"
+		and (first.find_child("Sub", true, false) as Label).text == "4 min ago · Ludo" and bool(first.find_child("Star", true, false).get_meta("friend"))
+		and not bool((rows[1] as Control).find_child("Star", true, false).get_meta("friend")))
+	check("sheet recent: the star is a 48 px target before Invite", (first.find_child("Star", true, false) as Button).get_combined_minimum_size().y >= UIKit.TAP
+		and first.find_child("Star", true, false).get_index() < first.find_child("Invite", true, false).get_index())
 	check("sheet recent: rows long-press and Invite is a 48 px target", LongPress.has(first)
 		and (first.find_child("Invite", true, false) as Button).get_combined_minimum_size().y >= UIKit.TAP)
 	f.show_tab("friends")
 	await frames(2)
 	var frows: Array = (f.lists.friends as Node).get_children().filter(func(n: Node) -> bool: return n.name.begins_with("Row_"))
+	check("sheet friends: every friend's star is filled", frows.all(func(r: Control) -> bool: return bool(r.find_child("Star", true, false).get_meta("friend"))))
 	check("sheet friends: both friends, the one never played with says when added", frows.size() == 2
 		and ((frows[1] as Control).find_child("Sub", true, false) as Label).text == "Added 6 days ago", frows.size())
 	f.close()
@@ -308,6 +321,25 @@ func _ask_friend() -> void:
 	var yes2 := await confirm_yes(layer)
 	await until(func() -> bool: return s.last_toast != "")
 	check("long-press a friend: Remove? then removed", yes2 and not s.is_friend(str(s.recent[0].uid)) and s.last_toast == "Rafi removed from friends", s.last_toast)
+	# the star: one tap adds (no question), a tap on a filled star asks before removing
+	await frames(2)
+	var row_of := func(i: int) -> Control: return (f.lists.recent as Node).get_children().filter(func(n: Node) -> bool: return n.name.begins_with("Row_"))[i]
+	s.last_toast = ""
+	(row_of.call(0).find_child("Star", true, false) as Button).pressed.emit()
+	await until(func() -> bool: return s.last_toast != "")
+	check("star: one tap adds, no question asked", s.is_friend(str(s.recent[0].uid)) and s.last_toast == "Rafi added to friends" and Sheet.top_sheet(layer) == f, s.last_toast)
+	await frames(2)
+	check("star: the row redraws with a filled star", bool(row_of.call(0).find_child("Star", true, false).get_meta("friend")))
+	s.last_toast = ""
+	(row_of.call(0).find_child("Star", true, false) as Button).pressed.emit()
+	var no := await confirm_no(layer)
+	await until(func() -> bool: return not (row_of.call(0).find_child("Star", true, false) as Button).disabled)
+	check("star on a friend: Remove? answered Keep -> still a friend, the star works again", no and s.is_friend(str(s.recent[0].uid))
+		and not (row_of.call(0).find_child("Star", true, false) as Button).disabled)
+	(row_of.call(0).find_child("Star", true, false) as Button).pressed.emit()
+	var yes3 := await confirm_yes(layer)
+	await until(func() -> bool: return s.last_toast != "")
+	check("star on a friend: Remove -> removed", yes3 and not s.is_friend(str(s.recent[0].uid)) and s.last_toast == "Rafi removed from friends", s.last_toast)
 	f.close()
 	s.queue_free()
 	await frames(2)
