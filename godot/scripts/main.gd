@@ -1309,14 +1309,23 @@ func _back() -> void:
 			_confirm_quit()
 		"welcome":                           # nothing to confirm before the first screen is passed
 			Save.flush()
-			get_tree().quit()
+			crash_watch.mark_ended("quit")
+			_quit()
 
 func _confirm_quit() -> void:
 	if await Sheet.confirm(self, tr("Quit Ludo Zing?"), tr("Your progress is saved."), tr("Quit"), tr("Stay"), true):
 		notifications.schedule_now()
 		Save.flush()
 		crash_watch.mark_ended("quit")
-		get_tree().quit()
+		_quit()
+
+## Quits once everything is saved. On Android the process ends right here: Godot 4.7's teardown can abort in the
+## renderer (a Scudo "invalid chunk state" in RendererSceneCull's destructor, seen on a Mali-G57), and Play counts
+## that as a crash although the game was already closed and saved.
+func _quit() -> void:
+	if OS.get_name() == "Android":
+		OS.kill(OS.get_process_id())
+	get_tree().quit()
 
 ## What CrashWatch records with each sample: the screen and, in a game, {game, mode, minutes, resumed}. mode: cpu |
 ## local (Pass & Play) | tutorial | friends (a friend room) | quick:<table> (quick match: practice, t100 ...).

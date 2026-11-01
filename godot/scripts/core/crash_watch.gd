@@ -120,7 +120,7 @@ func begin(start_timer := true) -> void:
 	session = {v = CrashReport.VERSION, sid = sid, app = CrashReport.app_of(info), device = device_facts(info),
 		started_at = now, last_at = now, ended = false, end = "", fg = true, screen = "", match = null,
 		samples = [], crumbs = []}
-	if native != null and native.has_method("diag_set_state"):
+	if _native_has("diag_set_state"):
 		native.call("diag_set_state", sid)
 	note("start", "%s %s" % [session.app.name, session.app.code])
 	sample()
@@ -214,8 +214,8 @@ static func proc_status(path := "/proc/self/status") -> Dictionary:
 	if f == null:
 		return {}
 	var out := {}
-	var text := f.get_as_text()
-	for line in text.split("\n"):
+	while not f.eof_reached():                   # line by line: /proc files report length 0, so get_as_text is ""
+		var line := f.get_line()
 		for pair: Array in [["VmRSS:", "rss"], ["VmHWM:", "hwm"]]:
 			if line.begins_with(pair[0]):
 				out[pair[1]] = snappedf(float(line.substr(6).strip_edges().split(" ")[0]) / 1024.0, 0.1)
@@ -360,11 +360,16 @@ func _send(body: Dictionary) -> Dictionary:
 # ---------- helpers ----------
 
 func _native_info(since_ms: int) -> Dictionary:
-	if native == null or not native.has_method("diag_info"):
+	if not _native_has("diag_info"):
 		return {}
 	var raw: Variant = native.call("diag_info", since_ms, EXITS_ASKED)
 	var parsed: Variant = raw if raw is Dictionary else JSON.parse_string(str(raw))
 	return parsed if parsed is Dictionary else {}
+
+## A JNISingleton (the real plugin) answers has_java_method, never has_method; a fake has the method itself.
+func _native_has(method: String) -> bool:
+	return native != null and (native.has_method(method)
+		or (native.has_method("has_java_method") and bool(native.call("has_java_method", method))))
 
 ## The device id: the network one (Save.prefs.net_pid) when there is one, else our own (kept in state.json).
 func _pid(st: Dictionary) -> String:

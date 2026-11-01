@@ -449,7 +449,7 @@ func _ui() -> void:
 	check("dialog: Update / Later", yes != null and yes.text == "Update", yes.text if yes else "none")
 	u._dialog.answered.emit(true)
 	check("dialog: Update opens the store page", _urls.back() == AppUpdate.STORE_URL, _urls)
-	app.queue_free()
+	app.free()                               # now, inside the sandbox: freeing the dialog answers "Later" and saves
 	AppUpdate.plugin = null
 	AppUpdate.code_override = 0
 
@@ -571,6 +571,6 @@ func _online() -> void:
 	o.quick_q.fail_info = {min = 12}
 	o._on_quick_failed("update_required", "old")
 	check("online: the quick queue's update_required too", o.state == "idle" and u.required() and Sheet.top_sheet(app.sheet_layer) is UpdateSheet)
-	app.queue_free()
+	app.free()                               # now, inside the sandbox: freeing the dialog answers "Later" and saves
 	AppUpdate.plugin = null
 	AppUpdate.code_override = 0

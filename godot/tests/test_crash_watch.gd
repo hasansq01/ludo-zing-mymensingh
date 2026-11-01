@@ -24,6 +24,11 @@ class FakeNative extends RefCounted:
 	func diag_set_state(s: String) -> void:
 		states.append(s)
 
+## Answers like a JNISingleton: has_method is false for the plugin's methods, has_java_method true.
+class FakeJni extends RefCounted:
+	func has_java_method(m: String) -> bool:
+		return m in ["diag_info", "diag_set_state"]
+
 var _root: Node
 var _dir := ""
 var _sent: Array = []
@@ -264,6 +269,15 @@ func _watch_tests() -> void:
 	_put(ps, "Name:\tgodot\nVmHWM:\t  512000 kB\nVmRSS:\t  409600 kB\nThreads:\t40\n")
 	var st := W.proc_status(ps)
 	check("proc_status: RSS and peak RSS in MB", is_equal_approx(float(st.rss), 400.0) and is_equal_approx(float(st.hwm), 500.0), st)
+	_put(ps, "")
+	check("proc_status: an empty file -> {}", W.proc_status(ps).is_empty())
+	var jw := W.new(FakeJni.new())
+	check("the real plugin (a JNISingleton) is found through has_java_method", jw._native_has("diag_info") \
+		and jw._native_has("diag_set_state") and not jw._native_has("share"))
+	jw.free()
+	var none := W.new()
+	check("no plugin: nothing to call", not none._native_has("diag_info"))
+	none.free()
 	check("proc_status: no /proc -> {}", W.proc_status(_dir.path_join("nope")).is_empty())
 	check("should_run: exported builds yes; editor runs only with --diag; --no-diag off",
 		W.should_run(PackedStringArray(["--diag"])) and not W.should_run(PackedStringArray(["--diag", "--no-diag"])) \
