@@ -33,6 +33,7 @@ var sl_hud: Control
 var online: Online                      # friend rooms (scripts/net/online.gd)
 var social: Social                      # recent players, friends, invites (scripts/net/social.gd)
 var app_update: AppUpdate               # Play in-app updates and the version policy (scripts/net/app_update.gd)
+var app_rating: AppRating               # Play's rating card after a win, when due (scripts/net/app_rating.gd)
 var account: Account                    # the server account, wallet and claims (scripts/net/account.gd)
 var notifications: Notifications        # reminders, push and the permission question (scripts/net/notifications.gd)
 var ads: Ads                            # rewarded ads + the consent form (scripts/net/ads.gd; AdFlow shows them)
@@ -319,6 +320,10 @@ func _build_screens() -> void:
 	app_update = AppUpdate.new(self)
 	app_update.name = "AppUpdate"
 	add_child(app_update)
+	app_rating = AppRating.new()
+	app_rating.name = "AppRating"
+	app_rating.quiet_fn = _rating_quiet
+	add_child(app_rating)
 	_on_resize()
 
 
@@ -475,6 +480,15 @@ func go_home() -> void:
 		_fly_winnings.call_deferred()
 		_maybe_open_daily(1.6 if flying else 0.6)   # after the coins have landed
 		notifications.maybe_ask()                   # back from a game: the notifications question, if it is due
+		app_rating.back_home()                      # after a win: Play's rating card, when due, once Home is quiet
+
+## For AppRating: "quiet" = Home with nothing over it, "busy" = a sheet, a result or a question first, "gone" = not Home.
+func _rating_quiet() -> String:
+	if screen != "home":
+		return "gone"
+	var quiet := _splash == null and home.visible and _top_sheet() == null and _app_focused \
+		and not bool(notifications.get("_ask_wanted")) and not is_instance_valid(_result)
+	return "quiet" if quiet else "busy"
 
 ## The coins won in the last game fly into the home counter (it counts up from the old balance).
 func _fly_winnings() -> void:
@@ -1089,6 +1103,8 @@ func _on_finished(result: Dictionary, game: String) -> void:
 		data.xp_after = int(Save.profile.xp)
 	data.reward = int(data.get("reward", 0))
 	data.human_won = bool(data.get("human_won", false))
+	if data.human_won and not (game == "ludo" and bool(last_ludo.get("tutorial", false))):
+		app_rating.note_win()
 	var target := _home_coins()
 	if target and target.is_visible_in_tree():
 		data.coin_target = target

@@ -61,11 +61,12 @@ const SUITES := [
 	"res://tests/test_l10n.gd",
 	"res://tests/test_social.gd",
 	"res://tests/test_app_update.gd",
+	"res://tests/test_app_rating.gd",
 ]
 
 ## Suites whose run() is a coroutine that the runner waits for (the others run to their first wait, as before).
 const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_stack.gd", "res://tests/test_crash_watch.gd", "res://tests/test_pair_online.gd", "res://tests/test_share.gd",
-	"res://tests/test_social.gd", "res://tests/test_app_update.gd"]
+	"res://tests/test_social.gd", "res://tests/test_app_update.gd", "res://tests/test_app_rating.gd"]
 
 func _initialize() -> void:
 	await process_frame                       # the info-bubble checks need a live scene tree

@@ -16,7 +16,8 @@ extends Sheet
 ##   Friends        Invites from players (Save.prefs.invites, default on; the server keeps it, through Social: off,
 ##                  nobody can invite you, and they can't tell)
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
-##   Help           How to play, Credits, Privacy policy, Delete my account, Support (URLS)
+##   Help           How to play, Credits, Rate Ludo Zing (the Play Store page), Privacy policy, Delete my account,
+##                  Support (URLS)
 ##   Reset progress (confirm first), then the version line and the Support ID (the player ID; nothing else uses it
 ##   offline, so it lives here instead of on the Profile).
 ## Every change is written to Save.prefs at once (Save.save() debounces the file write), sound changes reach the
@@ -159,6 +160,10 @@ func _build() -> void:
 	hp.add_child(_link_line(tr("How to play"), _open_howto))
 	hp.add_child(_divider())
 	hp.add_child(_link_line(tr("Credits"), _open_credits))
+	hp.add_child(_divider())
+	var rate := _link_line(tr("Rate Ludo Zing"), func(): AppRating.open_store())
+	rate.name = "RateGame"
+	hp.add_child(rate)
 	for k: Array in [["privacy", tr("Privacy policy")], ["delete", tr("Delete my account")], ["support", tr("Support")]]:
 		var url := str(URLS.get(k[0], ""))
 		if url != "":

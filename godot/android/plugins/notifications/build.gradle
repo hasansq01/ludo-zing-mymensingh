@@ -15,6 +15,9 @@ ext {
     // Play In-App Updates (Updates.kt): latest stable on Google Maven (2.1.0, checked 2026-11-01). Keep in sync with
     // PLAY_APP_UPDATE_DEPENDENCY in godot/addons/notifications/export_plugin.gd.
     playAppUpdateVersion = '2.1.0'
+    // Play In-App Review (Review.kt): latest stable on Google Maven (2.0.2, checked 2026-11-02). Keep in sync with
+    // PLAY_REVIEW_DEPENDENCY in godot/addons/notifications/export_plugin.gd.
+    playReviewVersion = '2.0.2'
 }
 
 android {
@@ -57,6 +60,7 @@ dependencies {
     implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
     // Play In-App Updates: also added to the app build by the export plugin (not bundled into the AAR).
     implementation "com.google.android.play:app-update:$playAppUpdateVersion"
+    implementation "com.google.android.play:review:$playReviewVersion"
     // GoogleApiAvailability: a runtime dependency of firebase-messaging 26.0.1 (same version), so the app has it
     // anyway; only compiled against here.
     compileOnly "com.google.android.gms:play-services-base:18.9.0"

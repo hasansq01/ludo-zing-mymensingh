@@ -16,6 +16,7 @@ no Firebase code runs and local notifications work as usual.
 | `src/main/java/com/flipfold/ludozing/notifications/NotificationsPlugin.kt` | The plugin class (`GodotPlugin`). Engine singleton **`NotificationsPlugin`** (not `Notifier`, which would hide the GDScript `class_name Notifier`). |
 | `Notifs.kt` | The schedule (SharedPreferences `lz_notifications`), the alarms, the four channels, posting, reading a tap back from the launch intent. |
 | `Updates.kt` | Google Play In-App Updates (`com.google.android.play:app-update:2.1.0`, Maven; the export plugin adds the dependency): the check, the flexible / immediate flows, the install-state listener. The flow's result comes back through `onMainActivityResult` (request code `Updates.REQUEST`); `onMainResume` resumes an interrupted immediate update and reports a finished flexible download. |
+| `Review.kt` | Google Play In-App Review (`com.google.android.play:review:2.0.2`, Maven; the export plugin adds the dependency): `requestReviewFlow` then `launchReviewFlow` over the game activity. Play decides whether the card shows (its quota; never for an app not installed from Play) and never says whether the player rated. GDScript side: `scripts/net/app_rating.gd` (when to ask). |
 | `Receivers.kt` | `AlarmReceiver` (a scheduled item is due: post it) and `BootReceiver` (`BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`: arm the stored schedule again). |
 | `PushService.kt` | `PushService` (`FirebaseMessagingService`: token refresh, messages) and `Push` (FirebaseApp from `FirebaseOptions`, saved for later processes). |
 | `src/main/AndroidManifest.xml` | Plugin registration, `POST_NOTIFICATIONS` + `RECEIVE_BOOT_COMPLETED`, the receivers and the service, FCM's default icon / colour / channel meta-data. |
@@ -78,6 +79,7 @@ Logcat tag `Notifications`: `plugin loaded: sdk 35, permission ask, 0 scheduled,
 | `update_check()` | `update_info({available, in_progress, version_code, staleness_days (-1 unknown), priority, flexible, immediate, status})`, or `update_failed("check:<m>")` when Play can't answer (not installed from Play, an emulator: ERROR_APP_NOT_OWNED / -6 ...) |
 | `update_start(immediate: bool)` | the flow's screen; flexible: `update_state({status, bytes, total, error})` with status pending / downloading / downloaded / installing / installed / failed / cancelled; failures `update_failed("start:<m>")` |
 | `update_complete()` | installs a downloaded flexible update, the game restarts; `update_failed("complete:<m>")` |
+| `review_request()` | Play's rating card when Play allows it; `review_done(ok, error)`: ok = the flow ran to its end (shown or not), error `request:<m>` / `launch:<m>` / `no_activity` |
 | `version_code(): int` | the installed package's version code (what hellos report as `app`) |
 | `schedule(id, at_unix: long, channel, title, body, link)` | none (replaces the same id) |
 | `cancel(id)`, `cancel_all()` | none (local only) |

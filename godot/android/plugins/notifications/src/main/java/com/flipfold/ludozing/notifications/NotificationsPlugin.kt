@@ -37,6 +37,8 @@ import java.lang.ref.WeakReference
  *
  * In-app updates (Updates.kt): update_check() / update_start() / update_complete(); Play's update screen answers
  * through onMainActivityResult, a returning game resumes an immediate update or reports a finished download.
+ *
+ * In-app review (Review.kt): review_request() shows Play's rating card when Play allows it -> review_done(ok, error).
  */
 class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
 
@@ -69,6 +71,9 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
         val SIG_UPDATE_STATE = SignalInfo(Updates.SIG_STATE, DICT)
         // (code) "check:<m>" | "start:<m>" | "complete:<m>": Play can't be used (not installed from Play, offline ...)
         val SIG_UPDATE_FAILED = SignalInfo(Updates.SIG_FAILED, STRING)
+        // (ok, error) review_request() ran: ok = the flow finished (Play may not have shown the card); error
+        // "request:<m>" | "launch:<m>" | "no_activity"
+        val SIG_REVIEW_DONE = SignalInfo(Review.SIG_DONE, BOOL, STRING)
 
         @Volatile private var live: WeakReference<NotificationsPlugin>? = null
 
@@ -86,12 +91,13 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
     private val launchLock = Any()
     private var launch: Map<String, String>? = null      // the tap that opened the game, until take_launch_data()
     private val updates = Updates { signal, arg -> emitSignal(signal, arg) }
+    private val review = Review { signal, a, b -> emitSignal(signal, a, b) }
 
     override fun getPluginName() = "NotificationsPlugin"
 
     override fun getPluginSignals(): Set<SignalInfo> = setOf(
         SIG_PERMISSION, SIG_OPENED, SIG_PUSH_TOKEN, SIG_PUSH_FAILED, SIG_PUSH_RECEIVED,
-        SIG_UPDATE_INFO, SIG_UPDATE_STATE, SIG_UPDATE_FAILED,
+        SIG_UPDATE_INFO, SIG_UPDATE_STATE, SIG_UPDATE_FAILED, SIG_REVIEW_DONE,
     )
 
     override fun onMainCreate(mainActivity: Activity?): View? {
@@ -263,6 +269,17 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     fun update_complete() {
         guard("update_complete") { updates.complete(appContext()) }
+    }
+
+    /** Play's in-app rating card, when Play allows it (its own quota). -> review_done(ok, error). */
+    @UsedByGodot
+    fun review_request() {
+        val act = activity
+        if (act == null) {
+            emitSignal(SIG_REVIEW_DONE.name, false, "no_activity")
+            return
+        }
+        runOnUiThread { guard("review_request") { review.request(act) } }
     }
 
     override fun onMainActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

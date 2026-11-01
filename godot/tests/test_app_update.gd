@@ -133,6 +133,14 @@ func _version() -> void:
 	check("version: export_presets.cfg has a version/code per preset", ok and codes.size() >= 1, codes)
 	check("version: the project setting equals every preset's version/code (bump them together)",
 		codes.all(func(c: int) -> bool: return c == setting), [setting, codes])
+	var names: Array = []
+	if ok:
+		for sec in cfg.get_sections():
+			if sec.ends_with(".options") and cfg.has_section_key(sec, "version/name"):
+				names.append(str(cfg.get_value(sec, "version/name")))
+	var vname := str(ProjectSettings.get_setting("application/config/version", ""))
+	check("version: the name setting (Settings' footer) equals every preset's version/name (bump them together)",
+		vname != "" and names.size() >= 1 and names.all(func(n: String) -> bool: return n == vname), [vname, names])
 	check("version: off Android it is the project setting", AppUpdate.version_code() == setting, AppUpdate.version_code())
 	var pg := FakePlugin.new()
 	pg.code = 42
