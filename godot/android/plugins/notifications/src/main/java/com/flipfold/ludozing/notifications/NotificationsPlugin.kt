@@ -34,6 +34,9 @@ import java.lang.ref.WeakReference
  * the plugin reads activity.intent in onMainCreate (cold start) and onMainResume (warm start) and takes the markers
  * off the intent once read. A relaunch from the recents list (FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) re-delivers the
  * old intent and is ignored.
+ *
+ * In-app updates (Updates.kt): update_check() / update_start() / update_complete(); Play's update screen answers
+ * through onMainActivityResult, a returning game resumes an immediate update or reports a finished download.
  */
 class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
 
@@ -59,6 +62,14 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
         // ({title, body, link, cid, kind}) a push arrived while the game is in the foreground (nothing is shown)
         val SIG_PUSH_RECEIVED = SignalInfo("push_received", DICT)
 
+        // ({available, version_code, staleness_days, flexible, immediate, in_progress, priority, status}) update_check()
+        val SIG_UPDATE_INFO = SignalInfo(Updates.SIG_INFO, DICT)
+        // ({status, bytes, total, error}) the install state: pending / downloading / downloaded / installing /
+        // installed / failed / cancelled
+        val SIG_UPDATE_STATE = SignalInfo(Updates.SIG_STATE, DICT)
+        // (code) "check:<m>" | "start:<m>" | "complete:<m>": Play can't be used (not installed from Play, offline ...)
+        val SIG_UPDATE_FAILED = SignalInfo(Updates.SIG_FAILED, STRING)
+
         @Volatile private var live: WeakReference<NotificationsPlugin>? = null
 
         /** The plugin of the running game, if any (the messaging service runs without it too). */
@@ -74,11 +85,13 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
     @Volatile private var asking = false                 // the POST_NOTIFICATIONS dialog is showing
     private val launchLock = Any()
     private var launch: Map<String, String>? = null      // the tap that opened the game, until take_launch_data()
+    private val updates = Updates { signal, arg -> emitSignal(signal, arg) }
 
     override fun getPluginName() = "NotificationsPlugin"
 
     override fun getPluginSignals(): Set<SignalInfo> = setOf(
         SIG_PERMISSION, SIG_OPENED, SIG_PUSH_TOKEN, SIG_PUSH_FAILED, SIG_PUSH_RECEIVED,
+        SIG_UPDATE_INFO, SIG_UPDATE_STATE, SIG_UPDATE_FAILED,
     )
 
     override fun onMainCreate(mainActivity: Activity?): View? {
@@ -99,7 +112,10 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
     override fun onMainResume() {
         super.onMainResume()
         resumed = true
-        activity?.let { readLaunch(it, notify = loopStarted) }
+        activity?.let {
+            readLaunch(it, notify = loopStarted)
+            if (loopStarted) guard("update resume") { updates.onResume(it) }
+        }
     }
 
     override fun onMainPause() {
@@ -110,6 +126,7 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
     override fun onMainDestroy() {
         resumed = false
         if (live?.get() === this) live = null
+        guard("update destroy") { updates.onDestroy() }
         super.onMainDestroy()
     }
 
@@ -207,6 +224,50 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
             grantResults[0] == PackageManager.PERMISSION_GRANTED
         Log.i(TAG, "permission ${if (granted) "granted" else "refused"} -> ${permission_state()}")
         emitSignal(SIG_PERMISSION.name, granted && permission_state() == "granted")
+    }
+
+    // ---------- in-app updates (Google Play: flexible and immediate) ----------
+
+    /** The game's version code (the Play Console's number): 0 when it can't be read. */
+    @UsedByGodot
+    fun version_code(): Int = try {
+        val ctx = appContext()
+        val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+        if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode.toInt() else @Suppress("DEPRECATION") pi.versionCode
+    } catch (t: Throwable) {
+        Log.w(TAG, "version_code failed", t)
+        0
+    }
+
+    /** Asks Play whether a newer version exists. -> update_info({...}), or update_failed("check:<m>") (not from Play). */
+    @UsedByGodot
+    fun update_check() {
+        guard("update_check") { updates.check(appContext()) }
+    }
+
+    /**
+     * Starts Play's flexible ([immediate] false: background download, then update_state "downloaded") or immediate
+     * (full-screen, Play restarts the app) update. -> update_state(...) / update_failed("start:<m>").
+     */
+    @UsedByGodot
+    fun update_start(immediate: Boolean) {
+        val act = activity
+        if (act == null) {
+            emitSignal(SIG_UPDATE_FAILED.name, "start:no_activity")
+            return
+        }
+        runOnUiThread { guard("update_start") { updates.start(act, immediate) } }
+    }
+
+    /** Installs the downloaded flexible update (the game restarts). A failure -> update_failed("complete:<m>"). */
+    @UsedByGodot
+    fun update_complete() {
+        guard("update_complete") { updates.complete(appContext()) }
+    }
+
+    override fun onMainActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onMainActivityResult(requestCode, resultCode, data)
+        if (requestCode == Updates.REQUEST) updates.onResult(resultCode)
     }
 
     // ---------- local notifications ----------

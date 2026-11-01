@@ -6,7 +6,8 @@ extends EditorExportPlugin
 ## - the plugin AAR (bin/debug or bin/release, built by tools/build-notifications-plugin.sh). Its own manifest brings
 ##   the plugin registration, the POST_NOTIFICATIONS and RECEIVE_BOOT_COMPLETED permissions, the alarm / boot
 ##   receivers, the FCM service and FCM's default icon / colour / channel ("game") meta-data,
-## - the Maven dependency com.google.firebase:firebase-messaging,
+## - the Maven dependencies com.google.firebase:firebase-messaging and com.google.android.play:app-update (in-app
+##   updates, Updates.kt),
 ## - the removal of firebase-common's FirebaseInitProvider: there is no google-services.json, so it would only log
 ##   that it can't initialise; the plugin initialises Firebase itself in push_init() (project settings
 ##   ludo_zing/push/*, read at runtime by res://scripts/net/notifier.gd; all empty = push off).
@@ -19,6 +20,8 @@ const PUSH_SETTINGS := ["ludo_zing/push/project_id", "ludo_zing/push/app_id", "l
 	"ludo_zing/push/sender_id"]
 ## Keep in sync with firebaseMessagingVersion in godot/android/plugins/notifications/build.gradle.
 const FIREBASE_MESSAGING_DEPENDENCY := "com.google.firebase:firebase-messaging:26.0.1"
+## Play In-App Updates (Updates.kt). Keep in sync with playAppUpdateVersion in the same build.gradle.
+const PLAY_APP_UPDATE_DEPENDENCY := "com.google.android.play:app-update:2.1.0"
 
 func _get_name() -> String:
 	return PLUGIN_NAME
@@ -62,7 +65,7 @@ func _get_android_libraries(platform: EditorExportPlatform, debug: bool) -> Pack
 func _get_android_dependencies(platform: EditorExportPlatform, debug: bool) -> PackedStringArray:
 	if not _active():
 		return PackedStringArray()
-	return PackedStringArray([FIREBASE_MESSAGING_DEPENDENCY])
+	return PackedStringArray([FIREBASE_MESSAGING_DEPENDENCY, PLAY_APP_UPDATE_DEPENDENCY])
 
 func _get_android_manifest_application_element_contents(platform: EditorExportPlatform, debug: bool) -> String:
 	if not _active():
