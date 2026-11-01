@@ -456,7 +456,7 @@ msgstr "“%s” অর্জন করো"
 #. daily_sheet.gd reward_text()
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
-#: scripts/core/collection.gd:206 scripts/core/rewards.gd:139 scripts/main.gd:865 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
+#: scripts/core/collection.gd:206 scripts/core/rewards.gd:139 scripts/main.gd:871 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
 msgid "%s coins"
 msgstr "%s কয়েন"
 
@@ -1558,82 +1558,83 @@ msgstr "শিখতে থাকো"
 
 # REVIEW: toast when online S&L is tapped; a bit long
 #. App (pause menu, dialogs, toasts) · main.gd _open_setup()
-#: scripts/main.gd:636
+#: scripts/main.gd:642
 msgid "Coming soon for Snakes & Ladders"
 msgstr "সাপ-সিঁড়ি অনলাইনে আসছে শীঘ্রই!"
 
 #. App (pause menu, dialogs, toasts) · main.gd continue_match()
-#: scripts/main.gd:684
+#: scripts/main.gd:690
 msgid "This match can’t be continued."
 msgstr "এই ম্যাচ আর চালানো যাবে না।"
 
 # REVIEW: %s is a countdown like '2h 5m'; reads '<time> পরে ফ্রি কয়েন'
 #. App (pause menu, dialogs, toasts) · main.gd _claim_free()
-#: scripts/main.gd:829
+#: scripts/main.gd:835
 msgid "Free coins in %s"
 msgstr "%s পরে ফ্রি কয়েন"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:968
+#: scripts/main.gd:974
 msgid "Menu"
 msgstr "মেনু"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:968
+#: scripts/main.gd:974
 msgid "Paused"
 msgstr "বিরতি"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:973
+#: scripts/main.gd:979
 msgid "The game keeps going while this is open."
 msgstr "এটা খোলা থাকলেই খেলা চলতে থাকে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:975
+#: scripts/main.gd:981
 msgid "Back to game"
 msgstr "খেলায় ফেরো"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. settings_sheet.gd _init()
-#: scripts/main.gd:976 scripts/main.gd:981 scripts/ui/sheets/settings_sheet.gd:54
+#: scripts/main.gd:982 scripts/main.gd:987 scripts/ui/sheets/settings_sheet.gd:54
 msgid "Settings"
 msgstr "সেটিংস"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:977
+#: scripts/main.gd:983
 msgid "Leave match"
 msgstr "ম্যাচ ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. Home screen · home_screen.gd _build_quick()
-#: scripts/main.gd:979 scripts/ui/home_screen.gd:353
+#: scripts/main.gd:985 scripts/ui/home_screen.gd:353
 msgid "Resume"
 msgstr "চালিয়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:980 scripts/main.gd:1020
+#. update_banner.gd set_mode()
+#: scripts/main.gd:986 scripts/main.gd:1026 scripts/ui/components/update_banner.gd:95
 msgid "Restart"
 msgstr "আবার শুরু"
 
 # Pause menu
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:982
+#: scripts/main.gd:988
 msgid "Exit to home"
 msgstr "হোমে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:993
+#: scripts/main.gd:999
 msgid "Your place is kept: your reward comes when the game ends."
 msgstr "তোমার জায়গা ঠিক আছে, খেলা শেষ হলে রিওয়ার্ড পাবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:993
+#: scripts/main.gd:999
 msgid "A bot plays your colour for the rest of the game."
 msgstr "তোমার রঙে বাকি খেলা বট খেলবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:994
+#: scripts/main.gd:1000
 msgid "Leave this match?"
 msgstr "ম্যাচ ছেড়ে যাবে?"
 
@@ -1642,69 +1643,69 @@ msgstr "ম্যাচ ছেড়ে যাবে?"
 #. online.gd _ask_leave_lobby()
 #. Result screen · result_screen.gd _sync_buttons()
 #. lobby_sheet.gd _init()
-#: scripts/main.gd:994 scripts/main.gd:1029 scripts/net/online.gd:239 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
+#: scripts/main.gd:1000 scripts/main.gd:1035 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
 msgid "Leave"
 msgstr "ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:994 scripts/main.gd:1020 scripts/main.gd:1029
+#: scripts/main.gd:1000 scripts/main.gd:1026 scripts/main.gd:1035
 msgid "Keep playing"
 msgstr "খেলতে থাকো"
 
 # REVIEW: online, after you finished
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. finish_card.gd _init()
-#: scripts/main.gd:994 scripts/ui/components/finish_card.gd:51
+#: scripts/main.gd:1000 scripts/ui/components/finish_card.gd:51
 msgid "Keep watching"
 msgstr "দেখতে থাকো"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1020
+#: scripts/main.gd:1026
 msgid "Restart this game?"
 msgstr "খেলা আবার শুরু করবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1020
+#: scripts/main.gd:1026
 msgid "Everyone goes back to the start."
 msgstr "সবাই আবার শুরু থেকে শুরু করবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1029
+#: scripts/main.gd:1035
 msgid "Leave this game?"
 msgstr "খেলা ছেড়ে যাবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1029
+#: scripts/main.gd:1035
 msgid "Your progress in this match is saved."
 msgstr "এই ম্যাচের প্রোগ্রেস সেভ হয়েছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _on_gems_granted()
 #. store_sheet.gd _on_granted()
-#: scripts/main.gd:1152 scripts/ui/sheets/store_sheet.gd:163
+#: scripts/main.gd:1158 scripts/ui/sheets/store_sheet.gd:163
 msgid "+%s gems"
 msgstr "+%s জেম"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1309
+#: scripts/main.gd:1315
 msgid "Quit Ludo Zing?"
 msgstr "Ludo Zing থেকে বের হবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1309
+#: scripts/main.gd:1315
 msgid "Your progress is saved."
 msgstr "তোমার প্রোগ্রেস সেভ আছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1309
+#: scripts/main.gd:1315
 msgid "Quit"
 msgstr "বের হও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/main.gd:1309 scripts/net/online.gd:239 scripts/net/social.gd:418
+#: scripts/main.gd:1315 scripts/net/online.gd:244 scripts/net/social.gd:418
 msgid "Stay"
 msgstr "থাকো"
 
@@ -1921,6 +1922,35 @@ msgstr "ভিডিওটা কনফার্ম করা যায়নি
 msgid "Still checking your reward. It will show up soon."
 msgstr "রিওয়ার্ড এখনও চেক হচ্ছে। একটু পরেই দেখা যাবে।"
 
+#. app_update.gd _on_state()
+#: scripts/net/app_update.gd:245
+msgid "The update didn’t download. Try again later."
+msgstr "আপডেটটা নামানো যায়নি। একটু পরে আবার চেষ্টা করো।"
+
+#. app_update.gd _open_dialog()
+#: scripts/net/app_update.gd:411
+msgid "Update Ludo Zing"
+msgstr "Ludo Zing আপডেট করো"
+
+#. app_update.gd _open_dialog()
+#: scripts/net/app_update.gd:411
+msgid "A new version is available. Update to get the latest fixes."
+msgstr "নতুন ভার্সন এসেছে। সব নতুন ঠিকঠাক পেতে আপডেট করো।"
+
+#. app_update.gd _open_dialog()
+#. update_banner.gd _init()
+#. update_banner.gd set_mode()
+#. update_sheet.gd _init()
+#: scripts/net/app_update.gd:412 scripts/ui/components/update_banner.gd:62 scripts/ui/components/update_banner.gd:88 scripts/ui/sheets/update_sheet.gd:25
+msgid "Update"
+msgstr "আপডেট"
+
+#. app_update.gd _open_dialog()
+#. update_banner.gd _init()
+#: scripts/net/app_update.gd:412 scripts/ui/components/update_banner.gd:60
+msgid "Later"
+msgstr "পরে"
+
 #. net_client.gd error_text()
 #: scripts/net/net_client.gd:182
 msgid "We couldn’t find that room. Check the code."
@@ -2035,70 +2065,70 @@ msgstr "এখন না"
 
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/net/online.gd:239 scripts/net/social.gd:417
+#: scripts/net/online.gd:244 scripts/net/social.gd:417
 msgid "Leave this room?"
 msgstr "রুম ছেড়ে যাবে?"
 
 #. online.gd _ask_leave_lobby()
-#: scripts/net/online.gd:239
+#: scripts/net/online.gd:244
 msgid "Your friends can keep the room going."
 msgstr "তোমার বন্ধুরা রুম চালিয়ে যেতে পারবে।"
 
 #. online.gd open_quick()
-#: scripts/net/online.gd:252
+#: scripts/net/online.gd:257
 msgid "Leave this room first."
 msgstr "আগে এই রুম ছেড়ে যাও।"
 
 # %s = the room code
 #. online.gd leave()
-#: scripts/net/online.gd:399
+#: scripts/net/online.gd:409
 msgid "You left the room. Join again later with code %s."
 msgstr "রুম ছেড়ে দিলে। পরে %s কোড দিয়ে আবার ঢুকতে পারবে।"
 
 #. online.gd _on_rematch()
-#: scripts/net/online.gd:545
+#: scripts/net/online.gd:556
 msgid "Not enough players said yes. Invite friends with the code."
 msgstr "যথেষ্ট প্লেয়ার রাজি হয়নি। কোড দিয়ে বন্ধুদের ডাকো।"
 
 # Teams fell back to free-for-all
 #. online.gd _on_rematch()
 #. Result screen · result_screen.gd set_vote()
-#: scripts/net/online.gd:548 scripts/ui/components/result_screen.gd:628
+#: scripts/net/online.gd:559 scripts/ui/components/result_screen.gd:628
 msgid "Teams need 4 players: this game is everyone for themselves."
 msgstr "টিমে 4 জন লাগে: এবার সবাই যার যার মতো খেলবে।"
 
 # %s = a player's name
 #. online.gd _vote_prompt()
 #. Result screen · result_screen.gd set_vote()
-#: scripts/net/online.gd:563 scripts/ui/components/result_screen.gd:624
+#: scripts/net/online.gd:574 scripts/ui/components/result_screen.gd:624
 msgid "%s wants to play again"
 msgstr "%s আবার খেলতে চায়"
 
 # Play = the prompt's button (খেলো)
 #. online.gd _vote_prompt()
 #. Result screen · result_screen.gd set_vote()
-#: scripts/net/online.gd:563 scripts/ui/components/result_screen.gd:628
+#: scripts/net/online.gd:574 scripts/ui/components/result_screen.gd:628
 msgid "The next game starts with everyone who taps Play."
 msgstr "যারা খেলো চাপবে, তাদের নিয়েই পরের খেলা শুরু হবে।"
 
 # %s = the room code
 #. online.gd _on_error()
-#: scripts/net/online.gd:612
+#: scripts/net/online.gd:626
 msgid "The others started a new game. Join again later with code %s."
 msgstr "বাকিরা নতুন খেলা শুরু করেছে। পরে %s কোড দিয়ে আবার ঢুকতে পারবে।"
 
 #. online.gd _on_error()
-#: scripts/net/online.gd:613
+#: scripts/net/online.gd:627
 msgid "Not enough players wanted to play again."
 msgstr "আবার খেলতে যথেষ্ট প্লেয়ার রাজি হয়নি।"
 
 #. online.gd _on_error()
-#: scripts/net/online.gd:629
+#: scripts/net/online.gd:643
 msgid "The room has closed."
 msgstr "রুম বন্ধ হয়ে গেছে।"
 
 #. online.gd _notification()
-#: scripts/net/online.gd:676
+#: scripts/net/online.gd:690
 msgid "The search stopped while the app was in the background."
 msgstr "অ্যাপ ব্যাকগ্রাউন্ডে থাকার সময় সার্চ থেমে গেছে।"
 
@@ -2415,6 +2445,36 @@ msgstr "XP"
 #: scripts/ui/components/result_screen.gd:818
 msgid "Level up!"
 msgstr "লেভেল আপ!"
+
+#. update_banner.gd set_mode()
+#: scripts/ui/components/update_banner.gd:86
+msgid "A new version is available"
+msgstr "নতুন ভার্সন এসেছে"
+
+#. update_banner.gd set_mode()
+#: scripts/ui/components/update_banner.gd:87
+msgid "It downloads while you keep playing."
+msgstr "তুমি খেলতে থাকো, নামতে থাকবে।"
+
+#. update_banner.gd set_mode()
+#: scripts/ui/components/update_banner.gd:90
+msgid "Downloading the update…"
+msgstr "আপডেট নামছে…"
+
+#. update_banner.gd set_mode()
+#: scripts/ui/components/update_banner.gd:93
+msgid "Update ready"
+msgstr "আপডেট রেডি"
+
+#. update_banner.gd set_mode()
+#: scripts/ui/components/update_banner.gd:94
+msgid "Restart Ludo Zing to finish updating."
+msgstr "আপডেট শেষ করতে Ludo Zing আবার চালু করো।"
+
+#. update_banner.gd progress_text()
+#: scripts/ui/components/update_banner.gd:107
+msgid "You can keep playing."
+msgstr "তুমি খেলতে থাকো।"
 
 #. win_card.gd eyebrow_text()
 #: scripts/ui/components/win_card.gd:36
@@ -4837,6 +4897,26 @@ msgstr "জেম দিয়ে কয়েন নেবে?"
 #: scripts/ui/sheets/store_sheet.gd:240
 msgid "%s gems for %s coins."
 msgstr "%s জেমে %s কয়েন।"
+
+#. update_sheet.gd _init()
+#: scripts/ui/sheets/update_sheet.gd:17
+msgid "Update required"
+msgstr "আপডেট লাগবে"
+
+#. update_sheet.gd _init()
+#: scripts/ui/sheets/update_sheet.gd:19
+msgid "Online play"
+msgstr "অনলাইন খেলা"
+
+#. update_sheet.gd _init()
+#: scripts/ui/sheets/update_sheet.gd:21
+msgid "This version of Ludo Zing is too old to play online. Update to play with friends and in quick match."
+msgstr "এই ভার্সন দিয়ে আর অনলাইনে খেলা যাবে না। বন্ধুদের সাথে আর কুইক ম্যাচ খেলতে Ludo Zing আপডেট করো।"
+
+#. update_sheet.gd _init()
+#: scripts/ui/sheets/update_sheet.gd:32
+msgid "Playing against the computer or passing the phone around still works."
+msgstr "কম্পিউটারের সাথে বা ফোন হাতবদল করে খেলা আগের মতোই চলবে।"
 
 # REVIEW: S&L landing; 'সিন' per glossary
 #. Snakes & Ladders landing · sl_landing.gd _ready()

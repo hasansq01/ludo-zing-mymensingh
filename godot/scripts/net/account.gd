@@ -226,7 +226,7 @@ func _real_http(method: int, path: String, body: Variant, sess: String) -> Dicti
 	var req := HTTPRequest.new()
 	req.timeout = TIMEOUT_SEC
 	add_child(req)
-	var headers := PackedStringArray(["Content-Type: application/json"])
+	var headers := PackedStringArray(["Content-Type: application/json", "X-App-Version: %d" % AppUpdate.version_code()])
 	if sess != "":
 		headers.append("Authorization: Bearer " + sess)
 	var text := ""

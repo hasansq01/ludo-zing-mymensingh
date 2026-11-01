@@ -142,6 +142,8 @@ func open_friends(game_ := "") -> void:
 	if net.in_room() and state == "lobby":
 		_open_lobby()
 		return
+	if _gate():
+		return
 	_friends_game = game_ if game_ in ["ludo", "sl"] else _home_game()
 	friends = FriendsSheet.new(_friends_game)
 	friends.create_room.connect(_create)
@@ -152,7 +154,7 @@ func open_friends(game_ := "") -> void:
 ## when we are in a room or searching already.
 func join_code(code: String) -> void:
 	var c := NetClient.clean_code(code)
-	if state != "idle" or not NetClient.valid_code(c):
+	if state != "idle" or not NetClient.valid_code(c) or _gate():
 		return
 	if NetClient.saved_room(net.prefs).get("code", "") == c and try_resume():
 		return
@@ -163,7 +165,7 @@ func join_code(code: String) -> void:
 func create_room(game_ := "") -> bool:
 	if state == "lobby" and net.in_room() and not net.quick:
 		return true
-	if state != "idle":
+	if state != "idle" or _gate():
 		return false
 	_friends_game = game_ if game_ in ["ludo", "sl"] else _home_game()
 	await _create()
@@ -176,6 +178,9 @@ func _create() -> void:
 		friends.set_busy("create")
 	var r: Dictionary = await net.create_room()
 	if not bool(r.get("ok", false)):
+		if str(r.get("error", "")) == "update_required":
+			_update_refused(int(r.get("min", 0)))
+			return
 		if str(r.get("error", "")) == "maintenance" and str(r.get("msg", "")) != "":
 			if is_instance_valid(friends):
 				friends.set_busy("")
@@ -250,6 +255,8 @@ func open_quick(game_ := "") -> void:
 		return
 	if net.in_room() and state in ["lobby", "match"]:
 		toast(tr("Leave this room first."), "info")
+		return
+	if _gate():
 		return
 	if CoinTables.is_broke(_coins()) and not is_instance_valid(broke_sheet):
 		_open_broke(g)
@@ -374,6 +381,9 @@ func _on_matched(code: String, token: String) -> void:
 func _on_quick_failed(code: String, msg: String) -> void:
 	if state not in ["searching", "joining"]:
 		return
+	if code == "update_required":
+		_update_refused(int(quick_q.fail_info.get("min", 0)))
+		return
 	_set_state("idle")
 	var text := msg if msg != "" and code in ["banned", "maintenance"] else QuickSheet.fail_text(code, quick_q.fail_info)
 	if is_instance_valid(quick_sheet):
@@ -433,7 +443,8 @@ func _table_playable(id: String, size: int) -> bool:
 
 ## After launch: take back the room kept in Save.prefs.net_room (quietly; a room that's gone is forgotten).
 func try_resume() -> bool:
-	if state != "idle" or not net.resume():
+	var u := _updater()
+	if state != "idle" or (u != null and u.required()) or not net.resume():
 		return false
 	_set_state("resuming")
 	return true
@@ -593,6 +604,9 @@ func _on_error(m: Dictionary) -> void:
 	var code := str(m.get("code", ""))
 	if code in QUIET_EMOTE:
 		return
+	if code == "update_required":
+		_update_refused(int(m.get("min", 0)), state == "resuming")
+		return
 	match state:
 		"joining":
 			if net.quick:
@@ -701,6 +715,35 @@ func _layer() -> Control:
 	if app and app.get("sheet_layer") is Control:
 		return app.sheet_layer
 	return get_tree().root.get_child(0) as Control
+
+## The AppUpdate of this run (main's), or null.
+func _updater() -> AppUpdate:
+	var u: Variant = app.get("app_update") if app != null else null
+	return u as AppUpdate if u is AppUpdate and is_instance_valid(u) else null
+
+## Online play needs an update first (below the server's minimum version): the "Update required" sheet is up, true.
+func _gate() -> bool:
+	var u := _updater()
+	return u != null and u.gate()
+
+## The server answered `update_required` (a room, a hello, the quick queue): back to idle with the "Update required"
+## sheet (quiet: a kept room that was only being resumed at launch; the next online tap asks).
+func _update_refused(min_ := 0, quiet := false) -> void:
+	var was := state
+	_set_state("idle")
+	if is_instance_valid(friends):
+		friends.set_busy("")
+	if is_instance_valid(quick_sheet):
+		quick_sheet.close()
+	var u := _updater()
+	if u != null:
+		u.note_refused(min_)
+	if was in ["lobby", "match", "over"]:
+		_close_lobby()
+		_closed()                              # (the seat is kept: back in the room once the app is updated)
+	if u != null and not quiet:
+		u.open_required()
+	_host_changed()
 
 ## The admin console's message of the day: shown once per new message, on Home, a few seconds after launch.
 func _show_motd() -> void:

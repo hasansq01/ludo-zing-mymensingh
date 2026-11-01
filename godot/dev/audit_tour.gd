@@ -11,7 +11,9 @@ extends Node
 ## so a narrow window alone still lays out at >= 390 px). Use it with a --resolution of the same size to see the
 ## narrow (< 340 px) layouts, e.g. --resolution 320x568 ... -- out --logical=320x568.
 ## Sections (--only takes these names): boot home rewards profile shop store settings misc setup online friends ludo sl lang
-## pawns
+## update pawns
+## (update: the in-app update states: the banner offering one, downloading, Update ready, the Update required sheet and
+## the fallback dialog)
 ## (lang: Settings' language switch done live, on Home and over a game's pause menu, then back)
 ## (pawns: every pawn skin in the Shop, its View sheet, the setup sheets, on the Ludo board in 3D and Top View, on the
 ## Snakes & Ladders board and in the snake's bite; not in the default run, name it with --only)
@@ -36,7 +38,7 @@ var coins := 5000
 var level := 7
 
 const SECTIONS := ["boot", "home", "rewards", "profile", "shop", "store", "settings", "misc", "setup", "online", "friends", "ludo", "sl", "lang",
-	"pawns"]
+	"update", "pawns"]
 ## Sections that only run when --only names them.
 const OPT_IN := ["pawns"]
 
@@ -397,6 +399,47 @@ func _s_misc() -> void:
 	b2.refresh()
 	await _sleep(0.9)
 	await shot("broke_cooldown")
+
+## The in-app update states over Home: the banner (offer, downloading, Update ready), the Update required sheet and the
+## fallback dialog. AppUpdate runs without a plugin here; the states are set the way Play's answers would.
+func _s_update() -> void:
+	var u: AppUpdate = main.app_update
+	u._asked = true                                  # (nothing asks Play or the network in a dev run)
+	u.open_url_fn = func(_url: String) -> int: return OK
+	u.version = 11
+	u.state = "none"
+	u._sync()
+	await _sleep(0.3)
+	u._set_state("offer")
+	await _sleep(0.9)
+	await shot("update_offer")
+	u.bytes = 0
+	u.total = 0
+	u._set_state("downloading")
+	await _sleep(0.5)
+	u.bytes = 14_000_000
+	u.total = 38_000_000
+	u._set_state("downloading")
+	await _sleep(0.9)
+	await shot("update_downloading")
+	u._set_state("ready")
+	await _sleep(0.9)
+	await shot("update_ready")
+	u._set_state("none")
+	await _sleep(0.5)
+	u.min_online = 11
+	AppUpdate.code_override = 10
+	await sheet_shot(func(): u.gate(), "update_required")
+	main.close_all_sheets()
+	AppUpdate.code_override = 0
+	u.min_online = 0
+	await _sleep(0.3)
+	u.state = "fallback"
+	u._sync()
+	await _sleep(0.9)
+	await shot("update_fallback")
+	main.close_all_sheets()
+	u.state = "none"
 
 func _s_setup() -> void:
 	await sheet_shot(func(): main._open_setup("ludo", "cpu"), "setup_ludo_cpu")

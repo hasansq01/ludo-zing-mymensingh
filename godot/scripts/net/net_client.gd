@@ -54,7 +54,7 @@ const JOIN_TRIES := 3                    ## a first join gives up after this man
 const CHECK_EVERY := 3                   ## while reconnecting, ask GET /v1/rooms/<code> every few failures
 const CODE_LEN := 6
 const ALPHABET := "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-const FATAL := ["version", "not_found", "full", "started", "banned"]   ## errors that end the connection attempt
+const FATAL := ["version", "update_required", "not_found", "full", "started", "banned"]   ## errors that end the connection attempt
 ## we are out of the room (an admin, even mid-match; a Play again vote that closed without our yes): never reconnect
 const REMOVED := ["kicked", "banned", "rematch_out"]
 const NAME_MAX := 16
@@ -186,7 +186,7 @@ static func error_text(code_: String) -> String:
 			return L10n.t("That game has already started.")
 		"no_connection":
 			return L10n.t("No connection. Check your internet and try again.")
-		"version":
+		"version", "update_required":
 			return L10n.t("Update Ludo Zing to play online.")
 		"too_few":
 			return L10n.t("You need at least 2 players to start.")
@@ -227,15 +227,19 @@ func create_room() -> Dictionary:
 		return {ok = true, code = str(d.code)}
 	if int(r.get("status", 0)) == 503 and d is Dictionary and str((d as Dictionary).get("error", "")) == "maintenance":
 		return {ok = false, error = "maintenance", msg = str((d as Dictionary).get("msg", ""))}   # admin: maintenance mode
+	if int(r.get("status", 0)) == 426 and d is Dictionary and str((d as Dictionary).get("error", "")) == "update_required":
+		return {ok = false, error = "update_required", min = int((d as Dictionary).get("min", 0))}   # below the server's minimum version
 	return {ok = false, error = "no_connection" if int(r.get("status", 0)) == 0 else "server"}
 
-## GET /v1/config: {ok = true, motd, maintenance} (the admin console's message of the day) or {ok = false}.
+## GET /v1/config: {ok = true, motd, maintenance, min_online, latest} (the admin console's message of the day and the
+## app version policy: AppUpdate) or {ok = false}.
 func fetch_config() -> Dictionary:
 	var r: Dictionary = await _http(HTTPClient.METHOD_GET, "/v1/config")
 	var d: Variant = r.get("data")
 	if int(r.get("status", 0)) == 200 and d is Dictionary:
 		return {ok = true, motd = str((d as Dictionary).get("motd", "")).strip_edges().left(140),
-			maintenance = bool((d as Dictionary).get("maintenance", false))}
+			maintenance = bool((d as Dictionary).get("maintenance", false)),
+			min_online = int((d as Dictionary).get("min_online", 0)), latest = int((d as Dictionary).get("latest", 0))}
 	return {ok = false}
 
 ## GET /v1/rooms/<code>: {ok = true, code, open, members, started} or {ok = false, error ("not_found" |
@@ -263,7 +267,7 @@ func _http(method: int, path: String) -> Dictionary:
 	req.timeout = 8.0
 	add_child(req)
 	var body := "{}" if method == HTTPClient.METHOD_POST else ""
-	var err := req.request(http_base(url_base) + path, PackedStringArray(["Content-Type: application/json"]), method, body)
+	var err := req.request(http_base(url_base) + path, PackedStringArray(["Content-Type: application/json", "X-App-Version: %d" % AppUpdate.version_code()]), method, body)
 	if err != OK:
 		req.queue_free()
 		return {status = 0}
@@ -391,7 +395,8 @@ func _hello() -> void:
 		avatar = str(p.get("avatar", "")).substr(0, 32), frame = str(p.get("frame", "")).substr(0, 32),
 		pawn = str(p.get("pawn", "")).substr(0, 32),      # your pawn skin (the server seats it only when you own it)
 		pair_ask = bool(prefs.get("pair_ask", true)),   # your "Ask before pairing" (quick rooms deal it to your colour)
-		vote = true}                                     # this app answers Play again votes (PROTOCOL.md "Play again")
+		vote = true,                                     # this app answers Play again votes (PROTOCOL.md "Play again")
+		app = AppUpdate.version_code()}                  # its version code (the server may refuse one below its minimum)
 	if token != "":
 		m.token = token
 	var sess := session()
@@ -567,8 +572,8 @@ func handle(msg: Dictionary) -> void:
 			if (c in FATAL and not _welcomed) or c in REMOVED:
 				_want = false
 				close_socket()
-				if c != "version":
-					forget_room()
+				if c != "version" and c != "update_required":
+					forget_room()                 # (an update keeps the seat: back in this room afterwards)
 				_set_status("idle")
 			_emit_error(msg)
 			return

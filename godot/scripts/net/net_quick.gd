@@ -29,7 +29,7 @@ const CONNECT_TRIES := 3
 const BACKOFF := [0.6, 1.5, 3.0]
 const SIZES := [2, 4]
 const GAMES := ["ludo", "sl"]
-const FATAL := ["maintenance", "banned", "replaced", "busy", "version", "bad_message", "coins", "locked"]
+const FATAL := ["maintenance", "banned", "replaced", "busy", "version", "update_required", "bad_message", "coins", "locked"]
 
 var net: NetClient
 var renew_fn := Callable()
@@ -140,7 +140,8 @@ func _hello() -> void:
 	var pid := NetClient.ensure_pid(net.prefs) if net else ""
 	var m := {t = "hello", v = NetClient.VERSION, session = _session, pid = pid,
 		name = NetClient.wire_name(str(p.get("name", ""))), avatar = str(p.get("avatar", "")).substr(0, 32),
-		frame = str(p.get("frame", "")).substr(0, 32), pawn = str(p.get("pawn", "")).substr(0, 32)}
+		frame = str(p.get("frame", "")).substr(0, 32), pawn = str(p.get("pawn", "")).substr(0, 32),
+		app = AppUpdate.version_code()}
 	_hello_sent = true
 	_send(m)
 
@@ -225,7 +226,7 @@ func handle(msg: Dictionary) -> void:
 				return
 			if code == "session" or code in FATAL:
 				fail_info = {}
-				for k in ["short", "level"]:
+				for k in ["short", "level", "min"]:
 					if msg.has(k):
 						fail_info[k] = int(msg[k])
 				_fail(code, why)

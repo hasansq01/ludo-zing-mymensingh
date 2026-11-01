@@ -32,6 +32,7 @@ var sl: SLMatch
 var sl_hud: Control
 var online: Online                      # friend rooms (scripts/net/online.gd)
 var social: Social                      # recent players, friends, invites (scripts/net/social.gd)
+var app_update: AppUpdate               # Play in-app updates and the version policy (scripts/net/app_update.gd)
 var account: Account                    # the server account, wallet and claims (scripts/net/account.gd)
 var notifications: Notifications        # reminders, push and the permission question (scripts/net/notifications.gd)
 var ads: Ads                            # rewarded ads + the consent form (scripts/net/ads.gd; AdFlow shows them)
@@ -180,6 +181,7 @@ func _ready() -> void:
 			_maybe_open_daily()
 		notifications.maybe_ask()                   # the notifications question, once Home is quiet (if it is due)
 		_bg_warm_up()
+		app_update.start()                          # the update offer (on a quiet Home, once per session)
 		return
 	_set_screen("welcome")                      # (the S&L scene waits: _bg_warm_up after Home, if it is wanted at all)
 	var w := Welcome.new()
@@ -196,6 +198,7 @@ func _ready() -> void:
 	_set_screen("home")                         # no daily reward on top of the welcome: it waits for the first game
 	notifications.maybe_ask()                   # the notifications question, right after the welcome
 	_bg_warm_up()
+	app_update.start()
 
 ## UPDATE_ONCE turns itself into UPDATE_DISABLED after its frame: the dice must go back to drawing while visible,
 ## or they freeze on their first frame for the rest of the session (no visible rolls).
@@ -313,6 +316,9 @@ func _build_screens() -> void:
 	social = Social.new(self)
 	social.name = "Social"
 	add_child(social)
+	app_update = AppUpdate.new(self)
+	app_update.name = "AppUpdate"
+	add_child(app_update)
 	_on_resize()
 
 
@@ -1346,6 +1352,7 @@ func _notification(what: int) -> void:
 				open_pause()                        # (online the game goes on: coming back goes straight to the board)
 		NOTIFICATION_APPLICATION_RESUMED:
 			Sound.set_app_paused(false)
+			app_update.resume()                      # the version policy again
 			if _online_match():
 				(ludo if screen == "ludo" else sl).app_resumed()   # back in the app: the seat is yours again
 		NOTIFICATION_APPLICATION_FOCUS_IN:
