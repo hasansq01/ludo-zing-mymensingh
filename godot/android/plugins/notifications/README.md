@@ -15,6 +15,7 @@ no Firebase code runs and local notifications work as usual.
 | `godot/android/plugins/notifications/` | Kotlin library module (this folder). Gradle wrapper 8.11.1, AGP 8.6.1, Kotlin 2.1.21, Java 17, compileSdk 36, minSdk 24: the same versions as the Godot 4.7.2 build template. It compiles against `org.godotengine:godot:4.7.2.stable` (compile-only) and `com.google.firebase:firebase-messaging:26.0.1` (Google Maven; the version in firebase-bom 35.1.0). |
 | `src/main/java/com/flipfold/ludozing/notifications/NotificationsPlugin.kt` | The plugin class (`GodotPlugin`). Engine singleton **`NotificationsPlugin`** (not `Notifier`, which would hide the GDScript `class_name Notifier`). |
 | `Notifs.kt` | The schedule (SharedPreferences `lz_notifications`), the alarms, the four channels, posting, reading a tap back from the launch intent. |
+| `Updates.kt` | Google Play In-App Updates (`com.google.android.play:app-update:2.1.0`, Maven; the export plugin adds the dependency): the check, the flexible / immediate flows, the install-state listener. The flow's result comes back through `onMainActivityResult` (request code `Updates.REQUEST`); `onMainResume` resumes an interrupted immediate update and reports a finished flexible download. |
 | `Receivers.kt` | `AlarmReceiver` (a scheduled item is due: post it) and `BootReceiver` (`BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`: arm the stored schedule again). |
 | `PushService.kt` | `PushService` (`FirebaseMessagingService`: token refresh, messages) and `Push` (FirebaseApp from `FirebaseOptions`, saved for later processes). |
 | `src/main/AndroidManifest.xml` | Plugin registration, `POST_NOTIFICATIONS` + `RECEIVE_BOOT_COMPLETED`, the receivers and the service, FCM's default icon / colour / channel meta-data. |
@@ -74,6 +75,10 @@ Logcat tag `Notifications`: `plugin loaded: sdk 35, permission ask, 0 scheduled,
 | `permission_state(): String` | `granted` \| `denied` \| `ask` \| `unsupported` (synchronous). `ask` = the system dialog can be shown (never asked, or refused once: Android 13+ allows a second ask). `denied` = it can't any more, or the app's notifications are off in the settings. Below Android 13: `granted` unless they are off (`denied`). |
 | `request_permission()` | `permission_result(granted)`; at once below Android 13 or when already granted. |
 | `share(text, image_path): bool` | The system share sheet (`Share.kt`: `ACTION_SEND` + `createChooser`). `image_path` is an absolute PNG path ("" = text only); it is copied to `cache/lz_share/` and served by `ShareFileProvider` (authority `<applicationId>.lzshare`, own provider: Godot's template declares none). Returns true when the chooser was started. GDScript side: `scripts/net/share.gd` (falls back to the clipboard; detects the method with `has_java_method`). Not in the Android Emulator preset (no plugin there). |
+| `update_check()` | `update_info({available, in_progress, version_code, staleness_days (-1 unknown), priority, flexible, immediate, status})`, or `update_failed("check:<m>")` when Play can't answer (not installed from Play, an emulator: ERROR_APP_NOT_OWNED / -6 ...) |
+| `update_start(immediate: bool)` | the flow's screen; flexible: `update_state({status, bytes, total, error})` with status pending / downloading / downloaded / installing / installed / failed / cancelled; failures `update_failed("start:<m>")` |
+| `update_complete()` | installs a downloaded flexible update, the game restarts; `update_failed("complete:<m>")` |
+| `version_code(): int` | the installed package's version code (what hellos report as `app`) |
 | `schedule(id, at_unix: long, channel, title, body, link)` | none (replaces the same id) |
 | `cancel(id)`, `cancel_all()` | none (local only) |
 | `scheduled(): PackedStringArray` | ids still to come |

@@ -251,6 +251,7 @@ func _on_failed(code: String) -> void:
 	if code.begins_with("check:"):
 		play_ok = false
 		play = {}
+		print("AppUpdate: Play can't be used (%s): the fallback (the server's latest %d, this version %d)" % [code, latest, version_code()])
 		if _now_flow:
 			_now_flow = false
 			open_store()
