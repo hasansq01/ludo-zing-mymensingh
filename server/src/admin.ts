@@ -607,6 +607,11 @@ async function configPut(c: Ctx): Promise<Response> {
         throw new BadRequest(`${k}: integer ${D.TURN_MIN}-${D.TURN_MAX}`);
       }
       patch[k as (typeof D.TURN_KEYS)[number]] = v;
+    } else if ((D.APP_KEYS as readonly string[]).includes(k)) {
+      if (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > D.APP_MAX) {
+        throw new BadRequest(`${k}: integer 0-${D.APP_MAX}`);
+      }
+      patch[k as (typeof D.APP_KEYS)[number]] = v;
     } else {
       throw new BadRequest(`unknown field ${k.slice(0, 40)}`);
     }

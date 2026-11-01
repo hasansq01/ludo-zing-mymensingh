@@ -1,4 +1,4 @@
-// Config: maintenance mode, message of the day, turn timers. Save shows a diff and asks for confirmation.
+// Config: maintenance mode, message of the day, turn timers, app versions. Save shows a diff and asks for confirmation.
 import { h, replace } from "../dom.js";
 import { api } from "../api.js";
 import { icon } from "../icons.js";
@@ -11,6 +11,11 @@ const TIMERS = [
   { key: "turn_choose_s", label: "Choose a pawn", hint: "Time to pick which pawn moves.", def: 20 },
   { key: "turn_pair_s", label: "Pair question", hint: "Time to answer “form a pair?”.", def: 10 },
 ];
+const APPS = [
+  { key: "min_online", label: "Minimum for online play", hint: "Apps with a lower version code get “Update required” for rooms and quick match (offline play still works). 0 = nobody is blocked.", def: 0 },
+  { key: "latest", label: "Latest version on Google Play", hint: "Apps with a lower version code are offered an update (the fallback when Play's own check can't run).", def: 10 },
+];
+const APP_MAX = 1000000;
 const T_MIN = 5;
 const T_MAX = 120;
 
@@ -42,6 +47,7 @@ export default function configPage(root, _params, ctx) {
   function normalize(c) {
     const o = { maintenance: Boolean(c?.maintenance), motd: String(c?.motd ?? "") };
     for (const t of TIMERS) o[t.key] = Number(c?.[t.key]) || t.def;
+    for (const a of APPS) o[a.key] = Number.isInteger(Number(c?.[a.key])) && c?.[a.key] !== null && c?.[a.key] !== undefined ? Number(c[a.key]) : a.def;
     return o;
   }
 
@@ -50,6 +56,14 @@ export default function configPage(root, _params, ctx) {
     const n = Number(v);
     if (!Number.isInteger(n)) return "Whole seconds only.";
     if (n < T_MIN || n > T_MAX) return `Between ${T_MIN} and ${T_MAX} seconds.`;
+    return "";
+  }
+
+  function appError(v) {
+    if (v === "" || v === null || Number.isNaN(Number(v))) return "Enter a version code.";
+    const n = Number(v);
+    if (!Number.isInteger(n)) return "Whole numbers only.";
+    if (n < 0 || n > APP_MAX) return `Between 0 and ${APP_MAX}.`;
     return "";
   }
 
@@ -62,6 +76,7 @@ export default function configPage(root, _params, ctx) {
     const e = {};
     if (draft.motd.length > MOTD_MAX) e.motd = `At most ${MOTD_MAX} characters.`;
     for (const t of TIMERS) { const m = timerError(draft[t.key]); if (m) e[t.key] = m; }
+    for (const a of APPS) { const m = appError(draft[a.key]); if (m) e[a.key] = m; }
     return e;
   }
 
@@ -110,6 +125,26 @@ export default function configPage(root, _params, ctx) {
       h("div", { class: "timers" }, timerRows),
       h("p", { class: "help" }, `Each ${T_MIN}–${T_MAX} seconds. Applies to matches started after the change; two timeouts in a row turn a player into a bot.`)));
 
+    // app versions
+    const appInputs = {};
+    const appRows = APPS.map((a) => {
+      const input = h("input", { type: "number", class: "input input-num", id: "a-" + a.key, min: 0, max: APP_MAX, step: 1, inputmode: "numeric", value: String(draft[a.key]), "aria-describedby": "ah-" + a.key });
+      const err = h("p", { class: "field-err", id: "ae-" + a.key, hidden: true });
+      input.addEventListener("input", () => { draft[a.key] = input.value === "" ? "" : Number(input.value); refresh(); });
+      appInputs[a.key] = { input, err };
+      return h("div", { class: "timer" },
+        h("label", { class: "cfg-label", for: "a-" + a.key }, a.label),
+        h("div", { class: "num-wrap" }, input),
+        h("p", { class: "help", id: "ah-" + a.key }, a.hint, " Default ", String(a.def), "."),
+        err);
+    });
+    const appWarn = h("div", { class: "callout callout-danger", role: "note" }, icon("alert", { size: 16 }),
+      h("div", null, h("strong", null, "Players on older versions are locked out of online play."), " Set it back to 0 to let everyone in. Keep it at or below the version that is live on Google Play."));
+    const appCard = card("App versions", h("div", { class: "cfg" },
+      h("div", { class: "timers" }, appRows),
+      h("p", { class: "help" }, "Version codes are the numbers in the Play Console (version/code in export_presets.cfg). An app that reports no version counts as 10. Applies at the next room or quick-match hello; the update offer within a minute."),
+      appWarn));
+
     // save bar
     const dirtyText = h("span", { class: "savebar-text" });
     const discard = h("button", { class: "btn btn-ghost", type: "button" }, "Discard");
@@ -118,8 +153,8 @@ export default function configPage(root, _params, ctx) {
     save.addEventListener("click", review);
     const bar = h("div", { class: "savebar", role: "region", "aria-label": "Unsaved changes" }, icon("info", { size: 16 }), dirtyText, h("span", { class: "spacer" }), discard, save);
 
-    replace(body, maintCard, motdCard, timersCard, bar);
-    ui = { maintWarn, maintState, motd, count, motdErr, preview, timerInputs, bar, dirtyText, save };
+    replace(body, maintCard, motdCard, timersCard, appCard, bar);
+    ui = { maintWarn, maintState, motd, count, motdErr, preview, timerInputs, appInputs, appWarn, bar, dirtyText, save };
     refresh();
   }
 
@@ -145,6 +180,14 @@ export default function configPage(root, _params, ctx) {
       input.setAttribute("aria-invalid", String(Boolean(e[t.key])));
       if (e[t.key]) input.setAttribute("aria-errormessage", "te-" + t.key); else input.removeAttribute("aria-errormessage");
     }
+    for (const a of APPS) {
+      const { input, err } = ui.appInputs[a.key];
+      err.hidden = !e[a.key];
+      err.textContent = e[a.key] || "";
+      input.setAttribute("aria-invalid", String(Boolean(e[a.key])));
+      if (e[a.key]) input.setAttribute("aria-errormessage", "ae-" + a.key); else input.removeAttribute("aria-errormessage");
+    }
+    ui.appWarn.hidden = !(Number(draft.min_online) > 0);
     const d = dirtyKeys();
     const bad = Object.keys(e).length;
     ui.bar.classList.toggle("is-dirty", d.length > 0);
@@ -152,15 +195,15 @@ export default function configPage(root, _params, ctx) {
     ui.save.disabled = !d.length || bad > 0;
   }
 
-  const LABELS = { maintenance: "Maintenance mode", motd: "Message of the day", turn_roll_s: "Roll timer", turn_choose_s: "Choose timer", turn_pair_s: "Pair question timer" };
-  const fmt = (k, v) => (k === "maintenance" ? (v ? "On" : "Off") : k === "motd" ? (v ? "“" + v + "”" : "(empty)") : v + " s");
+  const LABELS = { maintenance: "Maintenance mode", motd: "Message of the day", turn_roll_s: "Roll timer", turn_choose_s: "Choose timer", turn_pair_s: "Pair question timer", min_online: "Minimum version for online play", latest: "Latest version on Google Play" };
+  const fmt = (k, v) => (k === "maintenance" ? (v ? "On" : "Off") : k === "motd" ? (v ? "“" + v + "”" : "(empty)") : k === "min_online" || k === "latest" ? String(v) : v + " s");
 
   async function review() {
     const keys = dirtyKeys();
     if (!keys.length || Object.keys(errors()).length) return;
     const turningOn = keys.includes("maintenance") && draft.maintenance;
     const patch = {};
-    for (const k of keys) patch[k] = k.startsWith("turn_") ? Number(draft[k]) : draft[k];
+    for (const k of keys) patch[k] = k.startsWith("turn_") || k === "min_online" || k === "latest" ? Number(draft[k]) : draft[k];
     const ok = await openDialog({
       title: "Save " + keys.length + " change" + (keys.length > 1 ? "s" : "") + "?",
       danger: turningOn,

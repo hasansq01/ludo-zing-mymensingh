@@ -97,8 +97,11 @@ match → `abandoned`).
   room's cache; another room may keep refusing the pid for up to 60 s.
 - Turn timers: `config.turn_roll_s`, `turn_choose_s`, `turn_pair_s` (integers, 5–120) override the defaults
   (15 / 20 / 10) for matches started after the change.
-- Public `GET /v1/config` → `{"motd": "", "maintenance": false}` (cached 60 s) so the game can show a message of
-  the day on Home.
+- App versions: `config.min_online` (default 0 = nobody blocked) and `config.latest` (default 10), integers 0–1000000.
+  An app whose version code is below `min_online` is refused online play (`update_required`, PROTOCOL.md); below
+  `latest` it is offered an update. Read at every room / quick-match hello, no deploy needed.
+- Public `GET /v1/config` → `{"motd": "", "maintenance": false, "min_online": 0, "latest": 10}` (cached 60 s) so the
+  game can show a message of the day on Home and its update offer.
 
 ## Paused rooms
 
@@ -128,7 +131,7 @@ integers. Day boundaries (`today`, `days`) are UTC.
 | PATCH | `/admin/api/players/:pid` `{note}` (string ≤ 500, or null / "" to clear) | updates the note → `{ok: true, player}` |
 | GET | `/admin/api/matches?code=&pid=&result=` | matches rows, newest (id) first |
 | GET | `/admin/api/events?level=&kind=` | events rows, newest first |
-| GET | `/admin/api/config` | `{maintenance: bool, motd: string, turn_roll_s, turn_choose_s, turn_pair_s}` (unset → defaults false, "", 15, 20, 10) |
+| GET | `/admin/api/config` | `{maintenance: bool, motd: string, turn_roll_s, turn_choose_s, turn_pair_s, min_online, latest}` (unset → defaults false, "", 15, 20, 10, 0, 10) |
 | PUT | `/admin/api/config` | same shape (partial ok) → the full config; validated (maintenance bool, motd string ≤ 140 chars, turn_* integers 5–120, unknown fields rejected) |
 | GET | `/admin/api/audit` | admin_log rows, newest first |
 

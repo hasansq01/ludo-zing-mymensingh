@@ -243,13 +243,15 @@ export class Matchmaker extends DurableObject<Env> {
     let level = 1;
     let prof: { name: string; avatar: string; frame: string; pawn?: string; pawns?: string[] } | null = null;
     let maintenance: string | null = null;
+    let minApp = 0;
     try {
       const cfg = await withTimeout(D.readConfig(env.DB), MM.readTimeout);
       if (cfg.maintenance) maintenance = cfg.motd || "Online play is down for maintenance. Please try again later.";
+      if (D.appVersion(msg.app) < cfg.min_online) minApp = cfg.min_online; // (a missing version is 10)
     } catch (e) {
       console.error("config read failed (allowing):", e);
     }
-    if (!maintenance) {
+    if (!maintenance && !minApp) {
       try {
         const v = await withTimeout(A.verifySession(env, session), MM.readTimeout);
         if (v?.account_id) {
@@ -283,6 +285,10 @@ export class Matchmaker extends DurableObject<Env> {
     }
     if (ws.readyState !== 1) return;
     if (maintenance) return this.fatal(ws, "maintenance", maintenance);
+    if (minApp) {
+      this.send(ws, { t: "error", code: "update_required", msg: D.UPDATE_REQUIRED_MSG, min: minApp });
+      return this.closeWith(ws, CLOSE.fatal, "update_required");
+    }
     if (!account) return this.fatal(ws, "session", "your session is not valid: sign in again");
     if (ban) {
       this.error(ws, "banned", ban !== "banned" ? `You are banned from online play: ${ban}` : "You are banned from online play.");

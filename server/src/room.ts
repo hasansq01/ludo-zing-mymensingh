@@ -908,6 +908,16 @@ export class Room extends DurableObject<Env> {
     if (msg.t === "away" && att.mid < 0) return; // nobody to mark yet
     if (att.mid < 0) {
       if (msg.t !== "hello") return this.error(ws, "bad_message", "say hello first");
+      if (msg.v === 1) {
+        const min = await this.updateRequired(msg.app);
+        if (min !== null) {
+          if (ws.readyState !== 1 || this.att(ws).mid !== -1) return; // closed (or replaced) meanwhile
+          this.error(ws, "update_required", D.UPDATE_REQUIRED_MSG, { min });
+          this.fatalClose(ws, "update_required");
+          return;
+        }
+        if (ws.readyState !== 1 || this.att(ws).mid !== -1) return;
+      }
       let who: Identity = { account: null, ban: null, level: null };
       if (msg.v === 1 && typeof msg.pid === "string" && PID_RE.test(msg.pid)) {
         who = await this.identify(msg.pid, msg.session);
@@ -2221,6 +2231,11 @@ export class Room extends DurableObject<Env> {
   /** An error that ends the connection. */
   private fatal(ws: WebSocket, code: string, msg: string): void {
     this.error(ws, code, msg);
+    this.fatalClose(ws, code);
+  }
+
+  /** Ends the connection after its error was sent. */
+  private fatalClose(ws: WebSocket, code: string): void {
     try {
       ws.serializeAttachment({ mid: -2 } satisfies Att);
       ws.close(CLOSE.fatal, code);
@@ -2858,6 +2873,21 @@ export class Room extends DurableObject<Env> {
       return banned ? b!.reason || "banned" : null;
     } catch (e) {
       console.error("ban check failed (allowing):", e);
+      return null;
+    }
+  }
+
+  /**
+   * The lowest app version code allowed online when the app that said hello (`app`, a missing one is version 10) is
+   * below it, else null. Read from D1 config at every hello, so an admin edit applies at once; fails open.
+   */
+  private async updateRequired(app: unknown): Promise<number | null> {
+    if (!this.env.DB) return null;
+    try {
+      const c = await withTimeout(D.readConfig(this.env.DB), TELEMETRY.readTimeout);
+      return D.appVersion(app) < c.min_online ? c.min_online : null;
+    } catch (e) {
+      console.error("config read failed (allowing the app version):", e);
       return null;
     }
   }

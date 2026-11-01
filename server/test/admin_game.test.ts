@@ -113,7 +113,7 @@ describe("enforcement", () => {
   it("maintenance blocks POST /v1/rooms (503 + motd) but not existing rooms; /v1/config shows it", async () => {
     const cookie = await login();
     const { code } = await lobbyOf(1);
-    expect(await (await SELF.fetch("https://x/v1/config")).json()).toEqual({ motd: "", maintenance: false });
+    expect(await (await SELF.fetch("https://x/v1/config")).json()).toEqual({ motd: "", maintenance: false, min_online: 0, latest: 10 });
 
     await api(cookie, "config", { method: "PUT", body: { maintenance: true, motd: "Back at 6 pm" } });
     const r = await SELF.fetch("https://x/v1/rooms", { method: "POST" });
@@ -121,7 +121,7 @@ describe("enforcement", () => {
     expect(await r.json()).toEqual({ error: "maintenance", msg: "Back at 6 pm" });
     const cfg = await SELF.fetch("https://x/v1/config");
     expect(cfg.headers.get("Cache-Control")).toBe("public, max-age=60");
-    expect(await cfg.json()).toEqual({ motd: "Back at 6 pm", maintenance: true });
+    expect(await cfg.json()).toEqual({ motd: "Back at 6 pm", maintenance: true, min_online: 0, latest: 10 });
     // the existing room still works
     const c = await Client.join(code, { name: "Late" });
     await c.waitFor((m) => m.t === "lobby" && m.members.length === 2);
@@ -132,7 +132,7 @@ describe("enforcement", () => {
 
     await api(cookie, "config", { method: "PUT", body: { maintenance: false } });
     expect((await SELF.fetch("https://x/v1/rooms", { method: "POST" })).status).toBe(200);
-    expect(await (await SELF.fetch("https://x/v1/config")).json()).toEqual({ motd: "", maintenance: false });
+    expect(await (await SELF.fetch("https://x/v1/config")).json()).toEqual({ motd: "", maintenance: false, min_online: 0, latest: 10 });
   });
 
   it("a banned pid's hello gets error banned and close 4003 (and a warn event)", async () => {

@@ -118,6 +118,10 @@ export interface GameConfig {
   turn_roll_s: number;
   turn_choose_s: number;
   turn_pair_s: number;
+  /** The lowest app version code allowed online (rooms, quick match); 0 = nobody is blocked. */
+  min_online: number;
+  /** The newest app version code on Google Play: the app offers an update when its own is lower. */
+  latest: number;
 }
 
 export const CONFIG_DEFAULTS: GameConfig = {
@@ -126,7 +130,24 @@ export const CONFIG_DEFAULTS: GameConfig = {
   turn_roll_s: 15,
   turn_choose_s: 20,
   turn_pair_s: 10,
+  min_online: 0,
+  latest: 10,
 };
+
+/** The config keys that hold an app version code (admin PUT, parseConfig). */
+export const APP_KEYS = ["min_online", "latest"] as const;
+export const APP_MAX = 1_000_000;
+/** What an app that sends no version is: version code 10 and older do not report one. */
+export const APP_UNREPORTED = 10;
+
+/** The version code an app reported (hello `app`, header X-App-Version): a missing or bad one counts as APP_UNREPORTED. */
+export function appVersion(raw: unknown): number {
+  const n = typeof raw === "string" && /^\d{1,7}$/.test(raw.trim()) ? Number(raw.trim()) : raw;
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= APP_MAX ? n : APP_UNREPORTED;
+}
+
+/** The refusal text for an app below min_online (the `update_required` error, HTTP and sockets). */
+export const UPDATE_REQUIRED_MSG = "This version of Ludo Zing is too old to play online. Please update.";
 
 export const TURN_KEYS = ["turn_roll_s", "turn_choose_s", "turn_pair_s"] as const;
 export const TURN_MIN = 5;
@@ -140,6 +161,12 @@ function turnValue(raw: string | undefined, def: number): number {
 }
 
 /** The config table's key/value rows -> typed config (bad or missing values fall back to the defaults). */
+function appValue(raw: string | undefined, def: number): number {
+  if (raw === undefined || !/^\d{1,7}$/.test(raw)) return def;
+  const v = Number(raw);
+  return v <= APP_MAX ? v : def;
+}
+
 export function parseConfig(rows: Record<string, string>): GameConfig {
   return {
     maintenance: rows.maintenance === "1",
@@ -147,6 +174,8 @@ export function parseConfig(rows: Record<string, string>): GameConfig {
     turn_roll_s: turnValue(rows.turn_roll_s, CONFIG_DEFAULTS.turn_roll_s),
     turn_choose_s: turnValue(rows.turn_choose_s, CONFIG_DEFAULTS.turn_choose_s),
     turn_pair_s: turnValue(rows.turn_pair_s, CONFIG_DEFAULTS.turn_pair_s),
+    min_online: appValue(rows.min_online, CONFIG_DEFAULTS.min_online),
+    latest: appValue(rows.latest, CONFIG_DEFAULTS.latest),
   };
 }
 
@@ -181,6 +210,7 @@ export async function writeConfig(db: D1Database, patch: Partial<GameConfig>): P
   if (patch.maintenance !== undefined) put("maintenance", patch.maintenance ? "1" : "0");
   if (patch.motd !== undefined) put("motd", patch.motd);
   for (const k of TURN_KEYS) if (patch[k] !== undefined) put(k, String(patch[k]));
+  for (const k of APP_KEYS) if (patch[k] !== undefined) put(k, String(patch[k]));
   if (stmts.length) await db.batch(stmts);
 }
 

@@ -38,13 +38,16 @@ function stub(env: RoomEnv, code: string): DurableObjectStub<Room> {
 const MAINTENANCE_MSG = "Online play is down for maintenance. Please try again later.";
 
 /** POST /v1/rooms: a fresh code, reserved by asking that room's object to init (retried on a collision). */
-async function createRoom(env: Env): Promise<Response> {
+async function createRoom(req: Request, env: Env): Promise<Response> {
   // maintenance blocks new rooms only (existing rooms keep working); a D1 failure never blocks play
   const cfg = await D.cachedConfig(env.DB, 10_000).catch((e) => {
     console.error("config read failed:", e);
     return null;
   });
   if (cfg?.maintenance) return json({ error: "maintenance", msg: cfg.motd || MAINTENANCE_MSG }, 503);
+  if (cfg && D.appVersion(req.headers.get("X-App-Version")) < cfg.min_online) {
+    return json({ error: "update_required", msg: D.UPDATE_REQUIRED_MSG, min: cfg.min_online }, 426);
+  }
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = randomCode();
     if (await stub(env, code).init(code)) return json({ code });
@@ -56,10 +59,13 @@ async function createRoom(env: Env): Promise<Response> {
 async function publicConfig(env: Env): Promise<Response> {
   try {
     const cfg = await D.cachedConfig(env.DB, 60_000);
-    return json({ motd: cfg.motd, maintenance: cfg.maintenance }, 200, { "Cache-Control": "public, max-age=60" });
+    return json({ motd: cfg.motd, maintenance: cfg.maintenance, min_online: cfg.min_online, latest: cfg.latest }, 200, {
+      "Cache-Control": "public, max-age=60",
+    });
   } catch (e) {
     console.error("config read failed:", e);
-    return json({ motd: "", maintenance: false }, 200, { "Cache-Control": "public, max-age=10" });
+    const d = D.CONFIG_DEFAULTS;
+    return json({ motd: "", maintenance: false, min_online: d.min_online, latest: d.latest }, 200, { "Cache-Control": "public, max-age=10" });
   }
 }
 
@@ -166,7 +172,7 @@ async function v1(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
   if (parts[1] !== "rooms") return json({ error: "not_found" }, 404);
 
   if (parts.length === 2) {
-    return req.method === "POST" ? createRoom(env) : json({ error: "method" }, 405);
+    return req.method === "POST" ? createRoom(req, env) : json({ error: "method" }, 405);
   }
   const code = (parts[2] ?? "").toUpperCase();
   if (!isCode(code)) return json({ error: "not_found" }, 404);

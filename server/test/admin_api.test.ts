@@ -328,9 +328,9 @@ describe("matches, events, audit", () => {
 
 describe("config", () => {
   it("GET defaults, PUT partial updates, validation, audit", async () => {
-    expect(await get("config")).toEqual({ maintenance: false, motd: "", turn_roll_s: 15, turn_choose_s: 20, turn_pair_s: 10 });
+    expect(await get("config")).toEqual({ maintenance: false, motd: "", turn_roll_s: 15, turn_choose_s: 20, turn_pair_s: 10, min_online: 0, latest: 10 });
     const r = await api(cookie, "config", { method: "PUT", body: { motd: "Eid Mubarak!", turn_roll_s: 30 } });
-    expect(r).toEqual({ maintenance: false, motd: "Eid Mubarak!", turn_roll_s: 30, turn_choose_s: 20, turn_pair_s: 10 });
+    expect(r).toEqual({ maintenance: false, motd: "Eid Mubarak!", turn_roll_s: 30, turn_choose_s: 20, turn_pair_s: 10, min_online: 0, latest: 10 });
     expect(await api(cookie, "config", { method: "PUT", body: {} })).toEqual(r);
     for (const bad of [
       { motd: "x".repeat(141) },

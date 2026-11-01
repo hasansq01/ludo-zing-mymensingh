@@ -73,6 +73,8 @@ export class Client {
   pairAsk: boolean | undefined;
   /** Sent as `vote` in hello: the app answers Play again votes (false: an app from before them, version 9). */
   vote = true;
+  /** Sent as `app` (the app's version code) in hello when set; undefined = none, like version 10 and older. */
+  app: number | undefined;
   /** The pawn skin the hello asks for (undefined: none sent, like an older client). */
   pawn: string | undefined;
 
@@ -132,6 +134,7 @@ export class Client {
     if (this.pairAsk !== undefined) m.pair_ask = this.pairAsk;
     if (this.vote) m.vote = true;
     if (this.pawn !== undefined) m.pawn = this.pawn;
+    if (this.app !== undefined) m.app = this.app;
     this.send(m);
   }
 

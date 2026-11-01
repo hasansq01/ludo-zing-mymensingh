@@ -17,8 +17,14 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 - `GET /v1/rooms/<CODE>` → `200 {"code", "open": bool, "members": n, "started": bool}` or `404`.
 - `GET /v1/rooms/<CODE>/ws` with `Upgrade: websocket` → the room socket. Unknown code → `404` (no upgrade).
 - `GET /v1/health` → `{"ok": true}`.
-- `GET /v1/config` → `{"motd": "", "maintenance": false}` (`Cache-Control: public, max-age=60`): a message of the
-  day for Home, and whether online play is in maintenance (set in the admin console, `ADMIN_API.md`).
+- `GET /v1/config` → `{"motd": "", "maintenance": false, "min_online": 0, "latest": 10}` (`Cache-Control: public,
+  max-age=60`): a message of the day for Home, whether online play is in maintenance, and the app version policy (set
+  in the admin console, `ADMIN_API.md`): `min_online` is the lowest app version code allowed online (0: nobody is
+  blocked), `latest` the newest one on Google Play (the app offers an update when its own is lower).
+- App versions: the app reports its version code (`version/code`) as `app` in the `hello` of the room socket and of
+  the quick-match socket, and as the `X-App-Version` header on `POST /v1/rooms`. A missing or bad one counts as 10
+  (versions 10 and older send none). Below `min_online`: `POST /v1/rooms` → `426 {"error": "update_required", "msg",
+  "min"}`; a hello gets `error update_required` (`msg`, `min`) and close 4000, nothing is joined or queued.
 - Maintenance: `POST /v1/rooms` → `503 {"error": "maintenance", "msg": "<motd or a default text>"}`; show `msg`.
   Rooms that already exist keep working (joining by code still works).
 - Hosts: production `wss://ludo-zing-rooms.flipfold.workers.dev`; local dev `ws://<mac-ip>:8787` (`npm run dev` in
@@ -44,7 +50,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 
 | t | fields | when |
 |---|---|---|
-| `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
+| `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?, vote?, app?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
 | `settings` | `teams?: bool, game?: "ludo" \| "sl"` | host, lobby only (friend rooms). A `pair_ask` from older clients is accepted and ignored |
 | `start` | – | host, lobby; needs ≥ 2 members (teams: exactly 4). After `over` it is a `rematch` (older clients' Play again), or the old instant rematch while someone can't vote |
 | `rematch` | – | friend rooms, after `over`: Play again (or Play on the prompt), you say yes; the first one opens the vote (see "Play again") |
