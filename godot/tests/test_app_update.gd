@@ -338,8 +338,8 @@ func _failed_start() -> void:
 # ---------- required ----------
 
 func _required() -> void:
-	var u := make(null, 11, 12, 10)
 	check("required: default policy blocks nobody", not make_required(0, 10) and not make_required(0, 10))
+	var u := make(null, 11, 12, 10)                # (after make_required: its done() clears the version override)
 	u.refresh_policy()
 	check("required: below min_online", u.required() and u.min_online == 11)
 	check("required: at min_online it is fine", not make_required(11, 11))

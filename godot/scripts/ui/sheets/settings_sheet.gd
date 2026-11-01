@@ -29,7 +29,7 @@ extends Sheet
 signal prefs_changed
 signal language_picked(pref: String)     ## "auto" | "en" | "bn" (main switches the language and reopens Settings)
 
-const VERSION_LINE := "Ludo Zing Mymensingh · v%s · Flipfold Studio"
+const VERSION_LINE := "Ludo Zing · v%s · Flipfold Studio"
 ## Web pages for the Help rows. A row shows only when its URL is set (no dead "Coming soon" rows).
 const URLS := {
 	privacy = "https://ludo-zing-rooms.flipfold.workers.dev/privacy",
@@ -664,7 +664,7 @@ class CreditsSheet extends Sheet:
 	## Names of the game, people, fonts and licences stay as they are; titles and sentences are translated.
 	func _items() -> Array:
 		return [
-			["Ludo Zing Mymensingh", tr("Made by Flipfold Studio.")],
+			["Ludo Zing", tr("Made by Flipfold Studio.")],
 			["Godot Engine", tr("Built with Godot. © Juan Linietsky, Ariel Manzur and contributors. MIT licence.")],
 			[tr("Sounds"), tr("Kenney (kenney.nl), CC0 licence. The music and some effects are original to this game.")],
 			[tr("Fonts"), tr("Lilita One, Nunito, Baloo Da 2 and Noto Sans Bengali, SIL Open Font License 1.1.")],
