@@ -19,7 +19,7 @@ rules stay as written in ONLINE_V2.md and `src/econ/README.md` unless this file 
 | Nobody connected (quick match) | The match freezes; back within 2 min resumes it; else it ends, settled by progress (§3 "Nobody connected"; owner 2026-10-31) |
 | Broke | Coins < 100 (can't afford the cheapest table): a **daily bonus of 300 coins** (once per Bangladesh day) and the **refill ad** (500 coins) |
 | Re-roll | Once per player per match, online matches only (quick and friend rooms). Costs **1 free re-roll** (if you have one) else **5 gems** |
-| Rewarded ads (max 8 a day) | `reroll` +1 free re-roll (3/day) · `refill` +500 coins, only while broke (2/day) · `double` the coin payout of a won coin-table match again (2/day) · `gems` +2 gems (1/day) |
+| Rewarded ads (max 12 a day) | `reroll` +1 free re-roll (3/day) · `refill` +500 coins, only while broke (2/day) · `double` the coin payout of a won coin-table match again (2/day) · `gems` +2 gems (5/day) |
 | Gems earned | Level-up +5 per level · weekly boards (XP and wins, last week): 1st 50, 2nd 30, 3rd 20, 4th–10th 10 · each achievement +10 · `gems` ad +2 |
 | Gem prices in the shop | Every paid item can also be bought for `ceil(price / 100)` gems (rooms, dice, pawn skins, scenes, characters, emote packs). The premium pawn skins are sold for gems only (Glitter 80, Royal Crown 120, Chess Knight 150; buying them with coins answers 409 `gems_only`) |
 | Gems → Coins exchange | 10 → 1,000 · 50 → 5,500 · 120 → 14,000 (one way) |

@@ -100,14 +100,14 @@ export const ECON_V1 = {
   reroll_window_ms: 3_000,
   reroll_free_max: 9,
   ghost_reroll_chance: 0.25,
-  /** Rewarded ads: per-kind daily caps (Bangladesh day), what each grants, the total cap. */
+  /** Rewarded ads: per-kind daily caps (Bangladesh day), what each grants, the total cap (owner 2026-11-02: gems 1 -> 5 a day, total 8 -> 12). */
   ads: {
     reroll: { per_day: 3, amount: 1 },
     refill: { per_day: 2, amount: 500 },
     double: { per_day: 2, amount: 0 }, // amount = the match's payout
-    gems: { per_day: 1, amount: 2 },
+    gems: { per_day: 5, amount: 2 },
   } as Record<string, { per_day: number; amount: number }>,
-  ads_per_day: 8,
+  ads_per_day: 12,
   /** A pending ad nonce expires after this long; `double` must start within this long after the match ended. */
   ad_nonce_ms: 30 * 60_000,
   double_within_ms: 15 * 60_000,

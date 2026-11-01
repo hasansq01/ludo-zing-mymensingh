@@ -159,7 +159,7 @@ describe("ad kinds and caps", () => {
     expect(s.status).toBe(409);
     expect(s.body.error).toBe("cap");
     const t = await call("ads/today", g);
-    expect(t.body.left).toMatchObject({ reroll: 0, gems: 1 });
+    expect(t.body.left).toMatchObject({ reroll: 0, gems: ECON_V1.ads.gems.per_day });
     expect(t.body.total_left).toBe(ECON_V1.ads_per_day - 3);
   });
 
@@ -186,11 +186,12 @@ describe("ad kinds and caps", () => {
     expect((await call("ads/start", g, { body: { kind: "double", ref: mid } })).body.error).toBe("not_eligible");
   });
 
-  it("8 ads a day in total, whatever the kinds", async () => {
+  it("12 ads a day in total, whatever the kinds", async () => {
     const g = await guest();
     const day = Date.now();
-    // 7 already granted today (seeded), the 8th works, the 9th is over the total cap
-    const kinds = ["reroll", "reroll", "reroll", "refill", "refill", "double", "double"];
+    // 11 already granted today (seeded), the 12th works, the 13th is over the total cap
+    const kinds = ["reroll", "reroll", "reroll", "refill", "refill", "double", "double", "gems", "gems", "gems", "gems"];
+    expect(kinds.length + 1).toBe(ECON_V1.ads_per_day);
     await DB.batch(kinds.map((k, i) => DB.prepare("INSERT INTO ad_rewards (nonce, account_id, kind, created_at, status, tx_id, granted_at, amount) VALUES (?, ?, ?, ?, 'granted', ?, ?, 1)").bind(`ad_seed${i}${g.account.slice(4, 21)}`, g.account, k, day, `seed${i}${g.account}`, day)));
     await watch(g, "gems");
     const t = await call("ads/today", g);
@@ -313,9 +314,9 @@ describe("the LevelPlay callback", () => {
     const g = await guest();
     const s = await call("ads/start", g, { body: { kind: "gems" } });
     expect(s.status).toBe(200);
-    // another gems ad was granted while this one played (the gems cap is 1 a day)
+    // the day's other gems ads were granted while this one played (the gems cap is 5 a day)
     const day = Date.now();
-    await DB.prepare("INSERT INTO ad_rewards (nonce, account_id, kind, created_at, status, tx_id, granted_at, amount) VALUES (?, ?, 'gems', ?, 'granted', ?, ?, 2)").bind(`ad_capseed${g.account.slice(4, 18)}`, g.account, day, `capseed${g.account}`, day).run();
+    await DB.batch(Array.from({ length: ECON_V1.ads.gems.per_day }, (_, i) => DB.prepare("INSERT INTO ad_rewards (nonce, account_id, kind, created_at, status, tx_id, granted_at, amount) VALUES (?, ?, 'gems', ?, 'granted', ?, ?, 2)").bind(`ad_capseed${i}${g.account.slice(4, 17)}`, g.account, day, `capseed${i}${g.account}`, day)));
     expect((await lp(await lpUrl({ nonce: s.body.nonce, user: g.account, event: "ev-cap-1" }))).text).toBe("ev-cap-1:OK cap");
     expect((await acc(g.account)).gems).toBe(0);
     expect((await call(`ads/status?nonce=${s.body.nonce}`, g)).body.status).toBe("rejected");
