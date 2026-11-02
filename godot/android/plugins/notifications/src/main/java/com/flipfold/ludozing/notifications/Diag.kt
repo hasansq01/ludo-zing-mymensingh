@@ -101,6 +101,77 @@ internal object Diag {
         return o
     }
 
+    /**
+     * This process's memory, as the kernel sees it (Godot's own monitors miss what the GPU driver and native libraries
+     * hold): {rss_mb, hwm_mb, vm_mb, threads (/proc/self/status), fds (/proc/self/fd), maps (lines of
+     * /proc/self/maps: Android refuses new mappings past vm.max_map_count, 65530 by default), gpu_maps / gpu_mb (the
+     * mappings of the GPU driver's device: /dev/mali*, /dev/kgsl*, /dev/pvr*, ...), native_mb (malloc'd),
+     * java_mb, at (ms)}. Read on a background thread every MEM_EVERY_MS (/proc/self/maps can be tens of thousands of
+     * lines); mem() returns the latest reading instantly ({} before the first).
+     */
+    const val MEM_EVERY_MS = 15000L
+    @Volatile private var memLatest: JSONObject = JSONObject()
+    private var memThread: java.lang.Thread? = null
+
+    @Synchronized
+    fun mem(): JSONObject {
+        if (memThread == null) {
+            memThread = java.lang.Thread({
+                while (true) {
+                    guard("mem") { memLatest = readMem() }
+                    try { java.lang.Thread.sleep(MEM_EVERY_MS) } catch (e: InterruptedException) { return@Thread }
+                }
+            }, "LZDiagMem").apply { isDaemon = true; priority = java.lang.Thread.MIN_PRIORITY; start() }
+        }
+        return memLatest
+    }
+
+    private val GPU_DEVICES = arrayOf("/dev/mali", "/dev/kgsl", "/dev/pvr", "/dev/dri", "/dev/img", "/dev/nvmap")
+
+    internal fun readMem(): JSONObject {
+        val o = JSONObject()
+        guard("mem status") {
+            java.io.File("/proc/self/status").forEachLine { line ->
+                val kb = { line.substringAfter(':').trim().substringBefore(' ').toLongOrNull() ?: 0L }
+                when {
+                    line.startsWith("VmRSS:") -> o.put("rss_mb", kb() / 1024)
+                    line.startsWith("VmHWM:") -> o.put("hwm_mb", kb() / 1024)
+                    line.startsWith("VmSize:") -> o.put("vm_mb", kb() / 1024)
+                    line.startsWith("Threads:") -> o.put("threads", kb())
+                }
+            }
+        }
+        guard("mem fds") { o.put("fds", java.io.File("/proc/self/fd").list()?.size ?: -1) }
+        guard("mem maps") {
+            var maps = 0
+            var gpuMaps = 0
+            var gpuKb = 0L
+            java.io.File("/proc/self/maps").forEachLine { line ->
+                maps++
+                if (GPU_DEVICES.any { line.contains(it) }) {
+                    gpuMaps++
+                    val dash = line.indexOf('-')
+                    val sp = line.indexOf(' ')
+                    if (dash in 1 until sp) {
+                        val a = line.substring(0, dash).toLongOrNull(16)
+                        val b = line.substring(dash + 1, sp).toLongOrNull(16)
+                        if (a != null && b != null && b > a) gpuKb += (b - a) / 1024
+                    }
+                }
+            }
+            o.put("maps", maps)
+            o.put("gpu_maps", gpuMaps)
+            o.put("gpu_mb", gpuKb / 1024)
+        }
+        guard("mem heaps") {
+            o.put("native_mb", android.os.Debug.getNativeHeapAllocatedSize() / 1048576L)
+            val rt = Runtime.getRuntime()
+            o.put("java_mb", (rt.totalMemory() - rt.freeMemory()) / 1048576L)
+        }
+        o.put("at", System.currentTimeMillis())
+        return o
+    }
+
     private fun installer(ctx: Context, pkg: String): String = try {
         if (Build.VERSION.SDK_INT >= 30) {
             ctx.packageManager.getInstallSourceInfo(pkg).installingPackageName ?: ""

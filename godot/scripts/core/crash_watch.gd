@@ -7,8 +7,9 @@ extends Node
 ## id, start time, the device (model, Android version, CPU count, GPU renderer / vendor / GL version, screen, RAM,
 ## quality tier, the plugin's facts), the screen and match on screen (main's diag_context()), the last few events
 ## (crumbs: screen changes, sheets, pause / resume, memory warnings) and a sample every SAMPLE_SEC and on each
-## screen change (RSS and peak RSS from /proc/self/status, Godot's static and video memory, FPS, objects, nodes, draw
-## calls, the phone's free RAM, foreground or not). Writes are small (a few KB), atomic (tmp + rename) and at most one
+## screen change (RSS and peak RSS, plus on Android the plugin's mapping / GPU-driver mapping / thread / file
+## descriptor counts and native heap (diag_mem), Godot's static and video memory, FPS, objects, nodes, draw calls, the
+## phone's free RAM, foreground or not), and a coarse point a minute for the whole session (`trend`: what grows). Writes are small (a few KB), atomic (tmp + rename) and at most one
 ## per MIN_WRITE_GAP_MS.
 ## A clean end: a quit, or going to the background (Android may kill a backgrounded app; that is not a crash). The
 ## record says `ended` and whether the app was in the foreground at its last sample; coming back clears `ended`.
@@ -21,7 +22,8 @@ extends Node
 ## when there is one), again once RETRY_SEC later when offline, and on later launches for up to 3 days / 4 tries.
 ## At most CrashReport.MAX_PER_DAY reports a day. Nothing here blocks the game, and every failure is silent.
 ##
-## The plugin (NotificationsPlugin: diag_info(since_ms, max_exits) -> JSON text, diag_set_state(text)) is optional:
+## The plugin (NotificationsPlugin: diag_info(since_ms, max_exits) -> JSON text, diag_set_state(text), diag_mem() ->
+## JSON text) is optional:
 ## off Android `native` is null and the record alone decides ("unclean").
 
 const DIR := "user://diag"
@@ -34,6 +36,8 @@ const SINGLETON := "NotificationsPlugin"
 const SAMPLE_SEC := 15.0
 const MIN_WRITE_GAP_MS := 2000
 const SAMPLES_KEPT := 20                 # 5 minutes at SAMPLE_SEC
+const TREND_SEC := 60.0                  # session.trend: one coarse point a minute ...
+const TREND_KEPT := 90                   # ... for the first and the last 89 minutes
 const CRUMBS_KEPT := 40
 const EXITS_ASKED := 5
 const SEND_DELAY_SEC := 6.0              # after check_previous: the guest session is usually back by then
@@ -185,7 +189,22 @@ func sample() -> void:
 	list.append(s)
 	if list.size() > SAMPLES_KEPT:
 		session.samples = list.slice(-SAMPLES_KEPT)
+	_trend(s)
 	write()
+
+# A coarse point every TREND_SEC for the whole session (samples keep only the last 5 minutes): what grows.
+func _trend(s: Dictionary) -> void:
+	var tr: Array = session.get("trend", [])
+	if not tr.is_empty() and float(s.t) - float(tr[-1].get("t", 0.0)) < TREND_SEC:
+		return
+	var p := {}
+	for k in ["t", "screen", "mem", "maps", "gpu_maps", "gpu_mb", "threads", "fds", "native_mb", "vmem", "objects"]:
+		if s.has(k):
+			p[k] = s[k]
+	tr.append(p)
+	if tr.size() > TREND_KEPT:                   # the first point stays: the start of the session
+		tr = [tr[0]] + tr.slice(-(TREND_KEPT - 1))
+	session.trend = tr
 
 func take_sample() -> Dictionary:
 	var s := {
@@ -198,7 +217,14 @@ func take_sample() -> Dictionary:
 		draws = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 	}
 	var ps := proc_status(proc_status_path)
-	if ps.has("rss"):
+	var km := native_mem()
+	if km.has("rss_mb"):                         # the plugin (Android: Godot's FileAccess reads /proc files as empty)
+		s.mem = km.rss_mb
+		s.mem_peak = km.get("hwm_mb", km.rss_mb)
+		for k in ["maps", "gpu_maps", "gpu_mb", "threads", "fds", "native_mb"]:
+			if km.has(k):
+				s[k] = km[k]
+	elif ps.has("rss"):
 		s.mem = ps.rss                           # what low-memory kills look at (release builds track no static)
 		s.mem_peak = ps.get("hwm", ps.rss)
 	else:
@@ -207,6 +233,20 @@ func take_sample() -> Dictionary:
 	if avail > 0.0:
 		s.avail = snappedf(avail / MB, 1.0)
 	return s
+
+## The plugin's memory reading (diag_mem: RSS, mappings, GPU driver mappings, threads, file descriptors, native heap;
+## ints, see Diag.kt), {} without the plugin or before its first reading.
+func native_mem() -> Dictionary:
+	if not _native_has("diag_mem"):
+		return {}
+	var d: Variant = JSON.parse_string(str(native.call("diag_mem")))
+	if not d is Dictionary:
+		return {}
+	var out := {}
+	for k: Variant in d:
+		if d[k] is float or d[k] is int:
+			out[str(k)] = int(d[k])
+	return out
 
 ## VmRSS / VmHWM of /proc/self/status in MB ({} where there is no /proc: macOS, Windows).
 static func proc_status(path := "/proc/self/status") -> Dictionary:

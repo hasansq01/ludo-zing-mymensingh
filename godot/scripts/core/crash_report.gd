@@ -24,6 +24,7 @@ const LOG_TAIL_LINES := 200
 const TRACE_MAX := 65536
 const SAMPLES_MAX := 40
 const CRUMBS_MAX := 60
+const TREND_MAX := 90                    # CrashWatch.TREND_KEPT: a point a minute, the whole session
 const CACHED_IMPORTANCE := 400           # ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED
 const BAD_REASONS := ["crash", "crash_native", "anr"]
 const BENIGN_REASONS := ["user_requested", "user_stopped", "package_updated", "package_state_change",
@@ -126,6 +127,7 @@ static func build(prev: Dictionary, d: Dictionary, info: Dictionary, log: String
 			dev[k] = v
 	var samples: Array = prev.get("samples", []) if prev.get("samples") is Array else []
 	var crumbs: Array = prev.get("crumbs", []) if prev.get("crumbs") is Array else []
+	var trend: Array = prev.get("trend", []) if prev.get("trend") is Array else []
 	var body := {
 		v = VERSION,
 		pid = pid.left(64),
@@ -142,6 +144,7 @@ static func build(prev: Dictionary, d: Dictionary, info: Dictionary, log: String
 		match = prev.get("match") if prev.get("match") is Dictionary and not (prev.match as Dictionary).is_empty() else null,
 		samples = samples.slice(-SAMPLES_MAX),
 		crumbs = crumbs.slice(-CRUMBS_MAX),
+		trend = trend.slice(-TREND_MAX),
 		exit = ex if not ex.is_empty() else null,
 		log = scrub(log),
 	}

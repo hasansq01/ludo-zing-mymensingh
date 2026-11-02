@@ -27,7 +27,14 @@ class FakeNative extends RefCounted:
 ## Answers like a JNISingleton: has_method is false for the plugin's methods, has_java_method true.
 class FakeJni extends RefCounted:
 	func has_java_method(m: String) -> bool:
-		return m in ["diag_info", "diag_set_state"]
+		return m in ["diag_info", "diag_set_state", "diag_mem"]
+
+## Stands in for diag_mem() (Diag.mem): the kernel's view of this process's memory, JSON text.
+class FakeMem extends RefCounted:
+	static var answer := JSON.stringify({rss_mb = 612, hwm_mb = 700, vm_mb = 16000, maps = 41000, gpu_maps = 9000,
+		gpu_mb = 300, threads = 61, fds = 180, native_mb = 220, java_mb = 12, at = 1761800000000, note = "x"})
+	func diag_mem() -> String:
+		return answer
 
 var _root: Node
 var _dir := ""
@@ -279,6 +286,33 @@ func _watch_tests() -> void:
 	check("no plugin: nothing to call", not none._native_has("diag_info"))
 	none.free()
 	check("proc_status: no /proc -> {}", W.proc_status(_dir.path_join("nope")).is_empty())
+	# the plugin's memory reading (diag_mem) wins over /proc (unreadable through FileAccess on Android)
+	var mw := W.new(FakeMem.new())
+	mw.proc_status_path = ""
+	var ms := mw.take_sample()
+	check("diag_mem: RSS, peak, mappings, GPU mappings, threads, fds, native heap in the sample", ms.mem == 612 \
+		and ms.mem_peak == 700 and ms.maps == 41000 and ms.gpu_maps == 9000 and ms.gpu_mb == 300 and ms.threads == 61 \
+		and ms.fds == 180 and ms.native_mb == 220 and not ms.has("at"), ms)
+	check("diag_mem: whole numbers (JSON floats made ints), text values dropped", ms.maps is int and not ms.has("note"), ms)
+	FakeMem.answer = "{}"
+	ms = mw.take_sample()
+	check("diag_mem before its first reading: the sample still has mem, nothing else", ms.has("mem") and not ms.has("maps"), ms)
+	FakeMem.answer = "not json"
+	check("diag_mem: broken text -> {}", mw.native_mem().is_empty())
+	var jm := W.new(FakeJni.new())
+	check("the real plugin's diag_mem is found through has_java_method", jm._native_has("diag_mem"))
+	jm.free()
+	# the session trend: a point a minute, the first one kept when it is full
+	mw.session = {}
+	for i in 200:
+		mw._trend({t = i * 30.0, mem = 100 + i, maps = 3000 + 10 * i, screen = "ludo", fps = 27})
+	var tr: Array = mw.session.trend
+	check("trend: at most one point a minute, TREND_KEPT in all, the first one stays", tr.size() == W.TREND_KEPT \
+		and tr[0].t == 0.0 and tr[-1].t == 5940.0 and tr[1].t - tr[0].t >= 60.0 and tr[-1].t - tr[-2].t == 60.0, [tr.size(), tr[0], tr[1], tr[-1]])
+	check("trend: only the growth fields", tr[-1].has("maps") and tr[-1].has("mem") and not tr[-1].has("fps"), tr[-1])
+	var body := R.build({sid = "s1", trend = tr, samples = []}, {trigger = "unclean"}, {}, "", "p1")
+	check("report: carries the trend", (body.trend as Array).size() == R.TREND_MAX and body.trend[0].t == 0.0, (body.trend as Array).size())
+	mw.free()
 	check("should_run: exported builds yes; editor runs only with --diag; --no-diag off",
 		W.should_run(PackedStringArray(["--diag"])) and not W.should_run(PackedStringArray(["--diag", "--no-diag"])) \
 		and W.should_run(PackedStringArray()) == (not OS.has_feature("editor")))

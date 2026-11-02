@@ -357,6 +357,19 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
         "{}"
     }
 
+    /**
+     * JSON text: this process's memory as the kernel sees it {rss_mb, hwm_mb, vm_mb, threads, fds, maps, gpu_maps,
+     * gpu_mb, native_mb, java_mb, at} (Diag.mem: read every 15 s on a background thread, so this returns at once;
+     * "{}" before the first reading). Never throws.
+     */
+    @UsedByGodot
+    fun diag_mem(): String = try {
+        Diag.mem().toString()
+    } catch (t: Throwable) {
+        Log.w(TAG, "diag_mem failed", t)
+        "{}"
+    }
+
     /** Android 11+: [summary] (the game's session id, <= 128 bytes) comes back with this process's exit record. */
     @UsedByGodot
     fun diag_set_state(summary: String) {
