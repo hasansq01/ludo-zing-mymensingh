@@ -3,17 +3,21 @@ extends Node
 ## In-app updates: Google Play's In-App Updates through the notifications plugin (godot/android/plugins/notifications/
 ## Updates.kt), the server's version policy, and the offer on Home. main.gd owns one (`app_update`).
 ##
-## Soft updates (most releases): on Home, once per app session, Play is asked whether a newer version exists. If so a
-## banner says "A new version is available" with Update / Later. Update downloads it in the background (flexible mode)
-## while the player goes on; "Update ready" then offers Restart. Later hides the version for LATER_SEC (2 days). The
-## banner only shows on Home, with no sheet open, no search or room, and no invite banner.
+## Soft updates (most releases): on Home, once per app session, Play is asked whether a newer version exists. If so
+## our own sheet says "New version available" (UpdateSheet in its offer mode) with Update / Later. Update runs Play's
+## immediate flow: Play's full-screen update page downloads, installs and restarts the game (the way big games do it).
+## Where Play allows only the flexible flow, Update opens the store page instead: Play's flexible consent dialog
+## jumped over the game (full screen, then its own size). Later (or closing the sheet) hides the version for LATER_SEC
+## (2 days). The sheet only opens on Home, with no other sheet open, no search or room, and no invite banner. A
+## flexible download started by an older version (Play reports it downloading / downloaded) still gets the banner:
+## its progress, then "Update ready" with Restart.
 ## Required updates (rare): the server's `min_online` (GET /v1/config, edited in the admin console) is the lowest
 ## version code allowed online. Below it, gate() shows the blocking "Update required" sheet instead of quick match,
 ## friend rooms and joins; its Update button runs Play's immediate flow. Offline play (vs Computer, Pass & Play) never
 ## asks. A server that refuses a hello / room (`update_required`) does the same (note_refused).
 ## Fallback: where Play can't answer (no plugin, not installed from Play, an emulator, any error) the update goes to
-## the Play Store page (market://, else the web page); the soft offer is then a plain dialog, shown only when the
-## server's `latest` is above this version code.
+## the Play Store page (market://, else the web page); the soft offer is the same sheet, shown only when the server's
+## `latest` is above this version code.
 ##
 ##   var u := AppUpdate.new(self); add_child(u); u.start()   # main, once Home is up; u.resume() when the app returns
 ##   if u.gate(): return                                     # before any online play: true = the sheet is showing
@@ -44,7 +48,7 @@ var app: Node                            ## main (screen, ui_root, sheet_layer, 
 var min_online := 0                      ## the server's lowest version code for online play (0 = nobody blocked)
 var latest := 0                          ## the server's newest version code on Play (0 = not read yet)
 var state := "none"                      ## "none" | "offer" | "fallback" (a dialog is due) | "downloading" | "ready"
-var via := "flexible"                    ## the offer's Play flow: "flexible" | "immediate"
+var via := "immediate"                   ## what the offer's Update does: "immediate" (Play's full-screen flow) | "store"
 var version := 0                         ## the version the offer / download is for
 var bytes := 0
 var total := 0
@@ -63,7 +67,7 @@ var _forced := false                     # the server refused a hello / room as 
 var _asked := false                      # Play was asked this session
 var _now_flow := false                   # the required sheet's Update waits for Play's answer
 var _ready_hidden := false               # "Update ready" was put off for this session
-var _dialog: Sheet
+var _offer: Sheet                        # the "New version available" sheet while it is open
 var _required_sheet: Sheet
 var _timer: Timer
 
@@ -216,10 +220,10 @@ func _on_info(d: Dictionary) -> void:
 	var v := int(d.get("version_code", 0))
 	if v <= version_code() or _postponed(v):
 		return
-	if bool(d.get("flexible", false)):
-		via = "flexible"
-	elif bool(d.get("immediate", false)):
+	if bool(d.get("immediate", false)):
 		via = "immediate"
+	elif bool(d.get("flexible", false)):
+		via = "store"                             # (Play's flexible dialog jumps over the game: the store page)
 	else:
 		return
 	version = v
@@ -263,19 +267,18 @@ func _on_failed(code: String) -> void:
 		_set_state("none")
 		open_store()
 
-## Update on the offer banner: the flexible download starts (progress on the banner), or Play's immediate screen.
+## Update on the offer sheet: Play's full-screen immediate flow; the store page where Play can't (the fallback, only
+## the flexible flow allowed, no plugin).
 func accept_offer() -> void:
-	if state != "offer":
+	if state != "offer" and state != "fallback":
 		return
 	var p := _pg if _pg != null else native()
-	if p == null:
-		_set_state("none")
+	var play_it := state == "offer" and via == "immediate" and p != null
+	_set_state("none")
+	if play_it:
+		p.call("update_start", true)
+	else:
 		open_store()
-		return
-	bytes = 0
-	total = 0
-	_set_state("none" if via == "immediate" else "downloading")
-	p.call("update_start", via == "immediate")
 
 ## Later on the offer: hidden for this version for LATER_SEC.
 func decline_offer() -> void:
@@ -379,11 +382,19 @@ func _toast(text: String, kind := "info") -> void:
 	if not no_ui:
 		Toast.show(_host(), text, null, 2.4, kind)
 
-## Banner and dialog follow the state and whether Home is quiet (every TICK_SEC and on every state change).
+## The offer sheet and the download banner follow the state and whether Home is quiet (every TICK_SEC and on every
+## state change).
 func _sync() -> void:
 	if no_ui:
 		return
-	var show_banner := state in ["offer", "downloading", "ready"] and not (state == "ready" and _ready_hidden) and can_show()
+	if state == "offer" or state == "fallback":
+		if not is_instance_valid(_offer) and can_show():
+			_open_offer()
+	elif is_instance_valid(_offer):
+		var o := _offer
+		_offer = null
+		o.close()
+	var show_banner := state in ["downloading", "ready"] and not (state == "ready" and _ready_hidden) and can_show()
 	if show_banner:
 		if not is_instance_valid(banner):
 			banner = UpdateBanner.new(state)
@@ -401,21 +412,17 @@ func _sync() -> void:
 	elif is_instance_valid(banner):
 		banner.dismiss()
 		banner = null
-	if state == "fallback" and can_show() and not is_instance_valid(_dialog):
-		_open_dialog()
 
-## The fallback offer: a plain dialog, Update opens the store page.
-func _open_dialog() -> void:
+## "New version available" (UpdateSheet, offer mode): Update -> accept_offer, Later or closing it -> decline_offer.
+func _open_offer() -> void:
 	var layer := _layer()
 	if layer == null:
 		return
-	_dialog = Sheet.make_confirm(L10n.t("Update Ludo Zing"), L10n.t("A new version is available. Update to get the latest fixes."),
-		L10n.t("Update"), L10n.t("Later"))
-	var v := version
-	_dialog.answered.connect(func(yes: bool) -> void:
-		_set_state("none")
-		if yes:
-			open_store()
-		else:
-			postpone(v))
-	_dialog.open(layer)
+	var s := UpdateSheet.new(self, false)
+	_offer = s
+	s.closed.connect(func() -> void:
+		if _offer == s:                           # closed by the player (X, Back, the scrim): the same as Later
+			_offer = null
+			if state == "offer" or state == "fallback":
+				decline_offer())
+	s.open(layer)

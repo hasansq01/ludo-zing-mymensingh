@@ -74,6 +74,9 @@ const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_sta
 	"res://tests/test_redraw_free.gd"]
 
 func _initialize() -> void:
+	var save := root.get_node_or_null("Save")  # a suite that stops halfway can't write its throwaway profile to save.json
+	if save != null:
+		save.set("writes_off", true)
 	await process_frame                       # the info-bubble checks need a live scene tree
 	TranslationServer.set_locale("en")        # the checks read English UI text, whatever this computer's language
 	var failed := 0

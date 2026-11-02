@@ -1,9 +1,10 @@
 extends "res://tests/test_suite.gd"
 ## In-app updates (res://scripts/net/app_update.gd): the version code (and that the project setting equals every export
-## preset's version/code), the soft offer through a fake Play plugin (offer, download progress, Update ready, Restart,
-## Later for 2 days, the immediate-only case, a failed start), the fallback where Play can't answer (the server's
-## `latest`, the store page), the required update (gate, the sheet's immediate flow, the server's refusals), the
-## banner and the sheet, and what goes on the wire (`app` in hellos, X-App-Version, the 426 / update_required errors).
+## preset's version/code), the soft offer through a fake Play plugin (the offer, Update = Play's full-screen flow,
+## flexible-only = the store page, a download Play reports from an older version: progress, Update ready, Restart,
+## Later for 2 days, a failed start), the fallback where Play can't answer (the server's `latest`, the store page),
+## the required update (gate, the sheet's immediate flow, the server's refusals), the offer and required sheets and the
+## download banner, and what goes on the wire (`app` in hellos, X-App-Version, the 426 / update_required errors).
 ## Nothing here writes the save, opens a socket or opens a store page.
 
 ## Stands in for the Kotlin plugin singleton: the update methods and signals, answering as `answer` says.
@@ -72,7 +73,7 @@ func run() -> void:
 	_immediate_only()
 	_failed_start()
 	_required()
-	_ui()
+	await _ui()
 	await _wire()
 	_online()
 	AppUpdate.plugin = null
@@ -197,12 +198,19 @@ func _soft_flow() -> void:
 	pg.info = OFFER
 	var u := make(pg, 0, 10, 10)
 	u._ask()
-	check("soft: Play has a newer version -> the offer", u.state == "offer" and u.version == 11 and u.via == "flexible" and u.play_ok, [u.state, u.version])
+	check("soft: Play has a newer version -> the offer, through Play's full-screen flow", u.state == "offer" and u.version == 11 \
+		and u.via == "immediate" and u.play_ok, [u.state, u.version, u.via])
 	check("soft: asked once per session", pg.calls == ["check"])
 	u._ask()
 	check("soft: a second ask in the same session does nothing", pg.calls == ["check"])
 	u.accept_offer()
-	check("soft: Update starts the flexible flow and shows the download", pg.calls == ["check", "start:false"] and u.state == "downloading", pg.calls)
+	check("soft: Update runs Play's full-screen (immediate) flow, never the flexible dialog", pg.calls == ["check", "start:true"] \
+		and u.state == "none" and _urls.is_empty(), pg.calls)
+	done(u)
+
+	# a flexible download an older version started: Play reports its progress, then Update ready
+	pg = FakePlugin.new()
+	u = make(pg, 0, 10, 10)
 	pg.update_state.emit({status = "downloading", bytes = 5, total = 20, error = ""})
 	check("soft: progress is kept", u.state == "downloading" and u.bytes == 5 and u.total == 20)
 	check("soft: the banner text is a percentage", UpdateBanner.progress_text(5, 20) == "25%" and UpdateBanner.progress_text(0, 0) == "You can keep playing.")
@@ -317,6 +325,15 @@ func _immediate_only() -> void:
 	check("immediate-only: Update runs Play's immediate screen", pg.calls.back() == "start:true" and u.state == "none", pg.calls)
 	done(u)
 	pg = FakePlugin.new()
+	pg.info = OFFER.merged({immediate = false}, true)
+	u = make(pg, 0, 10, 10)
+	u._ask()
+	check("flexible-only: still offered, its Update goes to the store page", u.state == "offer" and u.via == "store")
+	u.accept_offer()
+	check("flexible-only: the store page, no Play flow started (its dialog jumps over the game)", pg.calls == ["check"] \
+		and _urls == [AppUpdate.STORE_URL] and u.state == "none", [pg.calls, _urls])
+	done(u)
+	pg = FakePlugin.new()
 	pg.info = OFFER.merged({flexible = false, immediate = false}, true)
 	u = make(pg, 0, 10, 10)
 	u._ask()
@@ -389,7 +406,7 @@ func make_required(min_online: int, code: int) -> bool:
 	return r
 
 
-# ---------- banner and sheet ----------
+# ---------- the offer sheet, the download banner, the required sheet ----------
 
 func _ui() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
@@ -402,65 +419,88 @@ func _ui() -> void:
 	u.app = app
 	u.min_online = 11
 	app.app_update = u
+	app.screen = "ludo"
 	u._ask()
 	u._sync()
+	check("offer: never in a match", u.state == "offer" and Sheet.top_sheet(app.sheet_layer) == null)
+	app.screen = "home"
+	var sh := Sheet.new("Some sheet")
+	sh.open(app.sheet_layer)
+	u._sync()
+	check("offer: never over another sheet", Sheet.top_sheet(app.sheet_layer) == sh)
+	sh.close()
+	app.close_all_sheets()
+	u._sync()
+	var os := Sheet.top_sheet(app.sheet_layer) as UpdateSheet
+	check("offer: a quiet Home -> our own sheet, New version available (no banner)", os != null and not os.required \
+		and os.title_label.text == "New version available" and u.banner == null, os)
+	check("offer: Update (a 48 px target) and Later", os.update_button.text == "Update" and os.later_button.text == "Later" \
+		and os.update_button.get_combined_minimum_size().y >= UIKit.TAP, [os.update_button.text, os.later_button.text])
+	u._sync()
+	check("offer: only one", app.sheet_layer.get_children().filter(func(c): return c is UpdateSheet and not c.is_queued_for_deletion()).size() == 1)
+	pg.calls.clear()
+	os.update_button.pressed.emit()
+	check("offer: Update runs Play's full-screen flow and the sheet goes", pg.calls == ["start:true"] and u.state == "none" \
+		and not u._postponed(11) and (not is_instance_valid(os) or os.is_queued_for_deletion() or os._closing), [pg.calls, u.state])
+	app.close_all_sheets()
+	# Later, and closing it, put the version off
+	u.state = "none"
+	u.version = 11
+	u._set_state("offer")
+	os = Sheet.top_sheet(app.sheet_layer) as UpdateSheet
+	os.later_button.pressed.emit()
+	check("offer: Later closes it and puts the version off for 2 days", u.state == "none" and u._postponed(11), [u.state])
+	app.close_all_sheets()
+	Save.prefs.erase("update_later")
+	u._set_state("offer")
+	os = Sheet.top_sheet(app.sheet_layer) as UpdateSheet
+	os.close()
+	await os.closed                          # (after its fade)
+	check("offer: the X / Back does the same as Later", u.state == "none" and u._postponed(11))
+	app.close_all_sheets()
+	Save.prefs.erase("update_later")
+	# the fallback (Play can't answer): the same sheet, Update opens the store page
+	u._set_state("fallback")
+	os = Sheet.top_sheet(app.sheet_layer) as UpdateSheet
+	check("fallback: the same offer sheet", os != null and not os.required)
+	os.update_button.pressed.emit()
+	check("fallback: Update opens the store page", _urls.back() == AppUpdate.STORE_URL and u.state == "none", _urls)
+	app.close_all_sheets()
+	# a download an older version started: the banner (progress, Update ready, Restart)
+	pg.update_state.emit({status = "downloading", bytes = 10, total = 40, error = ""})
+	u._sync()
 	var b := u.banner
-	check("banner: the offer shows on a quiet Home", b != null and b.mode == "offer" and b.title_label.text == "A new version is available"
-		and b.later_button.text == "Later" and b.action_button.text == "Update" and b.buttons.visible and not b.bar.visible, [b != null and b.mode])
-	check("banner: 48 px high buttons", b.action_button.get_combined_minimum_size().y >= 44.0, b.action_button.get_combined_minimum_size())
+	check("banner: an older version's download -> the banner with a bar", b != null and b.mode == "downloading" and b.bar.visible \
+		and not b.buttons.visible and b.sub_label.text == "25%", [b != null and b.mode])
 	check("banner: sits under the invite banner's z (over sheets)", b.z_index == UpdateBanner.Z)
+	check("banner: the text is a percentage", UpdateBanner.progress_text(5, 20) == "25%" and UpdateBanner.progress_text(0, 0) == "You can keep playing.")
 	app.screen = "ludo"
 	u._sync()
 	check("banner: never in a match", u.banner == null or u.banner.is_queued_for_deletion() or u.banner._gone)
 	app.screen = "home"
 	u.banner = null
-	u._sync()
-	b = u.banner
-	check("banner: back on Home it comes back", b != null)
-	var sh := Sheet.new("Some sheet")
-	sh.open(app.sheet_layer)
-	u._sync()
-	check("banner: never over a sheet", not u.can_show() and (u.banner == null or u.banner._gone))
-	sh.close()
-	app.close_all_sheets()
-	u.banner = null
-	u._sync()
-	b = u.banner
-	b.update_pressed.emit()
-	check("banner: Update -> downloading mode with a bar", u.state == "downloading" and b.mode == "downloading" and b.bar.visible and not b.buttons.visible, [u.state, b.mode])
-	pg.update_state.emit({status = "downloading", bytes = 10, total = 40, error = ""})
-	u._sync()
-	check("banner: the percentage", b.sub_label.text == "25%", b.sub_label.text)
 	pg.update_state.emit({status = "downloaded", bytes = 40, total = 40, error = ""})
 	u._sync()
-	check("banner: Update ready with Restart", b.mode == "ready" and b.title_label.text == "Update ready" and b.action_button.text == "Restart" and b.buttons.visible, [b.mode, b.action_button.text])
+	b = u.banner
+	check("banner: Update ready with Restart", b != null and b.mode == "ready" and b.title_label.text == "Update ready" \
+		and b.action_button.text == "Restart" and b.buttons.visible, [b != null and b.mode])
 	b.restart_pressed.connect(func() -> void: pass)
 	b.action_button.pressed.emit()
 	check("banner: Restart calls completeUpdate", pg.calls.back() == "complete", pg.calls)
 	# the required sheet
 	var s := u.open_required()
-	check("sheet: Update required", s is UpdateSheet and (s as UpdateSheet).title_label.text == "Update required" and u.gate(), s)
+	check("sheet: Update required", s is UpdateSheet and (s as UpdateSheet).required and (s as UpdateSheet).title_label.text == "Update required" and u.gate(), s)
 	check("sheet: only one at a time", u.open_required() == s)
 	var us := s as UpdateSheet
 	check("sheet: Update is a 48 px target", us.update_button.get_combined_minimum_size().y >= UIKit.TAP, us.update_button.get_combined_minimum_size())
-	check("sheet: says the offline modes still work", us.note_label.text.contains("computer"), us.note_label.text)
+	check("sheet: says the offline modes still work, no Later", us.note_label.text.contains("computer") and us.later_button == null, us.note_label.text)
 	pg.calls.clear()
 	us.update_button.pressed.emit()
 	check("sheet: Update asks Play, then runs the immediate flow", pg.calls == ["check", "start:true"], pg.calls)
-	# the fallback dialog
-	app.close_all_sheets()
-	u.state = "none"
-	u.version = 11
-	u._set_state("fallback")
-	check("dialog: the fallback offer is a confirm dialog", Sheet.top_sheet(app.sheet_layer) != null and Sheet.top_sheet(app.sheet_layer).has_meta("confirm"))
-	var yes := Sheet.top_sheet(app.sheet_layer).find_child("Yes", true, false) as Button
-	check("dialog: Update / Later", yes != null and yes.text == "Update", yes.text if yes else "none")
-	u._dialog.answered.emit(true)
-	check("dialog: Update opens the store page", _urls.back() == AppUpdate.STORE_URL, _urls)
-	app.free()                               # now, inside the sandbox: freeing the dialog answers "Later" and saves
+	await tree.create_timer(Sheet.OUT_SEC + 0.2).timeout   # (the closed sheets finish fading before the app goes)
+	app.free()                               # now, inside the sandbox (a sheet closing may save)
 	AppUpdate.plugin = null
 	AppUpdate.code_override = 0
-
 
 # ---------- on the wire ----------
 

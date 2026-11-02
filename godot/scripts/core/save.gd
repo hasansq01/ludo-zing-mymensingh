@@ -11,6 +11,7 @@ const VERSION := 1
 var profile := {}
 var prefs := {}
 var _dirty := false
+var writes_off := false                  ## the test runner (tests/run_tests.gd): flush() never writes user://save.json
 var _timer: Timer
 
 func _ready() -> void:
@@ -197,7 +198,7 @@ func save() -> void:
 	_timer.start()
 
 func flush() -> void:
-	if not _dirty:
+	if not _dirty or writes_off:
 		return
 	_dirty = false
 	var tmp := PATH + ".tmp"
