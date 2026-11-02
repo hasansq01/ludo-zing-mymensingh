@@ -28,8 +28,10 @@ extends Sheet
 
 signal prefs_changed
 signal language_picked(pref: String)     ## "auto" | "en" | "bn" (main switches the language and reopens Settings)
+signal probe_requested                   ## PROBE_TAPS taps on the version line: the graphics leak test (LeakProbe)
 
 const VERSION_LINE := "Ludo Zing · v%s · Flipfold Studio"
+const PROBE_TAPS := 7                    ## taps on the version line that start the graphics leak test (testers)
 ## Web pages for the Help rows. A row shows only when its URL is set (no dead "Coming soon" rows).
 const URLS := {
 	privacy = "https://ludo-zing-rooms.flipfold.workers.dev/privacy",
@@ -42,6 +44,7 @@ const SEG_W_SHORT := 112.0              ## two short choices (3D / Top): the lon
 const TAP_SLOP := 12.0
 
 var _width := 360.0
+var _probe_taps := 0
 var _list: VBoxContainer
 var _switch: Switch                      # the Sound switch (previews flip it)
 var _vol_lines: Array[Control] = []
@@ -191,7 +194,22 @@ func _build() -> void:
 	var id := str(Save.profile.get("id", ""))
 	if id != "":
 		foot.text += "\n" + tr("Support ID %s") % id
+	foot.name = "VersionLine"
+	foot.mouse_filter = Control.MOUSE_FILTER_PASS    # (taps still scroll the list)
+	foot.gui_input.connect(_on_version_tap)
 	_list.add_child(UIKit.margin(foot, 0, UIKit.SPACE.xs, 0, UIKit.SPACE.xs))
+
+# Testers: PROBE_TAPS taps on the version line close Settings and start the graphics leak test.
+func _on_version_tap(e: InputEvent) -> void:
+	var tap: bool = (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT) \
+		or (e is InputEventScreenTouch and e.pressed)
+	if not tap or e is InputEventMouseButton and DisplayServer.is_touchscreen_available() and e.device == -1:
+		return                               # (an emulated mouse click of a touch: counted once, as the touch)
+	_probe_taps += 1
+	if _probe_taps >= PROBE_TAPS:
+		_probe_taps = 0
+		probe_requested.emit()
+		close()
 
 
 # ---------- pieces ----------

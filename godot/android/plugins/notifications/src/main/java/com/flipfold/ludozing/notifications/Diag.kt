@@ -126,6 +126,9 @@ internal object Diag {
         return memLatest
     }
 
+    /** A reading right now (the graphics leak test: LeakProbe), kept as the latest too. */
+    fun memNow(): JSONObject = readMem().also { memLatest = it }
+
     private val GPU_DEVICES = arrayOf("/dev/mali", "/dev/kgsl", "/dev/pvr", "/dev/dri", "/dev/img", "/dev/nvmap")
 
     internal fun readMem(): JSONObject {

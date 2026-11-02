@@ -370,6 +370,15 @@ class NotificationsPlugin(godot: Godot) : GodotPlugin(godot) {
         "{}"
     }
 
+    /** diag_mem's reading taken right now, on the calling thread (tens of ms on a big process: tests only). */
+    @UsedByGodot
+    fun diag_mem_now(): String = try {
+        Diag.memNow().toString()
+    } catch (t: Throwable) {
+        Log.w(TAG, "diag_mem_now failed", t)
+        "{}"
+    }
+
     /** Android 11+: [summary] (the game's session id, <= 128 bytes) comes back with this process's exit record. */
     @UsedByGodot
     fun diag_set_state(summary: String) {

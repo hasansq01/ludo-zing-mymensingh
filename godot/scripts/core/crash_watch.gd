@@ -237,9 +237,37 @@ func take_sample() -> Dictionary:
 ## The plugin's memory reading (diag_mem: RSS, mappings, GPU driver mappings, threads, file descriptors, native heap;
 ## ints, see Diag.kt), {} without the plugin or before its first reading.
 func native_mem() -> Dictionary:
-	if not _native_has("diag_mem"):
+	return _mem_call("diag_mem")
+
+## The same, read right now (diag_mem_now: /proc/self/maps can be tens of thousands of lines, so only for the
+## graphics leak test, LeakProbe); the cached reading where the plugin predates it.
+func native_mem_now() -> Dictionary:
+	var m := _mem_call("diag_mem_now")
+	return m if not m.is_empty() else native_mem()
+
+## Sends the graphics leak test's numbers (LeakProbe) as a report with trigger "probe": the device, the app, this
+## session's trend and last samples. Fire and forget (one try; a probe is easy to run again).
+func send_probe(probe: Dictionary) -> void:
+	if not _started:
+		return
+	var st := _read(STATE)
+	var body := {
+		v = CrashReport.VERSION, pid = _pid(st), sid = str(session.get("sid", "")), trigger = "probe",
+		app = session.get("app", {}), device = session.get("device", {}), started_at = int(session.get("started_at", 0)),
+		last_at = _now(), ended = false, foreground = true, screen = str(session.get("screen", "")),
+		samples = (session.get("samples", []) as Array).slice(-8), crumbs = (session.get("crumbs", []) as Array).slice(-20),
+		trend = session.get("trend", []), probe = probe, log = "",
+	}
+	var acc := Account.instance()
+	if acc != null and str(acc.account.get("id", "")) != "":
+		body.account_id = str(acc.account.id)
+	var r: Dictionary = await _send(body)
+	print("CrashWatch: probe %s (%d)" % ["sent" if r.get("ok", false) else "not sent", int(r.get("status", 0))])
+
+func _mem_call(method: String) -> Dictionary:
+	if not _native_has(method):
 		return {}
-	var d: Variant = JSON.parse_string(str(native.call("diag_mem")))
+	var d: Variant = JSON.parse_string(str(native.call(method)))
 	if not d is Dictionary:
 		return {}
 	var out := {}

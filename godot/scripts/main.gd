@@ -39,6 +39,7 @@ var notifications: Notifications        # reminders, push and the permission que
 var ads: Ads                            # rewarded ads + the consent form (scripts/net/ads.gd; AdFlow shows them)
 var gem_store: GemStore                 # the gem packs: Play Billing + server verification (scripts/net/gem_store.gd)
 var crash_watch: CrashWatch             # breadcrumbs + the report of an unexpected exit (scripts/core/crash_watch.gd)
+var leak_probe: LeakProbe = null         # the graphics leak test while it runs (start_leak_probe)
 var screen := "splash"                  # splash | welcome | home | ludo | sl
 var paused := false
 var speed := 1.0
@@ -915,10 +916,29 @@ func _home_side(id: String) -> Control:
 func toast(text: String) -> void:
 	Toast.show(ui_root, text)
 
+## The graphics leak test (testers: seven taps on Settings' version line; LeakProbe): ~3.5 minutes, a message at
+## each step, the numbers sent as a "probe" report at the end.
+func start_leak_probe() -> void:
+	if leak_probe != null and leak_probe.running:
+		return
+	leak_probe = LeakProbe.new()
+	leak_probe.name = "LeakProbe"
+	leak_probe.app = self
+	add_child(leak_probe)
+	toast(tr("Graphics test started: keep the game open for about 4 minutes."))
+	leak_probe.step_started.connect(func(i: int, n: int, _step: String):
+		if i > 1:
+			toast(tr("Graphics test: step %d of %d") % [i, n]))
+	await leak_probe.run()
+	toast(tr("Graphics test done. Thank you!"))
+	leak_probe.queue_free()
+	leak_probe = null
+
 func open_settings() -> SettingsSheet:
 	var s := SettingsSheet.new()
 	s.prefs_changed.connect(_on_prefs_changed)
 	s.language_picked.connect(set_language)
+	s.probe_requested.connect(start_leak_probe)
 	if screen in ["ludo", "sl"]:               # opened from a game: computer turns wait
 		paused = true
 		s.closed.connect(func(): paused = _pause_sheet != null)
