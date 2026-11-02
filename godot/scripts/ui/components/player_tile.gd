@@ -65,6 +65,7 @@ var _sb_card: StyleBoxFlat
 var _sb_card_on: StyleBoxFlat
 var _sb_slot: StyleBoxFlat
 var _sb_glow: StyleBoxFlat
+var _glow_box: GlowPulse                 # the turn glow: drawn once, breathes by alpha / scale (no per-frame redraw)
 var _sb_mover: StyleBoxFlat
 var _sb_you: StyleBoxFlat
 
@@ -74,6 +75,11 @@ func _init(color_index_ := 0, side_ := "left") -> void:
 	side = side_
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_styles()
+	_glow_box = GlowPulse.new(_sb_glow)
+	_glow_box.name = "Glow"
+	_glow_box.visible = false
+	_glow_box.place(Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H)).grow(-4))
+	add_child(_glow_box)
 	_name = UIKit.label("", UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -153,6 +159,12 @@ func set_state(active_: bool, mover_: bool, home: int, pct: float, chip := "") -
 	set_process(active and not _reduce_motion())
 	if not active:
 		_glow = 0.0
+	_glow_box.visible = active
+	if active:
+		if _reduce_motion():
+			_glow_box.still()
+		else:
+			_glow_box.pulse(_glow)
 	queue_redraw()
 	_layout()
 
@@ -409,7 +421,7 @@ func _build_styles() -> void:
 	_sb_glow.bg_color = Color(col, 0.0)
 	_sb_glow.set_corner_radius_all(UIKit.R.lg + 6)
 	_sb_glow.corner_detail = 10
-	_sb_glow.shadow_color = Color(col.lightened(0.1), 0.7)
+	_sb_glow.shadow_color = Color(col.lightened(0.1), 1.0)   # (GlowPulse breathes its alpha 0.45-0.9)
 	_sb_glow.shadow_size = 14
 	_sb_you = StyleBoxFlat.new()
 	_sb_you.bg_color = col
@@ -534,18 +546,15 @@ func _enter_tree() -> void:
 	scale = Vector2.ONE * (ACTIVE_SCALE if active else IDLE_SCALE)
 	_layout()
 
+## The active tile's breathing glow: GlowPulse's alpha and scale only (a redraw every frame would rebuild the card's
+## shapes, and their GPU buffers, every frame: see GlowPulse).
 func _process(delta: float) -> void:
 	_t += delta
 	_glow = 0.5 + 0.5 * sin(_t * TAU / 1.4)
-	queue_redraw()
+	_glow_box.pulse(_glow)
 
 func _draw() -> void:
 	var card := Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H))
-	if active:
-		var a := 0.75 if _reduce_motion() else 0.45 + 0.45 * _glow
-		_sb_glow.shadow_color.a = a
-		_sb_glow.shadow_size = int(10 + 8 * _glow)
-		draw_style_box(_sb_glow, card.grow(-4))
 	draw_style_box(_sb_card_on if active else _sb_card, card)
 	draw_style_box(_sb_slot, Rect2(_slot_pos(), Vector2(SLOT, SLOT)))
 	if kind == "you":                       # the equipped avatar has its own colours: a ring in the seat colour

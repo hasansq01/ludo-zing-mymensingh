@@ -21,9 +21,10 @@ signal finished(result: Dictionary)
 const STEP_SEC := 20.0
 const SETTLE_SEC := 3.0
 ## In this order. "subviews": every 3D SubViewport (the dice, previews): off = not drawn, no_msaa = drawn without
-## MSAA. "main": the main view's MSAA / 3D scale / 3D at all. fps_15: if the growth halves, it is per frame.
+## MSAA. "main": the main view's MSAA / 3D scale / 3D at all. ui_hidden: the 2D interface (app.ui_root) hidden, the 3D
+## drawn as usual. fps_15: if the growth halves, it is per frame.
 const STEPS := ["base", "subviews_off", "subviews_no_msaa", "main_no_msaa", "main_scale_1", "main_no_3d", "all_2d",
-	"fps_15", "base_again"]
+	"ui_hidden", "fps_15", "base_again"]
 
 var app: Node = null                     ## main.gd (crash_watch, screen); null in tests
 var viewport: Viewport = null            ## the main view (default: the root window)
@@ -106,6 +107,11 @@ func _apply(step: String) -> void:
 			for vp in _subviews():
 				_save(vp, "render_target_update_mode")
 				vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		"ui_hidden":
+			var ui: Variant = app.get("ui_root") if app != null else null
+			if ui is CanvasItem:
+				_save(ui, "visible")
+				(ui as CanvasItem).visible = false
 		"fps_15":
 			_saved["max_fps"] = Engine.max_fps
 			Engine.max_fps = 15

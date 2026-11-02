@@ -327,8 +327,9 @@ func _process(_delta: float) -> void:
 	dice_pad.hint = _waiting and dice.hinting()
 	if online:
 		for t in chips.get_children():
-			if (t as SLTile).timer_end > 0:
-				(t as SLTile).queue_redraw_all()
+			var st := t as SLTile
+			if st and (st.timer_end > 0 or st._disc_step >= 0):
+				st.tick_timer()
 
 
 # =====================================================================================================================
@@ -1447,6 +1448,10 @@ class SLTile extends Control:
 	var _sb: StyleBoxFlat
 	var _sb_on: StyleBoxFlat
 	var _sb_glow: StyleBoxFlat
+	var _sb_ring: StyleBoxFlat           # "you": the ring round the avatar, in the seat colour
+	var _glow_box: GlowPulse             # the turn glow and the pointer: drawn once, moved / faded (see GlowPulse)
+	var _pointer: Control
+	var _disc_step := -1
 	var _tw: Tween
 	var _t := 0.0
 	var badge := ""                      ## online: "" | "offline" | "bot"
@@ -1475,8 +1480,27 @@ class SLTile extends Control:
 		_sb_glow = StyleBoxFlat.new()
 		_sb_glow.bg_color = Color(col, 0.0)
 		_sb_glow.set_corner_radius_all(UIKit.R.md + 6)
-		_sb_glow.shadow_color = Color(col.lightened(0.1), 0.6)
-		_sb_glow.shadow_size = 12
+		_sb_glow.shadow_color = Color(col.lightened(0.1), 1.0)   # (GlowPulse breathes its alpha 0.35-0.75)
+		_sb_glow.shadow_size = 11
+		_sb_ring = StyleBoxFlat.new()
+		_sb_ring.bg_color = col
+		_sb_ring.set_corner_radius_all(int(AVA * 0.3) + 2)
+		_sb_ring.anti_aliasing = true
+		_glow_box = GlowPulse.new(_sb_glow)
+		_glow_box.name = "Glow"
+		_glow_box.alpha_lo = 0.35
+		_glow_box.alpha_hi = 0.75
+		_glow_box.still_alpha = 0.6
+		_glow_box.visible = false
+		add_child(_glow_box)
+		_pointer = Control.new()             # a pointer under the tile, towards the board (bobs by position)
+		_pointer.name = "Pointer"
+		_pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_pointer.visible = false
+		_pointer.draw.connect(func():
+			_pointer.draw_colored_polygon(PackedVector2Array([Vector2(-7, -4), Vector2(7, -4), Vector2(0, 5)]), Color.WHITE)
+			_pointer.draw_colored_polygon(PackedVector2Array([Vector2(-4.5, -2.5), Vector2(4.5, -2.5), Vector2(0, 3)]), col))
+		add_child(_pointer)
 		_ava = PlayerTile.make_avatar(color_index, kind, AVA, cpu_id if cpu_id != "" else name_)
 		add_child(_ava)
 		_name = UIKit.label(L10n.seat_name(name_), UIKit.FS.label, Palette.INK_STRONG, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
@@ -1537,6 +1561,13 @@ class SLTile extends Control:
 		if _disc:
 			_disc.queue_redraw()
 
+	## The countdown's redraw while it runs: only its disc, and only when the ring moves a step (a tenth of a second).
+	func tick_timer() -> void:
+		var step := int((timer_end - Time.get_ticks_msec()) / 100) if timer_end > 0 else -1
+		if step != _disc_step and _disc:
+			_disc_step = step
+			_disc.queue_redraw()
+
 	## A white disc with the seconds left and a ring that empties (red near the end), like the Ludo tiles'.
 	func _draw_timer() -> void:
 		if timer_end <= 0:
@@ -1565,7 +1596,13 @@ class SLTile extends Control:
 		if active_ != active or _tw == null:
 			active = active_
 			_animate()
-		set_process(active and not PlayerTile._pref("reduce_motion"))
+		var still := PlayerTile._pref("reduce_motion")
+		set_process(active and not still)
+		_glow_box.visible = active
+		_pointer.visible = active
+		if active and still:
+			_glow_box.still()
+			_pointer.position.y = H + 6.0
 		queue_redraw()
 
 	## Play on: this player finished in place n while the game goes on: a place badge on the avatar's corner and the
@@ -1649,6 +1686,8 @@ class SLTile extends Control:
 			_place_badge.position = _ava.position - Vector2(9, 9)
 			move_child(_place_badge, get_child_count() - 1)
 		pivot_offset = Vector2(w / 2.0, H / 2.0)
+		_glow_box.place(Rect2(Vector2.ZERO, Vector2(w, H)).grow(-3))
+		_pointer.position = Vector2(w / 2.0, H + 6.0)
 		queue_redraw()
 
 	func _animate() -> void:
@@ -1662,29 +1701,17 @@ class SLTile extends Control:
 		_tw = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		_tw.tween_property(self, "scale", Vector2(k, k), 0.26 if active else 0.18)
 
+	## The active tile's glow breathes and its pointer bobs by alpha / scale / position only (no redraw: GlowPulse).
 	func _process(delta: float) -> void:
 		_t += delta
-		queue_redraw()
+		_glow_box.pulse(0.5 + 0.5 * sin(_t * TAU / 1.4))
+		_pointer.position.y = H + 6.0 + 2.0 * sin(_t * TAU / 1.0)
 
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, Vector2(size.x, H))
-		if active:
-			var g := 0.5 + 0.5 * sin(_t * TAU / 1.4)
-			_sb_glow.shadow_color.a = 0.35 + 0.4 * g
-			_sb_glow.shadow_size = int(8 + 6 * g)
-			draw_style_box(_sb_glow, r.grow(-3))
 		draw_style_box(_sb_on if active else _sb, r)
 		if kind == "you":                    # the equipped avatar has its own colours: a ring in the seat colour
-			var ring := StyleBoxFlat.new()
-			ring.bg_color = Palette.PLAYER[color_index]
-			ring.set_corner_radius_all(int(AVA * 0.3) + 2)
-			ring.anti_aliasing = true
-			draw_style_box(ring, Rect2(_ava.position, _ava.size).grow(2))
-		if active:                           # a pointer under the tile, towards the board
-			var c := Vector2(size.x / 2.0, H + 6.0 + 2.0 * sin(_t * TAU / 1.0))
-			var col: Color = Palette.PLAYER[color_index]
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-7, -4), c + Vector2(7, -4), c + Vector2(0, 5)]), Color.WHITE)
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-4.5, -2.5), c + Vector2(4.5, -2.5), c + Vector2(0, 3)]), col)
+			draw_style_box(_sb_ring, Rect2(_ava.position, _ava.size).grow(2))
 
 
 ## The dice's pad: a rounded tile in the colour of the player whose turn it is (white rim, a darker lip). On your
@@ -1698,6 +1725,9 @@ class DicePad extends Control:
 	var _sb := StyleBoxFlat.new()
 	var _lip := StyleBoxFlat.new()
 	var _glow := StyleBoxFlat.new()
+	var _sheen := StyleBoxFlat.new()
+	var _glow_box: GlowPulse              # the glow on your turn: drawn once, breathes by alpha / scale (see GlowPulse)
+	var _face: Node2D                     # the pad itself (lip, face, sheen): the hint bounces it by its scale
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1708,34 +1738,55 @@ class DicePad extends Control:
 		_sb.set_border_width_all(UIKit.BW.rim)
 		_sb.border_color = Color.WHITE
 		_glow.bg_color = Color(1, 1, 1, 0)
+		_glow.shadow_size = 13
+		_sheen.bg_color = Color(1, 1, 1, 0.18)
+		_sheen.set_corner_radius_all(UIKit.R.lg)
+		_glow_box = GlowPulse.new(_glow)
+		_glow_box.name = "Glow"
+		_glow_box.alpha_lo = 0.45
+		_glow_box.alpha_hi = 0.8
+		_glow_box.still_alpha = 0.65
+		_glow_box.visible = false
+		add_child(_glow_box)
+		_face = Node2D.new()                 # (a Node2D: scaling a Control redraws it, scaling this doesn't)
+		_face.name = "Face"
+		_face.draw.connect(_draw_face)
+		add_child(_face)
+		resized.connect(func():
+			_glow_box.place(Rect2(Vector2.ZERO, size).grow(-4))
+			_face.position = size / 2.0
+			_face.queue_redraw())
 
 	func set_color(c: int, active: bool) -> void:
 		color_index = posmod(c, 4)
 		on = active
-		queue_redraw()
+		_glow.shadow_color = Color((Palette.PLAYER[color_index] as Color).lightened(0.2), 1.0)
+		_glow_box.queue_redraw()
+		_glow_box.visible = on
+		_face.queue_redraw()
 
+	## The hint's bounce (scale) and the glow's breath (GlowPulse): no redraw a frame.
 	func _process(delta: float) -> void:
 		_t += delta
+		var still := PlayerTile._pref("reduce_motion")
 		var k := 1.0
-		if hint and not rolling and not PlayerTile._pref("reduce_motion"):
+		if hint and not rolling and not still:
 			k = 1.0 + 0.05 * (0.5 + 0.5 * sin(_t * TAU / 0.9))
-		scale = Vector2(k, k)
-		queue_redraw()
-
-	func _draw() -> void:
-		var col: Color = Palette.PLAYER[color_index]
-		var r := Rect2(Vector2.ZERO, size)
+		_face.scale = Vector2(k, k)
+		_glow_box.position = size / 2.0
 		if on:
-			var g := 0.5 + 0.5 * sin(_t * TAU / (0.9 if hint else 1.6))
-			_glow.shadow_color = Color(col.lightened(0.2), 0.45 + 0.35 * g)
-			_glow.shadow_size = int(10 + (10 if hint else 5) * g)
-			draw_style_box(_glow, r.grow(-4))
+			if still:
+				_glow_box.still()
+			else:
+				_glow_box.grow = 0.14 if hint else 0.07
+				_glow_box.pulse(0.5 + 0.5 * sin(_t * TAU / (0.9 if hint else 1.6)))
+
+	func _draw_face() -> void:
+		var col: Color = Palette.PLAYER[color_index]
+		var r := Rect2(-size / 2.0, size)    # (the face sits at the pad's centre)
 		_lip.bg_color = (Palette.PLAYER_DARK[color_index] as Color)
-		draw_style_box(_lip, Rect2(r.position + Vector2(0, 5), r.size))
+		_face.draw_style_box(_lip, Rect2(r.position + Vector2(0, 5), r.size))
 		_sb.bg_color = col.lerp(Color.WHITE, 0.12) if on else col.lerp(Palette.CHIP, 0.35)
-		draw_style_box(_sb, r)
+		_face.draw_style_box(_sb, r)
 		# a soft sheen on the upper half
-		var sheen := StyleBoxFlat.new()
-		sheen.bg_color = Color(1, 1, 1, 0.18)
-		sheen.set_corner_radius_all(UIKit.R.lg)
-		draw_style_box(sheen, Rect2(r.position + Vector2(8, 6), Vector2(r.size.x - 16, r.size.y * 0.38)))
+		_face.draw_style_box(_sheen, Rect2(r.position + Vector2(8, 6), Vector2(r.size.x - 16, r.size.y * 0.38)))

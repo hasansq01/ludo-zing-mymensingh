@@ -92,6 +92,7 @@ class Tile extends PlayerTile:
 	var open_k := 0.0:
 		set(v):
 			open_k = v
+			_place_glow()
 			queue_redraw()
 	var help: Control
 	var badge := ""                       # online: "" | "offline" | "bot"
@@ -101,6 +102,8 @@ class Tile extends PlayerTile:
 	var _open_tw: Tween
 	var _slot_bg := Color.WHITE
 	var _slot_edge := Color.WHITE
+	var _disc: Control                    # the countdown, its own drawing (redrawn ~10 times a second, not the card)
+	var _disc_step := -1
 	const TIMER_R := 13.0
 
 	## Online: this player's own avatar and frame (catalog ids) instead of the pawn tile.
@@ -145,6 +148,30 @@ class Tile extends PlayerTile:
 		super(c, side_)
 		_slot_bg = _sb_slot.bg_color
 		_slot_edge = _sb_slot.border_color
+		_disc = Control.new()
+		_disc.name = "TimerDisc"
+		_disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_disc.size = Vector2(CARD_W, CARD_H)
+		_disc.draw.connect(_draw_timer)
+		add_child(_disc)
+
+	## The card as it opens (open_k): the glow sits round it and fades in with it.
+	func _card_rect() -> Rect2:
+		var closed := Rect2(_ava_pos() - Vector2(PAD, PAD), Vector2(AVA + 2.0 * PAD, CARD_H))
+		var full := Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H))
+		return Rect2(closed.position.lerp(full.position, open_k), closed.size.lerp(full.size, open_k))
+
+	func _place_glow() -> void:
+		if _glow_box:
+			_glow_box.place(_card_rect().grow(-4))
+			_glow_box.strength = open_k
+
+	## The countdown's redraw while it runs (LudoHUD._process): only when the ring moves a step (a tenth of a second).
+	func tick_timer() -> void:
+		var step := int((timer_end - Time.get_ticks_msec()) / 100) if timer_end > 0 else -1
+		if step != _disc_step:
+			_disc_step = step
+			_disc.queue_redraw()
 
 	func set_state(active_: bool, mover_: bool, home: int, pct: float, chip := "") -> void:
 		var was := active
@@ -160,6 +187,7 @@ class Tile extends PlayerTile:
 
 	func _layout() -> void:
 		super()
+		_place_glow()
 		var cx := _ava_pos().x + AVA / 2.0
 		for p: Control in [_name_pill, _prog_pill, _chip_pill]:
 			if p and p.visible:
@@ -177,14 +205,7 @@ class Tile extends PlayerTile:
 			_badge.position = Vector2(round(bx), round(ap.y - _badge.size.y / 2.0 - 2.0))
 
 	func _draw() -> void:
-		var closed := Rect2(_ava_pos() - Vector2(PAD, PAD), Vector2(AVA + 2.0 * PAD, CARD_H))
-		var full := Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H))
-		var card := Rect2(closed.position.lerp(full.position, open_k), closed.size.lerp(full.size, open_k))
-		if active:
-			var a := 0.75 if _reduce_motion() else 0.45 + 0.45 * _glow
-			_sb_glow.shadow_color.a = a * open_k
-			_sb_glow.shadow_size = int(10 + 8 * _glow)
-			draw_style_box(_sb_glow, card.grow(-4))
+		var card := _card_rect()
 		draw_style_box(_sb_card_on if active else _sb_card, card)
 		if open_k > 0.01:                          # waiting: nothing at all where the die parks
 			var k := clampf((open_k - 0.3) / 0.7, 0.0, 1.0)   # the slot fades in once the card has widened
@@ -195,25 +216,26 @@ class Tile extends PlayerTile:
 			draw_style_box(_sb_you, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(2))
 		if mover:
 			draw_style_box(_sb_mover, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(3))
-		if timer_end > 0:
-			_draw_timer()
 
-	## The server's turn countdown: a white disc with the seconds left and a ring that empties (red near the end).
+	## The server's turn countdown (on _disc, over the avatar's corner): a white disc with the seconds left and a ring
+	## that empties (red near the end).
 	func _draw_timer() -> void:
+		if timer_end <= 0:
+			return
 		var left := maxf(0.0, float(timer_end - Time.get_ticks_msec()))
 		var k := clampf(left / maxf(timer_total, 1.0), 0.0, 1.0)
 		var m := timer_center()
 		var late := left <= 5000.0
-		draw_circle(m + Vector2(0, 1.5), TIMER_R + 1.0, Palette.shadow(0.25), true, -1.0, true)
-		draw_circle(m, TIMER_R + 1.0, Color.WHITE, true, -1.0, true)
-		draw_arc(m, TIMER_R - 2.0, 0.0, TAU, 40, Palette.TRACK, 3.0, true)
+		_disc.draw_circle(m + Vector2(0, 1.5), TIMER_R + 1.0, Palette.shadow(0.25), true, -1.0, true)
+		_disc.draw_circle(m, TIMER_R + 1.0, Color.WHITE, true, -1.0, true)
+		_disc.draw_arc(m, TIMER_R - 2.0, 0.0, TAU, 40, Palette.TRACK, 3.0, true)
 		if k > 0.0:
-			draw_arc(m, TIMER_R - 2.0, -PI / 2.0, -PI / 2.0 + TAU * k, 40, Palette.RED if late else Palette.PLAYER[color_index], 3.0, true)
+			_disc.draw_arc(m, TIMER_R - 2.0, -PI / 2.0, -PI / 2.0 + TAU * k, 40, Palette.RED if late else Palette.PLAYER[color_index], 3.0, true)
 		var f := UIKit.font_body(900, true)
 		var t := str(int(ceil(left / 1000.0)))
 		var fs := UIKit.FS.small
 		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(f, m + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.DANGER if late else Palette.INK)
+		_disc.draw_string(f, m + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.DANGER if late else Palette.INK)
 
 
 func _ready() -> void:
@@ -363,7 +385,7 @@ func set_timer(c: int, left_ms: float, total_ms: float) -> void:
 		if k == c and left_ms > 0.0:
 			t.timer_end = Time.get_ticks_msec() + int(left_ms)
 			t.timer_total = total_ms
-		t.queue_redraw()
+		t.tick_timer()
 
 ## Online badges by colour: "" | "offline" | "bot".
 func set_badges(b: Array) -> void:
@@ -573,6 +595,9 @@ func tile_rects() -> Array:
 	return out
 
 func _process(delta: float) -> void:
+	for t: Tile in tiles:                    # a running countdown: its disc redraws a step at a time
+		if t.timer_end > 0 or t._disc_step >= 0:
+			t.tick_timer()
 	if _turn < 0 or not dice.visible:
 		return
 	var r: Rect2 = (tiles[_turn] as Tile).dice_slot_rect()
@@ -907,21 +932,19 @@ func _on_tile_input(e: InputEvent, c: int) -> void:
 		dice_pressed.emit()
 
 
-## A small turning ring (the reconnect pill).
+## A small turning ring (the reconnect pill): drawn once, turned by rotation (no redraw a frame: see GlowPulse).
 class Spinner extends Control:
-	var _a := 0.0
-
 	func _init() -> void:
 		custom_minimum_size = Vector2(16, 16)
 		size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(func(): pivot_offset = size / 2.0)
 
 	func _process(d: float) -> void:
 		if is_visible_in_tree():
-			_a = fmod(_a + d * TAU * 1.1, TAU)
-			queue_redraw()
+			rotation = fmod(rotation + d * TAU * 1.1, TAU)
 
 	func _draw() -> void:
 		var m := size / 2.0
 		draw_arc(m, 6.0, 0.0, TAU, 32, Color(Palette.ON_HONEY, 0.18), 2.5, true)
-		draw_arc(m, 6.0, _a, _a + TAU * 0.3, 16, Palette.ON_HONEY, 2.5, true)
+		draw_arc(m, 6.0, 0.0, TAU * 0.3, 16, Palette.ON_HONEY, 2.5, true)
