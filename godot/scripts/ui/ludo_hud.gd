@@ -28,6 +28,7 @@ signal pause_pressed
 signal settings_pressed
 signal pick_chosen(kind: String)         # legacy (the Single / Pair step is gone); never emitted
 signal pair_answered(yes: bool)
+signal choice_answered(pick: int)         ## ask_two: 1 the first button, 0 the second, -1 closed without an answer
 signal away_pressed                      # online: "I’m back" (a bot was playing your seat)
 signal finish_home_pressed               # the finish card's Home (online: leave the room)
 signal reroll_pressed                    # online: the "Roll again" button (ECONOMY_V1.md 4)
@@ -46,6 +47,8 @@ var dice: Dice3D
 var pair_box: PanelContainer             # the inline pair prompt
 var pair_yes: Button
 var pair_no: Button
+var _pair_cap: Label
+var _choice := false                      # the box asks ask_two's question (else the pair question)
 var _s: Dictionary
 var _turn := -1
 var _corner := ["", "", "", ""]
@@ -275,6 +278,7 @@ func _build_pair_box() -> void:
 	var col := UIKit.vbox(UIKit.SPACE.xs)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	var cap := UIKit.label(tr("Join these two pawns?"), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	_pair_cap = cap
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(cap)
@@ -760,6 +764,28 @@ func bump_tile(c: int) -> void:
 ## The "Ask before pairing" prompt, anchored at the bottom over the board (not a modal: the board stays visible).
 ## Coroutine: returns the answer.
 func ask_pair() -> bool:
+	_set_box(tr("Join these two pawns?"), tr("Pair up"), tr("Keep single"))
+	_choice = false
+	_show_box()
+	var yes: bool = await pair_answered
+	return yes
+
+## The same prompt with another question and two answers (the pair or the single pawn on one square: which moves).
+## Coroutine: 1 for the first button, 0 for the second, -1 when it closed without an answer (cancel_pair: a new
+## game, leaving, the server moved for you).
+func ask_two(question: String, first: String, second: String) -> int:
+	_set_box(question, first, second)
+	_choice = true
+	_show_box()
+	var pick: int = await choice_answered
+	return pick
+
+func _set_box(question: String, first: String, second: String) -> void:
+	_pair_cap.text = question
+	pair_yes.text = first
+	pair_no.text = second
+
+func _show_box() -> void:
 	top.set_idle("")                         # the prompt asks the question itself: the bar goes quiet,
 	top.cancel_message()                     # and no stale event stays over a question aimed at you
 	pair_box.visible = true
@@ -767,22 +793,26 @@ func ask_pair() -> bool:
 	_place_emotes()
 	UIKit.pop_in(pair_box)
 	Sound.sfx("select")
-	var yes: bool = await pair_answered
-	return yes
 
 ## Closes the prompt without an answer (a new game, leaving).
 func cancel_pair() -> void:
 	if pair_box.visible:
 		pair_box.visible = false
 		_place_emotes()
-		pair_answered.emit(false)
+		if _choice:
+			choice_answered.emit(-1)
+		else:
+			pair_answered.emit(false)
 
 func _answer(yes: bool) -> void:
 	if not pair_box.visible:
 		return
 	pair_box.visible = false
 	_place_emotes()
-	pair_answered.emit(yes)
+	if _choice:
+		choice_answered.emit(1 if yes else 0)
+	else:
+		pair_answered.emit(yes)
 
 func _place_pair_box() -> void:
 	_place_bottom(pair_box)

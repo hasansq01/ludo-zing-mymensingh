@@ -741,6 +741,22 @@ func _s_ludo() -> void:
 	main.hud.emotes.show_emote(0, "party")
 	await _sleep(0.7)
 	await shot("ludo_emotes_shown")
+	var pr: Dictionary = S.duplicate(true)            # your pair and a single pawn on one square, a 4: which moves?
+	pr.tok[0] = [20, 20, 20, 56]
+	pr.pairs = [{c = 0, a = 0, b = 1}]
+	pr.dice = 4
+	pr.phase = "choose"
+	main.ludo.S = pr
+	main.world.board.relayout(pr)
+	main.hud.update(pr, 0)
+	var both := LudoMatch.units_sharing(pr, LudoRules.unit_for_token(pr, 2))
+	main.ludo._ask_unit(both.pair, both.single)
+	await _sleep(0.6)
+	await shot("ludo_unit_choice")
+	main.hud.cancel_pair()
+	main.ludo.S = S
+	main.world.board.relayout(S)
+	main.hud.update(S, 0)
 	main.hud.show_reroll(3000, 3000, false, 5)
 	await _sleep(0.5)
 	await shot("ludo_reroll_offer")

@@ -804,352 +804,370 @@ msgid "Free Coins"
 msgstr "ফ্রি কয়েন"
 
 #. Ludo match · ludo_match.gd _open()
-#: scripts/game/ludo_match.gd:291
+#: scripts/game/ludo_match.gd:293
 msgid "Teams: Red + Yellow vs Green + Blue"
 msgstr "টিম: লাল + হলুদ বনাম সবুজ + নীল"
 
 #. Ludo match · ludo_match.gd _idle_line()
-#: scripts/game/ludo_match.gd:453
+#: scripts/game/ludo_match.gd:455
 msgid "[b]%s[/b] is thinking…"
 msgstr "[b]%s[/b] ভাবছে…"
 
 # REVIEW: 'তোলো' (get a 6) used for rolling a 6 per glossary
 #. Ludo match · ludo_match.gd _idle_line()
-#: scripts/game/ludo_match.gd:460
+#: scripts/game/ludo_match.gd:462
 msgid "Roll a 6 to help %s"
 msgstr "%s-কে সাহায্য করতে 6 তোলো"
 
 # The seat is a teammate: Bangla uses the imperative 'তুলুক' (let them roll); check tone.
 #. Ludo match · ludo_match.gd _idle_line()
-#: scripts/game/ludo_match.gd:462
+#: scripts/game/ludo_match.gd:464
 msgid "[b]%s[/b]: roll a 6 to help %s"
 msgstr "[b]%s[/b]: %s-কে সাহায্য করতে 6 তুলতে হবে"
 
 #. Ludo match · ludo_match.gd _idle_line()
-#: scripts/game/ludo_match.gd:464
+#: scripts/game/ludo_match.gd:466
 msgid "Your turn — tap the dice"
 msgstr "তোমার চাল - ডাইসে ট্যাপ করো"
 
 #. Ludo match · ludo_match.gd _idle_line()
-#: scripts/game/ludo_match.gd:466
+#: scripts/game/ludo_match.gd:468
 msgid "[b]%s[/b]’s turn — tap the dice"
 msgstr "[b]%s[/b]-এর চাল — ডাইসে ট্যাপ করো"
 
 #. Ludo match · ludo_match.gd _idle_line()
 #. Ludo match · ludo_match.gd tap()
-#: scripts/game/ludo_match.gd:468 scripts/game/ludo_match.gd:668
+#: scripts/game/ludo_match.gd:470 scripts/game/ludo_match.gd:678
 msgid "Tap a glowing pawn"
 msgstr "জ্বলজ্বলে গুটিতে ট্যাপ করো"
 
 #. Ludo match · ludo_match.gd _place()
 #. Result screen · result_screen.gd _unhandled_input()
-#: scripts/game/ludo_match.gd:484 scripts/ui/components/result_screen.gd:139
+#: scripts/game/ludo_match.gd:486 scripts/ui/components/result_screen.gd:139
 msgid "1st"
 msgstr "প্রথম"
 
 #. Ludo match · ludo_match.gd _place()
 #. Result screen · result_screen.gd _unhandled_input()
-#: scripts/game/ludo_match.gd:485 scripts/ui/components/result_screen.gd:139
+#: scripts/game/ludo_match.gd:487 scripts/ui/components/result_screen.gd:139
 msgid "2nd"
 msgstr "দ্বিতীয়"
 
 #. Ludo match · ludo_match.gd _place()
 #. Result screen · result_screen.gd _unhandled_input()
-#: scripts/game/ludo_match.gd:486 scripts/ui/components/result_screen.gd:139
+#: scripts/game/ludo_match.gd:488 scripts/ui/components/result_screen.gd:139
 msgid "3rd"
 msgstr "তৃতীয়"
 
 #. Ludo match · ludo_match.gd _place()
 #. Result screen · result_screen.gd _unhandled_input()
-#: scripts/game/ludo_match.gd:487 scripts/ui/components/result_screen.gd:139
+#: scripts/game/ludo_match.gd:489 scripts/ui/components/result_screen.gd:139
 msgid "4th"
 msgstr "চতুর্থ"
 
 #. Ludo match · ludo_match.gd _reason_text()
-#: scripts/game/ludo_match.gd:500
+#: scripts/game/ludo_match.gd:502
 msgid "No move. Roll again."
 msgstr "চালার মতো কিছু নেই। আবার চালো।"
 
 #. Ludo match · ludo_match.gd _reason_text()
-#: scripts/game/ludo_match.gd:502
+#: scripts/game/ludo_match.gd:504
 msgid "No move this time."
 msgstr "এবার চালার মতো কিছু নেই।"
 
 #. Ludo match · ludo_match.gd _reason_text()
-#: scripts/game/ludo_match.gd:504
+#: scripts/game/ludo_match.gd:506
 msgid "A pair needs an even roll."
 msgstr "জোড়া চালতে জোড় সংখ্যা লাগে।"
 
 #. Ludo match · ludo_match.gd _reason_text()
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:509 scripts/game/ludo_match.gd:870
+#: scripts/game/ludo_match.gd:511 scripts/game/ludo_match.gd:909
 msgid "Roll again."
 msgstr "আবার চাল দাও।"
 
 #. Ludo match · ludo_match.gd _reason_text()
-#: scripts/game/ludo_match.gd:511
+#: scripts/game/ludo_match.gd:513
 msgid "Blocked by your pair."
 msgstr "তোমার জোড়া আটকে দিয়েছে।"
 
 #. Ludo match · ludo_match.gd _reason_text()
-#: scripts/game/ludo_match.gd:514
+#: scripts/game/ludo_match.gd:516
 msgid "Blocked by %s’s pair."
 msgstr "%s-এর জোড়া আটকে দিয়েছে।"
 
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:579
+#: scripts/game/ludo_match.gd:581
 msgid "You rolled three 6s. Turn lost."
 msgstr "তুমি তিনটা ছক্কা তুলেছো। চাল গেছে।"
 
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:579
+#: scripts/game/ludo_match.gd:581
 msgid "%s rolled three 6s. Turn lost."
 msgstr "%s তিনটা ছক্কা তুলেছে। চাল গেছে।"
 
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:582
+#: scripts/game/ludo_match.gd:584
 msgid "You need a 6 to help %s."
 msgstr "%s-কে সাহায্য করতে তোমার 6 লাগবে।"
 
 # REVIEW: placeholder order (helper, helped) kept; sentence reads fine but check
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:582
+#: scripts/game/ludo_match.gd:584
 msgid "%s needs a 6 to help %s."
 msgstr "%s-কে সাহায্য করতে %s-এর 6 লাগবে।"
 
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:587
+#: scripts/game/ludo_match.gd:589
 msgid "Six! You now move %s."
 msgstr "ছক্কা! এখন তুমি %s-এর গুটি চালাবে।"
 
 # REVIEW: first %s is the roller, second the teammate whose pawns now move
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:587
+#: scripts/game/ludo_match.gd:589
 msgid "Six! %s now moves %s."
 msgstr "ছক্কা! এখন %s চালাবে %s-এর গুটি।"
 
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:589
+#: scripts/game/ludo_match.gd:591
 msgid "You rolled %d. %s"
 msgstr "তুমি %d তুলেছো। %s"
 
 #. Ludo match · ludo_match.gd _after_roll()
-#: scripts/game/ludo_match.gd:589
+#: scripts/game/ludo_match.gd:591
 msgid "%s rolled %d. %s"
 msgstr "%s %d তুলেছে। %s"
 
 #. Ludo match · ludo_match.gd tap()
-#: scripts/game/ludo_match.gd:666
+#: scripts/game/ludo_match.gd:676
 msgid "That pawn can’t move with a %d."
 msgstr "%d দিয়ে ওই গুটি চলবে না।"
 
+# a pair and a single pawn of yours share the tapped square: which one moves
+#. Ludo match · ludo_match.gd _ask_unit()
+#: scripts/game/ludo_match.gd:701
+msgid "Which one moves?"
+msgstr "কোনটা চালবে?"
+
+# %d: how many squares the pair moves
+#. Ludo match · ludo_match.gd _ask_unit()
+#: scripts/game/ludo_match.gd:702
+msgid "Move the pair (%d)"
+msgstr "জোড়া চালো (%d)"
+
+# %d: how many squares the single pawn moves
+#. Ludo match · ludo_match.gd _ask_unit()
+#: scripts/game/ludo_match.gd:703
+msgid "Move one pawn (%d)"
+msgstr "একটা গুটি চালো (%d)"
+
 #. Ludo match · ludo_match.gd _after_move()
-#: scripts/game/ludo_match.gd:748
+#: scripts/game/ludo_match.gd:787
 msgid "Home!"
 msgstr "পাকা!"
 
 #. Ludo match · ludo_match.gd _finish_text()
-#: scripts/game/ludo_match.gd:812
+#: scripts/game/ludo_match.gd:851
 msgid "Your team finished %s! The others play on."
 msgstr "তোমার টিম %s হয়েছে! বাকিরা খেলছে।"
 
 # REVIEW: %s is the ordinal (its Bangla form belongs to the result-screen owner)
 #. Ludo match · ludo_match.gd _finish_text()
 #. finish_card.gd present()
-#: scripts/game/ludo_match.gd:812 scripts/ui/components/finish_card.gd:70
+#: scripts/game/ludo_match.gd:851 scripts/ui/components/finish_card.gd:70
 msgid "Your team finished %s!"
 msgstr "তোমার টিম %s হয়েছে!"
 
 #. Ludo match · ludo_match.gd _finish_text()
-#: scripts/game/ludo_match.gd:813
+#: scripts/game/ludo_match.gd:852
 msgid "You finished %s! The others play on."
 msgstr "তুমি %s হয়েছো! বাকিরা খেলছে।"
 
 # REVIEW: %s is the ordinal; same note
 #. Ludo match · ludo_match.gd _finish_text()
 #. finish_card.gd present()
-#: scripts/game/ludo_match.gd:813 scripts/ui/components/finish_card.gd:70
+#: scripts/game/ludo_match.gd:852 scripts/ui/components/finish_card.gd:70
 msgid "You finished %s!"
 msgstr "তুমি %s হয়েছো!"
 
 #. Ludo match · ludo_match.gd _finish_text()
 #. Result screen · result_screen.gd winner_label()
-#: scripts/game/ludo_match.gd:814 scripts/ui/components/result_screen.gd:243
+#: scripts/game/ludo_match.gd:853 scripts/ui/components/result_screen.gd:243
 msgid "Team %s"
 msgstr "টিম %s"
 
 # REVIEW: second %s is the place word (প্রথম...); স্থান পেয়েছে = got Nth place
 #. Ludo match · ludo_match.gd _finish_text()
 #. Snakes & Ladders match · sl_match.gd _finished_one()
-#: scripts/game/ludo_match.gd:817 scripts/game/sl_match.gd:679
+#: scripts/game/ludo_match.gd:856 scripts/game/sl_match.gd:679
 msgid "%s finished %s! The others play on."
 msgstr "%s %s হয়েছে! বাকিরা খেলছে।"
 
 #. Ludo match · ludo_match.gd _finish_text()
 #. Snakes & Ladders match · sl_match.gd _finished_one()
-#: scripts/game/ludo_match.gd:817 scripts/game/sl_match.gd:680
+#: scripts/game/ludo_match.gd:856 scripts/game/sl_match.gd:680
 msgid "%s finished %s!"
 msgstr "%s %s হয়েছে!"
 
 #. Ludo match · ludo_match.gd _capture()
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:843 scripts/game/ludo_match.gd:918
+#: scripts/game/ludo_match.gd:882 scripts/game/ludo_match.gd:957
 msgid "+1 roll"
 msgstr "+1 চাল"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:877
+#: scripts/game/ludo_match.gd:916
 msgid "You broke a pair!"
 msgstr "তুমি একটা জোড়া ভেঙেছো!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:879
+#: scripts/game/ludo_match.gd:918
 msgid "%s broke your pair!"
 msgstr "%s তোমার জোড়া ভেঙেছে!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:881
+#: scripts/game/ludo_match.gd:920
 msgid "%s broke %s’s pair!"
 msgstr "%s ভেঙেছে %s-এর জোড়া!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:885
+#: scripts/game/ludo_match.gd:924
 msgid "You captured a pawn!"
 msgstr "তুমি একটা গুটি কেটেছো!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:887
+#: scripts/game/ludo_match.gd:926
 msgid "%s captured your pawn!"
 msgstr "%s তোমার গুটি কেটেছে!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:889
+#: scripts/game/ludo_match.gd:928
 msgid "%s captured %s’s pawn!"
 msgstr "%s কেটেছে %s-এর গুটি!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:896
+#: scripts/game/ludo_match.gd:935
 msgid "All four home! Roll a 6 to help %s."
 msgstr "চারটা গুটিই পেকেছে! %s-কে সাহায্য করতে 6 তোলো।"
 
 # REVIEW: 'শেষ' for done; teammate name second
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:898
+#: scripts/game/ludo_match.gd:937
 msgid "%s is done! A 6 lets them help %s."
 msgstr "%s শেষ! 6 তুললে %s-কে সাহায্য করতে পারবে।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:902
+#: scripts/game/ludo_match.gd:941
 msgid "Pair home!"
 msgstr "জোড়া পাকা!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:902
+#: scripts/game/ludo_match.gd:941
 msgid "Pawn home!"
 msgstr "গুটি পাকা!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:904
+#: scripts/game/ludo_match.gd:943
 msgid "%s got a pair home!"
 msgstr "%s একটা জোড়া পাকিয়েছে!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:904
+#: scripts/game/ludo_match.gd:943
 msgid "%s got a pawn home!"
 msgstr "%s একটা গুটি পাকিয়েছে!"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:906
+#: scripts/game/ludo_match.gd:945
 msgid "You made a pair."
 msgstr "তুমি একটা জোড়া বেঁধেছো।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:906
+#: scripts/game/ludo_match.gd:945
 msgid "%s made a pair."
 msgstr "%s একটা জোড়া বেঁধেছে।"
 
 # REVIEW: 'হোম লেন' loanword for the coloured lane to the centre
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:911
+#: scripts/game/ludo_match.gd:950
 msgid "Your pair split in the home lane."
 msgstr "তোমার জোড়া পাকার ঘরে আলাদা হয়ে গেছে।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:911
+#: scripts/game/ludo_match.gd:950
 msgid "Your pair split on the start square."
 msgstr "তোমার জোড়া শুরুর ঘরে আলাদা হয়ে গেছে।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:913
+#: scripts/game/ludo_match.gd:952
 msgid "[b]%s[/b]’s pair split in the home lane."
 msgstr "[b]%s[/b]-এর জোড়া পাকার ঘরে আলাদা হয়ে গেছে।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:913
+#: scripts/game/ludo_match.gd:952
 msgid "[b]%s[/b]’s pair split on the start square."
 msgstr "[b]%s[/b]-এর জোড়া শুরুর ঘরে আলাদা হয়ে গেছে।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:917
+#: scripts/game/ludo_match.gd:956
 msgid "Six! Roll again."
 msgstr "ছক্কা! আবার চালো।"
 
 #. Ludo match · ludo_match.gd _turn_message()
-#: scripts/game/ludo_match.gd:917
+#: scripts/game/ludo_match.gd:956
 msgid "Six! %s rolls again."
 msgstr "ছক্কা! %s আবার চালবে।"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1038 scripts/ui/components/result_screen.gd:216
+#: scripts/game/ludo_match.gd:1077 scripts/ui/components/result_screen.gd:216
 msgid "Team %s wins!"
 msgstr "টিম %s জিতেছে!"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Result screen · result_screen.gd sub_text()
-#: scripts/game/ludo_match.gd:1038 scripts/ui/components/result_screen.gd:232
+#: scripts/game/ludo_match.gd:1077 scripts/ui/components/result_screen.gd:232
 msgid "Both teammates got all four pawns home!"
 msgstr "দুই টিমমেটের চারটা করে গুটিই পেকেছে!"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1041 scripts/ui/components/result_screen.gd:213
+#: scripts/game/ludo_match.gd:1080 scripts/ui/components/result_screen.gd:213
 msgid "Your team wins!"
 msgstr "তোমার টিম জিতেছে!"
 
 #. Ludo match · ludo_match.gd result_copy()
-#: scripts/game/ludo_match.gd:1041
+#: scripts/game/ludo_match.gd:1080
 msgid "You and %s got all 8 pawns home!"
 msgstr "তুমি আর %s মিলে আটটা গুটিই পাকিয়েছো!"
 
 #. Ludo match · ludo_match.gd result_copy()
-#: scripts/game/ludo_match.gd:1043
+#: scripts/game/ludo_match.gd:1082
 msgid "Team %s won"
 msgstr "টিম %s জিতেছে"
 
 # REVIEW: %s is the place word (প্রথম...); 'হয়েছে' assumes 'became Nth'
 #. Ludo match · ludo_match.gd result_copy()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1044 scripts/ui/components/result_screen.gd:210
+#: scripts/game/ludo_match.gd:1083 scripts/ui/components/result_screen.gd:210
 msgid "Your team finished %s"
 msgstr "তোমার টিম %s হয়েছে"
 
 # REVIEW: sub-line of the result; first %s is the 'X won' sentence
 #. Ludo match · ludo_match.gd result_copy()
-#: scripts/game/ludo_match.gd:1045
+#: scripts/game/ludo_match.gd:1084
 msgid "%s · %d of 8 pawns home"
 msgstr "%s · 8টার মধ্যে %dটা পাকা"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1047 scripts/game/sl_match.gd:756 scripts/ui/components/result_screen.gd:219
+#: scripts/game/ludo_match.gd:1086 scripts/game/sl_match.gd:756 scripts/ui/components/result_screen.gd:219
 msgid "%s wins!"
 msgstr "%s জিতেছে!"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Result screen · result_screen.gd sub_text()
-#: scripts/game/ludo_match.gd:1047 scripts/game/ludo_match.gd:1049 scripts/ui/components/result_screen.gd:233
+#: scripts/game/ludo_match.gd:1086 scripts/game/ludo_match.gd:1088 scripts/ui/components/result_screen.gd:233
 msgid "All four pawns home!"
 msgstr "চারটা গুটিই পেকেছে!"
 
@@ -1157,67 +1175,67 @@ msgstr "চারটা গুটিই পেকেছে!"
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
 #. win_card.gd title_text()
-#: scripts/game/ludo_match.gd:1049 scripts/game/sl_match.gd:756 scripts/ui/components/result_screen.gd:218 scripts/ui/components/win_card.gd:42
+#: scripts/game/ludo_match.gd:1088 scripts/game/sl_match.gd:756 scripts/ui/components/result_screen.gd:218 scripts/ui/components/win_card.gd:42
 msgid "You win!"
 msgstr "তুমি জিতেছো!"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd sub_text()
-#: scripts/game/ludo_match.gd:1051 scripts/game/sl_match.gd:763 scripts/ui/components/result_screen.gd:228
+#: scripts/game/ludo_match.gd:1090 scripts/game/sl_match.gd:763 scripts/ui/components/result_screen.gd:228
 msgid "%s won"
 msgstr "%s জিতেছে"
 
 #. Ludo match · ludo_match.gd result_copy()
-#: scripts/game/ludo_match.gd:1054
+#: scripts/game/ludo_match.gd:1093
 msgid "%s · you got all four home"
 msgstr "%s · তোমার চারটাই পেকেছে"
 
 # REVIEW: sub-line of the result; first %s is the 'X won' sentence
 #. Ludo match · ludo_match.gd result_copy()
-#: scripts/game/ludo_match.gd:1056
+#: scripts/game/ludo_match.gd:1095
 msgid "%s · %d of 4 pawns home"
 msgstr "%s · 4টার মধ্যে %dটা পাকা"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1057 scripts/game/sl_match.gd:759 scripts/ui/components/result_screen.gd:210
+#: scripts/game/ludo_match.gd:1096 scripts/game/sl_match.gd:759 scripts/ui/components/result_screen.gd:210
 msgid "You finished %s"
 msgstr "তুমি %s হয়েছো"
 
 # REVIEW: 'চেলেছো' (rolled) — online reroll toast; verb form for rolled
 #. Ludo match · ludo_match.gd net_rerolled()
-#: scripts/game/ludo_match.gd:1470
+#: scripts/game/ludo_match.gd:1512
 msgid "You rolled again"
 msgstr "তুমি আবার চেলেছো"
 
 # REVIEW: toast after a re-roll offer
 #. Ludo match · ludo_match.gd net_rerolled()
 #. Snakes & Ladders match · sl_match.gd net_rerolled()
-#: scripts/game/ludo_match.gd:1470 scripts/game/sl_match.gd:1149
+#: scripts/game/ludo_match.gd:1512 scripts/game/sl_match.gd:1149
 msgid "%s rolled again"
 msgstr "%s আবার চেলেছে"
 
 #. Ludo match · ludo_match.gd _net_wait_line()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1524 scripts/game/sl_match.gd:1221
+#: scripts/game/ludo_match.gd:1566 scripts/game/sl_match.gd:1221
 msgid "A bot is playing for you"
 msgstr "তোমার হয়ে বট খেলছে"
 
 #. Ludo match · ludo_match.gd _net_wait_line()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1526 scripts/game/sl_match.gd:1223
+#: scripts/game/ludo_match.gd:1568 scripts/game/sl_match.gd:1223
 msgid "%s is away. A bot is playing…"
 msgstr "%s নেই। বট খেলছে…"
 
 #. Ludo match · ludo_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1529
+#: scripts/game/ludo_match.gd:1571
 msgid "%s is choosing a pawn…"
 msgstr "%s গুটি নির্বাচন করছে…"
 
 #. Ludo match · ludo_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1531
+#: scripts/game/ludo_match.gd:1573
 msgid "%s is deciding on a pair…"
 msgstr "%s জোড়া বাঁধবে কি না ভাবছে…"
 
@@ -1225,19 +1243,19 @@ msgstr "%s জোড়া বাঁধবে কি না ভাবছে…"
 #. Snakes & Ladders match · sl_match.gd _set_dice_turn()
 #. Snakes & Ladders match · sl_match.gd _begin()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1532 scripts/game/sl_match.gd:321 scripts/game/sl_match.gd:531 scripts/game/sl_match.gd:1224
+#: scripts/game/ludo_match.gd:1574 scripts/game/sl_match.gd:321 scripts/game/sl_match.gd:531 scripts/game/sl_match.gd:1224
 msgid "%s’s turn"
 msgstr "%s-এর চাল"
 
 #. Snakes & Ladders match · sl_match.gd _build_online()
 #. Ludo match HUD · ludo_hud.gd _build_online()
-#: scripts/game/sl_match.gd:182 scripts/ui/ludo_hud.gd:324
+#: scripts/game/sl_match.gd:182 scripts/ui/ludo_hud.gd:328
 msgid "You were away — a bot played for you."
 msgstr "তুমি ছিলে না — তোমার হয়ে বট খেলেছে।"
 
 #. Snakes & Ladders match · sl_match.gd _build_online()
 #. Ludo match HUD · ludo_hud.gd _build_online()
-#: scripts/game/sl_match.gd:183 scripts/ui/ludo_hud.gd:326
+#: scripts/game/sl_match.gd:183 scripts/ui/ludo_hud.gd:330
 msgid "I’m back"
 msgstr "আমি ফিরেছি"
 
@@ -1393,13 +1411,13 @@ msgstr "বাইরে"
 
 #. Snakes & Ladders match · sl_match.gd set_badge()
 #. Ludo match HUD · ludo_hud.gd set_badge()
-#: scripts/game/sl_match.gd:1523 scripts/ui/ludo_hud.gd:124
+#: scripts/game/sl_match.gd:1523 scripts/ui/ludo_hud.gd:127
 msgid "Bot"
 msgstr "বট"
 
 #. Snakes & Ladders match · sl_match.gd set_badge()
 #. Ludo match HUD · ludo_hud.gd set_badge()
-#: scripts/game/sl_match.gd:1523 scripts/ui/ludo_hud.gd:124
+#: scripts/game/sl_match.gd:1523 scripts/ui/ludo_hud.gd:127
 msgid "Offline"
 msgstr "অফলাইন"
 
@@ -2854,45 +2872,48 @@ msgid "Close"
 msgstr "বন্ধ"
 
 #. Ludo match HUD · ludo_hud.gd _build_pair_box()
-#: scripts/ui/ludo_hud.gd:277
+#. Ludo match HUD · ludo_hud.gd ask_pair()
+#: scripts/ui/ludo_hud.gd:280 scripts/ui/ludo_hud.gd:767
 msgid "Join these two pawns?"
 msgstr "এই দুই গুটি জোড়া বাঁধবে?"
 
 #. Ludo match HUD · ludo_hud.gd _build_pair_box()
-#: scripts/ui/ludo_hud.gd:284
+#. Ludo match HUD · ludo_hud.gd ask_pair()
+#: scripts/ui/ludo_hud.gd:288 scripts/ui/ludo_hud.gd:767
 msgid "Pair up"
 msgstr "জোড়া বাঁধো"
 
 #. Ludo match HUD · ludo_hud.gd _build_pair_box()
-#: scripts/ui/ludo_hud.gd:285
+#. Ludo match HUD · ludo_hud.gd ask_pair()
+#: scripts/ui/ludo_hud.gd:289 scripts/ui/ludo_hud.gd:767
 msgid "Keep single"
 msgstr "একা রাখো"
 
 # REVIEW: team chip, %s is a colour
 #. Ludo match HUD · ludo_hud.gd team_chip()
-#: scripts/ui/ludo_hud.gd:664
+#: scripts/ui/ludo_hud.gd:668
 msgid "Helping %s"
 msgstr "%s-কে সাহায্য করছো"
 
 #. Ludo match HUD · ludo_hud.gd team_chip()
-#: scripts/ui/ludo_hud.gd:664
+#: scripts/ui/ludo_hud.gd:668
 msgid "Roll a 6 to help"
 msgstr "সাহায্য করতে 6 তোলো"
 
 # REVIEW: team chip under a tile, %s is a colour name (e.g. 'হলুদ-এর সাথে')
 #. Ludo match HUD · ludo_hud.gd team_chip()
-#: scripts/ui/ludo_hud.gd:670
+#: scripts/ui/ludo_hud.gd:674
 msgid "With %s"
 msgstr "%s-এর সাথী"
 
 #. Ludo match HUD · ludo_hud.gd team_chip()
-#: scripts/ui/ludo_hud.gd:672
+#: scripts/ui/ludo_hud.gd:676
 msgid "With you"
 msgstr "তোমার সাথে"
 
 # REVIEW: team chip for the other team
 #. Ludo match HUD · ludo_hud.gd team_chip()
-#: scripts/ui/ludo_hud.gd:673
+#: scripts/ui/ludo_hud.gd:677
 msgid "Rivals"
 msgstr "বিপক্ষ"
 

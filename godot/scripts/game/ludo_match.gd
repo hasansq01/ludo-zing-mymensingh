@@ -78,6 +78,8 @@ var _busy := false                       # an animation or prompt is running: ig
 var rng := RandomNumberGenerator.new()
 var autoplay := false                   # debug builds only (user://autoplay.txt): humans play like computers
 var save_matches := true                 # MatchStore after every turn (off for autoplay / previews)
+var _unit_ask := false                   # "Which one moves?" is up (_ask_unit)
+var _unit_ticket := 0                    # the question being answered (an older one that never closed can't move)
 var _ff := 1.0
 var _view := {on = false, zoom = 1.0, y = 0.0}   # the 3D view framing for this screen size
 var _view_key := ""
@@ -640,11 +642,15 @@ func choose_pick(kind: String) -> void:
 		return
 	await _choose(_id, S.turn)
 
-## A tap on the board: move the tapped glowing pawn's unit. During a computer's turn: fast-forward. A miss on your
-## turn: "Tap a glowing pawn", an error buzz, and the glowing pawns pulse once.
+## A tap on the board: move the tapped glowing pawn's unit; when a pair and a single pawn of yours share that square
+## (their pawns overlap, so the tap can't tell them apart), ask which one moves (_ask_unit). During a computer's turn:
+## fast-forward. A miss on your turn: "Tap a glowing pawn", an error buzz, and the glowing pawns pulse once.
 func tap(screen_pos: Vector2) -> bool:
 	if S.is_empty() or app.paused or _sheet_open() or S.phase == "over":
 		return false
+	if _unit_ask:                            # a tap on the board while "which one moves?" is up: never mind, it closes
+		_unit_ask = false
+		hud.cancel_pair()
 	if online and (not ns.my_turn() or _net_sent == ns.n):
 		return false                         # not your move (or already sent): nothing to fast-forward online
 	if _cpu_turn(S.turn) and not autoplay:
@@ -659,7 +665,11 @@ func tap(screen_pos: Vector2) -> bool:
 	if key >= 0 and key / 4 == mc and board.movable.has(key):
 		var u := LudoRules.unit_for_token(S, key % 4)
 		if not u.is_empty():
-			move(int(u.token))
+			var both := units_sharing(S, u)
+			if both.is_empty():
+				move(int(u.token))
+			else:
+				_ask_unit(both.pair, both.single)
 			return true
 	var own := board.pick_any(world.camera, screen_pos, mc)
 	if own >= 0:
@@ -670,6 +680,35 @@ func tap(screen_pos: Vector2) -> bool:
 	Sound.sfx("tap")
 	board.pulse_movable()
 	return true
+
+## When unit u shares its square with a movable unit of the other kind (a pair and a single pawn of the same colour on
+## one square), {pair, single} (units() entries); else {}. Two singles (or two pairs) on one square move the same.
+static func units_sharing(s: Dictionary, u: Dictionary) -> Dictionary:
+	if int(u.get("from", -1)) < 0:
+		return {}                            # in the base: only singles come out
+	for v: Dictionary in LudoRules.units(s):
+		if v.from == u.from and v.mover == u.mover and bool(v.pair) != bool(u.pair):
+			return {pair = u if u.pair else v, single = v if u.pair else u}
+	return {}
+
+## "Which one moves?": the pair or the single pawn on the tapped square, with how far each goes. A tap elsewhere on
+## the board, the server moving for you, or the match ending closes it without a move.
+func _ask_unit(pair: Dictionary, single: Dictionary) -> void:
+	_unit_ask = true
+	_unit_ticket += 1
+	var ticket := _unit_ticket
+	var id := _id
+	var pick := await hud.ask_two(tr("Which one moves?"),
+		tr("Move the pair (%d)") % (int(pair.to) - int(pair.from)),
+		tr("Move one pawn (%d)") % (int(single.to) - int(single.from)))
+	if ticket != _unit_ticket or not _unit_ask:
+		return                               # (closed by a tap on the board, or a newer question is up)
+	_unit_ask = false
+	if pick < 0 or not live(id) or S.phase != "choose" or _busy or app.paused:
+		return
+	if online and (not ns.my_turn() or _net_sent == ns.n):
+		return
+	move(int((pair if pick == 1 else single).token))
 
 ## Move token i of the player whose pawns the roll moves; animates every event the rules return.
 func move(i: int) -> void:
@@ -1212,6 +1251,9 @@ func _net_kick() -> void:
 
 ## One server action through the offline animation path.
 func _net_act(id: int, m: Dictionary) -> void:
+	if _unit_ask:                            # "which one moves?" is moot: the server has moved on (your timer)
+		_unit_ask = false
+		hud.cancel_pair()
 	var a: Dictionary = m.get("a", {})
 	var c := int(a.get("c", S.turn))
 	if not rr.offer.is_empty() and int(m.get("n", 0)) >= int(rr.offer.n):
