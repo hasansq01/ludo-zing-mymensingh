@@ -12,6 +12,7 @@ export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$(prop keystore)"
 export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$(prop alias)"
 export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$(prop password)"
 mkdir -p "$REPO/build/android"
+"$REPO/tools/android-engine.sh" status || true       # Ludo Zing's own engine or the official one (tools/android-engine.sh)
 "${GODOT:-godot}" --headless --path "$REPO/godot" --export-release "Android Release" "$REPO/build/android/ludo-zing-release.aab"
 "$JAVA_HOME/bin/jarsigner" -verify "$REPO/build/android/ludo-zing-release.aab" | tail -1
 echo "== built $REPO/build/android/ludo-zing-release.aab"

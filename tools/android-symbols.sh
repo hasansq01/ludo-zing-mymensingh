@@ -2,11 +2,13 @@
 # Makes the native debug symbols zip for Play Console (Crashes & ANRs symbolication of native crashes) for the
 # "Android Release" export: build/android/native-debug-symbols-<version code>.zip.
 #
-# The game runs on the official Godot export template, whose libgodot_android.so ships stripped, so Gradle's
-# ndk.debugSymbolLevel cannot produce useful symbols. Godot publishes the matching symbols with each release
-# (Godot_native_debug_symbols.<version>.template_release.android.zip, ~780 MB, every ABI). This script downloads it
-# once into a cache outside the repo, checks the arm64 library's BuildId against the template the export uses
-# (godot/android/build/libs/release/godot-lib.template_release.aar), and packs only the ABIs the preset exports,
+# The export's libgodot_android.so ships stripped, so Gradle's ndk.debugSymbolLevel cannot produce useful symbols.
+# With Ludo Zing's own engine installed (tools/android-engine.sh: godot/android/build's AAR has the BuildIds in
+# tools/engine-buildids.txt) the symbols are the ones its build kept (<cache>/engine/<tag>/symbols). With the official
+# template, Godot publishes the matching symbols with each release
+# (Godot_native_debug_symbols.<version>.template_release.android.zip, ~780 MB, every ABI): downloaded once into a
+# cache outside the repo. Either way the BuildIds are checked against the AAR the export uses
+# (godot/android/build/libs/release/godot-lib.template_release.aar), and only the ABIs the preset exports are packed,
 # with the ABI folders at the zip root as Play expects.
 #
 # Usage: tools/android-symbols.sh [--symtab] [--abi <abi>]
@@ -38,11 +40,20 @@ case "$VER" in *.*.*.*) ;; *) VER="$("${GODOT:-godot}" --version | cut -d. -f1-3
 TAG="$(echo "$VER" | sed 's/\.\([a-z][a-z0-9]*\)$/-\1/')"      # 4.7.2-stable
 NAME="Godot_native_debug_symbols.$VER.template_release.android.zip"
 URL="https://github.com/godotengine/godot/releases/download/$TAG/$NAME"
-mkdir -p "$CACHE"
-if [ ! -s "$CACHE/$NAME" ] || ! unzip -tq "$CACHE/$NAME" >/dev/null 2>&1; then
-	echo "== downloading $URL (~780 MB, once)"
-	curl -fL --retry 3 -C - -o "$CACHE/$NAME.part" "$URL"
-	mv "$CACHE/$NAME.part" "$CACHE/$NAME"
+OWN="$CACHE/engine/$TAG/symbols"                                # tools/android-engine.sh build
+AAR="$REPO/godot/android/build/libs/release/godot-lib.template_release.aar"
+OWN_ENGINE=0
+if [ -f "$AAR" ] && [ -s "$REPO/tools/engine-buildids.txt" ] && "$REPO/tools/android-engine.sh" status >/dev/null; then
+	OWN_ENGINE=1
+	[ -d "$OWN" ] || { echo "android-symbols: Ludo Zing's engine is installed but $OWN is missing (tools/android-engine.sh build)" >&2; exit 1; }
+	echo "== Ludo Zing's engine: symbols from $OWN"
+else
+	mkdir -p "$CACHE"
+	if [ ! -s "$CACHE/$NAME" ] || ! unzip -tq "$CACHE/$NAME" >/dev/null 2>&1; then
+		echo "== downloading $URL (~780 MB, once)"
+		curl -fL --retry 3 -C - -o "$CACHE/$NAME.part" "$URL"
+		mv "$CACHE/$NAME.part" "$CACHE/$NAME"
+	fi
 fi
 
 # the Android Release preset: its version code and exported ABIs
@@ -59,12 +70,15 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 for abi in $ABIS; do
-	unzip -q "$CACHE/$NAME" "$abi/*" -d "$TMP/syms"
+	if [ "$OWN_ENGINE" -eq 1 ]; then
+		mkdir -p "$TMP/syms/$abi" && cp "$OWN/$abi/libgodot_android.so" "$TMP/syms/$abi/"
+	else
+		unzip -q "$CACHE/$NAME" "$abi/*" -d "$TMP/syms"
+	fi
 done
 
 # the BuildId of the symbols must be the template's (else Play cannot match them to the crashes)
 buildid() { file -b "$1" | sed -n 's/.*BuildID\[[a-z0-9]*\]=\([0-9a-f]*\).*/\1/p'; }
-AAR="$REPO/godot/android/build/libs/release/godot-lib.template_release.aar"
 if [ -f "$AAR" ]; then
 	for abi in $ABIS; do
 		unzip -q -o "$AAR" "jni/$abi/libgodot_android.so" -d "$TMP/aar" 2>/dev/null || continue
