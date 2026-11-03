@@ -48,6 +48,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
+| `tests/avatars.js` | More-characters avatar tests (12 avatars, free, unique, no origin labels, draw cleanly; original characters unchanged; Edit Profile grid + save, one Collection group + equip, home chip and game card, no avatar maker); source page with `?vt=1`. |
 | `tests/emotes.js` | 67 emote tests (incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
@@ -389,6 +390,15 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   and ownership if saving fails; button disabled on the first tap). A purchase does not equip; Equip uses the common
   collection equip path (`P.avatar`). Cards: Free / Owned / Equipped tag, lock icon + coin price when for sale (shown
   in full colour). Edit Profile's avatar grid lists them too; a locked one says where to buy it.
+- **More characters (2026-11-04):** `WORLD` = 12 free person avatars with a wide range of looks (Hana, Kenji, Mei,
+  Linh, Emma, Lukas, Sofia, Oliver, Jayden, Maya, Carlos, Ava), appended to `AVATARS` after `CHARS`; Collection ›
+  Characters shows them together under "More characters" after Male / Female, and they are in Edit Profile's grid. The
+  user asked that they are never labelled or grouped by origin. `personSVG` gained optional face fields (none set = the
+  original faces, so CHARS look the same): `eye` (round / almond / narrow / big), `eyeCol` (iris colour, '' = dark),
+  `lash`, `brow` (none / thin / soft / thick), `nose` (none / small / wide), `mouth` (smile / lips / grin / neutral),
+  `fh` (none / stubble / moustache / goatee / beard), `acc` 'shades'; and hairstyles bald, fade, straight, locs. The
+  buzz cut draws its beard only when `fh` is unset (Sabbir). An avatar customizer was built the same day and removed
+  at the user's request. Tests: `tests/avatars.js`.
   Presentation (style ref: user's casual-game profile screenshots, in our palette): `#profilePage` (`.ppage`) is a
   dimmed full-screen overlay (size container) holding a fixed-size modal `.pm` (max 440x720): cream panel, white rim,
   warm-brown outline, coral title ribbon `.pm-title` over the top edge, red `.x-btn` (`#ppBack`). Folder tabs `.ftabs`
