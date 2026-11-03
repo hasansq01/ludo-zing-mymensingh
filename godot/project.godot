@@ -1,0 +1,84 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Ludo Zing Mymensingh"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/quit_on_go_back=false
+; The Play version code (version/code in export_presets.cfg; tests keep them equal): what AppUpdate reports off Android.
+config/version_code=15
+; The version name (version/name in export_presets.cfg; tests keep them equal): the Settings footer's "v0.3.0".
+config/version="0.4.4"
+run/low_processor_mode=false
+config/icon="res://assets/icon/icon.svg"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.0901961, 0.0588235, 0.133333, 1)
+run/flush_stdout_on_print=true
+
+[autoload]
+
+Save="*res://scripts/core/save.gd"
+Sound="*res://scripts/audio/sound.gd"
+
+[debug]
+
+file_logging/enable_file_logging.mobile=true
+file_logging/max_log_files=3
+
+[display]
+
+window/size/viewport_width=390
+window/size/viewport_height=844
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/billing/plugin.cfg", "res://addons/levelplay/plugin.cfg", "res://addons/notifications/plugin.cfg", "res://addons/play_games/plugin.cfg")
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=false
+pointing/emulate_mouse_from_touch=true
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://locale/bn.po")
+locale/fallback="en"
+
+[ludo_zing]
+
+push/project_id="ludo-zing-a1b7c"
+push/app_id="1:650464431641:android:90e6b5cebd13aed0c1a488"
+push/api_key="AIzaSyD1iquBS8PYJofWWjfjRnEsyXy1xKCELvg"
+push/sender_id="650464431641"
+ads/app_id="ca-app-pub-1525695956680184~8542680820"
+ads/rewarded_unit="ca-app-pub-1525695956680184/5856807738"
+ads/test_ad_devices="61EB8B4CD496BC8D2C8612FA57C8012B"
+ads/levelplay_app_key="2928a1d3d"
+ads/levelplay_rewarded_unit="ij2h0kzjw5bnxhll"
+ads/provider="auto"
+play_games/app_id="650464431641"
+play_games/web_client_id="650464431641-ot93kr1vi3847gsg5ef3cqsiq0p0habm.apps.googleusercontent.com"
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.0901961, 0.0588235, 0.133333, 1)
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/positional_shadow/atlas_16_bits=false
+lights_and_shadows/positional_shadow/atlas_size=2048
+lights_and_shadows/positional_shadow/atlas_size.mobile=2048
+lights_and_shadows/positional_shadow/atlas_quadrant_0_subdiv=1
+textures/vram_compression/import_etc2_astc=true

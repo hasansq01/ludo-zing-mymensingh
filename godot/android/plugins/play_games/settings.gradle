@@ -1,0 +1,19 @@
+// Ludo Zing: Google Play Games Services v2 Godot Android plugin (v2 plugin architecture).
+// Build with tools/build-play-games-plugin.sh from the repo root.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "PlayGames"

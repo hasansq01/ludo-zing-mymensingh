@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://dev/rr_snake_shots.gd" id="1"]
+
+[node name="RrSnakeShots" type="Node"]
+script = ExtResource("1")

@@ -1,0 +1,1126 @@
+class_name ResultScreen
+extends Control
+## The full-screen game result over the (blurred, dimmed) board, always headlined from the player's side: on a
+## win the winner's avatar with a crown in a burst of gold rays; on a loss your own avatar with your place badge
+## ("You finished 3rd", soft rays), the .pm card with the title ribbon, the finish order (1st–4th: place badges, avatars, names, a teal check + "Finished"
+## or the progress of the unfinished), the rewards (coins counting up, XP filling the Meter, "Level up!") and the
+## buttons Play again (honey, lg), Share (teal; a win or a podium finish only) and Home (ghost). Back = Home. Confetti only when the human (or their team) won.
+##
+##   var r := ResultScreen.new({
+##       game = "ludo",                     # "ludo" | "sl"
+##       title = "",                        # "" = derived ("You win!", "You finished 3rd", "Your team finished 2nd",
+##                                          #   "Mocha wins!" when there is no "you": Pass & Play)
+##       sub = "",                          # "" = derived ("All four pawns home!", "Mocha won"); never the XP (the
+##                                          #   card shows it once)
+##       standings = [{color, name, kind ("you"|"cpu"|"human"), cpu_id, place, finished, progress, pos}],
+##       teams = false,                     # optional; derived from shared places
+##       human_won = true, reward = 200,
+##       xp_before = 120, xp_after = 220,   # total XP before / after this game
+##       level_before = 2, level_after = 3, # optional (derived from the XP)
+##       coin_target = home_coin_amount,    # optional Control (CoinAmount): coins fly there after the count-up
+##       coin_total = 5500,                 # optional: the new balance for that target
+##   })
+##   r.play_again.connect(...); r.home.connect(...)
+##   r.open(app.sheet_layer)
+## The screen closes itself after a button (or Back); `closed` fires when it is gone.
+## Online (data.online = true, data.host = Play again can be offered: you are in the room): rows carry the friends'
+## own avatars (e.avatar, e.frame). In a friend room Play again is anyone's yes in the room's vote (server/PROTOCOL.md
+## "Play again"; the screen stays until the server starts the next match: the app closes it). set_vote(vote, me)
+## (data.vote / data.me at the start) shows the vote above the buttons: the title ("Rafi wants to play again",
+## "Waiting for the others…", "Starting a new game…"), the countdown, and everyone asked (a teal tick: in; a ring:
+## still deciding; a cross: left). While you are asked the buttons are Play / Leave (Leave = home: out of the room);
+## after your yes Play again waits ("Waiting…") and Home reads Leave. set_host(false) disables Play again.
+## A coin-table match (data.table = {tier, entry, payout, bonus, refund, ended, match_id}, entry > 0; ECONOMY_V1.md 3):
+## `reward` is what you received, the payout plus the 1st place's house bonus (the Coins tile reads "Prize +228" and a
+## line says "Includes +38 house bonus"); a refund says "Entry 100 refunded"; a payout of 0 without a refund says
+## "Entry 100 lost"; ended = "away" adds "The match ended while everyone was away: places by progress."; a payout > 0 with a video available offers
+## "Double it with a video" (AdFlow "double", ref = match_id; the server grants the same payout again) and toasts the
+## extra coins. Share draws the WinCard (your avatar, name, place, coins, game, the logo) and opens the phone's share
+## sheet with it (Share; without one the text is copied). Tests and previews: data.ads (bool) replaces AdFlow.available(), flow (an AdFlow) a new AdFlow.
+
+signal play_again
+signal home
+signal closed
+signal doubled(extra: int)               ## the "double" video was granted (the extra coins)
+
+const CARD_W := 358.0
+const AVA_HERO := 92.0
+const AVA_ROW := 40.0
+const ROW_H := 52.0
+
+var data := {}
+var dismissable := false                 # Sheet-like: main's back handler must not just close it
+var card: PanelContainer
+var title_ribbon: Control
+var content: VBoxContainer
+var again_button: Button
+var home_button: Button
+var share_button: Button                 ## a win, or 2nd of 4 with coins: draws the WinCard and opens the share sheet
+var double_button: Button                ## coin table, prize > 0, a video can run: "Double it with a video"
+var table_note: Label                    ## coin table, no prize: "Entry 100 lost" / "Entry 100 refunded"
+var bonus_note: Label                    ## coin table, bonus > 0: "Includes +38 house bonus"
+var away_note: Label                     ## the server ended the match while nobody was connected
+var vote_card: PanelContainer            ## online friend rooms: the Play again vote (hidden while none is open)
+var flow: AdFlow
+var coins: CoinAmount
+var xp_meter: Meter
+var level_badge: LevelBadge
+
+var _backdrop: ColorRect
+var _hero: Control
+var _rays: Rays
+var _title: Label
+var _sub: Label
+var _rows: Array[Control] = []
+var _rewards: Control
+var _body: VBoxContainer
+var _claim_note: Label
+var _level_up: Control
+var _buttons: VBoxContainer
+var _closing := false
+var _done := false
+var _sharing := false
+var _extra := 0                          # coins the "double" video added (the shared card counts them)
+var _revealed := false                   # the buttons have played in (from then on they may be enabled)
+var _vote := {}                          # the vote as the server last sent it ({} = none open)
+var _me := ""                            # your member id (the vote's "you")
+var _vote_end := 0                       # Time.get_ticks_msec() when the vote closes
+var _prompted := false                   # the "wants to play again" nudge (haptics) was given
+var _vote_title: Label
+var _vote_sub: Label
+var _vote_timer: Label
+var _vote_names: HFlowContainer
+
+static var _blur: Shader
+
+
+func _init(data_: Dictionary = {}) -> void:
+	data = data_
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	theme = UIKit.theme()
+	_build()
+
+## Shows the screen on `layer` (the app's sheet layer) and plays the reveal. Coroutine; callers may ignore it.
+func open(layer: Control) -> ResultScreen:
+	layer.add_child(self)
+	await get_tree().process_frame
+	_layout()
+	_play()
+	return self
+
+## Fades out and frees; emits `closed`. Coroutine.
+func close() -> void:
+	if _closing:
+		return
+	_closing = true
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if is_inside_tree():
+		var tw := create_tween()
+		tw.tween_property(self, "modulate:a", 0.0, 0.16)
+		await tw.finished
+	closed.emit()
+	queue_free()
+
+## Back (Android) = Home.
+func on_back() -> void:
+	_pick("home")
+
+func _unhandled_input(e: InputEvent) -> void:
+	if e.is_action_pressed("ui_cancel") and not _closing:
+		get_viewport().set_input_as_handled()
+		on_back()
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Copy
+# ---------------------------------------------------------------------------------------------------------------
+
+const PLACES := ["1st", "2nd", "3rd", "4th"]  # l10n
+
+## The ordinal: 1 -> "1st", 2 -> "2nd" ... (Bangla: the place word, প্রথম ... চতুর্থ)
+static func ordinal(n: int) -> String:
+	var en := ordinal_en(n)
+	return L10n.t(PLACES[n - 1]) if n >= 1 and n <= 4 else en
+
+## The English ordinal (logs, ids).
+static func ordinal_en(n: int) -> String:
+	var suf := "th"
+	if n % 100 < 11 or n % 100 > 13:
+		match n % 10:
+			1: suf = "st"
+			2: suf = "nd"
+			3: suf = "rd"
+	return "%d%s" % [n, suf]
+
+func standings() -> Array:
+	var st: Array = data.get("standings", [])
+	var out := st.duplicate()
+	out.sort_custom(func(a, b): return int(a.get("place", 9)) < int(b.get("place", 9)) if int(a.get("place", 9)) != int(b.get("place", 9)) else int(a.get("color", 0)) < int(b.get("color", 0)))
+	return out
+
+func is_teams() -> bool:
+	if data.has("teams"):
+		return bool(data.teams)
+	var seen := {}
+	for e in data.get("standings", []):
+		var p := int(e.get("place", 0))
+		if seen.has(p):
+			return true
+		seen[p] = true
+	return false
+
+func winners() -> Array:
+	return standings().filter(func(e): return int(e.get("place", 0)) == 1)
+
+func you() -> Dictionary:
+	for e in data.get("standings", []):
+		if str(e.get("kind", "")) == "you":
+			return e
+	return {}
+
+## Confetti: data.celebrate, else when the human (or their team) won, or in Pass & Play (everyone at the table is
+## a human, so somebody here won).
+func celebrates() -> bool:
+	if data.has("celebrate"):
+		return bool(data.celebrate)
+	if bool(data.get("human_won", false)):
+		return true
+	var st: Array = data.get("standings", [])
+	return not st.is_empty() and st.all(func(e): return str(e.get("kind", "")) == "human")
+
+func xp_gain() -> int:
+	return maxi(0, int(data.get("xp_after", 0)) - int(data.get("xp_before", 0)))
+
+## You lost (you played, and neither you nor your team won).
+func you_lost() -> bool:
+	return not you().is_empty() and not bool(data.get("human_won", false)) and not winners().is_empty()
+
+## The title: data.title, else from your side ("You win!", "Your team wins!", "You finished 3rd", "Your team finished
+## 2nd"), or with no "you" the winner ("Team Red + Yellow wins!", "Mocha wins!").
+func title_text() -> String:
+	var t := str(data.get("title", ""))
+	if t != "":
+		return t
+	var w := winners()
+	if w.is_empty():
+		return tr("Game over")
+	if you_lost():
+		var place := ordinal(maxi(int(you().get("place", 2)), 2))
+		return (tr("Your team finished %s") if is_teams() else tr("You finished %s")) % place
+	if is_teams():
+		if w.any(func(e): return str(e.get("kind", "")) == "you"):
+			return tr("Your team wins!")
+		var cols := w.map(func(e): return int(e.color))
+		cols.sort()
+		return tr("Team %s wins!") % " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
+	if str(w[0].get("kind", "")) == "you":
+		return tr("You win!")
+	return tr("%s wins!") % L10n.seat_name(str(w[0].get("name", Palette.NAMES[int(w[0].color)])))
+
+## The line under the title: data.sub, else what happened ("All four pawns home!") or, for a loss, who won
+## ("Mocha won", "Team Green + Blue won"). The XP is not repeated here (the card shows it).
+func sub_text() -> String:
+	var s := str(data.get("sub", ""))
+	if s != "":
+		return s
+	if you_lost():
+		return tr("%s won") % winner_label()
+	if str(data.get("game", "ludo")) == "sl":
+		return tr("First to square 100!")
+	if is_teams():
+		return tr("Both teammates got all four pawns home!")
+	return tr("All four pawns home!")
+
+## "Mocha" / "Team Green + Blue": who won, for the copy.
+func winner_label() -> String:
+	var w := winners()
+	if w.is_empty():
+		return ""
+	if is_teams():
+		var cols := w.map(func(e): return int(e.color))
+		cols.sort()
+		return tr("Team %s") % " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
+	return L10n.seat_name(str(w[0].get("name", Palette.NAMES[int(w[0].color)])))
+
+## Whose avatars the hero shows: the winners, or on a loss you (and your teammate).
+func hero_rows() -> Array:
+	if not you_lost():
+		return winners()
+	var me := you()
+	var out := []
+	for e: Dictionary in standings():
+		if int(e.get("place", 0)) == int(me.get("place", 0)) and (str(e.get("kind", "")) == "you" or is_teams()):
+			out.append(e)
+	return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------------------------------------------
+
+func _build() -> void:
+	_backdrop = ColorRect.new()
+	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_backdrop.material = _blur_material()
+	add_child(_backdrop)
+	var won := bool(data.get("human_won", false))
+	content = UIKit.vbox(0)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	add_child(content)
+	# hero: rays + winner avatar(s) + crown
+	_hero = Control.new()
+	_hero.custom_minimum_size = Vector2(CARD_W, AVA_HERO + 72)
+	_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(_hero)
+	_rays = Rays.new()
+	_rays.gold = won or you().is_empty()
+	if _rays.gold:
+		var add := CanvasItemMaterial.new()
+		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		_rays.material = add
+	_hero.add_child(_rays)
+	var w := hero_rows()
+	var lost := you_lost()
+	var n := clampi(w.size(), 1, 2)
+	var ava_px := AVA_HERO if n == 1 else AVA_HERO - 12.0
+	var avs := Control.new()
+	avs.name = "Avatars"
+	avs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hero.add_child(avs)
+	for i in n:
+		var e: Dictionary = w[i] if i < w.size() else {}
+		var mount := _avatar_mount(e, ava_px)
+		mount.position = Vector2(i * (ava_px + 10.0), 0)
+		avs.add_child(mount)
+		if lost:                             # your place on your avatar instead of the winner's crown
+			var pb := PlayerTile.PlaceBadge.make(int(e.get("place", 2)), 34)
+			pb.name = "Place%d" % i
+			pb.position = Vector2(-12, -12)
+			mount.add_child(pb)
+	avs.size = Vector2(n * ava_px + (n - 1) * 10.0, ava_px)
+	var crown := UIKit.icon("ic_crown", 52)
+	crown.name = "Crown"
+	crown.size = Vector2(52, 52)
+	avs.add_child(crown)
+	crown.position = Vector2(avs.size.x / 2.0 - 26.0, -38.0)
+	crown.pivot_offset = Vector2(26, 40)
+	crown.rotation = deg_to_rad(-8.0)
+	crown.visible = not lost
+	content.add_child(_gap(6))
+	# card: ribbon title, sub line, standings, rewards
+	card = PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Sheet.PMStyle.new())
+	var pm := card.get_theme_stylebox("panel")
+	pm.content_margin_left = 14; pm.content_margin_right = 14
+	pm.content_margin_top = 34; pm.content_margin_bottom = 16
+	card.custom_minimum_size = Vector2(CARD_W, 0)
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(card)
+	var body := UIKit.vbox(UIKit.SPACE.sm)
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(body)
+	_body = body
+	_sub = UIKit.label(sub_text(), UIKit.FS.body_l, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(_sub)
+	var list := UIKit.vbox(UIKit.SPACE.sm)            # the list-row gap
+	list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(list)
+	var teams := is_teams()
+	var last_place := -1
+	for e: Dictionary in standings():
+		if teams and int(e.get("place", 0)) != last_place:
+			var cap := UIKit.caption(_team_caption(e))
+			cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			list.add_child(UIKit.margin(cap, 6, 2 if last_place < 0 else 4, 0, 0))
+		last_place = int(e.get("place", 0))
+		var row := _row(e)
+		list.add_child(row)
+		_rows.append(row)
+	_rewards = _rewards_row()
+	body.add_child(_rewards)
+	_build_table(body)
+	title_ribbon = RibbonTitle.new(title_text())
+	title_ribbon.name = "Ribbon"
+	add_child(title_ribbon)
+	_title = (title_ribbon as RibbonTitle).label
+	content.add_child(_gap(UIKit.SPACE.lg))
+	_buttons = UIKit.vbox(UIKit.SPACE.sm)
+	_buttons.custom_minimum_size = Vector2(CARD_W - 20.0, 0)
+	_buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vote_card = _build_vote()
+	_buttons.add_child(vote_card)
+	again_button = UIKit.btn(tr("Play again"), "honey", "lg")
+	again_button.pressed.connect(_pick.bind("again"))
+	_buttons.add_child(again_button)
+	if can_share():
+		share_button = UIKit.btn(tr("Share"), "teal", "md")
+		share_button.name = "Share"
+		share_button.pressed.connect(share)
+		_buttons.add_child(share_button)
+	home_button = UIKit.btn(tr("Home"), "ghost", "md")
+	home_button.pressed.connect(_pick.bind("home"))
+	_buttons.add_child(home_button)
+	content.add_child(_buttons)
+	_me = str(data.get("me", ""))
+	if is_online():
+		set_host(bool(data.get("host", false)))
+		if data.get("vote") is Dictionary and not (data.vote as Dictionary).is_empty():
+			set_vote(data.vote, _me)
+	resized.connect(_layout)
+
+# ---------------------------------------------------------------------------------------------------------------
+# Coin table
+# ---------------------------------------------------------------------------------------------------------------
+
+func table() -> Dictionary:
+	var t: Variant = data.get("table")
+	return t if t is Dictionary else {}
+
+## A paid coin table (not Practice, not a friends' room).
+func is_coin_table() -> bool:
+	return int(table().get("entry", 0)) > 0
+
+func table_payout() -> int:
+	return int(table().get("payout", 0))
+
+func table_bonus() -> int:
+	return int(table().get("bonus", 0))
+
+func table_refund() -> int:
+	return int(table().get("refund", 0))
+
+## A video can run here (data.ads overrides AdFlow.available(): tests, previews).
+func _ads_ok() -> bool:
+	return bool(data.ads) if data.has("ads") else AdFlow.available()
+
+## Under the rewards: "Entry 100 lost" without a prize, or the double button with one.
+func _build_table(parent: VBoxContainer) -> void:
+	if not is_coin_table():
+		return
+	if str(table().get("ended", "")) == "away":
+		away_note = _quiet_line(tr(CoinTables.AWAY_TEXT), "AwayNote")
+		parent.add_child(away_note)
+	if table_payout() <= 0:
+		var refunded := table_refund() > 0
+		var row := UIKit.hbox(UIKit.SPACE.xs)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(UIKit.icon("coin", 20))
+		var text := CoinTables.refund_text(table_refund()) if refunded else CoinTables.lost_text(int(table().entry))
+		table_note = UIKit.label(text, UIKit.FS.body_l, Palette.MUTED, UIKit.font_body(900))
+		table_note.name = "TableNote"
+		table_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(table_note)
+		parent.add_child(row)
+		return
+	if table_bonus() > 0:
+		bonus_note = _quiet_line(CoinTables.bonus_text(table_bonus()), "BonusNote")
+		parent.add_child(bonus_note)
+	if not _ads_ok():
+		return
+	double_button = UIKit.btn(tr("Double it with a video"), "teal", "md")
+	double_button.name = "Double"
+	double_button.pressed.connect(_double)
+	parent.add_child(double_button)
+
+func _quiet_line(text: String, node_name: String) -> Label:
+	var l := UIKit.label(text, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	l.name = node_name
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+## The "double" video: AdFlow does the ad and the server grants the extra coins (never from this side's word).
+func _double() -> void:
+	if double_button == null or double_button.disabled or _closing:
+		return
+	double_button.disabled = true
+	double_button.text = tr("Watching…")
+	if flow == null:
+		flow = AdFlow.new()
+		add_child(flow)
+	var res: Dictionary = await AdWatch.run(flow, "double", str(table().get("match_id", "")))
+	if not is_instance_valid(self) or _closing:
+		return
+	var info: Dictionary = res.info
+	if bool(res.ok):
+		var extra := int(info.get("amount", table_payout()))
+		double_button.text = tr("Doubled!")
+		Toast.show(self, tr("+%s coins") % Fmt.coins_full(extra), null, 2.0, "coin")
+		_extra += extra
+		doubled.emit(extra)
+		return
+	double_button.text = tr("Double it with a video")
+	double_button.disabled = false
+	Toast.show(self, str(info.get("text", tr(AdFlow.NO_FILL_TEXT))), null, 2.2, "bad")
+
+## A quiet line under the rewards when the server cut the payout of an offline match ("Daily limit reached"; see
+## Account.claim_note). Safe to call late or twice; "" removes it.
+func set_claim_note(text: String) -> void:
+	if _body == null:
+		return
+	if text == "":
+		if _claim_note:
+			_claim_note.queue_free()
+			_claim_note = null
+		return
+	if _claim_note == null:
+		_claim_note = UIKit.label(text, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+		_claim_note.name = "ClaimNote"
+		_claim_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_claim_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_body.add_child(_claim_note)
+	_claim_note.text = text
+
+func _gap(h: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(0, h)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
+func _team_caption(e: Dictionary) -> String:
+	var mates := standings().filter(func(x): return int(x.get("place", 0)) == int(e.get("place", 0)))
+	var cols := mates.map(func(x): return int(x.color))
+	cols.sort()
+	var label := " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
+	return "%s · %s" % [ordinal(int(e.get("place", 1))), label]
+
+## An avatar in a white mount ring in the player's colour (hero).
+func _avatar_mount(e: Dictionary, px: float) -> Control:
+	var c := int(e.get("color", 0))
+	var holder := Panel.new()
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.size = Vector2(px, px)
+	var st := UIKit.box(Color.WHITE, int(px * 0.3) + 4, UIKit.BW.card, Palette.PLAYER[c])
+	st.shadow_size = 12
+	st.shadow_color = Color(Palette.SHADOW_DEEP, 0.35)
+	st.shadow_offset = Vector2(0, 6)
+	st.expand_margin_left = 5; st.expand_margin_right = 5; st.expand_margin_top = 5; st.expand_margin_bottom = 5
+	holder.add_theme_stylebox_override("panel", st)
+	var a := _make_avatar(e, px)
+	a.size = Vector2(px, px)
+	holder.add_child(a)
+	return holder
+
+## A row's / the hero's avatar: an online friend's own avatar, else PlayerTile's (you, a mascot, a pawn tile).
+static func _make_avatar(e: Dictionary, px: float) -> Control:
+	var c := int(e.get("color", 0))
+	var id := str(e.get("avatar", ""))
+	if str(e.get("kind", "")) == "human" and id != "" and not Collection.avatar(id).is_empty():
+		return Collection.make_avatar_of(id, str(e.get("frame", "classic")) if str(e.get("frame", "")) != "" else "classic", px)
+	return PlayerTile.make_avatar(c, str(e.get("kind", "cpu")), px, str(e.get("cpu_id", e.get("name", ""))))
+
+func is_online() -> bool:
+	return bool(data.get("online", false))
+
+## Online: whether Play again can be offered (you are still in the room).
+func set_host(on: bool) -> void:
+	data.host = on
+	_sync_buttons()
+
+## Play again / Home as things stand: online, the vote (asked: Play / Leave; after your yes: "Waiting…" / Leave;
+## at the close: "Starting…"); nothing is tappable before the screen has played in.
+func _sync_buttons() -> void:
+	if again_button == null:
+		return
+	var res := str(_vote.get("result", ""))
+	var open := not _vote.is_empty() and res == ""
+	var mine := Online.vote_of(_vote, _me) if not _vote.is_empty() else ""
+	var text := tr("Play again")
+	var kind := "honey"
+	var off := false
+	if is_online() and not bool(data.get("host", false)):
+		kind = "off"
+		off = true
+	elif mine == "wait" and open:
+		text = tr("Play")
+	elif mine == "yes":
+		text = tr("Starting…") if res == "go" else tr("Waiting…")
+		kind = "off"
+		off = true
+	if again_button.text != text or str(again_button.get_meta("kit_kind", "honey")) != kind:
+		again_button.text = text
+		UIKit.set_kind(again_button, kind)
+		again_button.set_meta("kit_kind", kind)
+	again_button.disabled = off or not _revealed
+	home_button.text = tr("Leave") if open else tr("Home")
+	home_button.disabled = not _revealed
+	if share_button:
+		share_button.visible = _vote.is_empty()   # (the vote needs the room)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Play again: the vote (online friend rooms)
+# ---------------------------------------------------------------------------------------------------------------
+
+## The vote's card above the buttons (hidden until a vote is open): the title and the countdown pill, a line on who
+## plays, and everyone asked as name chips.
+func _build_vote() -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = "Vote"
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Palette.CARD, UIKit.R.md, UIKit.BW.line, Palette.ROW_EDGE)
+	st.border_width_bottom = UIKit.LIP.sm
+	UIKit.pad(st, 12, 8)
+	p.add_theme_stylebox_override("panel", st)
+	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(col)
+	var head := UIKit.hbox(UIKit.SPACE.sm)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_title = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	_vote_title.name = "Title"
+	_vote_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_vote_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_vote_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(_vote_title)
+	var pill := PanelContainer.new()
+	pill.name = "Timer"
+	var ps := UIKit.box(Palette.HONEY_TINT, UIKit.R.pill, UIKit.BW.line, Palette.HONEY_TINT_EDGE)
+	UIKit.pad(ps, 10, 2)
+	pill.add_theme_stylebox_override("panel", ps)
+	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_timer = UIKit.label("0:30", UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
+	pill.add_child(_vote_timer)
+	head.add_child(pill)
+	col.add_child(head)
+	_vote_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+	_vote_sub.name = "Sub"
+	_vote_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_vote_sub)
+	_vote_names = HFlowContainer.new()
+	_vote_names.name = "Names"
+	_vote_names.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_names.add_theme_constant_override("h_separation", UIKit.SPACE.xs + 2)
+	_vote_names.add_theme_constant_override("v_separation", UIKit.SPACE.xs + 2)
+	col.add_child(_vote_names)
+	p.visible = false
+	return p
+
+## The room's Play again vote (a `rematch` message; {} = none): the card, the buttons, the countdown. me: your member
+## id ("" keeps the one you have). The first time you are asked the phone gives a nudge.
+func set_vote(v: Dictionary, me := "") -> void:
+	_vote = v.duplicate(true)
+	if me != "":
+		_me = me
+	data.vote = _vote
+	if vote_card == null:
+		return
+	var res := str(_vote.get("result", ""))
+	var mine := Online.vote_of(_vote, _me)
+	vote_card.visible = not _vote.is_empty() and (res == "" or mine == "yes")
+	if vote_card.visible:
+		if res == "":
+			_vote_end = Time.get_ticks_msec() + maxi(0, int(_vote.get("until", 0)) - int(_vote.get("now", 0)))
+		if res == "go":
+			_vote_title.text = tr("Starting a new game…")
+		elif mine == "wait":
+			_vote_title.text = tr("%s wants to play again") % Online.vote_by_name(_vote)
+		else:
+			_vote_title.text = tr("Waiting for the others…")
+		var ffa := bool(_vote.get("ffa", false))
+		_vote_sub.text = tr("Teams need 4 players: this game is everyone for themselves.") if ffa else tr("The next game starts with everyone who taps Play.")
+		_vote_sub.visible = res == "" or ffa
+		(_vote_timer.get_parent() as Control).visible = res == ""
+		_tick_vote()
+		for c in _vote_names.get_children():
+			_vote_names.remove_child(c)
+			c.queue_free()
+		for pl: Dictionary in _vote.get("players", []) if _vote.get("players") is Array else []:
+			_vote_names.add_child(_vote_chip(pl))
+		if mine == "wait" and res == "" and not _prompted:
+			_prompted = true
+			Haptics.medium()
+			UIKit.sfx("select")
+	_sync_buttons()
+	if is_inside_tree():
+		_layout.call_deferred()
+
+## One name in the vote: a teal tick (in), a dotted ring (still deciding) or a cross (left), then the name ("You").
+func _vote_chip(pl: Dictionary) -> Control:
+	var v := str(pl.get("vote", "wait"))
+	var chip := PanelContainer.new()
+	chip.name = "Voter%s" % NetClient.id_str(pl.get("id", ""))
+	chip.set_meta("vote", v)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Color.WHITE if v != "no" else Palette.CHIP, UIKit.R.pill, UIKit.BW.line, Palette.TEAL if v == "yes" else Palette.ROW_EDGE)
+	UIKit.pad(st, 6, 3)
+	st.content_margin_right = 10
+	chip.add_theme_stylebox_override("panel", st)
+	var row := UIKit.hbox(UIKit.SPACE.xs)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_check_disc(16.0) if v == "yes" else _vote_mark(v, 16.0))
+	var mine := NetClient.id_str(pl.get("id", "")) == _me
+	var nm := UIKit.label(tr("You") if mine else L10n.seat_name(str(pl.get("name", "Player"))), UIKit.FS.label,
+		Palette.MUTED if v == "no" else Palette.INK, UIKit.font_body(900))
+	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.custom_minimum_size.x = minf(UIKit.font_body(900).get_string_size(nm.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.label).x + 2.0, 104.0)
+	row.add_child(nm)
+	chip.add_child(row)
+	return chip
+
+## A ring with three dots (still deciding) or a grey disc with a cross (left), px wide.
+static func _vote_mark(v: String, px: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(px, px)
+	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.draw.connect(func() -> void:
+		var m := c.size / 2.0
+		var r := px / 2.0
+		if v == "no":
+			c.draw_circle(m, r, Palette.TAN_DEEP, true, -1.0, true)
+			var d := r * 0.42
+			c.draw_line(m - Vector2(d, d), m + Vector2(d, d), Color.WHITE, 2.0, true)
+			c.draw_line(m + Vector2(-d, d), m + Vector2(d, -d), Color.WHITE, 2.0, true)
+			return
+		c.draw_arc(m, r - 1.0, 0.0, TAU, 32, Palette.TAN_DEEP, 2.0, true)
+		for k in 3:
+			c.draw_circle(m + Vector2((k - 1) * r * 0.48, 0.0), 1.4, Palette.MUTED, true, -1.0, true))
+	return c
+
+## The countdown pill: the seconds left on the vote ("0:24").
+func _tick_vote() -> void:
+	if _vote_timer and vote_card.visible:
+		_vote_timer.text = Fmt.clock(ceili(maxi(0, _vote_end - Time.get_ticks_msec()) / 1000.0))
+
+func _row(e: Dictionary) -> Control:
+	var c := int(e.get("color", 0))
+	var place := int(e.get("place", 0))
+	var first := place == 1
+	var mine := str(e.get("kind", "")) == "you"
+	var p := PanelContainer.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Palette.HONEY_TINT if first else Color.WHITE, UIKit.R.md, UIKit.BW.line,
+		Palette.GOLD if first else (Palette.PLAYER[c] if mine else Palette.ROW_EDGE))
+	st.border_width_bottom = UIKit.LIP.sm
+	UIKit.pad(st, 8, 4)
+	st.content_margin_bottom = 4 + UIKit.LIP.sm - UIKit.BW.line
+	p.add_theme_stylebox_override("panel", st)
+	p.custom_minimum_size = Vector2(0, ROW_H)
+	var row := UIKit.hbox(UIKit.SPACE.sm)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(row)
+	var badge := PlayerTile.PlaceBadge.make(place, 28)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(badge)
+	var a := _make_avatar(e, AVA_ROW)
+	a.custom_minimum_size = Vector2(AVA_ROW, AVA_ROW)
+	a.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(a)
+	var name_box := UIKit.hbox(UIKit.SPACE.xs + 2)
+	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var nm := UIKit.label(L10n.seat_name(str(e.get("name", Palette.NAMES[c]))), UIKit.FS.h3, PlayerTile.name_color(c) if not mine else Palette.INK, UIKit.font_body(900))
+	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var tw_ := UIKit.font_body(900).get_string_size(nm.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.h3).x + 2.0
+	nm.custom_minimum_size.x = minf(tw_, 118.0)       # a trimmed Label reports no width of its own
+	name_box.add_child(nm)
+	if str(e.get("kind", "")) == "cpu":
+		var tag := UIKit.tag(tr("CPU"), "ink")
+		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		name_box.add_child(tag)
+	row.add_child(name_box)
+	row.add_child(_result_cell(e))
+	return p
+
+## Right side of a row: a teal check + "Finished" (home in Ludo, square 100 in S&L) or the progress of the unfinished.
+func _result_cell(e: Dictionary) -> Control:
+	var sl := str(data.get("game", "ludo")) == "sl"
+	var box := UIKit.hbox(UIKit.SPACE.xs + 2)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if bool(e.get("finished", false)):
+		box.add_theme_constant_override("separation", UIKit.SPACE.xs)
+		box.add_child(_check_disc(18.0))
+		var f := UIKit.label(tr("Finished"), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_RIGHT)
+		f.name = "Finished"
+		f.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		box.add_child(f)
+		return box
+	var prog := float(e.get("progress", 0.0))
+	var m := Meter.new("teal", 8)
+	m.custom_minimum_size = Vector2(56, 8)
+	m.set_value(prog, 1.0)
+	m.size_flags_horizontal = Control.SIZE_SHRINK_END
+	box.add_child(m)
+	var txt := (tr("Sq %d") % int(e.get("pos", roundi(prog * 100.0)))) if sl else Fmt.pct(prog)
+	var l := UIKit.label(txt, UIKit.FS.label, Palette.SUB, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_RIGHT)
+	l.custom_minimum_size.x = 40 if not sl else 46
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	box.add_child(l)
+	return box
+
+## A teal disc with the white check (a finished player; a yes in the vote).
+static func _check_disc(px: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(px, px)
+	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var check := UIKit.svg("ic_check")
+	c.draw.connect(func() -> void:
+		var m := c.size / 2.0
+		c.draw_circle(m, px / 2.0, Palette.TEAL, true, -1.0, true)
+		if check:
+			var g := px * 0.68
+			c.draw_texture_rect(check, Rect2(m - Vector2(g, g) / 2.0, Vector2(g, g)), false))
+	return c
+
+func _rewards_row() -> Control:
+	var wrap := VBoxContainer.new()
+	wrap.add_theme_constant_override("separation", 0)
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(_gap(UIKit.SPACE.xs))
+	var row := UIKit.hbox(UIKit.SPACE.sm)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(row)
+	var reward := int(data.get("reward", 0))
+	if reward > 0:
+		var tile := _reward_tile()
+		tile.custom_minimum_size.x = 112
+		var v := UIKit.vbox(2)
+		v.alignment = BoxContainer.ALIGNMENT_CENTER
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var cap := UIKit.eyebrow(tr("Prize") if is_coin_table() else tr("Coins"))
+		v.add_child(cap)                          # left-aligned, the value under it (like the Experience tile)
+		coins = CoinAmount.new(0, "lg", "plain", "+")
+		coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		v.add_child(coins)
+		tile.add_child(v)
+		row.add_child(tile)
+	if xp_gain() <= 0:                      # Pass & Play without XP, or nothing earned: no empty bar
+		row.visible = reward > 0
+		_level_up = Control.new()
+		_level_up.visible = false
+		wrap.add_child(_level_up)
+		xp_meter = null
+		return wrap
+	var xt := _reward_tile()
+	xt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var xv := UIKit.vbox(4)
+	xv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var head := UIKit.hbox(UIKit.SPACE.xs)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cap2 := UIKit.eyebrow(tr("Experience"))
+	cap2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(cap2)
+	# "Level up!" takes the caption's place in the head row (inside the tile): no sticker straddling the border
+	_level_up = UIKit.tag(tr("Level up!"), "gold", UIKit.FS.label)
+	_level_up.visible = false
+	_level_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_level_up.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_level_up.set_meta("caption", cap2)
+	head.add_child(_level_up)
+	head.move_child(_level_up, 1)
+	head.custom_minimum_size.y = _level_up.get_combined_minimum_size().y      # the row doesn't grow when it shows
+	var gain := UIKit.label("+%d XP" % xp_gain(), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900, true))
+	head.add_child(gain)
+	xv.add_child(head)
+	var lb := _levels()
+	level_badge = LevelBadge.new(int(lb.x), "md")
+	xp_meter = Meter.new("xp", 18, true, "XP")
+	var info := Collection.level_info(int(data.get("xp_before", 0)))
+	xp_meter.set_value(float(info.into), float(info.need))
+	xv.add_child(LevelBadge.row(level_badge, xp_meter))
+	xt.add_child(xv)
+	row.add_child(xt)
+	return wrap
+
+func _reward_tile() -> PanelContainer:
+	var p := PanelContainer.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Palette.PANE, UIKit.R.md, UIKit.BW.line, Palette.ROW_EDGE)
+	UIKit.pad(st, 10, 8)
+	p.add_theme_stylebox_override("panel", st)
+	p.custom_minimum_size.y = 74
+	return p
+
+## (level before, level after).
+func _levels() -> Vector2i:
+	var b := int(data.get("level_before", Collection.level_info(int(data.get("xp_before", 0))).level))
+	var a := int(data.get("level_after", Collection.level_info(int(data.get("xp_after", 0))).level))
+	return Vector2i(b, a)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Layout and reveal
+# ---------------------------------------------------------------------------------------------------------------
+
+func _layout() -> void:
+	var vp := size if size.x > 0 else get_viewport_rect().size
+	var room := vp.x - 2.0 * UIKit.SCREEN_GUTTER
+	var cw := minf(CARD_W, room)
+	card.custom_minimum_size.x = cw
+	_buttons.custom_minimum_size.x = cw - 20.0
+	_hero.custom_minimum_size.x = cw
+	content.size = Vector2(cw, 0)
+	var need := content.get_combined_minimum_size()
+	if need.x > cw + 0.5:                    # the rows want more than the screen (320 px): lay out at that width, scale down
+		cw = need.x
+		card.custom_minimum_size.x = cw
+		_buttons.custom_minimum_size.x = cw - 20.0
+		_hero.custom_minimum_size.x = cw
+		need = content.get_combined_minimum_size()
+	var safe_top := float(data.get("safe_top", 0.0))
+	var safe_bottom := float(data.get("safe_bottom", 0.0))
+	var avail := vp.y - safe_top - safe_bottom - 24.0
+	var k := minf(1.0, minf(avail / maxf(need.y, 1.0), room / maxf(cw, 1.0)))
+	content.scale = Vector2(k, k)
+	content.size = Vector2(cw, need.y)
+	content.position = Vector2((vp.x - cw * k) / 2.0, safe_top + 12.0 + maxf(0.0, (avail - need.y * k) / 2.0))
+	_rays.size = Vector2(cw, _hero.custom_minimum_size.y)
+	_rays.position = Vector2.ZERO
+	var avs := _hero.get_node("Avatars") as Control
+	avs.position = Vector2((cw - avs.size.x) / 2.0, 46.0)
+	_rays.center = avs.position + avs.size / 2.0
+	_place_ribbon.call_deferred()
+
+func _place_ribbon() -> void:
+	if not is_instance_valid(card):
+		return
+	var rt := title_ribbon as RibbonTitle
+	rt.fit_to(card.size.x)
+	rt.scale = content.scale
+	var top := content.position + card.position * content.scale
+	rt.position = top + Vector2((card.size.x * content.scale.x - rt.size.x * rt.scale.x) / 2.0, -RibbonTitle.H * 0.5 * content.scale.y)
+	rt.modulate = card.modulate
+
+func _process(_d: float) -> void:
+	_place_ribbon()
+	if not _vote.is_empty():
+		_tick_vote()
+
+func _play() -> void:
+	var reduce := Sheet.reduce_motion()
+	_backdrop.modulate.a = 0.0
+	for c: Control in [_hero, card, _buttons]:
+		c.modulate.a = 0.0
+	for r in _rows:
+		r.modulate.a = 0.0
+	again_button.disabled = true
+	home_button.disabled = true
+	if share_button:
+		share_button.disabled = true
+	var tw := create_tween()
+	tw.tween_property(_backdrop, "modulate:a", 1.0, 0.25)
+	await tw.finished
+	if not _alive():
+		return
+	_hero.pivot_offset = Vector2(_hero.size.x / 2.0, _hero.size.y * 0.6)
+	_hero.scale = Vector2(0.6, 0.6) if not reduce else Vector2.ONE
+	var t2 := create_tween().set_parallel(true)
+	t2.tween_property(_hero, "modulate:a", 1.0, 0.18)
+	t2.tween_property(_hero, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if celebrates():
+		Celebrate.run(self)
+		Haptics.success()
+	var crown := _hero.get_node("Avatars/Crown") as Control
+	if not reduce and crown.visible:
+		crown.position.y -= 30
+		crown.modulate.a = 0.0
+		var t3 := create_tween()
+		t3.tween_interval(0.25)
+		t3.tween_property(crown, "modulate:a", 1.0, 0.1)
+		t3.parallel().tween_property(crown, "position:y", crown.position.y + 30, 0.35).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	await _wait(0.2)
+	var cy := card.position.y
+	card.position.y = cy + (24 if not reduce else 0)
+	var t4 := create_tween().set_parallel(true)
+	t4.tween_property(card, "modulate:a", 1.0, 0.22)
+	t4.tween_property(card, "position:y", cy, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	set_process(true)
+	await _wait(0.18)
+	for r in _rows:
+		if not _alive():
+			return
+		var x := r.position.x
+		r.position.x = x - (18 if not reduce else 0)
+		var tr := create_tween().set_parallel(true)
+		tr.tween_property(r, "modulate:a", 1.0, 0.16)
+		tr.tween_property(r, "position:x", x, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		await _wait(0.07)
+	var tb := create_tween()
+	tb.tween_property(_buttons, "modulate:a", 1.0, 0.2)
+	await _wait(0.15)
+	if not _alive():
+		return
+	_revealed = true
+	if share_button:
+		share_button.disabled = _sharing
+	_sync_buttons()
+	await _count_rewards()
+	_done = true
+
+func _count_rewards() -> void:
+	var reward := int(data.get("reward", 0))
+	if coins and reward > 0:
+		coins.tick = true
+		coins.set_amount(reward, true)
+		await _wait(CoinAmount.COUNT_SEC)
+		if not _alive():
+			return
+		coins.flash()
+	if xp_meter == null:
+		_after_rewards(reward)
+		return
+	var lv := _levels()
+	var before := Collection.level_info(int(data.get("xp_before", 0)))
+	var after := Collection.level_info(int(data.get("xp_after", 0)))
+	if lv.y > lv.x:
+		xp_meter.set_value(float(before.need), float(before.need), true)
+		await _wait(Meter.SEC + 0.05)
+		if not _alive():
+			return
+		level_badge.set_level(lv.y, true)
+		var cap_label := _level_up.get_meta("caption", null) as Control
+		if cap_label:
+			cap_label.visible = false
+		_level_up.visible = true
+		_level_up.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		UIKit.pop_in(_level_up, 0.3)
+		_level_up.pivot_offset = _level_up.get_combined_minimum_size() / 2.0
+		Haptics.medium()
+		UIKit.sfx("six")
+		xp_meter.set_value(0.0, float(after.need))
+		xp_meter.set_value(float(after.into), float(after.need), true)
+	else:
+		xp_meter.set_value(float(after.into), float(after.need), true)
+	_after_rewards(reward)
+
+func _after_rewards(reward: int) -> void:
+	var target: Variant = data.get("coin_target", null)
+	if reward > 0 and target is Control and is_instance_valid(target):
+		await _wait(0.25)
+		if _alive():
+			CoinFly.run(self, coins.coin_center(), target, reward, Callable(), int(data.get("coin_total", -1)))
+
+## The Share button shows for a win, and for 2nd place of a four-player game that paid coins (a podium finish): 3rd and
+## 4th, losses, teams' runners-up and Pass & Play (no "you") have nothing to brag about.
+func can_share() -> bool:
+	var me := you()
+	if me.is_empty():
+		return false
+	var place := int(me.get("place", 0))
+	if bool(data.get("human_won", false)):
+		return place == 1
+	return place == 2 and not is_teams() and standings().size() >= 4 and int(data.get("reward", 0)) > 0
+
+## The coins the card and the text name: the prize, plus what the "double" video added.
+func share_coins() -> int:
+	return int(data.get("reward", 0)) + _extra
+
+## What the card says: your name, the place, the title, the coins, the game (the live profile supplies the avatar).
+func card_data() -> Dictionary:
+	var n := str(Save.profile.get("name", ""))
+	return {name = n if n != "" else tr("You"), place = int(you().get("place", 1)), title = title_text(), coins = share_coins(),
+		game = str(data.get("game", "ludo"))}
+
+## Draws the WinCard once and opens the share sheet with it and the text ("I just won 228 coins in Ludo Zing! ...");
+## with no share sheet the text is copied and a toast says so. Coroutine; the button waits meanwhile.
+func share() -> void:
+	if _sharing or _closing or share_button == null:
+		return
+	_sharing = true
+	share_button.disabled = true
+	var cd := card_data()
+	var path := ""
+	if Share.available():
+		path = await WinCard.render(self, cd)
+	if is_instance_valid(self) and not _closing:
+		Share.send(self, Share.win_text(int(cd.coins), str(cd.game), int(cd.place)), path)
+		share_button.disabled = false
+	_sharing = false
+
+func _wait(sec: float) -> void:
+	if is_inside_tree():
+		await get_tree().create_timer(sec).timeout
+
+func _alive() -> bool:
+	return is_inside_tree() and not _closing
+
+func _pick(what: String) -> void:
+	if _closing:
+		return
+	if what == "again":
+		play_again.emit()
+		if is_online():
+			again_button.disabled = true       # a yes in the vote (it says so next); the server's start closes the screen
+			again_button.text = tr("Waiting…")
+			UIKit.set_kind(again_button, "off")
+			again_button.set_meta("kit_kind", "off")
+			return
+	else:
+		home.emit()
+	close()
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Art
+# ---------------------------------------------------------------------------------------------------------------
+
+## The backdrop: the game behind, blurred (13 taps over two rings) and dimmed with the scrim colour.
+static func _blur_material() -> ShaderMaterial:
+	if _blur == null:
+		_blur = Shader.new()
+		_blur.code = """shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform float radius = 7.0;
+uniform vec4 tint : source_color = vec4(0.16, 0.08, 0.15, 0.55);
+void fragment() {
+	vec2 px = SCREEN_PIXEL_SIZE * radius;
+	vec3 acc = textureLod(screen_tex, SCREEN_UV, 2.0).rgb * 2.0;
+	float w = 2.0;
+	for (int i = 0; i < 6; i++) {
+		float a = float(i) * 1.0472;
+		vec2 d = vec2(cos(a), sin(a));
+		acc += textureLod(screen_tex, SCREEN_UV + d * px, 2.0).rgb;
+		acc += textureLod(screen_tex, SCREEN_UV + d.yx * vec2(-1.0, 1.0) * px * 2.2, 2.5).rgb;
+		w += 2.0;
+	}
+	vec3 c = acc / w;
+	float g = dot(c, vec3(0.299, 0.587, 0.114));
+	c = mix(c, vec3(g), 0.25);
+	COLOR = vec4(mix(c, tint.rgb, tint.a), 1.0);
+}"""
+	var m := ShaderMaterial.new()
+	m.shader = _blur
+	m.set_shader_parameter("tint", Color(Palette.SHADOW_DEEP, 0.55))
+	return m
+
+
+## A slowly turning sunburst behind the winner (gold on a win, soft cream otherwise) with a glow disc.
+class Rays extends Control:
+	var gold := true
+	var center := Vector2.ZERO
+	var _a := 0.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(d: float) -> void:
+		if not Sheet.reduce_motion():
+			_a += d * 0.25
+		queue_redraw()
+
+	func _draw() -> void:
+		var r := 150.0
+		var col := Color(Palette.GOLD, 0.30) if gold else Color(Palette.CARD, 0.12)
+		var n := 14
+		for i in n:
+			var a0 := _a + TAU * i / n
+			var a1 := a0 + TAU / n * 0.45
+			var pts := PackedVector2Array([center, center + Vector2(cos(a0), sin(a0)) * r, center + Vector2(cos(a1), sin(a1)) * r])
+			draw_colored_polygon(pts, col)
+		var glow := Color(Palette.GOLD, 0.30) if gold else Color(Palette.CARD, 0.14)
+		for k in 4:
+			draw_circle(center, 70.0 - k * 10.0, Color(glow, glow.a * (0.25 + k * 0.18)), true, -1.0, true)

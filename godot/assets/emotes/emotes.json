@@ -1,0 +1,370 @@
+{
+ "emotes": [
+  {
+   "id": "happy",
+   "name": "Victory",
+   "set": "starter",
+   "set_name": "Starter Set",
+   "frames": 11,
+   "fps": 15.714,
+   "loop_s": 0.7,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "laugh",
+   "name": "Laugh",
+   "set": "starter",
+   "set_name": "Starter Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "cool",
+   "name": "Cool",
+   "set": "starter",
+   "set_name": "Starter Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "angry",
+   "name": "Angry",
+   "set": "starter",
+   "set_name": "Starter Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "love",
+   "name": "Love",
+   "set": "starter",
+   "set_name": "Starter Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "party",
+   "name": "Celebrate",
+   "set": "starter",
+   "set_name": "Starter Set",
+   "frames": 31,
+   "fps": 14.762,
+   "loop_s": 2.1,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "champ",
+   "name": "Champ",
+   "set": "pawns",
+   "set_name": "Pawn Pals",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "sleepy",
+   "name": "Sleepy",
+   "set": "pawns",
+   "set_name": "Pawn Pals",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "sob",
+   "name": "Sob",
+   "set": "pawns",
+   "set_name": "Pawn Pals",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "gasp",
+   "name": "Gasp",
+   "set": "pawns",
+   "set_name": "Pawn Pals",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "confused",
+   "name": "Confused",
+   "set": "pawns",
+   "set_name": "Pawn Pals",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "hi",
+   "name": "Hi!",
+   "set": "pawns",
+   "set_name": "Pawn Pals",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "cry",
+   "name": "Cry",
+   "set": "friends",
+   "set_name": "Friends Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "wow",
+   "name": "Shocked",
+   "set": "friends",
+   "set_name": "Friends Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "facepalm",
+   "name": "Facepalm",
+   "set": "friends",
+   "set_name": "Friends Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "cheer",
+   "name": "Yay!",
+   "set": "friends",
+   "set_name": "Friends Set",
+   "frames": 31,
+   "fps": 14.762,
+   "loop_s": 2.1,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "think",
+   "name": "Thinking",
+   "set": "friends",
+   "set_name": "Friends Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "tease",
+   "name": "Tease",
+   "set": "friends",
+   "set_name": "Friends Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "dice",
+   "name": "Roll it!",
+   "set": "game",
+   "set_name": "Game Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "crown",
+   "name": "Winner",
+   "set": "game",
+   "set_name": "Game Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "highfive",
+   "name": "High five",
+   "set": "game",
+   "set_name": "Game Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "flag",
+   "name": "Give up",
+   "set": "game",
+   "set_name": "Game Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "sad",
+   "name": "Disappointed",
+   "set": "game",
+   "set_name": "Game Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "peek",
+   "name": "Peek-a-boo",
+   "set": "game",
+   "set_name": "Game Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  }
+ ],
+ "sets": [
+  {
+   "id": "starter",
+   "name": "Starter Set",
+   "price": 0,
+   "emotes": [
+    "happy",
+    "laugh",
+    "cool",
+    "angry",
+    "love",
+    "party"
+   ]
+  },
+  {
+   "id": "pawns",
+   "name": "Pawn Pals",
+   "price": 2500,
+   "emotes": [
+    "champ",
+    "sleepy",
+    "sob",
+    "gasp",
+    "confused",
+    "hi"
+   ]
+  },
+  {
+   "id": "friends",
+   "name": "Friends Set",
+   "price": 4000,
+   "emotes": [
+    "cry",
+    "wow",
+    "facepalm",
+    "cheer",
+    "think",
+    "tease"
+   ]
+  },
+  {
+   "id": "game",
+   "name": "Game Set",
+   "price": 3500,
+   "emotes": [
+    "dice",
+    "crown",
+    "highfive",
+    "flag",
+    "sad",
+    "peek"
+   ]
+  }
+ ]
+}
