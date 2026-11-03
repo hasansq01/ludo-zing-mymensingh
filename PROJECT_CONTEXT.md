@@ -48,7 +48,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
-| `tests/emotes.js` | 61 emote tests (incl. the 16 required reactions, 4 sets of 6, every set one emote per mood, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
+| `tests/emotes.js` | 67 emote tests (incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -155,12 +155,17 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   sized by `bubbleW()` (84-116px, smaller only if it cannot fit); life `LIFE` 2.4s, fading with `emOut`; the picker
   cools down 2s after a send (`cool()`, `.cooling`). The emote button (`place()`) sits just above your avatar (HUD
   row if no room): a cream chat bubble, thin warm-brown outline, three dots, no background.
-  **Sets (balanced by mood, 2026-11-03; user's request):** each emote has a `mood`, one of the six in `EMOTE_MOODS`
-  (happy, funny, sad, angry, surprised, friendly), and each set holds one of each, in that order. 24 emotes in 4 sets
-  of 6 (`EMOTE_SETS`; ids unchanged so saved purchases still work): Starter (free, default; Victory, Laugh, Sob, Angry,
-  Shocked, Love), Party Set `pawns` 2,500 (Celebrate, Tease, Cry, Facepalm, Gasp, Hi!), Cheeky Set `friends` 4,000
-  (Yay!, Cool, Disappointed, Grr!, Peek-a-boo, High five), Champion Set `game` 3,500 (Winner, Roll it!, Give up,
-  Hmph!, Confused, Champ). Sets now mix the pawn, friend and game characters. Profile:
+  **Sets (by character, 2026-11-04; user's request, replaces the mood-balanced sets of 2026-11-03):** every
+  character set holds the same six core emotions in the same order and with the same names (`EMOTE_FEELS`: Happy, Laugh,
+  Cry, Angry, Shocked, Love; an emote's `feel`, names from `FEEL_NAMES`), drawn as one character: Pawn Set `starter`
+  (free, default; pawn art), Girl Set `friends` 2,500 (hijab girl: Yay art as Happy, new `gLaugh`, Cry, new `gAngry`,
+  `gShock`, `gLove`), Boy Set `boys` 2,500 (hoodie boy: new `bHappy`, `bLaugh`, `bCry`, Grr art as Angry, Shocked art,
+  new `bLove`). Every other emote is an extra in a Premium pack of 8 (`premium: true`, gold "Premium" tag on the card):
+  Party Pack `pawns` 5,000 (Celebrate, Cool, Tease, Hi!, High five, Confused, Facepalm, Heartbroken) and Champion Pack
+  `game` 5,000 (Winner, Champ, Roll it!, Peek-a-boo, Thinking, Hmph!, Give up, Sleepy; Thinking and Sleepy are back).
+  Ids kept, so saved purchases still work (old Cheeky Set owners now own the Girl Set, Party Set owners the Party Pack,
+  Champion Set owners the Champion Pack). 34 emotes, each in exactly one set. Pack cards preview 2x4 (`.emset-prev.eight`).
+  The in-game picker holds the equipped set's 6 or 8 emotes. Profile:
   `P.emoteSets` (always incl. starter), `P.emoteSet` (equipped; `ensureProfile` repairs). Only the equipped set is in the
   game picker (`Emotes.refresh()` on each `reset()` / set change). Shop > Emotes and Inventory > Emotes (`renderEmoteSets`):
   card = 2x3 preview of the set, Equipped / Owned / Locked tag, View + Buy / Use; `buyEmoteSet` (commitProfile; owns +
@@ -179,7 +184,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   player with a queue of 2; `sfx('emote')` follows the sound settings. Sender = the only human, or the player to move
   in Pass & Play. CPU reactions: `Emotes.react('capture'|'win')` from `move` / `gameOver` (random chance, 9s per CPU,
   4s overall, never the same twice running; cleared by `reset()` on each new game / exit). No game state is touched.
-  Tests: `tests/emotes.js` (29).
+  Tests: `tests/emotes.js` (67).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;

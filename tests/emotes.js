@@ -23,11 +23,14 @@
     check('the button sits just above your avatar (or in the HUD row when there is no room)', btn.classList.contains('in-hud') || (bb.bottom <= av.top && av.top - bb.bottom <= 12 && Math.abs((bb.left + bb.right) / 2 - (av.left + av.right) / 2) < 3), [bb, av]); }
   const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'confused', 'facepalm', 'cheer', 'party', 'sad', 'hi', 'tease', 'grr', 'hmph'];
   check('every required reaction exists (16+)', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)), need.filter(id => !L.EMOTES.some(e => e.id === id)));
-  check('4 sets of 6: Starter free, others priced, every emote in exactly one set', L.EMOTE_SETS.length === 4 && L.EMOTE_SETS.every(s => s.emotes.length === 6) && L.EMOTE_SETS[0].id === 'starter' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
-  check('every emote has one of the 6 core moods', L.EMOTE_MOODS.length === 6 && L.EMOTES.every(e => L.EMOTE_MOODS.includes(e.mood)), L.EMOTES.filter(e => !L.EMOTE_MOODS.includes(e.mood)).map(e => e.id));
-  check('every set is balanced: one emote per mood, in mood order', L.EMOTE_SETS.every(s => s.emotes.map(id => L.EMOTES.find(e => e.id === id).mood).join() === L.EMOTE_MOODS.join()), L.EMOTE_SETS.map(s => [s.id, s.emotes.map(id => (L.EMOTES.find(e => e.id === id) || {}).mood)]));
+  check('5 sets: Pawn (free), Girl and Boy (6 core emotions each), two Premium packs of 8 extras; every emote in exactly one set', L.EMOTE_SETS.map(s => s.id).join() === 'starter,friends,boys,pawns,game' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTE_SETS.slice(0, 3).every(s => s.emotes.length === 6 && !s.premium) && L.EMOTE_SETS.slice(3).every(s => s.emotes.length === 8 && s.premium) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
+  check('the 6 core emotions: happy, laugh, cry, angry, shocked, love', L.EMOTE_FEELS.join() === 'happy,laugh,cry,angry,shocked,love');
+  check('every character set has the same emotions, in the same order and with the same names', L.EMOTE_SETS.slice(0, 3).every(s => s.emotes.map(id => L.EMOTES.find(e => e.id === id).feel).join() === L.EMOTE_FEELS.join()) && new Set(L.EMOTE_SETS.slice(0, 3).map(s => s.emotes.map(id => L.EMOTES.find(e => e.id === id).name).join())).size === 1, L.EMOTE_SETS.map(s => [s.id, s.emotes.map(id => (L.EMOTES.find(e => e.id === id) || {}).feel)]));
+  check('each character set is one character: pawn, girl, boy', ['pawn', 'girl', 'boy'].every((g, k) => L.EMOTE_SETS[k].emotes.every(id => L.EMOTES.find(e => e.id === id).group === g)));
+  check('the first two sets (Pawn, Girl) have a real angry emote', ['angry', 'gAngry'].every((id, k) => L.EMOTE_SETS[k].emotes.includes(id) && L.EMOTES.find(e => e.id === id).motion === 'em-rage'));
+  check('Premium packs hold only extras (no core emotion)', L.EMOTE_SETS.slice(3).every(s => s.emotes.every(id => !L.EMOTES.find(e => e.id === id).feel)));
   check('a new player owns and has equipped only the Starter set', JSON.stringify(L.P.emoteSets) === '["starter"]' && L.P.emoteSet === 'starter', [L.P.emoteSets, L.P.emoteSet]);
-  check('the picker holds only the equipped set (6 emotes)', panel.querySelectorAll('.em-pick').length === 6 && E.list().join() === L.EMOTE_SETS[0].emotes.join());
+  check('the picker holds only the equipped Pawn set (6 emotes)', panel.querySelectorAll('.em-pick').length === 6 && E.list().join() === L.EMOTE_SETS[0].emotes.join());
   check('every emote is a 2D vector sticker (inline SVG on the 172x109 grid, no image files)', L.EMOTES.every(e => /^<svg viewBox="0 0 172 109"/.test(e.art) && !/<image|\.png|\.jpg/.test(e.art)));
   check('every emote is an animated sticker (moving parts inside a still bubble)', L.EMOTES.every(e => /class="sa-/.test(e.art)), L.EMOTES.filter(e => !/class="sa-/.test(e.art)).map(e => e.id));
   check('every copy on the page has its own clip-path ids', (() => { const ids = [...document.querySelectorAll('#emotePanel [id], #pcards [id^="st"]')].map(n => n.id); return ids.length > 0 && new Set(ids).size === ids.length; })());
@@ -130,7 +133,7 @@
   const pals = L.EMOTE_SETS.find(s => s.id === 'pawns');
   L.goHome(); L.renderShop(); L.openSheet('shopSheet'); L.showShopTab('emotes'); await sleep(50);
   const cards = [...$('shopEmotes').querySelectorAll('.item')];
-  check('Shop > Emotes: one card per set, each previewing its 6 emotes', cards.length === 4 && cards.every(c => c.querySelectorAll('.emset-prev svg').length === 6));
+  check('Shop > Emotes: one card per set, previewing its emotes (6, or 8 for a pack, marked Premium)', cards.length === 5 && cards.every((c, k) => c.querySelectorAll('.emset-prev svg').length === (k < 3 ? 6 : 8) && !!c.querySelector('.tag.prem') === k >= 3));
   check('the cards tell Equipped / Locked apart', /Equipped/.test(cards[0].textContent) && cards.slice(1).every(c => /Locked/.test(c.textContent) && c.querySelector('[data-emset-buy]')));
   P.coins = pals.price - 1; $('shopEmotes').querySelector('[data-emset-buy="pawns"]').click();
   check('not enough coins: nothing spent, still locked', P.coins === pals.price - 1 && !P.emoteSets.includes('pawns'));
@@ -141,9 +144,12 @@
   L.closeSheet('shopSheet');
   L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(300);
   btn.click(); await sleep(30);
-  check('in the game, the picker now holds only the Party Set emotes', [...panel.querySelectorAll('.em-pick')].map(b => b.dataset.emote).join() === pals.emotes.join());
+  check('in the game, the picker now holds only the Party Pack emotes (all 8)', [...panel.querySelectorAll('.em-pick')].map(b => b.dataset.emote).join() === pals.emotes.join());
+  { const st2 = R($('stage')), pr = R(panel), parts2 = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #msg, #menuBtn, #gearBtn, #emoteBtn')];
+    check('the 8-emote picker is fully on screen, covers no card or control, buttons 44px+', pr.left >= st2.left - .5 && pr.right <= st2.right + .5 && pr.top >= st2.top - .5 && pr.bottom <= st2.bottom + .5 &&
+      parts2.every(p => !overlap(pr, R(p), .5)) && [...panel.querySelectorAll('.em-pick')].every(b => b.offsetWidth >= 44 && b.offsetHeight >= 44), [pr, parts2.filter(p => overlap(pr, R(p), .5)).map(p => p.className || p.id)]); }
   panel.querySelector('[data-emote="party"]').click(); await sleep(220);
-  check('a Party Set emote plays on your avatar', bubbleOf(0) && bubbleOf(0).dataset.emote === 'party');
+  check('a Party Pack emote plays on your avatar', bubbleOf(0) && bubbleOf(0).dataset.emote === 'party');
   L.goHome(); L.renderInv(); L.openSheet('invSheet'); await sleep(30);
   const inv = [...$('invEmotes').querySelectorAll('.item')];
   check('Inventory > Emotes lists only owned sets', inv.length === 2);
@@ -151,7 +157,7 @@
   check('Use in Inventory equips the Starter set again', P.emoteSet === 'starter');
   L.closeSheet('invSheet');
   L.openEmoteSet('friends'); await sleep(30);
-  check('View: the set preview shows its 6 emotes and Buy with the real price', !$('emSetSheet').hidden && $('emSetGrid').children.length === 6 && /Buy — 4K/.test($('emSetAct').textContent));
+  check('View: the Girl Set preview shows its 6 emotes and Buy with the real price', !$('emSetSheet').hidden && $('emSetGrid').children.length === 6 && /Buy — 2.5K/.test($('emSetAct').textContent));
   P.coins = 0; $('emSetAct').click();
   check('View: Buy without coins explains and spends nothing', /more coins/.test($('emSetNote').textContent) && !P.emoteSets.includes('friends'));
   L.closeSheet('emSetSheet');

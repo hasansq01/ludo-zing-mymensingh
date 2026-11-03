@@ -860,6 +860,9 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .emset-prev{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);place-items:center;padding:8px 6px;box-sizing:border-box}
 .emset-prev>span:not(.tag){display:block;width:96%;aspect-ratio:172/109}
 .emset-prev svg{width:100%;height:100%;overflow:visible}
+.emset-prev.eight{grid-template-rows:repeat(4,1fr);padding:28px 8px 6px;row-gap:2px}
+.emset-prev.eight>span:not(.tag){width:84%}
+.room-prev .tag.prem{left:auto;right:6px;background:linear-gradient(#ffe48c,#f2b632);color:#5a3a00}
 .room-prev .tag.lock{background:rgba(74,43,61,.75);color:#fff}
 .emset-card{position:relative;max-width:380px}
 .emset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 4px}
@@ -4471,6 +4474,46 @@ Object.assign(EMOTE_STICKERS, {
     front: stTube('M58 92Q78 86 101 81', ST_SLEEVE, 12.5) + stFist('hmph-h', 103, 80, 7.4, ...ST_HAND, 70) +
       stTube('M112 93Q92 88 70 82', ST_SLEEVE, 12.5) + stLine('M64 88Q80 84 96 83', 1.6, '#36211c'),
     extra: stPuff(122, 50, 1.1) + stPuff(132, 42, .8) + stAnger(122, 16) }),
+  // ---- the girl's and the boy's core emotions (2026-11-04: every character set has the same six) ----
+  gLaugh: stHijab('gLaugh', ['#ef6fa6', '#c94f86', '#ffb3d2'], stFace(ST_HG, 'squeeze', 'laugh', null, true) + stDrop(52, 44, 1.2, -40) + stDrop(120, 40, 1.2, 40), {
+    mood: 'sa-shake',
+    arms: stTube('M60 92L66 80', ST_SLEEVE, 13) + stTube('M110 92L104 80', ST_SLEEVE, 13),
+    front: stFist('gLaugh-l', 69, 78, 7.6, ...ST_HAND, -30) + stFist('gLaugh-r', 101, 78, 7.6, ...ST_HAND, 30),
+    extra: stShards(4, 4) }),
+  gAngry: stHijab('gAngry', ['#e5484d', '#bf2f37', '#ff9a9a'],
+      `<ellipse cx="70" cy="56" rx="6.4" ry="4" fill="#ff4a4a" opacity=".45"/><ellipse cx="100" cy="55" rx="6.4" ry="4" fill="#ff4a4a" opacity=".45"/>` +
+      stFace(ST_HG, 'dot', 'grit', 'angry'), {
+    mood: 'sa-rage',
+    arms: stTube('M58 94L50 74', ST_SLEEVE, 13) + stTube('M112 94L120 74', ST_SLEEVE, 13),
+    front: stPart('sa-arm sa-arm-fist', '58px 94px', '-10deg', '0s', stFist('gAngry-l', 49, 68, 8.6, ...ST_HAND, -20)) +
+      stPart('sa-arm sa-arm-fist', '112px 94px', '10deg', '-.2s', stFist('gAngry-r', 121, 68, 8.6, ...ST_HAND, 20)),
+    extra: stAnger(126, 14) + stPuff(36, 32, 1) + stPuff(132, 46, .8) }),
+  gShock: stHijab('gShock', ['#34b766', '#22894a', '#8ae3a8'], stFace({ ...ST_HG, y: 45 }, 'round', 'O', 'up'), {
+    mood: 'sa-jolt',
+    arms: stTube('M60 92L62 72', ST_SLEEVE, 12.5) + stTube('M110 92L108 72', ST_SLEEVE, 12.5),
+    front: stPalm('gShock-l', 63, 63, 8, ...ST_HAND, 10) + stPalm('gShock-r', 108, 62, 8, ...ST_HAND, -10),
+    extra: stBang(128, 18) + stPart('sa-pop', '', '', '.12s', stShard('138 24L145 28 136 35 133 32', '#f6b72a')) + stPart('sa-pop', '', '', '.24s', stShard('40 12L46 10 48 22 44 23', '#f6b72a')) }),
+  gLove: stHijab('gLove', ['#9b6be0', '#7a4cc0', '#c9a8ff'], stFace(ST_HG, 'heart', 'smile', null, true), {
+    arms: stTube('M60 92L76 80', ST_SLEEVE, 12.5) + stTube('M110 92L96 80', ST_SLEEVE, 12.5),
+    front: stFist('gLove-l', 80, 77, 7.6, ...ST_HAND, -40) + stFist('gLove-r', 92, 77, 7.6, ...ST_HAND, 40),
+    extra: stHeart(40, 28, 1.6, '#ff3d5e', -15) + stHeart(126, 18, 1.9, '#ff3d5e', 12) + stHeart(132, 42, 1.2, '#ff6f8a', 20) }),
+  bHappy: stBoy('bHappy', ['#3b6fd8', '#2a52a8'], stFace(ST_BG, 'happy', 'laugh', null, true), {
+    front: stArm('bHappy-l', 'M60 72Q48 60 46 42', '#3b6fd8', 12, 'fist', 45, 35, 9.4, ST_HAND, -18) +
+      stArm('bHappy-r', 'M108 72Q120 60 122 42', '#3b6fd8', 12, 'fist', 123, 35, 9.4, ST_HAND, 18),
+    extra: stPart('sa-pop', '', '', '0s', stShard('130 6L138 4 137 18 132 19', '#f6b72a')) + stPart('sa-pop', '', '', '.12s', stShard('142 22L148 28 136 34 133 30', '#f6b72a')) +
+      stPart('sa-pop', '', '', '.24s', stShard('30 10L36 8 40 20 36 21', '#f6b72a')) }),
+  bLaugh: stBoy('bLaugh', ['#f4b52a', '#d18f12'], stFace(ST_BG, 'squeeze', 'laugh') + stDrop(54, 34, 1.3, -40) + stDrop(116, 32, 1.3, 40), {
+    mood: 'sa-shake',
+    front: stArm('bLaugh-r', 'M108 76Q120 84 106 90', '#f4b52a', 12, 'fist', 100, 88, 8.4, ST_HAND, -60, 4),
+    extra: stShards(4, 4) }),
+  bCry: stBoy('bCry', ['#2fb39c', '#1f8a78'], stFace(ST_BG, 'closed', 'bawl', 'worried') +
+      stTears(`<path d="M70 48C66 58 63 70 63 80H71C70 70 71 59 74 49z" fill="#7fd0ff" stroke="#2f86c8" stroke-width="1.3"/>`) +
+      stTears(`<path d="M98 47C102 57 105 69 105 79H97C98 69 97 58 94 48z" fill="#7fd0ff" stroke="#2f86c8" stroke-width="1.3"/>`), {
+    mood: 'sa-heave', extra: stDrop(42, 40, 1, -30) + stDrop(128, 36, 1.1, 30) + stDrop(134, 54, .8, 40) }),
+  bLove: stBoy('bLove', ['#e5484d', '#bf2f37'], stFace(ST_BG, 'heart', 'laugh', null, true), {
+    front: stArm('bLove-l', 'M62 74Q52 72 56 60', '#e5484d', 12, 'fist', 58, 57, 8.6, ST_HAND, -10, -5) +
+      stArm('bLove-r', 'M106 74Q116 72 112 60', '#e5484d', 12, 'fist', 110, 57, 8.6, ST_HAND, 10, 5),
+    extra: stHeart(38, 30, 1.6, '#ff3d5e', -15) + stHeart(128, 18, 1.9, '#ff3d5e', 12) + stHeart(134, 42, 1.2, '#ff6f8a', 20) }),
   // ---- game ----
   dice: stSticker('dice', `<g class="sa-roll"><g transform="rotate(-10 82 60)">` +
       stSil(`<path d="M82 22L114 36V74L82 90L50 74V36z"/>`, '#fffaf2') +
@@ -4519,51 +4562,64 @@ Object.assign(EMOTE_STICKERS, {
       stPart('sa-pop', '', '', '0s', stLine('M34 30l7 4M32 42h8M36 54l7-3', 2.6, '#f6b72a'))),
 });
 
-/* Every emote has one of six core moods (EMOTE_MOODS) and every set holds one emote of each mood, in this order, so
-   whichever set is equipped a player can always say happy, funny, sad, angry, surprised and friendly.
-   Retired 2026-11-03 for Grr! and Hmph! (their art stays in EMOTE_STICKERS): Sleepy, Thinking. */
-const EMOTE_MOODS = ['happy', 'funny', 'sad', 'angry', 'surprised', 'friendly'];
+/* Emotions (2026-11-04, user's request): every character set (Pawn, Girl, Boy) holds the same six core emotions,
+   in this order, each drawn as that character; an emote's `feel` says which one it is. Every other emote is an extra,
+   sold in the Premium packs. Sleepy and Thinking, retired on 2026-11-03, are back as Premium extras. */
+const EMOTE_FEELS = ['happy', 'laugh', 'cry', 'angry', 'shocked', 'love'];
+const FEEL_NAMES = { happy: 'Happy', laugh: 'Laugh', cry: 'Cry', angry: 'Angry', shocked: 'Shocked', love: 'Love' };
 const EMOTES = [
-  // ---- pawns ----
-  { id: 'happy', group: 'pawn', mood: 'happy', name: 'Victory', ch: '🙌', motion: 'em-jump' },
-  { id: 'laugh', group: 'pawn', mood: 'funny', name: 'Laugh', ch: '😂', motion: 'em-shake' },
-  { id: 'cool', group: 'pawn', mood: 'funny', name: 'Cool', ch: '😎', motion: 'em-tilt' },
-  { id: 'angry', group: 'pawn', mood: 'angry', name: 'Angry', ch: '😡', motion: 'em-rage' },
-  { id: 'love', group: 'pawn', mood: 'friendly', name: 'Love', ch: '😍', motion: 'em-beat' },
-  { id: 'confused', group: 'pawn', mood: 'surprised', name: 'Confused', ch: '😕', motion: 'em-wobble' },
-  { id: 'hi', group: 'pawn', mood: 'friendly', name: 'Hi!', ch: '👋', motion: 'em-wave' },
-  { id: 'party', group: 'pawn', mood: 'happy', name: 'Celebrate', ch: '🎉', motion: 'em-party' },
-  { id: 'sob', group: 'pawn', mood: 'sad', name: 'Sob', ch: '😢', motion: 'em-sob' },
-  { id: 'gasp', group: 'pawn', mood: 'surprised', name: 'Gasp', ch: '😲', motion: 'em-jump' },
-  { id: 'champ', group: 'pawn', mood: 'friendly', name: 'Champ', ch: '👍', motion: 'em-beat' },
-  // ---- friends ----
-  { id: 'cry', group: 'friend', mood: 'sad', name: 'Cry', ch: '😭', motion: 'em-sob' },
-  { id: 'wow', group: 'friend', mood: 'surprised', name: 'Shocked', ch: '😮', motion: 'em-jump' },
-  { id: 'facepalm', group: 'friend', mood: 'angry', name: 'Facepalm', ch: '🤦', motion: 'em-float' },
-  { id: 'cheer', group: 'friend', mood: 'happy', name: 'Yay!', ch: '🥳', motion: 'em-jump' },
-  { id: 'tease', group: 'friend', mood: 'funny', name: 'Tease', ch: '😜', motion: 'em-shake' },
-  { id: 'grr', group: 'friend', mood: 'angry', name: 'Grr!', ch: '😠', motion: 'em-rage' },
-  { id: 'hmph', group: 'friend', mood: 'angry', name: 'Hmph!', ch: '😤', motion: 'em-tilt' },
-  // ---- game ----
-  { id: 'dice', group: 'game', mood: 'funny', name: 'Roll it!', ch: '🎲', motion: 'em-roll' },
-  { id: 'crown', group: 'game', mood: 'happy', name: 'Winner', ch: '👑', motion: 'em-beat' },
-  { id: 'sad', group: 'game', mood: 'sad', name: 'Disappointed', ch: '💔', motion: 'em-sob' },
-  { id: 'highfive', group: 'game', mood: 'friendly', name: 'High five', ch: '🙏', motion: 'em-clap' },
-  { id: 'flag', group: 'game', mood: 'sad', name: 'Give up', ch: '🏳️', motion: 'em-wave' },
-  { id: 'peek', group: 'game', mood: 'surprised', name: 'Peek-a-boo', ch: '🫣', motion: 'em-float' },
-].map(e => ({ ...e, art: EMOTE_STICKERS[e.id] }));
+  // ---- core: the pawn, the girl, the boy (names come from the feeling, so the sets read the same) ----
+  { id: 'happy', group: 'pawn', feel: 'happy', ch: '🙌', motion: 'em-jump' },
+  { id: 'laugh', group: 'pawn', feel: 'laugh', ch: '😂', motion: 'em-shake' },
+  { id: 'sob', group: 'pawn', feel: 'cry', ch: '😢', motion: 'em-sob' },
+  { id: 'angry', group: 'pawn', feel: 'angry', ch: '😡', motion: 'em-rage' },
+  { id: 'gasp', group: 'pawn', feel: 'shocked', ch: '😲', motion: 'em-jump' },
+  { id: 'love', group: 'pawn', feel: 'love', ch: '😍', motion: 'em-beat' },
+  { id: 'cheer', group: 'girl', feel: 'happy', ch: '🥳', motion: 'em-jump' },
+  { id: 'gLaugh', group: 'girl', feel: 'laugh', ch: '😂', motion: 'em-shake' },
+  { id: 'cry', group: 'girl', feel: 'cry', ch: '😭', motion: 'em-sob' },
+  { id: 'gAngry', group: 'girl', feel: 'angry', ch: '😡', motion: 'em-rage' },
+  { id: 'gShock', group: 'girl', feel: 'shocked', ch: '😲', motion: 'em-jump' },
+  { id: 'gLove', group: 'girl', feel: 'love', ch: '😍', motion: 'em-beat' },
+  { id: 'bHappy', group: 'boy', feel: 'happy', ch: '🙌', motion: 'em-jump' },
+  { id: 'bLaugh', group: 'boy', feel: 'laugh', ch: '😂', motion: 'em-shake' },
+  { id: 'bCry', group: 'boy', feel: 'cry', ch: '😭', motion: 'em-sob' },
+  { id: 'grr', group: 'boy', feel: 'angry', ch: '😠', motion: 'em-rage' },
+  { id: 'wow', group: 'boy', feel: 'shocked', ch: '😮', motion: 'em-jump' },
+  { id: 'bLove', group: 'boy', feel: 'love', ch: '😍', motion: 'em-beat' },
+  // ---- extras (Premium packs) ----
+  { id: 'party', group: 'extra', name: 'Celebrate', ch: '🎉', motion: 'em-party' },
+  { id: 'cool', group: 'extra', name: 'Cool', ch: '😎', motion: 'em-tilt' },
+  { id: 'tease', group: 'extra', name: 'Tease', ch: '😜', motion: 'em-shake' },
+  { id: 'hi', group: 'extra', name: 'Hi!', ch: '👋', motion: 'em-wave' },
+  { id: 'highfive', group: 'extra', name: 'High five', ch: '🙏', motion: 'em-clap' },
+  { id: 'confused', group: 'extra', name: 'Confused', ch: '😕', motion: 'em-wobble' },
+  { id: 'facepalm', group: 'extra', name: 'Facepalm', ch: '🤦', motion: 'em-float' },
+  { id: 'sad', group: 'extra', name: 'Heartbroken', ch: '💔', motion: 'em-sob' },
+  { id: 'crown', group: 'extra', name: 'Winner', ch: '👑', motion: 'em-beat' },
+  { id: 'champ', group: 'extra', name: 'Champ', ch: '👍', motion: 'em-beat' },
+  { id: 'dice', group: 'extra', name: 'Roll it!', ch: '🎲', motion: 'em-roll' },
+  { id: 'peek', group: 'extra', name: 'Peek-a-boo', ch: '🫣', motion: 'em-float' },
+  { id: 'think', group: 'extra', name: 'Thinking', ch: '🤔', motion: 'em-wobble' },
+  { id: 'hmph', group: 'extra', name: 'Hmph!', ch: '😤', motion: 'em-tilt' },
+  { id: 'flag', group: 'extra', name: 'Give up', ch: '🏳️', motion: 'em-wave' },
+  { id: 'sleepy', group: 'extra', name: 'Sleepy', ch: '😴', motion: 'em-float' },
+].map(e => ({ ...e, name: e.name || FEEL_NAMES[e.feel], art: EMOTE_STICKERS[e.id] }));
 // every copy of a sticker on the page gets its own clip-path ids (a copy may sit in a hidden panel)
 let emUid = 0;
 const emArt = e => { const n = ++emUid; return e.art.replace(/(id="|url\(#)(st[\w-]+)/g, `$1$2-${n}`); };
-/* Emote sets: six emotes each, one per mood in EMOTE_MOODS order. One set is equipped and only its emotes appear
-   in the game; the Starter set is free and always owned, the others are bought in Shop > Emotes with coins
-   (commitProfile, like scenes). P.emoteSets = owned ids, P.emoteSet = the equipped one. The ids predate the mood
-   regrouping (2026-11-03) and stay as they are, so purchases already saved keep working. */
+/* Emote sets: the Pawn, Girl and Boy sets each hold the six core emotions (EMOTE_FEELS order) drawn as that character;
+   the two Premium packs hold eight extras each. One set is equipped and only its emotes appear in the game; the Pawn
+   set is free and always owned, the others are bought in Shop > Emotes with coins (commitProfile, like scenes).
+   P.emoteSets = owned ids, P.emoteSet = the equipped one. Ids are kept from the earlier sets, so saved purchases
+   still work: 'starter' was and is the free pawn set, 'friends' (Cheeky Set) is now the Girl Set, 'pawns' (Party Set)
+   the Party Pack, 'game' (Champion Set) the Champion Pack; 'boys' is new. */
 const EMOTE_SETS = [
-  { id: 'starter', name: 'Starter Set', price: 0, desc: 'One of every mood: cheer, laugh, sob, rage, shock and love.', emotes: ['happy', 'laugh', 'sob', 'angry', 'wow', 'love'], g: 'linear-gradient(160deg,#ffe9d2,#ffc9a0)' },
-  { id: 'pawns', name: 'Party Set', price: 2500, desc: 'Celebrate, tease, cry, facepalm, gasp and say hi.', emotes: ['party', 'tease', 'cry', 'facepalm', 'gasp', 'hi'], g: 'linear-gradient(160deg,#fff3c4,#ffd36a)' },
-  { id: 'friends', name: 'Cheeky Set', price: 4000, desc: 'Yay, play it cool, sulk, growl, peek and high five.', emotes: ['cheer', 'cool', 'sad', 'grr', 'peek', 'highfive'], g: 'linear-gradient(160deg,#dff3ef,#9fdcd0)' },
-  { id: 'game', name: 'Champion Set', price: 3500, desc: 'Wear the crown, roll it, give up, huff, puzzle and thumbs up.', emotes: ['crown', 'dice', 'flag', 'hmph', 'confused', 'champ'], g: 'linear-gradient(160deg,#e6efff,#a9c4f5)' },
+  { id: 'starter', name: 'Pawn Set', price: 0, desc: 'Happy, laugh, cry, angry, shocked and love, as the pawn.', emotes: ['happy', 'laugh', 'sob', 'angry', 'gasp', 'love'], g: 'linear-gradient(160deg,#ffe9d2,#ffc9a0)' },
+  { id: 'friends', name: 'Girl Set', price: 2500, desc: 'The same six emotions, as the girl.', emotes: ['cheer', 'gLaugh', 'cry', 'gAngry', 'gShock', 'gLove'], g: 'linear-gradient(160deg,#ffe3f1,#f6b2d0)' },
+  { id: 'boys', name: 'Boy Set', price: 2500, desc: 'The same six emotions, as the boy.', emotes: ['bHappy', 'bLaugh', 'bCry', 'grr', 'wow', 'bLove'], g: 'linear-gradient(160deg,#e3f1ff,#a9c9f5)' },
+  { id: 'pawns', name: 'Party Pack', price: 5000, premium: true, desc: 'Premium extras: celebrate, cool, tease, hi, high five, confused, facepalm, heartbroken.', emotes: ['party', 'cool', 'tease', 'hi', 'highfive', 'confused', 'facepalm', 'sad'], g: 'linear-gradient(160deg,#fff3c4,#ffc94a)' },
+  { id: 'game', name: 'Champion Pack', price: 5000, premium: true, desc: 'Premium extras: winner, champ, roll it, peek-a-boo, thinking, hmph, give up, sleepy.', emotes: ['crown', 'champ', 'dice', 'peek', 'think', 'hmph', 'flag', 'sleepy'], g: 'linear-gradient(160deg,#ece4ff,#a995d8)' },
 ];
 const emoteSet = id => EMOTE_SETS.find(s => s.id === id);
 const Emotes = (() => {
@@ -5041,7 +5097,8 @@ function renderEmoteSets(el, shop) {
       : owned ? `<button type="button" data-emset-use="${s.id}">Use</button>`
       : `<button type="button" data-emset-buy="${s.id}">Buy</button>`;
     const grid = s.emotes.map(id => `<span>${emArt(EMOTES.find(e => e.id === id))}</span>`).join('');
-    return `<div class="item${on ? ' eq' : ''}"><div class="room-prev emset-prev" style="--g:${s.g}">${grid}${on ? '<span class="tag">Equipped</span>' : owned ? '<span class="tag">Owned</span>' : '<span class="tag lock">Locked</span>'}</div>` +
+    const tag = on ? '<span class="tag">Equipped</span>' : owned ? '<span class="tag">Owned</span>' : '<span class="tag lock">Locked</span>';
+    return `<div class="item${on ? ' eq' : ''}" data-set="${s.id}"><div class="room-prev emset-prev${s.emotes.length > 6 ? ' eight' : ''}" style="--g:${s.g}">${grid}${tag}${s.premium ? '<span class="tag prem">Premium</span>' : ''}</div>` +
       `<b>${s.name}</b><small>${s.desc}</small>${owned ? '' : coinTag(fmtCoins(s.price))}<div class="btns"><button type="button" class="alt" data-emset-view="${s.id}">View</button>${btn}</div></div>`;
   }).join('');
 }
@@ -7515,7 +7572,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { EMOTE_STICKERS, Emotes, EMOTES, EMOTE_MOODS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
