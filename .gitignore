@@ -46,3 +46,10 @@ desktop.ini
 # Cloudflare Worker local state (wrangler dev / vitest)
 /server/.wrangler/
 /server/.dev.vars
+
+# Python bytecode (tools/*.py)
+__pycache__/
+
+# Emulator test builds and Claude Code's agent worktrees: local only
+/build/emu/
+/.claude/worktrees/
