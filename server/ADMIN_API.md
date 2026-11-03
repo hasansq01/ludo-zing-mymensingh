@@ -339,7 +339,7 @@ them. What it raises:
 | `server:usage_read:<UTC day>` | warning | Cloudflare's usage could not be read 2 checks in a row (or `CF_API_TOKEN` unset) |
 | `server:errors:<UTC day>:<0-3>` | danger | the last hour: ≥ 20 errors and ≥ 2 % of the requests (Cloudflare's `errors` of the Worker and its Durable Objects + D1 `events` at level error). At most one per 6 h |
 | `server:push:<UTC day>` | warning | today's push_events: ≥ 20 failed and more failed than sent |
-| `summary:<yesterday>` | info | the first check from 03:00 UTC (09:00 Bangladesh): accounts seen in 24 h, new accounts, online matches, crash reports (and phones) of the previous UTC day, its highest allowance |
+| `summary:<yesterday>` | info | the first check from 03:00 UTC (09:00 Bangladesh): accounts seen in 24 h, new accounts, online matches, crashes on players' phones of the previous UTC day (Google's pre-launch robots, SwiftShader, and emulators counted apart; graphics-test `probe` reports not at all), its highest allowance |
 | `test:<ms>` | info | POST /admin/api/alerts/test |
 
 The usage numbers come from the same GraphQL query as Usage, without the games-left estimate (no D1 match scan) and

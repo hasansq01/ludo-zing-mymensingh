@@ -233,7 +233,9 @@ describe("checkAlerts", () => {
       DB.prepare("DELETE FROM crash_reports"),
       DB.prepare("INSERT INTO accounts (id, created_at, last_seen) VALUES ('acc_newnewnewnewnew2', ?, ?)").bind(y + HOUR, TODAY + HOUR),
       DB.prepare("INSERT INTO matches (code, started_at, result) VALUES ('AAAAAA', ?, 'over'), ('BBBBBB', ?, 'over'), ('CCCCCC', ?, 'over')").bind(y + 2 * HOUR, y + 3 * HOUR, TODAY + HOUR),
-      DB.prepare("INSERT INTO crash_reports (id, received_at, pid, sid, reason, payload) VALUES ('crs_1', ?, 'p1', 's1', 'x', '{}'), ('crs_2', ?, 'p1', 's2', 'x', '{}')").bind(y + HOUR, y + 2 * HOUR),
+      DB.prepare("INSERT INTO crash_reports (id, received_at, pid, sid, reason, payload, gpu, model) VALUES ('crs_1', ?, 'p1', 's1', 'x', '{}', 'Mali-G57 MC2', 'Infinix X6886'), ('crs_2', ?, 'p1', 's2', 'x', '{}', 'Mali-G57 MC2', 'Infinix X6886')").bind(y + HOUR, y + 2 * HOUR),
+      // not players' crashes: Google's pre-launch robot, an emulator, a graphics-test report
+      DB.prepare("INSERT INTO crash_reports (id, received_at, pid, sid, reason, payload, gpu, model) VALUES ('crs_3', ?, 'r1', 's1', 'crash_native', '{}', 'Google SwiftShader', 'OnePlus8Pro'), ('crs_4', ?, 'e1', 's1', 'unclean', '{}', 'Android Emulator OpenGL ES Translator (Apple M3 Pro)', 'sdk_gphone64_arm64'), ('crs_5', ?, 'p2', 's1', 'probe', '{}', 'Mali-G68 MC4', 'OPPO CPH2251')").bind(y + HOUR, y + HOUR, y + HOUR),
     ]);
     expect((await checkAlerts(E, TODAY + 2 * HOUR + 50 * MIN)).raised).toEqual([]);
     const r = await checkAlerts(E, TODAY + 3 * HOUR + 5 * MIN);
@@ -241,7 +243,7 @@ describe("checkAlerts", () => {
     const n = fcm.delivered[0];
     expect(n.notification.title).toBe("Ludo Zing yesterday");
     expect(n.notification.body).toBe(
-      "2 players in the last 24 hours, 1 new account, 2 online matches, 2 crash reports from 1 phone. Highest free limit yesterday: Workers requests at 0%.",
+      "2 players in the last 24 hours, 1 new account, 2 online matches, 2 crashes on 1 player's phone (+2 on Google's test robots / emulators). Highest free limit yesterday: Workers requests at 0%.",
     );
     expect(n.android.ttl).toBe("86400s");
     expect((await row<Json>("SELECT level, read_at FROM alerts"))).toEqual({ level: "info", read_at: null });

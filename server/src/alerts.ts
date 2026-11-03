@@ -270,7 +270,16 @@ function note(title: string, body: string, tag: string, summary: boolean): P.Not
 
 // ---------- the summary ----------
 
-/** Yesterday (UTC day, 06:00 to 06:00 Bangladesh time): players, new accounts, online matches, crashes, the peak use. */
+/**
+ * Crash reports from test devices, not players: Google's pre-launch robots (software rendering, "SwiftShader") and
+ * Android emulators. Graphics-test reports (reason "probe") are not crashes at all.
+ */
+const TEST_DEVICE_SQL = "(gpu LIKE '%SwiftShader%' OR gpu LIKE '%Emulator%' OR model LIKE 'sdk_gphone%' OR model LIKE '%sdk_gphone%')";
+
+/**
+ * Yesterday (UTC day, 06:00 to 06:00 Bangladesh time): players, new accounts, online matches, crashes (players'
+ * phones; test devices counted apart), the peak use.
+ */
 export async function summaryAlert(db: D1Database, usage: UsageBody | null, now: number): Promise<NewAlert> {
   const to = utcDayStart(now);
   const from = to - DAY;
@@ -280,18 +289,20 @@ export async function summaryAlert(db: D1Database, usage: UsageBody | null, now:
          (SELECT COUNT(*) FROM accounts WHERE last_seen >= ?) AS active,
          (SELECT COUNT(*) FROM accounts WHERE created_at >= ? AND created_at < ?) AS fresh,
          (SELECT COUNT(*) FROM matches WHERE started_at >= ? AND started_at < ?) AS matches,
-         (SELECT COUNT(*) FROM crash_reports WHERE received_at >= ? AND received_at < ?) AS crashes,
-         (SELECT COUNT(DISTINCT pid) FROM crash_reports WHERE received_at >= ? AND received_at < ?) AS crash_devices`,
+         (SELECT COUNT(*) FROM crash_reports WHERE received_at >= ? AND received_at < ? AND reason != 'probe' AND NOT ${TEST_DEVICE_SQL}) AS crashes,
+         (SELECT COUNT(DISTINCT pid) FROM crash_reports WHERE received_at >= ? AND received_at < ? AND reason != 'probe' AND NOT ${TEST_DEVICE_SQL}) AS crash_devices,
+         (SELECT COUNT(*) FROM crash_reports WHERE received_at >= ? AND received_at < ? AND reason != 'probe' AND ${TEST_DEVICE_SQL}) AS test_crashes`,
     )
-    .bind(now - DAY, from, to, from, to, from, to, from, to)
-    .first<{ active: number; fresh: number; matches: number; crashes: number; crash_devices: number }>();
-  const n = r ?? { active: 0, fresh: 0, matches: 0, crashes: 0, crash_devices: 0 };
+    .bind(now - DAY, from, to, from, to, from, to, from, to, from, to)
+    .first<{ active: number; fresh: number; matches: number; crashes: number; crash_devices: number; test_crashes: number }>();
+  const n = r ?? { active: 0, fresh: 0, matches: 0, crashes: 0, crash_devices: 0, test_crashes: 0 };
   const plural = (k: number, one: string, many = one + "s") => `${fmt(k)} ${k === 1 ? one : many}`;
   const parts = [
     `${plural(n.active, "player")} in the last 24 hours`,
     `${plural(n.fresh, "new account")}`,
     `${plural(n.matches, "online match", "online matches")}`,
-    n.crashes ? `${plural(n.crashes, "crash report")} from ${plural(n.crash_devices, "phone")}` : "no crash reports",
+    (n.crashes ? `${plural(n.crashes, "crash", "crashes")} on ${plural(n.crash_devices, "player's phone", "players' phones")}` : "no crashes on players' phones") +
+      (n.test_crashes ? ` (+${fmt(n.test_crashes)} on Google's test robots / emulators)` : ""),
   ];
   let peak = "";
   const y = usage?.daily.find((d) => d.day === dayKey(from));
