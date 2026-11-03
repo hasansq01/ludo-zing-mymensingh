@@ -33,3 +33,9 @@ secrets.*
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Godot: editor cache (rebuilt on import) and Android / desktop export output. The *.uid files ARE tracked.
+/godot/.godot/
+/godot/export/
+/godot/android/build/
+/build/android/
