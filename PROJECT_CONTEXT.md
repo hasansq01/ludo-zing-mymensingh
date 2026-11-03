@@ -83,6 +83,8 @@ release (12-tester closed test for 14 days).
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
+| `tests/avatars.js` | More-characters avatar tests (12 avatars, free, unique, no origin labels, draw cleanly; original characters unchanged; Edit Profile grid + save, one Collection group + equip, home chip and game card, no avatar maker); source page with `?vt=1`. |
+| `tests/emotes.js` | 67 emote tests (incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -90,7 +92,7 @@ release (12-tester closed test for 14 days).
 | `firebase/firestore.rules`, `firebase/SETUP.md` | Firestore security rules for player progress; the manual Firebase / Google / Facebook setup steps. |
 | `submission/` | YouTube Playables submission kit (`SUBMISSION.md`, two screenshots). |
 | `README.md` | Build, test and deploy commands. |
-| `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). |
+| `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). Team workflow (since 2026-10-24): all updates are committed on the shared working branch `feature/emotes`, never directly on `main`; they reach `main` through pull requests on GitHub (PR #1). |
 | `godot/`, `tools/godot-test.sh` | The Godot 4.7 Android version (rules + tests so far) and its headless test runner. See `godot/README.md`. |
 | `build/`, `ludo-royale-web.zip` | Obsolete early build; not used. |
 
@@ -165,6 +167,61 @@ release (12-tester closed test for 14 days).
   `dailyState()` decides; `claimDaily()` writes via `commitProfile` after re-reading the stored profile. Limitation:
   local only (browser storage or the signed-in account's sync / YouTube cloud save); the device clock decides the day.
   Tests: `tests/daily-rewards.js` (32).
+- **Emotes (Ludo games, 2026-10-24; sticker style approved the same day):** 24 2D stickers matched to the user's
+  reference sheet. Each sticker carries its own cream speech bubble (dark outline, tail left) on a 172x109 viewBox
+  (`stSticker`); the character pops out over its top edge and is cut at its bottom. Kit: `stSil` (merged silhouette:
+  outline pass + fill), `stShade` (clipped cel shading), `stTube` / `stArm`, hands (`stFist`, `stPalm`, `stThumb`,
+  `stPoint`), a face kit (`STE` eyes / `STB` brows / `STM` mouths, `stFace` over `{l,r,y,m,cx}`), accents (`stShards`,
+  `stHeart`, `stStar`, `stDrop`, `stZ`, `stQ`, `stAnger`, `stBang`, `stConfetti`), and three bases: `stPawn` (four
+  colours, `ST_PAL`), `stHijab` (any scarf colour) and `stBoy` (jacket colour). `EMOTE_STICKERS[id]` holds the art;
+  `EMOTES` maps id/name/motion onto it. `emArt(e)` makes the clip-path ids unique per copy on the page (use it wherever
+  a sticker is inserted). Reactions: Victory, Laugh, Cool, Angry, Love, Confused, Hi!, Celebrate, Sob, Gasp,
+  Champ (pawns); Cry, Shocked, Facepalm, Yay! (`cheer`, the approved yellow-hijab sticker; replaced Clap), Tease,
+  Grr! (hoodie boy fuming), Hmph! (purple-hijab girl, arms crossed) (friends; Grr! / Hmph! added 2026-11-03); Roll it!,
+  Winner, Disappointed, High five, Give up, Peek-a-boo (game). Sleepy and Thinking were retired from the sets on
+  2026-11-03 (art kept in `EMOTE_STICKERS`). In-game bubble: the sticker
+  (100x63.5) on the sender's avatar with a thin glow in their colour. Picker cells 72x50 (`CW` / `CH` in `placePanel`).
+  **Animation (Clash-style):** parts are `<g class="sa-…">` groups (`stPart`): `sa-char` + a mood class wraps the
+  character (built in by `stPawn` / `stHijab` / `stBoy`, `mood` option), `stArm` wraps arms in `sa-arm` (pivot = the
+  path's start, swing by hand kind), `stFace` wraps eyes / mouths (`ST_EYEMOVE`, `ST_TALK`), accents wrap themselves
+  (`sa-beat`, `sa-twinkle`, `sa-drip`, `sa-rise`, `sa-wobble`, `sa-throb`, `sa-pop`, `sa-burst`); game objects use
+  `sa-roll`, `sa-hop`, `sa-crack`, `sa-clap`, `sa-bob`, `sa-wave`, `sa-peek`. All keyframes live in the "sticker
+  animation" CSS block (reduced motion stops them). Stickers with parts get `em-alive` instead of a whole-sticker
+  motion. Reactions pop in (`emPop`, small bounce) at `spot(c)`: beside the sender's dice on the inner side, just
+  above the card row (below it for the top players), each on its own half of the screen and clear of the emote button,
+  sized by `bubbleW()` (84-116px, smaller only if it cannot fit); life `LIFE` 2.4s, fading with `emOut`; the picker
+  cools down 2s after a send (`cool()`, `.cooling`). The emote button (`place()`) sits just above your avatar (HUD
+  row if no room): a cream chat bubble, thin warm-brown outline, three dots, no background.
+  **Sets (by character, 2026-11-04; user's request, replaces the mood-balanced sets of 2026-11-03):** every
+  character set holds the same six core emotions in the same order and with the same names (`EMOTE_FEELS`: Happy, Laugh,
+  Cry, Angry, Shocked, Love; an emote's `feel`, names from `FEEL_NAMES`), drawn as one character: Pawn Set `starter`
+  (free, default; pawn art), Girl Set `friends` 2,500 (hijab girl: Yay art as Happy, new `gLaugh`, Cry, new `gAngry`,
+  `gShock`, `gLove`), Boy Set `boys` 2,500 (hoodie boy: new `bHappy`, `bLaugh`, `bCry`, Grr art as Angry, Shocked art,
+  new `bLove`). Every other emote is an extra in a Premium pack of 8 (`premium: true`, gold "Premium" tag on the card):
+  Party Pack `pawns` 5,000 (Celebrate, Cool, Tease, Hi!, High five, Confused, Facepalm, Heartbroken) and Champion Pack
+  `game` 5,000 (Winner, Champ, Roll it!, Peek-a-boo, Thinking, Hmph!, Give up, Sleepy; Thinking and Sleepy are back).
+  Ids kept, so saved purchases still work (old Cheeky Set owners now own the Girl Set, Party Set owners the Party Pack,
+  Champion Set owners the Champion Pack). 34 emotes, each in exactly one set. Pack cards preview 2x4 (`.emset-prev.eight`).
+  The in-game picker holds the equipped set's 6 or 8 emotes. Profile:
+  `P.emoteSets` (always incl. starter), `P.emoteSet` (equipped; `ensureProfile` repairs). Only the equipped set is in the
+  game picker (`Emotes.refresh()` on each `reset()` / set change). Shop > Emotes and Inventory > Emotes (`renderEmoteSets`):
+  card = 2x3 preview of the set, Equipped / Owned / Locked tag, View + Buy / Use; `buyEmoteSet` (commitProfile; owns +
+  equips; refuses without coins / when owned) / `useEmoteSet`; View = `#emSetSheet` (`openEmoteSet`): the six emotes big,
+  each playing its motion, with Buy / Use. Picker: a slim panel along the left edge of the board, vertically centred in
+  the band between the top and bottom player cards (1 column; 2 or 3 when the band is short, e.g. 320x568 and the
+  landscape frame), popping out from the left (slide + scale + fade, buttons staggered by `--i`), closing with a quick
+  fade (`.closing`, then hidden after 170ms).
+  `EMOTES` entries: id, group, name, emoji fallback (ch), motion class, art; all
+  free, `owned()` is the hook for a future shop; `Emotes` is defined before the HUD code. `#emoteBtn` is placed by
+  `Emotes.place()` (from `buildCards` and on resize): level with your dice between the bottom cards, else just below
+  between them, else in `.hud-top` before the gear, judged against each bottom card's columns at rest and enlarged
+  (x1.05) plus the "Tap" hint (falls back to the HUD at 320px and in landscape). `#emotePanel` (4x2) closes on a pick,
+  an outside tap, Escape or `openSheet`. Bubbles (`.emote-bubble` in `#pcards`, pointer-events none) are centred on the
+  sender's avatar with their colour ring, live 1.8s (`emLife` + a per-emote motion; reduced motion = fade), one per
+  player with a queue of 2; `sfx('emote')` follows the sound settings. Sender = the only human, or the player to move
+  in Pass & Play. CPU reactions: `Emotes.react('capture'|'win')` from `move` / `gameOver` (random chance, 9s per CPU,
+  4s overall, never the same twice running; cleared by `reset()` on each new game / exit). No game state is touched.
+  Tests: `tests/emotes.js` (67).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;
@@ -369,6 +426,15 @@ release (12-tester closed test for 14 days).
   and ownership if saving fails; button disabled on the first tap). A purchase does not equip; Equip uses the common
   collection equip path (`P.avatar`). Cards: Free / Owned / Equipped tag, lock icon + coin price when for sale (shown
   in full colour). Edit Profile's avatar grid lists them too; a locked one says where to buy it.
+- **More characters (2026-11-04):** `WORLD` = 12 free person avatars with a wide range of looks (Hana, Kenji, Mei,
+  Linh, Emma, Lukas, Sofia, Oliver, Jayden, Maya, Carlos, Ava), appended to `AVATARS` after `CHARS`; Collection ›
+  Characters shows them together under "More characters" after Male / Female, and they are in Edit Profile's grid. The
+  user asked that they are never labelled or grouped by origin. `personSVG` gained optional face fields (none set = the
+  original faces, so CHARS look the same): `eye` (round / almond / narrow / big), `eyeCol` (iris colour, '' = dark),
+  `lash`, `brow` (none / thin / soft / thick), `nose` (none / small / wide), `mouth` (smile / lips / grin / neutral),
+  `fh` (none / stubble / moustache / goatee / beard), `acc` 'shades'; and hairstyles bald, fade, straight, locs. The
+  buzz cut draws its beard only when `fh` is unset (Sabbir). An avatar customizer was built the same day and removed
+  at the user's request. Tests: `tests/avatars.js`.
   Presentation (style ref: user's casual-game profile screenshots, in our palette): `#profilePage` (`.ppage`) is a
   dimmed full-screen overlay (size container) holding a fixed-size modal `.pm` (max 440x720): cream panel, white rim,
   warm-brown outline, coral title ribbon `.pm-title` over the top edge, red `.x-btn` (`#ppBack`). Folder tabs `.ftabs`

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ludo-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-c", "import http.server as h; H=h.SimpleHTTPRequestHandler; H.extensions_map.update({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8'}); h.ThreadingHTTPServer(('127.0.0.1',8080),H).serve_forever()"],
+      "port": 8080
+    }
+  ]
+}

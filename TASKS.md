@@ -242,6 +242,54 @@ Last reviewed: 2026-10-30.
       ran to 100% only at the end and went to the welcome screen; as a guest, Shop > Scenes > View Candy Kingdom opened
       the card preview with its own 3D canvas (343x343) and Buy — 22K, closed cleanly (canvas released); no console
       errors at 375x812.
+- [x] Ninth deploy (2026-10-24): `feature/emotes` build (emote sets, Shop > Emotes, the left-side picker, the 24
+      animated stickers, the chat button above your avatar and reactions beside the dice) uploaded to Cloudflare Pages
+      (production); verified live at https://ludo-king-mymensingh.pages.dev (new code present, same size as the local
+      build, game loads with no console errors).
+- [x] Emote button + reaction placement, round 2 (2026-10-24, user's marked screenshot): the button sits just above
+      your avatar (green mark) and is a cream speech bubble with a thin warm-brown outline and three dots (the game's
+      card palette; no circle). Reactions pop in beside the sender's dice on the inner side, just above the card row
+      (red mark; below the card for top players), each on its own half of the screen and clear of the button (shrinking
+      a little on narrow screens). `tests/emotes.js` 61/61 at 320x568, 390x844, 430x932, 520x917, 844x390, 1366x768.
+- [x] Emote button + reaction placement polish (2026-10-24, user's screenshot): the button is a bare outlined chat
+      bubble with three dots (no circle; drop shadow for contrast; a soft glow while open). Reactions show just above
+      the sender's avatar and dice (below the card for top players), centred on the card and kept on screen, sized to
+      the screen (116px wide on normal phones, down to 84px), pop in with a small bounce and fade out. `tests/emotes.js`
+      60/60 at 320x568, 390x844, 430x932, 844x390, 1366x768 (both cameras, Pass & Play); home visual suite PASS.
+- [x] Clash-style emote animation (2026-10-24, from the user's two Clash Royale recordings, studied frame by frame):
+      every sticker has moving parts inside a still bubble: the character moves in its mood (squash, shake, rage,
+      sway, tilt, heave, jolt, groove, no), arms swing about their shoulders (wave / pump / point / thumb), faces
+      laugh, blink, wag a tongue, tears flow, and accents pop, twinkle, drip, rise, wobble or burst; game objects roll,
+      hop, crack, clap, wave or peek. Sending flies the sticker out of the tapped picker cell (overshoot, settle), it
+      holds ~2.4s and shrinks away; the picker greys out for 2s after a send. Victory + Yay! prototyped first and
+      approved. `tests/emotes.js` 56/56 at 320x568, 390x844, 430x932, 844x390, 1366x768 (headless Chrome); home visual
+      suite PASS (0.000%). On `feature/emotes`, uncommitted. Not deployed.
+- [x] Emote sticker collection (2026-10-24, user's reference sheet; phase 1 style approved on Victory + Celebration):
+      all 24 emotes redrawn as stickers with their own speech bubble (172x109), from one kit (pawn / hijab girl / hoodie
+      boy bases, hands, faces, accents); reviewed against the reference by a subagent and fixed. Clap replaced by Yay!
+      (the approved yellow-hijab sticker). Picker cells 72x50, in-game bubble = the sticker with a glow in the sender's
+      colour, Shop/Inventory previews at sticker ratio; `emArt()` keeps clip ids unique. `tests/emotes.js` 52/52 at
+      320x568, 390x844, 430x932, 844x390, 1366x768 (headless Chrome; the hidden pane fails 2-3 checks that need a
+      visible page); home visual suite PASS (0.000%). On `feature/emotes`, uncommitted. Not deployed.
+- [x] Emote sets + left-side picker (2026-10-24, user's screenshots): 6 new cartoon emotes (Sob, Gasp, Champ, High five,
+      Give up, Peek-a-boo) -> 24 in 4 sets of 6; Starter free and equipped by default, Pawn Pals / Friends / Game sold in a
+      new Shop > Emotes tab (and Inventory > Emotes) with preview cards, a View sheet, Buy (existing coin logic) and Use;
+      only the equipped set appears in the game, in a slim panel at the left of the board (1-3 columns by space) with a
+      slide-in + staggered pop and a fade-out. `tests/emotes.js` 51/51 at 320x568, 390x844, 430x932, 844x390, 1366x768.
+      On `feature/emotes`. Not deployed.
+- [x] Emotes redrawn as a 2D cartoon collection (2026-10-24, user's style reference; original art, not copied): 18
+      emotes in three families (pawn characters in the four colours, a hoodie boy and hijab girls, game symbols) covering
+      all 16 requested reactions plus Roll it! and Winner; consistent outline / proportions; grouped picker; cartoon
+      speech bubbles with the sender's colour rim. `tests/emotes.js` 34/34 at 320x568, 390x844, 430x932, 844x390,
+      1366x768; home visual suite PASS (0.000%). On `feature/emotes`. Not deployed.
+- [x] Emotes in Ludo games (2026-10-24): 8 free custom-drawn animated emotes (Laugh, Cool, Love, Angry, Cry, Surprised,
+      Clap, Celebrate) in `EMOTES` (expandable; `owned()` is the future shop hook). Button beside your dice (measured
+      against the enlarged cards and the "Tap" hint; falls back to the top HUD row at 320px and in landscape), panel
+      closes on pick / outside tap / Escape / any sheet. Bubble pops over the sender's avatar with their colour ring
+      (~1.8s, per-emote motion, soft pop sound, reduced-motion fade), per-player queue (max 2). vs Computer: you send;
+      Pass & Play: the player to move. CPU players react now and then to captures and the result (throttled, varied).
+      No online play exists, so no delivery was built. `tests/emotes.js` 29/29 at 320x568, 390x844, 430x932, 844x390,
+      1366x768. Not deployed.
 - [x] Bars polish (2026-10-22, user's marked screenshot): blue replaced by the café palette (honey/peach bars, peach-cream
       tiles, coral Home, teal "+", plum tracks); top row in three groups (cream profile capsule, coin pill, cream gear
       tile); five equal tab columns (no negative margins, Home raised by transform inside its column); badges centred
