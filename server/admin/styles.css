@@ -295,6 +295,12 @@ p { margin: 0; }
 .banner[hidden] { display: none; }
 .banner-maint { background: repeating-linear-gradient(135deg, var(--warn-tint) 0 14px, color-mix(in srgb, var(--warn-tint) 70%, var(--honey)) 14px 28px); color: var(--warn-ink); border-bottom: 1px solid var(--honey-tint-edge); }
 .banner-link { margin-left: auto; font-weight: 800; }
+.banner-alert { background: var(--warn-tint); color: var(--warn-ink); border-bottom: 1px solid var(--honey-tint-edge); }
+.banner-alert.is-danger { background: var(--danger-tint); color: var(--danger); border-bottom-color: color-mix(in srgb, var(--danger) 25%, transparent); }
+.alert-cell { max-width: 640px; }
+.alert-title { font-weight: 700; }
+.alert-cell.is-unread .alert-title::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); margin-right: 7px; vertical-align: 2px; }
+.alert-body { color: var(--muted); font-size: 13px; margin-top: 2px; white-space: normal; }
 
 .main { padding: 20px 24px 48px; max-width: 1440px; width: 100%; }
 .main:focus { outline: none; }

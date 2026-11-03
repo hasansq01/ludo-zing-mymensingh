@@ -181,7 +181,7 @@ async function accessToken(sa: ServiceAccount, renew = false): Promise<string | 
 
 // ---------- sending ----------
 
-export type PushKind = "turn" | "joined" | "rematch" | "invite" | "weekly" | "promo" | "test";
+export type PushKind = "turn" | "joined" | "rematch" | "invite" | "weekly" | "promo" | "test" | "alert";
 /** Android channel (NOTIFICATIONS.md "Ids and texts"): game alerts are high priority, offers normal. */
 export type Channel = "game" | "offers";
 

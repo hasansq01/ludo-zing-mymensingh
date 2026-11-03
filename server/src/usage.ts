@@ -147,6 +147,11 @@ async function graphql(token: string, accountId: string, now: number): Promise<A
     end: new Date(utcDayStart(now) + DAY).toISOString(),
     storageFrom: dayKey(utcDayStart(now) - DAY),
   };
+  return (await post(token, QUERY, variables)) as Account;
+}
+
+/** One GraphQL request; the account's data (`viewer.accounts[0]`). */
+async function post(token: string, query: string, variables: Record<string, unknown>): Promise<unknown> {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
   let res: Response;
@@ -154,7 +159,7 @@ async function graphql(token: string, accountId: string, now: number): Promise<A
     res = await cfFetch(GRAPHQL_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ query: QUERY, variables }),
+      body: JSON.stringify({ query, variables }),
       signal: ac.signal,
     });
   } catch (e) {
@@ -162,7 +167,7 @@ async function graphql(token: string, accountId: string, now: number): Promise<A
   } finally {
     clearTimeout(t);
   }
-  let body: { data?: { viewer?: { accounts?: Account[] } }; errors?: Array<{ message?: string }> } | null = null;
+  let body: { data?: { viewer?: { accounts?: unknown[] } }; errors?: Array<{ message?: string }> } | null = null;
   try {
     body = await res.json();
   } catch {
@@ -287,9 +292,10 @@ function limitsOnly() {
   });
 }
 
-async function build(env: UsageEnv, db: D1Database, now: number) {
+/** `db` null: no games-left estimate (the alert check: it would read every match of the week each time). */
+async function build(env: UsageEnv, db: D1Database | null, now: number) {
   const accountId = env.CF_ACCOUNT_ID || ACCOUNT_ID;
-  const [acc, matches] = await Promise.all([graphql(env.CF_API_TOKEN!, accountId, now), matchCounts(db, now)]);
+  const [acc, matches] = await Promise.all([graphql(env.CF_API_TOKEN!, accountId, now), db ? matchCounts(db, now) : null]);
   const { hourly, mine, doByType } = aggregate(acc, WORKER_NAME);
 
   const today0 = utcDayStart(now);
@@ -348,11 +354,49 @@ async function build(env: UsageEnv, db: D1Database, now: number) {
     metrics: list,
     hourly: { hours, ...series },
     daily,
-    estimate: estimateGames(daily_list, { today: todayOf, week: weekOf }, matches),
+    estimate: matches ? estimateGames(daily_list, { today: todayOf, week: weekOf }, matches) : null,
     do_requests_by_type: doByType,
     info: PER_REQUEST_LIMITS,
     sampling: "Cloudflare's adaptive analytics are sampled: the numbers track the real usage closely but can differ slightly from the dashboard's billing figures.",
   };
+}
+
+export type UsageBody = Awaited<ReturnType<typeof build>>;
+
+/** Today's numbers straight from Cloudflare, no cache and no estimate (alerts.ts). Throws CloudflareError. */
+export function usageSnapshot(env: UsageEnv, now: number): Promise<UsageBody> {
+  return build(env, null, now);
+}
+
+/** The last hour's requests and errors of this Worker and its Durable Objects (alerts.ts "server errors"). */
+export const ERRORS_QUERY = `query Errors($accountTag: string!, $start: Time!, $end: Time!, $script: string!) {
+  viewer {
+    accounts(filter: { accountTag: $accountTag }) {
+      workers: workersInvocationsAdaptive(limit: 10, filter: { datetime_geq: $start, datetime_lt: $end, scriptName: $script }) {
+        sum { requests errors }
+      }
+      durableObjects: durableObjectsInvocationsAdaptiveGroups(limit: 10, filter: { datetime_geq: $start, datetime_lt: $end, scriptName: $script }) {
+        sum { requests errors }
+      }
+    }
+  }
+}`;
+
+export async function cloudflareErrors(env: UsageEnv, now: number): Promise<{ requests: number; errors: number }> {
+  const res = await post(env.CF_API_TOKEN!, ERRORS_QUERY, {
+    accountTag: env.CF_ACCOUNT_ID || ACCOUNT_ID,
+    start: new Date(now - HOUR).toISOString(),
+    end: new Date(now).toISOString(),
+    script: WORKER_NAME,
+  });
+  const acc = res as { workers?: Array<Row<{ requests: number; errors: number }, unknown>>; durableObjects?: Array<Row<{ requests: number; errors: number }, unknown>> };
+  let requests = 0;
+  let errors = 0;
+  for (const r of [...(acc.workers ?? []), ...(acc.durableObjects ?? [])]) {
+    requests += r.sum?.requests ?? 0;
+    errors += r.sum?.errors ?? 0;
+  }
+  return { requests, errors };
 }
 
 // ---------- cache (per isolate; 5 minutes) ----------

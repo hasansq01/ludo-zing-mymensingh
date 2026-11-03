@@ -1,4 +1,4 @@
-// Ludo Zing admin console: boot, session, shell (sidebar + top bar + maintenance banner) and the hash router.
+// Ludo Zing admin console: boot, session, shell (sidebar + top bar + maintenance and alert banners) and the hash router.
 import { h, clear, tickTimes } from "./dom.js";
 import { icon } from "./icons.js";
 import { api, request, onApi, newSession } from "./api.js";
@@ -20,9 +20,11 @@ import notificationsPage from "./pages/notifications.js";
 import usagePage from "./pages/usage.js";
 import economyPage from "./pages/economy.js";
 import crashesPage, { crashDetailPage } from "./pages/crashes.js";
+import alertsPage from "./pages/alerts.js";
 
 const NAV = [
   { id: "status", label: "Status", icon: "status" },
+  { id: "alerts", label: "Alerts", icon: "alarm" },
   { id: "accounts", label: "Accounts", icon: "accounts" },
   { id: "players", label: "Players", icon: "players" },
   { id: "rooms", label: "Rooms", icon: "rooms" },
@@ -40,6 +42,7 @@ const NAV = [
 
 const ROUTES = [
   { re: /^\/status$/, nav: "status", page: statusPage },
+  { re: /^\/alerts$/, nav: "alerts", page: alertsPage },
   { re: /^\/accounts$/, nav: "accounts", page: accountsPage },
   { re: /^\/accounts\/([^/]+)$/, nav: "accounts", page: accountPage },
   { re: /^\/leaderboards$/, nav: "leaderboards", page: leaderboardsPage },
@@ -63,6 +66,8 @@ const app = document.getElementById("app");
 let shell = null;
 let cleanups = [];
 let maintenance = false;
+let alertStatus = null;
+const ALERT_POLL_MS = 60_000;
 
 // ---------- environment ----------
 
@@ -193,6 +198,9 @@ function buildShell() {
     icon("wrench", { size: 16 }),
     h("span", null, h("strong", null, "Maintenance mode is on."), " New rooms are refused; rooms already open keep playing."),
     h("a", { href: "#/config", class: "banner-link" }, "Config"));
+  const alertText = h("span");
+  const alertBanner = h("div", { class: "banner banner-alert", role: "status", hidden: true },
+    icon("alarm", { size: 16 }), alertText, h("a", { href: "#/alerts", class: "banner-link" }, "Alerts"));
   const main = h("main", { id: "main", class: "main", tabindex: "-1" });
   const el = h("div", { class: "shell" },
     h("a", { href: "#/status", class: "skip", onClick: (e) => { e.preventDefault(); main.focus(); } }, "Skip to content"),
@@ -211,8 +219,9 @@ function buildShell() {
           themeButton(),
           logout)),
       banner,
+      alertBanner,
       main));
-  return { el, main, title, crumbs, banner, links };
+  return { el, main, title, crumbs, banner, alertBanner, alertText, links };
 }
 
 function setMaintenance(on) {
@@ -220,11 +229,26 @@ function setMaintenance(on) {
   if (shell) shell.banner.hidden = !maintenance;
 }
 
+/** The alert banner: unread warnings / dangers (GET /admin/api/alerts `status`). */
+function setAlerts(st) {
+  alertStatus = st || null;
+  if (!shell) return;
+  const n = alertStatus?.unread || 0;
+  shell.alertBanner.hidden = !n;
+  shell.alertBanner.classList.toggle("is-danger", Boolean(alertStatus?.unread_danger));
+  clear(shell.alertText).append(h("strong", null, n === 1 ? "1 new server alert." : `${n} new server alerts.`), " Also pushed to your phone.");
+}
+
+function pollAlerts() {
+  if (shell) api.get("/alerts", { limit: 1 }).then((d) => setAlerts(d?.status)).catch(() => {});
+}
+
 async function startShell() {
   shell = buildShell();
   clear(app).appendChild(shell.el);
   setMaintenance(maintenance);
   api.get("/config").then((c) => setMaintenance(c?.maintenance)).catch(() => {});
+  pollAlerts();
   if (!location.hash || location.hash === "#" || location.hash === "#/") history.replaceState(null, "", "#/status");
   route();
 }
@@ -269,6 +293,7 @@ function route() {
     query,
     title: setTitle,
     setMaintenance,
+    setAlerts,
     onCleanup: (fn) => cleanups.push(fn),
     /** Rewrite the hash query (filters) without re-rendering the page. */
     setQuery(obj) {
@@ -310,6 +335,7 @@ onApi("disabled", () => { if (shell) renderLogin({ disabled: true }); });
 
 window.addEventListener("hashchange", route);
 setInterval(() => tickTimes(document), 15000);
+setInterval(pollAlerts, ALERT_POLL_MS);
 
 (async function boot() {
   try {

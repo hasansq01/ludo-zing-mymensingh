@@ -1,5 +1,6 @@
 // The admin console's JSON API: /admin/api/* (ADMIN_API.md is the contract). Auth: one password (secret
 // ADMIN_PASSWORD) -> an HMAC-signed session cookie; X-Admin: 1 on every write (CSRF); every write is audited.
+import * as AL from "./alerts";
 import { ACCOUNT_RE, type AccountRow, type Step, adminAccountOut, getAccount, guardedInsert, mutate } from "./accounts";
 import { DAY_OFFSET_MIN, ECON_V1 } from "./econ/rules";
 import { econDayStartMs } from "./wallet";
@@ -265,6 +266,13 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
           const u = await usageReport(env as Env & UsageEnv, c.now);
           return json(u.body, u.status);
         }
+      case "alerts":
+        if (b === undefined) return m === "GET" ? await alertsList(c) : fail(405, "method");
+        if (m !== "POST") return fail(405, "method");
+        if (b === "read") return await alertsRead(c);
+        if (b === "test") return await alertsTest(c);
+        if (b === "check") return await alertsCheck(c);
+        break;
       case "config":
         if (b !== undefined) break;
         if (m === "GET") return json(await D.readConfig(env.DB));
@@ -308,6 +316,37 @@ export async function handleAdmin(req: Request, env: Env, ctx: ExecutionContext,
     if (e instanceof D.BadCursor) return fail(400, "bad_request", "bad cursor");
     throw e;
   }
+}
+
+// ----- alerts (ADMIN_API.md "Alerts") -----
+
+/** GET /admin/api/alerts?limit&cursor -> {items, next, status}. `cursor`: the `next` of the previous page. */
+async function alertsList(c: Ctx): Promise<Response> {
+  const { limit, cursor } = pageArgs(c.url);
+  if (cursor !== null && !/^\d{1,15}$/.test(cursor)) throw new BadRequest("bad cursor");
+  const [p, status] = await Promise.all([AL.listAlerts(c.env.DB, limit, cursor ? Number(cursor) : null), AL.alertStatus(c.env)]);
+  return json({ ...p, status });
+}
+
+/** POST /admin/api/alerts/read -> {read}: every alert marked read (the banner goes). */
+async function alertsRead(c: Ctx): Promise<Response> {
+  return json({ read: await AL.markRead(c.env.DB, c.now) });
+}
+
+/** POST /admin/api/alerts/test -> {sent, failed, accounts}: a test push to the alert accounts (at most 5 an hour). */
+async function alertsTest(c: Ctx): Promise<Response> {
+  const n = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'test' AND at >= ?").bind(c.now - 3_600_000).first<{ n: number }>();
+  if ((n?.n ?? 0) >= 5) return fail(429, "rate_limited", "at most 5 test alerts per hour");
+  const r = await AL.testAlert(c.env, c.now);
+  await audit(c, "alerts.test", null, r);
+  return json(r);
+}
+
+/** POST /admin/api/alerts/check -> the check's result (what the 15-minute cron does, now). */
+async function alertsCheck(c: Ctx): Promise<Response> {
+  const r = await AL.checkAlerts(c.env, c.now);
+  await audit(c, "alerts.check", null, { raised: r.raised });
+  return json(r);
 }
 
 // ----- auth -----

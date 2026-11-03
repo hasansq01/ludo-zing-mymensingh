@@ -324,6 +324,40 @@ with **Account > Account Analytics > Read** on the account (`tools/cf.sh secret 
 - Cloudflare refused / unreachable: `200` with the last good body and `stale: true, error_msg` if it is from today,
   else `502 {error: "cloudflare_failed", msg}`.
 
+## Alerts (migrations/0008_alerts.sql, `src/alerts.ts`)
+
+A check every 15 minutes (cron `*/15 * * * *`; the daily `17 3 * * *` stays the housekeeping cron) raises alerts, each
+a D1 `alerts` row with a unique `key` (so once only) and a push (channel `game`, kind `alert`, link `home`, tag
+`alert-<metric>` / `alert-errors` / …) to every device of the accounts in the var `ALERT_ACCOUNTS` (wrangler.jsonc;
+account ids, comma separated; push preferences are ignored). More than 2 new alerts in one check: one push listing
+them. What it raises:
+
+| key | level | when |
+|---|---|---|
+| `usage:<metric>:<70\|90\|100>:<UTC day>` | warning (70) / danger (90, 100) | a daily free-plan allowance (Usage's metric ids) reached that step today. Only the highest new step is pushed; the lower ones are stored already read. Storage metrics: `<YYYY-MM>` instead of the day |
+| `pace:<metric>:<UTC day>` | warning | at least 3 h into the UTC day and 25 % used: at the rate of the last 3 complete hours the allowance runs out before 00:00 UTC |
+| `server:usage_read:<UTC day>` | warning | Cloudflare's usage could not be read 2 checks in a row (or `CF_API_TOKEN` unset) |
+| `server:errors:<UTC day>:<0-3>` | danger | the last hour: ≥ 20 errors and ≥ 2 % of the requests (Cloudflare's `errors` of the Worker and its Durable Objects + D1 `events` at level error). At most one per 6 h |
+| `server:push:<UTC day>` | warning | today's push_events: ≥ 20 failed and more failed than sent |
+| `summary:<yesterday>` | info | the first check from 03:00 UTC (09:00 Bangladesh): accounts seen in 24 h, new accounts, online matches, crash reports (and phones) of the previous UTC day, its highest allowance |
+| `test:<ms>` | info | POST /admin/api/alerts/test |
+
+The usage numbers come from the same GraphQL query as Usage, without the games-left estimate (no D1 match scan) and
+without the 5 minute cache. `alert_state` keeps `last_check` (the latest result) and `usage_fails`. Rows older than 90
+days are deleted by the daily cron.
+
+- `GET /admin/api/alerts?limit&cursor` → `{items: [{id, key, at, level: info|warning|danger, kind: usage|pace|server|summary|test,
+  title, body, sent, failed (devices), read_at}], next (cursor: an id, or null), status: {unread, unread_danger (unread
+  warning / danger only), last_check: {at, usage: "ok" | why not, errors_check: "ok" | "skipped" | why not, top: {id,
+  percent} | null, raised: [key], pushed: {sent, failed}} | null, every_min: 15, steps: [70, 90, 100], push_configured,
+  accounts: [{id, name, devices} | {id, name: null, devices: 0, missing: true}]}}`. Newest first.
+- `POST /admin/api/alerts/read` → `{read}`: every alert marked read (the console's banner goes).
+- `POST /admin/api/alerts/test` → `{sent, failed, accounts}`: a test alert pushed to the alert accounts; audited
+  `alerts.test`; at most 5 an hour (`429 rate_limited`).
+- `POST /admin/api/alerts/check` → the check's result (as `last_check`), run now; audited `alerts.check`.
+
+The console polls `status` every minute for the banner ("N new server alerts").
+
 ## Economy (Economy v1)
 
 `GET /admin/api/economy?days=14` (session required; `days` 1-60, default 14, anything else clamped, non-numbers = 14).

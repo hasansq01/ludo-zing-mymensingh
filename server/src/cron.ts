@@ -1,6 +1,7 @@
 // The daily Cron Trigger (wrangler.jsonc "triggers"): D1 pruning, rooms-row reconciliation and, on Mondays, the
 // weekly-result pushes (NOTIFICATIONS.md). Kept out of index.ts because a Worker's main module may only export
 // handlers and Durable Object classes.
+import { pruneAlerts } from "./alerts";
 import * as D from "./db";
 import { isoWeek } from "./econ";
 import { KEEP_WEEKS } from "./leaderboard";
@@ -65,12 +66,13 @@ export async function cron(env: Env, now = Date.now()): Promise<CronResult> {
     return null;
   });
   const pushEvents = await prunePush(env.DB, now).catch(() => 0);
+  const alerts = await pruneAlerts(env.DB, now).catch(() => 0);
   const social = await pruneSocial(env.DB, now).catch((e) => (console.error("social prune failed:", e), { invites: 0, ghosts: 0 }));
   const entries = await sweepEntries(env as never, now).catch((e) => (console.error("entry sweep failed:", e), 0));
   const voided = await voidRefunded(env as never, now).catch((e) => (console.error("voided purchases failed:", e), 0));
   const prizes = await weeklyPrizes(env as never, now).catch((e) => (console.error("weekly prizes failed:", e), null));
   console.log(
-    `cron: pruned ${JSON.stringify(pruned)} (incl. ${pruned.crash_reports} crash reports) + ${pushEvents} push_events + ${social.invites} invites + ${social.ghosts} ghost rows, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
+    `cron: pruned ${JSON.stringify(pruned)} (incl. ${pruned.crash_reports} crash reports) + ${pushEvents} push_events + ${alerts} alerts + ${social.invites} invites + ${social.ghosts} ghost rows, closed ${reconciled} vanished rooms, swept ${swept} stale rooms, queued ${weekly ?? "no"} weekly pushes, refunded ${entries} entries, voided ${voided} purchases, paid ${prizes ?? "no"} weekly prizes`,
   );
   return { pruned, reconciled, swept, weekly, entries, voided, prizes };
 }

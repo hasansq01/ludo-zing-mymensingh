@@ -5,6 +5,7 @@
 // players / friends / invites (/v1/social/*, social.ts).
 import * as A from "./accounts";
 import { CSP, handleAdmin } from "./admin";
+import { ALERT_CRON, checkAlerts } from "./alerts";
 import { cron } from "./cron";
 import * as D from "./db";
 import { postCrash } from "./diag";
@@ -243,7 +244,9 @@ export default {
     }
   },
 
-  async scheduled(_ctrl: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(cron(env).then(() => undefined));
+  async scheduled(ctrl: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    // every 15 minutes: the alert check (src/alerts.ts); daily at 03:17 UTC: the housekeeping cron
+    if (ctrl.cron === ALERT_CRON) ctx.waitUntil(checkAlerts(env).then(() => undefined));
+    else ctx.waitUntil(cron(env).then(() => undefined));
   },
 } satisfies ExportedHandler<Env>;

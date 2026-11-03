@@ -37,8 +37,10 @@
     "not_found_handling": "none"
   },
   // Daily at 03:17 UTC: prune events / login_attempts older than 30 days, reconcile rooms rows of vanished rooms;
-  // on Mondays also queue the weekly-result pushes.
-  "triggers": { "crons": ["17 3 * * *"] },
+  // on Mondays also queue the weekly-result pushes. Every 15 minutes: the alert check (src/alerts.ts).
+  "triggers": { "crons": ["17 3 * * *", "*/15 * * * *"] },
+  // The accounts whose phones get the server alerts (src/alerts.ts, ADMIN_API.md "Alerts"): the owner's.
+  "vars": { "ALERT_ACCOUNTS": "acc_trk4hyeypeu26juq" },
   "observability": { "enabled": true }
   // Secret (not here): ADMIN_PASSWORD (tools/cf.sh secret put ADMIN_PASSWORD; locally .dev.vars).
   // Optional secret: CF_API_TOKEN (API token, Account > Account Analytics > Read; the console's Usage page, ADMIN_API.md).

@@ -50,6 +50,8 @@ export interface Env {
   GOOGLE_WEB_CLIENT_SECRET?: string;
   /** The Firebase service-account JSON (push notifications, NOTIFICATIONS.md; a secret). Unset: push is off. */
   FCM_SERVICE_ACCOUNT?: string;
+  /** Account ids whose devices get the server alerts (src/alerts.ts; a var in wrangler.jsonc). */
+  ALERT_ACCOUNTS?: string;
   /** "1" only under vitest (vitest.config.ts miniflare bindings). Never set in wrangler.jsonc. */
   TEST_MODE?: string;
 }
