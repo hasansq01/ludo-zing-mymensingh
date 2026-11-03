@@ -1,0 +1,81 @@
+# Website auto-deploy: every push builds the web game (tools/build.ps1) and publishes it to Cloudflare Pages, so the
+# website never lags behind GitHub again (it used to change only when someone uploaded the zip by hand).
+#   main            -> https://ludo-king-mymensingh.pages.dev            (the live site)
+#   any other branch -> https://<branch>.ludo-king-mymensingh.pages.dev  (its own preview link; "Skin" -> skin.,
+#                       "feature/emotes" -> feature-emotes.)
+# Add ?demo=1 to any of them for the demo version. Settings > Version on the page shows the branch and commit it runs.
+# One-time setup (repository Settings > Secrets and variables > Actions): CLOUDFLARE_API_TOKEN (a token with
+# "Cloudflare Pages: Edit") and CLOUDFLARE_ACCOUNT_ID. Without them the build still runs and its zip is kept as an
+# artifact, but nothing is published (the run says so).
+name: Deploy website
+
+on:
+  push:
+    paths:
+      - index.html
+      - tools/build.ps1
+      - vendor/**
+      - .github/workflows/deploy-web.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $env:LUDO_BUILD = "${{ github.ref_name }} · $('${{ github.sha }}'.Substring(0, 7)) · $(Get-Date -Format 'yyyy-MM-dd HH:mm') UTC"
+          ./tools/build.ps1
+
+      - name: Keep the Playables zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ludo-king-mymensingh-playables
+          path: ludo-king-mymensingh-playables.zip
+
+      - name: Check Cloudflare secrets
+        id: cf
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Not published: add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets (see the top of .github/workflows/deploy-web.yml)."
+          fi
+
+      - name: Publish to Cloudflare Pages
+        id: deploy
+        if: steps.cf.outputs.ok == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=ludo-king-mymensingh --branch=${{ github.ref_name }} --commit-hash=${{ github.sha }} --commit-dirty=true
+
+      - name: Links
+        if: steps.cf.outputs.ok == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+          ALIAS: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          site="${ALIAS:-$URL}"
+          [ "$BRANCH" = "main" ] && site="https://ludo-king-mymensingh.pages.dev"
+          {
+            echo "### Website updated ($BRANCH)"
+            echo "- Game: $site"
+            echo "- Demo: $site/?demo=1"
+            echo "- This exact deployment: $URL"
+          } >> "$GITHUB_STEP_SUMMARY"
