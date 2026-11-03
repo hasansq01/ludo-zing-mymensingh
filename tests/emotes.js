@@ -21,9 +21,11 @@
   check('game: the emote button is shown, 44px', !btn.hidden && btn.offsetWidth >= 44 && btn.offsetHeight >= 44);
   { const av = R(document.querySelector('#pcards .pcard[data-pos="bl"] .ava')), bb = R(btn);
     check('the button sits just above your avatar (or in the HUD row when there is no room)', btn.classList.contains('in-hud') || (bb.bottom <= av.top && av.top - bb.bottom <= 12 && Math.abs((bb.left + bb.right) / 2 - (av.left + av.right) / 2) < 3), [bb, av]); }
-  const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'sleepy', 'confused', 'facepalm', 'cheer', 'party', 'think', 'sad', 'hi', 'tease'];
+  const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'confused', 'facepalm', 'cheer', 'party', 'sad', 'hi', 'tease', 'grr', 'hmph'];
   check('every required reaction exists (16+)', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)), need.filter(id => !L.EMOTES.some(e => e.id === id)));
-  check('4 sets of 6 (rows of the reference): Starter free, others priced, every emote in exactly one set', L.EMOTE_SETS.length === 4 && L.EMOTE_SETS.every(s => s.emotes.length === 6) && L.EMOTE_SETS[0].id === 'starter' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
+  check('4 sets of 6: Starter free, others priced, every emote in exactly one set', L.EMOTE_SETS.length === 4 && L.EMOTE_SETS.every(s => s.emotes.length === 6) && L.EMOTE_SETS[0].id === 'starter' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
+  check('every emote has one of the 6 core moods', L.EMOTE_MOODS.length === 6 && L.EMOTES.every(e => L.EMOTE_MOODS.includes(e.mood)), L.EMOTES.filter(e => !L.EMOTE_MOODS.includes(e.mood)).map(e => e.id));
+  check('every set is balanced: one emote per mood, in mood order', L.EMOTE_SETS.every(s => s.emotes.map(id => L.EMOTES.find(e => e.id === id).mood).join() === L.EMOTE_MOODS.join()), L.EMOTE_SETS.map(s => [s.id, s.emotes.map(id => (L.EMOTES.find(e => e.id === id) || {}).mood)]));
   check('a new player owns and has equipped only the Starter set', JSON.stringify(L.P.emoteSets) === '["starter"]' && L.P.emoteSet === 'starter', [L.P.emoteSets, L.P.emoteSet]);
   check('the picker holds only the equipped set (6 emotes)', panel.querySelectorAll('.em-pick').length === 6 && E.list().join() === L.EMOTE_SETS[0].emotes.join());
   check('every emote is a 2D vector sticker (inline SVG on the 172x109 grid, no image files)', L.EMOTES.every(e => /^<svg viewBox="0 0 172 109"/.test(e.art) && !/<image|\.png|\.jpg/.test(e.art)));
@@ -64,7 +66,7 @@
   btn.click(); panel.querySelector('[data-emote="laugh"]').click();
   check('a picked emote pops in with a small bounce, then fades out (test mode freezes animation, so read the rule)', bubbleOf(0) && [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.selectorText === '.emote-bubble' && /emPop/.test(r.style.animation) && /emOut/.test(r.style.animation)); } catch (e) { return false; } }));
   check('after sending, the picker cools down (greyed, taps ignored)', panel.classList.contains('cooling'));
-  btn.click(); panel.querySelector('[data-emote="cool"]').click();
+  btn.click(); panel.querySelector('[data-emote="love"]').click();
   check('a tap during the cooldown sends nothing', !(E.queue[0] || []).length);
   E.setOpen(false); await sleep(220);
   const b0 = bubbleOf(0);
@@ -109,7 +111,7 @@
   // CPU reactions: forced chance, then throttled
   E.reset(); const rnd = Math.random; Math.random = () => 0;
   E.react('capture', 0, [[1, 0]]); await sleep(1000);
-  check('a CPU whose pawn is captured may react (cry / angry / shocked / facepalm / disappointed)', bubbleOf(1) && ['cry', 'angry', 'wow', 'facepalm', 'sad'].includes(bubbleOf(1).dataset.emote));
+  check('a CPU whose pawn is captured may react (cry / angry / shocked / facepalm / disappointed / grr / hmph)', bubbleOf(1) && ['cry', 'angry', 'wow', 'facepalm', 'sad', 'grr', 'hmph'].includes(bubbleOf(1).dataset.emote));
   E.react('capture', 0, [[2, 0]]); await sleep(1000);
   check('reactions are throttled (no burst right after)', !bubbleOf(2));
   Math.random = rnd;
@@ -139,9 +141,9 @@
   L.closeSheet('shopSheet');
   L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(300);
   btn.click(); await sleep(30);
-  check('in the game, the picker now holds only the Pawn Pals emotes', [...panel.querySelectorAll('.em-pick')].map(b => b.dataset.emote).join() === pals.emotes.join());
-  panel.querySelector('[data-emote="champ"]').click(); await sleep(220);
-  check('a Pawn Pals emote plays on your avatar', bubbleOf(0) && bubbleOf(0).dataset.emote === 'champ');
+  check('in the game, the picker now holds only the Party Set emotes', [...panel.querySelectorAll('.em-pick')].map(b => b.dataset.emote).join() === pals.emotes.join());
+  panel.querySelector('[data-emote="party"]').click(); await sleep(220);
+  check('a Party Set emote plays on your avatar', bubbleOf(0) && bubbleOf(0).dataset.emote === 'party');
   L.goHome(); L.renderInv(); L.openSheet('invSheet'); await sleep(30);
   const inv = [...$('invEmotes').querySelectorAll('.item')];
   check('Inventory > Emotes lists only owned sets', inv.length === 2);

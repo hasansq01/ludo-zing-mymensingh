@@ -4251,6 +4251,8 @@ const stInk = (d, col, w = 3.4) => `<path d="${d}" stroke="#fff" stroke-width="$
 const stZ = (x, y, s) => stPart('sa-rise', '', '', `-${(10 - s) * .3}s`, stInk(`M${x} ${y}h${s}l-${s} ${s}h${s}`, '#3b7be0', 2.4 + s * .12));
 const stQ = (x, y) => stPart('sa-wobble', '', '', stDelay(), stInk(`M${x - 5} ${y - 4}a5.5 5.5 0 1 1 7.5 5.2c-1.6.8-2.4 2-2.4 4`, '#3b7be0', 3.6) + `<circle cx="${x + .1}" cy="${y + 12}" r="2.9" fill="#3b7be0" stroke="#fff" stroke-width="2"/>`);
 const stAnger = (x, y) => stPart('sa-throb', '', '', stDelay(), stInk(`M${x - 7} ${y - 2}q5 0 5-5M${x + 2} ${y - 7}q0 5 5 5M${x + 7} ${y + 2}q-5 0-5 5M${x - 2} ${y + 7}q0-5-5-5`, '#e5484d', 3.2));
+// a puff of steam / air: three soft lobes, rising and fading
+const stPuff = (x, y, s = 1) => stPart('sa-rise', '', '', stDelay(), stAcc(`<circle cx="${x}" cy="${y}" r="${4.2 * s}"/><circle cx="${x + 5 * s}" cy="${y - 2.5 * s}" r="${3.4 * s}"/><circle cx="${x + 4.4 * s}" cy="${y + 3 * s}" r="${3 * s}"/>`, '#eef3f8'));
 const stBang = (x, y) => stPart('sa-pop', '', '', '0s', stShard(`${x - 3} ${y - 12}L${x + 4} ${y - 12} ${x + 1.6} ${y + 4} ${x - 1.2} ${y + 4}`, '#f6b72a') + `<circle cx="${x + .2}" cy="${y + 9}" r="2.8" fill="#f6b72a" stroke="#fff" stroke-width="2.2" paint-order="stroke"/>`);
 // the yellow excitement shards of the approved victory sticker, shifted
 const stShards = (dx = 0, dy = 0) => `<g transform="translate(${dx} ${dy})">` +
@@ -4301,6 +4303,8 @@ const STE = {
   heart: g => `<path d="${stHeartD(g.l, g.y, 1.9)}" fill="#ff3d5e" stroke="${ST.ol}" stroke-width="1.8" stroke-linejoin="round"/><path d="${stHeartD(g.r, g.y, 1.9)}" fill="#ff3d5e" stroke="${ST.ol}" stroke-width="1.8" stroke-linejoin="round"/>` +
     `<circle cx="${g.l - 3}" cy="${g.y - 3}" r="1.2" fill="#fff"/><circle cx="${g.r - 3}" cy="${g.y - 3}" r="1.2" fill="#fff"/>`,
   wink: g => stLine(`M${g.l - 4.8} ${g.y + 2}q4.8-6.6 9.6 0`, 2.8) + stDotEye(g.r, g.y),
+  // shut in a huff: heavy lids, a lash flick at each outer corner
+  lid: g => stLine(`M${g.l - 5} ${g.y}q5 3 10 0M${g.r - 5} ${g.y}q5 3 10 0M${g.l - 5} ${g.y}l-2.4-2M${g.r + 5} ${g.y}l2.4-2`, 2.8),
   shades: g => [g.l, g.r].map(x => `<path d="M${x - 8.5} ${g.y - 5.5}h17q.8 10.5-8.5 10.5t-8.5-10.5z" fill="#1d1922" stroke="${ST.ol}" stroke-width="2" stroke-linejoin="round"/><path d="M${x - 5} ${g.y - 3}l3.5 4.5" stroke="#8d93b8" stroke-width="1.8" stroke-linecap="round"/>`).join('') +
     stLine(`M${g.l + 8.5} ${g.y - 4}h${g.r - g.l - 17}M${g.l - 8.5} ${g.y - 5}l-4 -1.5M${g.r + 8.5} ${g.y - 5}l4-1.5`, 2.4),
 };
@@ -4323,6 +4327,7 @@ const STM = {
   snore: g => `<ellipse cx="${g.cx}" cy="${g.m + 3}" rx="3.2" ry="2.6" fill="#7a1d22" stroke="${ST.ol}" stroke-width="1.8"/>`,
   grit: g => `<path d="M${g.cx - 9} ${g.m + 7}q9-9 18 0z" fill="#fff" stroke="${ST.ol}" stroke-width="2.2" stroke-linejoin="round"/>` + stLine(`M${g.cx - 3} ${g.m + 3.4}v3.6M${g.cx + 3} ${g.m + 3.4}v3.6`, 1.4),
   flat: g => stLine(`M${g.cx - 5} ${g.m + 3}q5 1.4 10-.8`, 2.8),
+  pout: g => stLine(`M${g.cx - 4.5} ${g.m + 5}q4.5-4 9 0`, 2.8),
 };
 const stBlush = g => `<ellipse cx="${g.l - 3}" cy="${g.y + 9.5}" rx="5.2" ry="3.3" fill="#ff8f9a" opacity=".6"/><ellipse cx="${g.r + 3}" cy="${g.y + 9.5}" rx="5.2" ry="3.3" fill="#ff8f9a" opacity=".6"/>`;
 // face parts move too: laughing / crying mouths open and close, an O pulses, a tongue wags; smiling eyes squint with
@@ -4453,6 +4458,19 @@ Object.assign(EMOTE_STICKERS, {
     arms: stPart('sa-arm sa-arm-point', '108px 86px', '8deg', '0s', stTube('M108 86L118 70', ST_SLEEVE, 13)),
     front: stPart('sa-arm sa-arm-point', '108px 86px', '8deg', '0s', stPoint('tease-h', 122, 63, 8.4, ...ST_HAND, -25)),
     extra: stStar(134, 30, 1.2) + stStar(40, 26, .9) + stStar(126, 10, .7) }),
+  // Grr!: the hoodie boy fuming, red in the face, one fist shaking, steam from both ears
+  grr: stBoy('grr', ['#f08a2c', '#c96a16'],
+      `<ellipse cx="71" cy="55" rx="7" ry="4.4" fill="#ff4a4a" opacity=".45"/><ellipse cx="97" cy="55" rx="7" ry="4.4" fill="#ff4a4a" opacity=".45"/>` +
+      stFace(ST_BG, 'dot', 'grit', 'angry'), {
+    mood: 'sa-rage',
+    front: stArm('grr-r', 'M112 99Q121 84 122 66', '#f08a2c', 12, 'fist', 122, 58, 9, ST_HAND, 8, 16),
+    extra: stPuff(42, 38, 1.1) + stPuff(36, 26, .8) + stPuff(130, 30, 1) + stAnger(118, 12) }),
+  // Hmph!: a hijab girl with her arms crossed, eyes shut, pouting, a huff of air beside her
+  hmph: stHijab('hmph', ['#9b6be0', '#7a4cc0', '#c9a8ff'], stFace(ST_HG, 'lid', 'pout', 'angry', true), {
+    mood: 'sa-tilt',
+    front: stTube('M58 92Q78 86 101 81', ST_SLEEVE, 12.5) + stFist('hmph-h', 103, 80, 7.4, ...ST_HAND, 70) +
+      stTube('M112 93Q92 88 70 82', ST_SLEEVE, 12.5) + stLine('M64 88Q80 84 96 83', 1.6, '#36211c'),
+    extra: stPuff(122, 50, 1.1) + stPuff(132, 42, .8) + stAnger(122, 16) }),
   // ---- game ----
   dice: stSticker('dice', `<g class="sa-roll"><g transform="rotate(-10 82 60)">` +
       stSil(`<path d="M82 22L114 36V74L82 90L50 74V36z"/>`, '#fffaf2') +
@@ -4501,46 +4519,51 @@ Object.assign(EMOTE_STICKERS, {
       stPart('sa-pop', '', '', '0s', stLine('M34 30l7 4M32 42h8M36 54l7-3', 2.6, '#f6b72a'))),
 });
 
+/* Every emote has one of six core moods (EMOTE_MOODS) and every set holds one emote of each mood, in this order, so
+   whichever set is equipped a player can always say happy, funny, sad, angry, surprised and friendly.
+   Retired 2026-11-03 for Grr! and Hmph! (their art stays in EMOTE_STICKERS): Sleepy, Thinking. */
+const EMOTE_MOODS = ['happy', 'funny', 'sad', 'angry', 'surprised', 'friendly'];
 const EMOTES = [
   // ---- pawns ----
-  { id: 'happy', group: 'pawn', name: 'Victory', ch: 'ðŸ™Œ', motion: 'em-jump' },
-  { id: 'laugh', group: 'pawn', name: 'Laugh', ch: 'ðŸ˜‚', motion: 'em-shake' },
-  { id: 'cool', group: 'pawn', name: 'Cool', ch: 'ðŸ˜Ž', motion: 'em-tilt' },
-  { id: 'angry', group: 'pawn', name: 'Angry', ch: 'ðŸ˜¡', motion: 'em-rage' },
-  { id: 'love', group: 'pawn', name: 'Love', ch: 'ðŸ˜', motion: 'em-beat' },
-  { id: 'sleepy', group: 'pawn', name: 'Sleepy', ch: 'ðŸ˜´', motion: 'em-float' },
-  { id: 'confused', group: 'pawn', name: 'Confused', ch: 'ðŸ˜•', motion: 'em-wobble' },
-  { id: 'hi', group: 'pawn', name: 'Hi!', ch: 'ðŸ‘‹', motion: 'em-wave' },
-  { id: 'party', group: 'pawn', name: 'Celebrate', ch: 'ðŸŽ‰', motion: 'em-party' },
-  { id: 'sob', group: 'pawn', name: 'Sob', ch: 'ðŸ˜¢', motion: 'em-sob' },
-  { id: 'gasp', group: 'pawn', name: 'Gasp', ch: 'ðŸ˜²', motion: 'em-jump' },
-  { id: 'champ', group: 'pawn', name: 'Champ', ch: 'ðŸ‘', motion: 'em-beat' },
+  { id: 'happy', group: 'pawn', mood: 'happy', name: 'Victory', ch: '🙌', motion: 'em-jump' },
+  { id: 'laugh', group: 'pawn', mood: 'funny', name: 'Laugh', ch: '😂', motion: 'em-shake' },
+  { id: 'cool', group: 'pawn', mood: 'funny', name: 'Cool', ch: '😎', motion: 'em-tilt' },
+  { id: 'angry', group: 'pawn', mood: 'angry', name: 'Angry', ch: '😡', motion: 'em-rage' },
+  { id: 'love', group: 'pawn', mood: 'friendly', name: 'Love', ch: '😍', motion: 'em-beat' },
+  { id: 'confused', group: 'pawn', mood: 'surprised', name: 'Confused', ch: '😕', motion: 'em-wobble' },
+  { id: 'hi', group: 'pawn', mood: 'friendly', name: 'Hi!', ch: '👋', motion: 'em-wave' },
+  { id: 'party', group: 'pawn', mood: 'happy', name: 'Celebrate', ch: '🎉', motion: 'em-party' },
+  { id: 'sob', group: 'pawn', mood: 'sad', name: 'Sob', ch: '😢', motion: 'em-sob' },
+  { id: 'gasp', group: 'pawn', mood: 'surprised', name: 'Gasp', ch: '😲', motion: 'em-jump' },
+  { id: 'champ', group: 'pawn', mood: 'friendly', name: 'Champ', ch: '👍', motion: 'em-beat' },
   // ---- friends ----
-  { id: 'cry', group: 'friend', name: 'Cry', ch: 'ðŸ˜­', motion: 'em-sob' },
-  { id: 'wow', group: 'friend', name: 'Shocked', ch: 'ðŸ˜®', motion: 'em-jump' },
-  { id: 'facepalm', group: 'friend', name: 'Facepalm', ch: 'ðŸ¤¦', motion: 'em-float' },
-  { id: 'cheer', group: 'friend', name: 'Yay!', ch: 'ðŸ¥³', motion: 'em-jump' },
-  { id: 'think', group: 'friend', name: 'Thinking', ch: 'ðŸ¤”', motion: 'em-wobble' },
-  { id: 'tease', group: 'friend', name: 'Tease', ch: 'ðŸ˜œ', motion: 'em-shake' },
+  { id: 'cry', group: 'friend', mood: 'sad', name: 'Cry', ch: '😭', motion: 'em-sob' },
+  { id: 'wow', group: 'friend', mood: 'surprised', name: 'Shocked', ch: '😮', motion: 'em-jump' },
+  { id: 'facepalm', group: 'friend', mood: 'angry', name: 'Facepalm', ch: '🤦', motion: 'em-float' },
+  { id: 'cheer', group: 'friend', mood: 'happy', name: 'Yay!', ch: '🥳', motion: 'em-jump' },
+  { id: 'tease', group: 'friend', mood: 'funny', name: 'Tease', ch: '😜', motion: 'em-shake' },
+  { id: 'grr', group: 'friend', mood: 'angry', name: 'Grr!', ch: '😠', motion: 'em-rage' },
+  { id: 'hmph', group: 'friend', mood: 'angry', name: 'Hmph!', ch: '😤', motion: 'em-tilt' },
   // ---- game ----
-  { id: 'dice', group: 'game', name: 'Roll it!', ch: 'ðŸŽ²', motion: 'em-roll' },
-  { id: 'crown', group: 'game', name: 'Winner', ch: 'ðŸ‘‘', motion: 'em-beat' },
-  { id: 'sad', group: 'game', name: 'Disappointed', ch: 'ðŸ’”', motion: 'em-sob' },
-  { id: 'highfive', group: 'game', name: 'High five', ch: 'ðŸ™', motion: 'em-clap' },
-  { id: 'flag', group: 'game', name: 'Give up', ch: 'ðŸ³ï¸', motion: 'em-wave' },
-  { id: 'peek', group: 'game', name: 'Peek-a-boo', ch: 'ðŸ«£', motion: 'em-float' },
+  { id: 'dice', group: 'game', mood: 'funny', name: 'Roll it!', ch: '🎲', motion: 'em-roll' },
+  { id: 'crown', group: 'game', mood: 'happy', name: 'Winner', ch: '👑', motion: 'em-beat' },
+  { id: 'sad', group: 'game', mood: 'sad', name: 'Disappointed', ch: '💔', motion: 'em-sob' },
+  { id: 'highfive', group: 'game', mood: 'friendly', name: 'High five', ch: '🙏', motion: 'em-clap' },
+  { id: 'flag', group: 'game', mood: 'sad', name: 'Give up', ch: '🏳️', motion: 'em-wave' },
+  { id: 'peek', group: 'game', mood: 'surprised', name: 'Peek-a-boo', ch: '🫣', motion: 'em-float' },
 ].map(e => ({ ...e, art: EMOTE_STICKERS[e.id] }));
 // every copy of a sticker on the page gets its own clip-path ids (a copy may sit in a hidden panel)
 let emUid = 0;
 const emArt = e => { const n = ++emUid; return e.art.replace(/(id="|url\(#)(st[\w-]+)/g, `$1$2-${n}`); };
-/* Emote sets: six emotes each (the rows of the user's reference sheet). One set is equipped and only its emotes appear
+/* Emote sets: six emotes each, one per mood in EMOTE_MOODS order. One set is equipped and only its emotes appear
    in the game; the Starter set is free and always owned, the others are bought in Shop > Emotes with coins
-   (commitProfile, like scenes). P.emoteSets = owned ids, P.emoteSet = the equipped one. */
+   (commitProfile, like scenes). P.emoteSets = owned ids, P.emoteSet = the equipped one. The ids predate the mood
+   regrouping (2026-11-03) and stay as they are, so purchases already saved keep working. */
 const EMOTE_SETS = [
-  { id: 'starter', name: 'Starter Set', price: 0, desc: 'Pawn pals cheer, laugh, sulk and celebrate.', emotes: ['happy', 'laugh', 'cool', 'angry', 'love', 'party'], g: 'linear-gradient(160deg,#ffe9d2,#ffc9a0)' },
-  { id: 'pawns', name: 'Pawn Pals', price: 2500, desc: 'More pawn moods: champ, sleepy, sob, gasp, confused, hi.', emotes: ['champ', 'sleepy', 'sob', 'gasp', 'confused', 'hi'], g: 'linear-gradient(160deg,#fff3c4,#ffd36a)' },
-  { id: 'friends', name: 'Friends Set', price: 4000, desc: 'A hoodie boy and hijab girls react for you.', emotes: ['cry', 'wow', 'facepalm', 'cheer', 'think', 'tease'], g: 'linear-gradient(160deg,#dff3ef,#9fdcd0)' },
-  { id: 'game', name: 'Game Set', price: 3500, desc: 'Dice, crown, high five, white flag and more.', emotes: ['dice', 'crown', 'highfive', 'flag', 'sad', 'peek'], g: 'linear-gradient(160deg,#e6efff,#a9c4f5)' },
+  { id: 'starter', name: 'Starter Set', price: 0, desc: 'One of every mood: cheer, laugh, sob, rage, shock and love.', emotes: ['happy', 'laugh', 'sob', 'angry', 'wow', 'love'], g: 'linear-gradient(160deg,#ffe9d2,#ffc9a0)' },
+  { id: 'pawns', name: 'Party Set', price: 2500, desc: 'Celebrate, tease, cry, facepalm, gasp and say hi.', emotes: ['party', 'tease', 'cry', 'facepalm', 'gasp', 'hi'], g: 'linear-gradient(160deg,#fff3c4,#ffd36a)' },
+  { id: 'friends', name: 'Cheeky Set', price: 4000, desc: 'Yay, play it cool, sulk, growl, peek and high five.', emotes: ['cheer', 'cool', 'sad', 'grr', 'peek', 'highfive'], g: 'linear-gradient(160deg,#dff3ef,#9fdcd0)' },
+  { id: 'game', name: 'Champion Set', price: 3500, desc: 'Wear the crown, roll it, give up, huff, puzzle and thumbs up.', emotes: ['crown', 'dice', 'flag', 'hmph', 'confused', 'champ'], g: 'linear-gradient(160deg,#e6efff,#a9c4f5)' },
 ];
 const emoteSet = id => EMOTE_SETS.find(s => s.id === id);
 const Emotes = (() => {
@@ -4681,7 +4704,7 @@ const Emotes = (() => {
     if (kind === 'capture') {
       const owners = [...new Set(victims.map(v => v[0]))];
       const hurt = owners.find(o => S.players[o] === 'cpu' && isHuman(c));
-      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow', 'facepalm', 'sad'], .4)) return;
+      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow', 'facepalm', 'sad', 'grr', 'hmph'], .4)) return;
       if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool', 'tease'], .35);
     } else if (kind === 'win') {
       const winners = teamOn() ? [c, mateOf(c)] : [c];
@@ -7492,7 +7515,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { EMOTE_STICKERS, Emotes, EMOTES, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { EMOTE_STICKERS, Emotes, EMOTES, EMOTE_MOODS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
