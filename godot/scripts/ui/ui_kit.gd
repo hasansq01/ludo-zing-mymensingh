@@ -1109,6 +1109,13 @@ static func segmented(options: Array, selected, on_pick: Callable, size: Variant
 	return row
 
 
+## Greys out one choice of a segmented() row (its Button): it can't be picked, its label fades.
+static func segmented_disable(b: Button) -> void:
+	b.disabled = true
+	b.add_theme_stylebox_override("disabled", b.get_theme_stylebox("normal"))
+	b.add_theme_color_override("font_disabled_color", Color(Palette.MUTED, 0.4))
+	b.mouse_default_cursor_shape = Control.CURSOR_ARROW
+
 # =====================================================================================================================
 # Tags, badges, pills, mounts
 # =====================================================================================================================

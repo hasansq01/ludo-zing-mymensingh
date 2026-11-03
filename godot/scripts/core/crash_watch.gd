@@ -119,6 +119,10 @@ func begin(start_timer := true) -> void:
 	if native == null and Engine.has_singleton(SINGLETON):
 		native = Engine.get_singleton(SINGLETON)
 	info = _native_info(int(_read(STATE).get("last_exit_at", 0)))
+	# the last run died on a graphics tier this phone can't hold: this run (and every later one) starts a tier lower
+	var dead := CrashReport.blame_tier(cur, info.get("exits", []) if info.get("exits") is Array else [],
+		int(_read(STATE).get("last_exit_at", 0)))
+	var lowered := Quality.learn_crash(dead) if dead != "" else ""
 	var now := _now()
 	var sid := "%x%s" % [now, Crypto.new().generate_random_bytes(4).hex_encode()]
 	session = {v = CrashReport.VERSION, sid = sid, app = CrashReport.app_of(info), device = device_facts(info),
@@ -127,6 +131,8 @@ func begin(start_timer := true) -> void:
 	if _native_has("diag_set_state"):
 		native.call("diag_set_state", sid)
 	note("start", "%s %s" % [session.app.name, session.app.code])
+	if lowered != "":
+		note("quality_cap", "%s > %s" % [dead, lowered])
 	sample()
 	if start_timer:
 		_timer = Timer.new()
@@ -298,6 +304,16 @@ func resumed() -> void:
 	session.fg = true
 	note("resume")
 	sample()
+
+## Settings switched the graphics tier (Quality.set_tier): the record says which tier runs since when, so a death soon
+## after blames it (CrashReport.blame_tier).
+func set_tier(t: String) -> void:
+	if not _started:
+		return
+	session.tier = t
+	session.tier_at = _now()
+	note("quality", t)
+	write(true)
 
 ## A clean end: "background" (the app went away; Android may kill it there), "quit", "exit".
 func mark_ended(why: String) -> void:

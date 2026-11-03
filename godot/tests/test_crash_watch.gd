@@ -41,15 +41,94 @@ var _dir := ""
 var _sent: Array = []
 var _answer := {ok = true, status = 200}
 
+## Stands in for the Save autoload while CrashWatch lowers the graphics cap (never the real prefs / save.json).
+class FakeSave extends Node:
+	var prefs := {}
+	var saves := 0
+	func save() -> void:
+		saves += 1
+
 func run() -> void:
 	_root = (Engine.get_main_loop() as SceneTree).root
 	_dir = "user://test_diag_%d" % (Time.get_ticks_usec() % 1000000)
+	var keep_save: Node = Quality.save_node
+	var keep_tier: String = Quality._tier
+	var keep_lowered: Dictionary = Quality.lowered
+	var fake := FakeSave.new()
+	fake.prefs = {quality = "auto"}
+	Quality.save_node = fake                   # the watch tests' dead runs lower the cap: on the stand-in only
 	_decide_tests()
+	_blame_tests()
 	_build_tests()
 	_log_tests()
 	await _watch_tests()
+	_cap_tests(fake)
 	_wiring_tests()
 	_rm_tree(_dir)
+	Quality.save_node = keep_save
+	Quality._tier = keep_tier
+	Quality.lowered = keep_lowered
+	fake.free()
+
+
+# ---------- CrashReport.blame_tier ----------
+
+func _blame_tests() -> void:
+	var run := {sid = "s1", started_at = NOW - 60000, last_at = NOW - 30000, ended = false, device = {tier = "medium"}}
+	check("blame: died 30 s into a Medium run (no exit record): Medium", R.blame_tier(run, [], 0) == "medium")
+	var long := run.duplicate(true)
+	long.started_at = NOW - 40 * 60000
+	check("blame: a crash 40 minutes in is not the tier's fault", R.blame_tier(long, [{reason = "crash_native", at = NOW, summary = "s1"}], 0) == "")
+	check("blame: out of memory blames the tier at any time", R.blame_tier(long, [{reason = "low_memory", at = NOW, summary = "s1"}], 0) == "medium")
+	check("blame: the user stopping the app blames nothing", R.blame_tier(run, [{reason = "user_requested", at = NOW, summary = "s1"}], 0) == "")
+	var ended := run.duplicate(true)
+	ended.ended = true
+	check("blame: a clean end blames nothing", R.blame_tier(ended, [], 0) == "" and R.blame_tier({}, [], 0) == "")
+	var switched := long.duplicate(true)
+	switched.tier = "high"
+	switched.tier_at = NOW - 60000
+	check("blame: died a minute after switching to High in Settings: High", R.blame_tier(switched, [{reason = "crash", at = NOW, summary = "s1"}], 0) == "high")
+
+
+# ---------- the graphics cap after a death (CrashWatch.begin > Quality.learn_crash) ----------
+
+func _cap_tests(fake: FakeSave) -> void:
+	fake.prefs = {quality = "high"}
+	Quality.lowered = {}
+	Quality._tier = ""
+	Quality._detected = "high"
+	var nat := FakeNative.new()
+	var w := _watch(nat, NOW + 50 * DAY_MS)
+	w.begin(false)
+	_root.add_child(w)
+	check("a run starts on the saved pick (High)", w.session.device.tier == "high", w.session.device)
+	w.sample()
+	_die(w)
+	var w2 := _watch(nat, NOW + 50 * DAY_MS + 10000)
+	w2.begin(false)
+	_root.add_child(w2)
+	check("died seconds into High: the next run starts on Medium, held there", w2.session.device.tier == "medium" \
+		and fake.prefs.quality_cap == "medium" and fake.prefs.quality == "auto" and Quality.cap() == "medium", [w2.session.device, fake.prefs])
+	check("...says so once (main's message) and in the record", Quality.lowered == {from = "high", to = "medium"} \
+		and (w2.session.crumbs as Array).any(func(c): return c.e == "quality_cap"), Quality.lowered)
+	Quality.set_tier("high")
+	check("Settings can't put it back on High (counts as Auto: Medium)", fake.prefs.quality == "auto" and Quality.tier() == "medium")
+	Quality.set_tier("low")
+	check("a pick is recorded with its time", w2.session.tier == "low" and w2.session.tier_at == NOW + 50 * DAY_MS + 10000)
+	Quality.set_tier("auto")
+	w2.mark_ended("quit")
+	_root.remove_child(w2)
+	w2.free()
+	var w3 := _watch(nat, NOW + 50 * DAY_MS + 20000)
+	w3.begin(false)
+	_root.add_child(w3)
+	check("after a clean quit nothing is lowered further", fake.prefs.quality_cap == "medium" and w3.session.device.tier == "medium")
+	w3.mark_ended("quit")
+	_root.remove_child(w3)
+	w3.free()
+	Quality._detected = ""
+	Quality._tier = ""
+	Quality.lowered = {}
 
 
 # ---------- CrashReport.decide ----------

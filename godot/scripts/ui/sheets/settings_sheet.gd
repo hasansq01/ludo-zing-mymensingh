@@ -374,8 +374,8 @@ func _link_line(text: String, on_tap: Callable, danger := false) -> Control:
 		on_tap.call())
 	return row
 
-## Graphics: the label (and the launch note under it) over a full-width Auto / Low / Medium / High choice; Auto names
-## the tier this phone gets (Quality.detected()).
+## Graphics: the label (and the note under it) over a full-width Auto / Low / Medium / High choice; Auto names the
+## tier this phone gets (Quality.cap()), the tiers above it are greyed out and the note says they aren't available.
 func _graphics_line() -> Control:
 	var row := Row.new()
 	row.name = "Graphics"
@@ -386,9 +386,12 @@ func _graphics_line() -> Control:
 	var box := _label_box(tr("Graphics"), " ")
 	_gfx_note = box.get_child(1) as Label
 	v.add_child(box)
-	var opts := [["auto", tr("Auto (%s)") % tr(Quality.detected().capitalize())], ["low", tr("Low")], ["medium", tr("Medium")], ["high", tr("High")]]
+	var opts := [["auto", tr("Auto (%s)") % tr(Quality.cap().capitalize())], ["low", tr("Low")], ["medium", tr("Medium")], ["high", tr("High")]]
 	var seg := UIKit.segmented(opts, Quality.saved_pref(), _on_quality, "sm")
 	seg.name = "QualitySeg"
+	for b: Button in seg.get_children():
+		if not Quality.allowed(str(b.get_meta("value"))):
+			UIKit.segmented_disable(b)            # more than this phone can run: it would close the game
 	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UIKit.fit_segmented(seg)                      # the four labels share one size; "Auto (Medium)" gets the room it needs
 	v.add_child(seg)
@@ -420,11 +423,18 @@ func _on_language(v: Variant) -> void:
 	L10n.apply(v)
 	_build()
 
-## The launch note under Graphics: only when the pick changes something read at startup (Quality.needs_restart).
+## The note under Graphics: which tiers this phone can't run (above Quality.cap()), and when the pick changes
+## something read at startup (Quality.needs_restart).
 func _gfx_hint(t: String) -> void:
 	if _gfx_note == null:
 		return
-	_gfx_note.text = tr("Texture detail applies on next launch.") if Quality.needs_restart(t) else ""
+	var lines: Array[String] = []
+	match Quality.cap():
+		"low": lines.append(tr("Medium and High are too heavy for this phone."))
+		"medium": lines.append(tr("High is too heavy for this phone."))
+	if Quality.needs_restart(t):
+		lines.append(tr("Texture detail applies on next launch."))
+	_gfx_note.text = " ".join(lines)
 	_gfx_note.visible = _gfx_note.text != ""
 
 func _on_quality(t: Variant) -> void:

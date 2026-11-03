@@ -259,10 +259,46 @@ func _settings() -> void:
 		Quality._launch = ""
 		Quality._tex_used = used
 	sheet.free()
+	_cap(fake)
 	root.free()
 	fake.free()
 	Quality.save_node = null
 	Quality._vp = null
+	Quality.force("")
+
+## The cap: never above the detected tier, lower after a death (learn_crash); Settings greys out what's above it.
+func _cap(fake: FakeSave) -> void:
+	var keep: String = Quality._detected
+	Quality.force("")
+	Quality._detected = "low"                                    # a Helio P35 / PowerVR GE8320 phone (vivo Y21)
+	fake.prefs = {quality = "medium"}                            # picked by an older version, before the cap
+	check("cap: a Low phone's saved Medium runs as Low, shows as Auto", Quality.tier() == "low" and Quality.saved_pref() == "auto" and Quality.cap() == "low")
+	check("cap: allowed(): Low and Auto only", Quality.allowed("low") and Quality.allowed("auto") and not Quality.allowed("medium") and not Quality.allowed("high"))
+	Quality.set_tier("high")
+	check("cap: set_tier above the cap saves Auto", fake.prefs.quality == "auto" and Quality.tier() == "low")
+	var sheet := SettingsSheet.new()
+	var seg := sheet.find_child("QualitySeg", true, false) as Container
+	var off: Array = seg.get_children().filter(func(b: Button): return b.disabled).map(func(b: Button): return b.get_meta("value"))
+	check("Settings: Medium and High greyed out on a Low phone", off == ["medium", "high"], off)
+	check("Settings: Auto names the cap", (seg.get_child(0) as Button).text == "Auto (Low)", (seg.get_child(0) as Button).text)
+	check("Settings: the note says why", sheet._gfx_note.visible and sheet._gfx_note.text.contains("too heavy"), sheet._gfx_note.text)
+	sheet.free()
+	Quality._detected = "high"
+	fake.prefs = {quality = "high"}
+	Quality.force("")
+	Quality.lowered = {}
+	check("learn_crash(low): low is the floor", Quality.learn_crash("low") == "" and not fake.prefs.has("quality_cap"))
+	check("learn_crash(high): held on Medium, the High pick becomes Auto", Quality.learn_crash("high") == "medium" \
+		and fake.prefs.quality_cap == "medium" and fake.prefs.quality == "auto" and Quality.tier() == "medium" and Quality.lowered.to == "medium")
+	check("learn_crash(high) again: already held lower, nothing changes", Quality.learn_crash("high") == "")
+	check("learn_crash(medium): down to Low", Quality.learn_crash("medium") == "low" and Quality.cap() == "low")
+	sheet = SettingsSheet.new()
+	seg = sheet.find_child("QualitySeg", true, false) as Container
+	off = seg.get_children().filter(func(b: Button): return b.disabled).map(func(b: Button): return b.get_meta("value"))
+	check("Settings: a learned cap greys out the same way", off == ["medium", "high"], off)
+	sheet.free()
+	Quality._detected = keep
+	Quality.lowered = {}
 	Quality.force("")
 
 func _overlay() -> void:

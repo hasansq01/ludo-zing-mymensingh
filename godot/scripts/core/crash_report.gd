@@ -31,6 +31,9 @@ const BENIGN_REASONS := ["user_requested", "user_stopped", "package_updated", "p
 	"permission_change"]
 ## An exit counts for a session when it happened after the session began (minus this slack, clock jitter).
 const EXIT_SLACK_MS := 5000
+## blame_tier(): a death (other than running out of memory) this soon after the run started on its tier, or switched
+## to it, blames the tier.
+const EARLY_DEATH_MS := 3 * 60 * 1000
 
 
 # ---------- the decision ----------
@@ -61,6 +64,24 @@ static func decide(prev: Dictionary, exits: Array, state: Dictionary, now_ms: in
 	out.send = true
 	out.why = out.trigger
 	return out
+
+## The graphics tier the previous run died on, "" when it didn't die or the tier isn't to blame: the run never ended
+## cleanly, its exit (if any) is not a benign one, and it ran out of memory (low_memory: at any time) or died within
+## EARLY_DEATH_MS of starting on that tier (prev.tier / prev.tier_at: a switch in Settings; else device.tier at
+## the start). Quality.learn_crash() then holds the phone one tier lower.
+static func blame_tier(prev: Dictionary, exits: Array, last_handled: int) -> String:
+	if prev.is_empty() or bool(prev.get("ended", false)):
+		return ""
+	var reason := str(pick_exit(prev, exits, last_handled).get("reason", ""))
+	if reason in BENIGN_REASONS:
+		return ""
+	var dev: Variant = prev.get("device", {})
+	var t := str(prev.get("tier", (dev as Dictionary).get("tier", "") if dev is Dictionary else ""))
+	if reason == "low_memory":
+		return t
+	var since := maxi(int(prev.get("started_at", 0)), int(prev.get("tier_at", 0)))
+	var lasted := int(prev.get("last_at", since)) - since
+	return t if lasted < EARLY_DEATH_MS else ""
 
 ## The exit record that belongs to the previous run: newer than `last_handled` (ms), the one carrying the previous
 ## session's id (setProcessStateSummary) if any, else the newest one since that session began ({} when none).

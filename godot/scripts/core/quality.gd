@@ -27,6 +27,12 @@ extends RefCounted
 ## real device): the weakest of the GPU class (gpu_class(): a table of mobile GPU families by their GL_RENDERER name,
 ## with the core count "MC2" / "MP4" where the family spans weak and strong parts and the driver names it), the RAM class (marketing size:
 ## <= 3 GB low, 4 GB medium, 6 GB+ high) and the CPU (4 cores or fewer: low). See docs in classify().
+##
+## The cap (cap()): no phone runs above its detected tier, and a phone whose run on a tier died (out of memory at any
+## time, any other death within EARLY_DEATH_MS of picking it: CrashReport.blame_tier, read by CrashWatch at the next
+## launch) is held one tier lower from then on (learn_crash(): Save.prefs.quality_cap). Settings greys out the tiers
+## above the cap, a saved pick above it counts as "auto", and "auto" is always the cap. A weak phone that was switched
+## to High by an older version (or died on it) starts on its own tier again instead of dying at every launch.
 
 const TIERS := ["low", "medium", "high"]
 const SETTINGS := {
@@ -63,16 +69,60 @@ static var _launch := ""                 # the tier of the first apply() (what t
 static var _vp: WeakRef
 static var _file_args: Variant = null    # ARGS_FILE's options (read once)
 static var _tex_used := false            # texture_scale() was read (textures were baked at the launch tier's size)
+## learn_crash() lowered the cap at this launch: {from, to} (main shows a message once the home screen is up).
+static var lowered := {}
 
 
 # ---------- the tier ----------
 
-## The tier in use: the player's choice, else the detected one.
+## The tier in use: the player's choice (never above the cap), else the cap (debug builds: `--quality=<tier>` wins,
+## uncapped).
 static func tier() -> String:
 	if _tier == "":
 		var p := pref()
-		_tier = p if TIERS.has(p) else detected()
+		_tier = p if TIERS.has(p) else cap()
 	return _tier
+
+## The highest tier this phone may run: the detected one, or lower after a run on a tier died (learned_cap()).
+## "Auto" in Settings is this tier; the tiers above it are greyed out.
+static func cap() -> String:
+	var learned := learned_cap()
+	return _min_tier(detected(), learned) if learned != "" else detected()
+
+## The cap learn_crash() saved (Save.prefs.quality_cap), "" when none.
+static func learned_cap() -> String:
+	var save := _save()
+	if save and save.get("prefs") is Dictionary:
+		var c := str((save.get("prefs") as Dictionary).get("quality_cap", ""))
+		return c if TIERS.has(c) else ""
+	return ""
+
+## Settings may offer tier `t` on this phone ("auto" always).
+static func allowed(t: String) -> bool:
+	return not TIERS.has(t) or TIERS.find(t) <= TIERS.find(cap())
+
+## The previous run died on tier `dead` (CrashWatch.begin, from CrashReport.blame_tier): the cap goes one tier below
+## it, for good (Save.prefs.quality_cap; a saved pick above it becomes "auto"), and `lowered` says so for this launch.
+## Returns the new cap, "" when nothing changed (low is the floor; the cap was already that low).
+static func learn_crash(dead: String) -> String:
+	if not TIERS.has(dead) or dead == TIERS[0]:
+		return ""
+	var to: String = TIERS[TIERS.find(dead) - 1]
+	var cur := learned_cap()
+	if cur != "" and TIERS.find(cur) <= TIERS.find(to):
+		return ""
+	var save := _save()
+	if save == null or not save.get("prefs") is Dictionary:
+		return ""
+	var prefs := save.get("prefs") as Dictionary
+	prefs.quality_cap = to
+	if TIERS.has(str(prefs.get("quality", ""))) and TIERS.find(str(prefs.quality)) > TIERS.find(to):
+		prefs.quality = "auto"
+	if save.has_method("save"):
+		save.save()
+	_tier = ""
+	lowered = {from = dead, to = cap()}
+	return to
 
 ## The tier this device gets on "auto".
 static func detected() -> String:
@@ -87,12 +137,13 @@ static func pref() -> String:
 		return a
 	return saved_pref()
 
-## Only the saved choice (Settings shows it; the command line doesn't change what the player picked).
+## Only the saved choice (Settings shows it; the command line doesn't change what the player picked). A tier above
+## the cap reads as "auto".
 static func saved_pref() -> String:
 	var save := _save()
 	if save and save.get("prefs") is Dictionary:
 		var q := str((save.get("prefs") as Dictionary).get("quality", "auto"))
-		return q if TIERS.has(q) else "auto"
+		return q if TIERS.has(q) and allowed(q) else "auto"
 	return "auto"
 
 ## A debug build's command-line option `--<name>=<value>` ("" when absent; release builds: always ""); a bare
@@ -110,15 +161,21 @@ static func arg(name: String) -> String:
 			return a.trim_prefix("--" + name + "=")
 	return ""
 
-## Settings: pick a tier ("auto" for the detected one), save it and apply it at once to the viewport given to apply()
-## and to the SubViewports under the root (the dice, an open preview).
+## Settings: pick a tier ("auto" for the cap; a tier above the cap counts as "auto"), save it and apply it at once to
+## the viewport given to apply() and to the SubViewports under the root (the dice, an open preview). CrashWatch notes
+## the switch (a death soon after it blames this tier).
 static func set_tier(t: String) -> void:
+	if not TIERS.has(t) or not allowed(t):
+		t = "auto"
 	var save := _save()
 	if save and save.get("prefs") is Dictionary:
-		(save.get("prefs") as Dictionary).quality = t if TIERS.has(t) else "auto"
+		(save.get("prefs") as Dictionary).quality = t
 		if save.has_method("save"):
 			save.save()
-	_tier = t if TIERS.has(t) else detected()
+	_tier = t if TIERS.has(t) else cap()
+	var cw := CrashWatch.instance()
+	if cw:
+		cw.set_tier(_tier)
 	var vp: Viewport = _vp.get_ref() if _vp else null
 	if is_instance_valid(vp):
 		apply(vp)

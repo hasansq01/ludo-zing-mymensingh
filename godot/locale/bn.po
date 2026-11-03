@@ -456,7 +456,7 @@ msgstr "“%s” অর্জন করো"
 #. daily_sheet.gd reward_text()
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
-#: scripts/core/collection.gd:206 scripts/core/rewards.gd:139 scripts/main.gd:886 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
+#: scripts/core/collection.gd:206 scripts/core/rewards.gd:139 scripts/main.gd:889 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
 msgid "%s coins"
 msgstr "%s কয়েন"
 
@@ -1574,103 +1574,109 @@ msgstr "বাদ দাও"
 msgid "Keep learning"
 msgstr "শিখতে থাকো"
 
+# %s: the tier names (Low / Medium / High), first the one the game closed on, then the lower one it now runs on
+#. App (pause menu, dialogs, toasts) · main.gd _ready()
+#: scripts/main.gd:172
+msgid "The game closed on %s graphics, so it now runs on %s."
+msgstr "গেমটি %s গ্রাফিক্সে বন্ধ হয়ে গিয়েছিল, তাই গ্রাফিক্স এখন %s করা হয়েছে।"
+
 # REVIEW: toast when online S&L is tapped; a bit long
 #. App (pause menu, dialogs, toasts) · main.gd _open_setup()
-#: scripts/main.gd:657
+#: scripts/main.gd:660
 msgid "Coming soon for Snakes & Ladders"
 msgstr "সাপ-সিঁড়ি অনলাইনে আসছে শীঘ্রই!"
 
 #. App (pause menu, dialogs, toasts) · main.gd continue_match()
-#: scripts/main.gd:705
+#: scripts/main.gd:708
 msgid "This match can’t be continued."
 msgstr "এই ম্যাচ আর চালানো যাবে না।"
 
 # REVIEW: %s is a countdown like '2h 5m'; reads '<time> পরে ফ্রি কয়েন'
 #. App (pause menu, dialogs, toasts) · main.gd _claim_free()
-#: scripts/main.gd:850
+#: scripts/main.gd:853
 msgid "Free coins in %s"
 msgstr "%s পরে ফ্রি কয়েন"
 
 # testers only: the graphics leak test (seven taps on Settings' version line)
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:928
+#: scripts/main.gd:931
 msgid "Graphics test started: keep the game open for about 4 minutes."
 msgstr "গ্রাফিক্স টেস্ট শুরু হয়েছে: প্রায় 4 মিনিট গেমটি খোলা রাখো।"
 
 # testers only
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:931
+#: scripts/main.gd:934
 msgid "Graphics test: step %d of %d"
 msgstr "গ্রাফিক্স টেস্ট: ধাপ %d / %d"
 
 # testers only
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:933
+#: scripts/main.gd:936
 msgid "Graphics test done. Thank you!"
 msgstr "গ্রাফিক্স টেস্ট শেষ। ধন্যবাদ!"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1008
+#: scripts/main.gd:1011
 msgid "Menu"
 msgstr "মেনু"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1008
+#: scripts/main.gd:1011
 msgid "Paused"
 msgstr "বিরতি"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1013
+#: scripts/main.gd:1016
 msgid "The game keeps going while this is open."
 msgstr "এটা খোলা থাকলেই খেলা চলতে থাকে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1015
+#: scripts/main.gd:1018
 msgid "Back to game"
 msgstr "খেলায় ফেরো"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. settings_sheet.gd _init()
-#: scripts/main.gd:1016 scripts/main.gd:1021 scripts/ui/sheets/settings_sheet.gd:58
+#: scripts/main.gd:1019 scripts/main.gd:1024 scripts/ui/sheets/settings_sheet.gd:58
 msgid "Settings"
 msgstr "সেটিংস"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1017
+#: scripts/main.gd:1020
 msgid "Leave match"
 msgstr "ম্যাচ ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. Home screen · home_screen.gd _build_quick()
-#: scripts/main.gd:1019 scripts/ui/home_screen.gd:353
+#: scripts/main.gd:1022 scripts/ui/home_screen.gd:353
 msgid "Resume"
 msgstr "চালিয়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. update_banner.gd set_mode()
-#: scripts/main.gd:1020 scripts/main.gd:1060 scripts/ui/components/update_banner.gd:95
+#: scripts/main.gd:1023 scripts/main.gd:1063 scripts/ui/components/update_banner.gd:95
 msgid "Restart"
 msgstr "আবার শুরু"
 
 # Pause menu
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1022
+#: scripts/main.gd:1025
 msgid "Exit to home"
 msgstr "হোমে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1033
+#: scripts/main.gd:1036
 msgid "Your place is kept: your reward comes when the game ends."
 msgstr "তোমার জায়গা ঠিক আছে, খেলা শেষ হলে রিওয়ার্ড পাবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1033
+#: scripts/main.gd:1036
 msgid "A bot plays your colour for the rest of the game."
 msgstr "তোমার রঙে বাকি খেলা বট খেলবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1034
+#: scripts/main.gd:1037
 msgid "Leave this match?"
 msgstr "ম্যাচ ছেড়ে যাবে?"
 
@@ -1679,69 +1685,69 @@ msgstr "ম্যাচ ছেড়ে যাবে?"
 #. online.gd _ask_leave_lobby()
 #. Result screen · result_screen.gd _sync_buttons()
 #. lobby_sheet.gd _init()
-#: scripts/main.gd:1034 scripts/main.gd:1069 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
+#: scripts/main.gd:1037 scripts/main.gd:1072 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
 msgid "Leave"
 msgstr "ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1034 scripts/main.gd:1060 scripts/main.gd:1069
+#: scripts/main.gd:1037 scripts/main.gd:1063 scripts/main.gd:1072
 msgid "Keep playing"
 msgstr "খেলতে থাকো"
 
 # REVIEW: online, after you finished
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. finish_card.gd _init()
-#: scripts/main.gd:1034 scripts/ui/components/finish_card.gd:51
+#: scripts/main.gd:1037 scripts/ui/components/finish_card.gd:51
 msgid "Keep watching"
 msgstr "দেখতে থাকো"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1060
+#: scripts/main.gd:1063
 msgid "Restart this game?"
 msgstr "খেলা আবার শুরু করবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1060
+#: scripts/main.gd:1063
 msgid "Everyone goes back to the start."
 msgstr "সবাই আবার শুরু থেকে শুরু করবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1069
+#: scripts/main.gd:1072
 msgid "Leave this game?"
 msgstr "খেলা ছেড়ে যাবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1069
+#: scripts/main.gd:1072
 msgid "Your progress in this match is saved."
 msgstr "এই ম্যাচের প্রোগ্রেস সেভ হয়েছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _on_gems_granted()
 #. store_sheet.gd _on_granted()
-#: scripts/main.gd:1194 scripts/ui/sheets/store_sheet.gd:163
+#: scripts/main.gd:1197 scripts/ui/sheets/store_sheet.gd:163
 msgid "+%s gems"
 msgstr "+%s জেম"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1352
+#: scripts/main.gd:1355
 msgid "Quit Ludo Zing?"
 msgstr "Ludo Zing থেকে বের হবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1352
+#: scripts/main.gd:1355
 msgid "Your progress is saved."
 msgstr "তোমার প্রোগ্রেস সেভ আছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1352
+#: scripts/main.gd:1355
 msgid "Quit"
 msgstr "বের হও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/main.gd:1352 scripts/net/online.gd:244 scripts/net/social.gd:429
+#: scripts/main.gd:1355 scripts/net/online.gd:244 scripts/net/social.gd:429
 msgid "Stay"
 msgstr "থাকো"
 
@@ -2232,7 +2238,7 @@ msgstr "যোগ করো"
 #. Sheets (shared dialogs) · sheet.gd make_confirm()
 #. quick_sheet.gd _build_search()
 #. settings_sheet.gd _confirm_reset()
-#: scripts/net/social.gd:220 scripts/net/social.gd:241 scripts/ui/sheet.gd:811 scripts/ui/sheet.gd:822 scripts/ui/sheets/quick_sheet.gd:124 scripts/ui/sheets/settings_sheet.gd:529
+#: scripts/net/social.gd:220 scripts/net/social.gd:241 scripts/ui/sheet.gd:811 scripts/ui/sheet.gd:822 scripts/ui/sheets/quick_sheet.gd:124 scripts/ui/sheets/settings_sheet.gd:539
 msgid "Cancel"
 msgstr "বাতিল"
 
@@ -4595,7 +4601,7 @@ msgstr "সাহায্য"
 
 #. settings_sheet.gd _build()
 #. settings_sheet.gd _init()
-#: scripts/ui/sheets/settings_sheet.gd:165 scripts/ui/sheets/settings_sheet.gd:692
+#: scripts/ui/sheets/settings_sheet.gd:165 scripts/ui/sheets/settings_sheet.gd:702
 msgid "Credits"
 msgstr "ক্রেডিট"
 
@@ -4666,7 +4672,7 @@ msgstr "গ্রাফিক্স"
 
 #. settings_sheet.gd _graphics_line()
 #. settings_sheet.gd _language_line()
-#: scripts/ui/sheets/settings_sheet.gd:389 scripts/ui/sheets/settings_sheet.gd:404
+#: scripts/ui/sheets/settings_sheet.gd:389 scripts/ui/sheets/settings_sheet.gd:407
 msgid "Auto (%s)"
 msgstr "অটো (%s)"
 
@@ -4685,58 +4691,70 @@ msgstr "মাঝারি"
 msgid "High"
 msgstr "উচ্চ"
 
+# Under Settings > Graphics, when the phone can only run Low (the other two are greyed out)
 #. settings_sheet.gd _gfx_hint()
-#: scripts/ui/sheets/settings_sheet.gd:427
+#: scripts/ui/sheets/settings_sheet.gd:433
+msgid "Medium and High are too heavy for this phone."
+msgstr "মাঝারি আর উচ্চ এই ফোনের জন্য বেশি ভারী।"
+
+# Under Settings > Graphics, when the phone can run up to Medium
+#. settings_sheet.gd _gfx_hint()
+#: scripts/ui/sheets/settings_sheet.gd:434
+msgid "High is too heavy for this phone."
+msgstr "উচ্চ এই ফোনের জন্য বেশি ভারী।"
+
+#. settings_sheet.gd _gfx_hint()
+#: scripts/ui/sheets/settings_sheet.gd:436
 msgid "Texture detail applies on next launch."
 msgstr "টেক্সচার ডিটেইল পরের বার অ্যাপ খুললে লাগবে।"
 
 #. settings_sheet.gd _confirm_reset()
-#: scripts/ui/sheets/settings_sheet.gd:527
+#: scripts/ui/sheets/settings_sheet.gd:537
 msgid "Reset all progress?"
 msgstr "সব প্রোগ্রেস রিসেট করবে?"
 
 #. settings_sheet.gd _confirm_reset()
-#: scripts/ui/sheets/settings_sheet.gd:528
+#: scripts/ui/sheets/settings_sheet.gd:538
 msgid "Your coins, level, stats and items start over. Sound settings stay. This can’t be undone."
 msgstr "তোমার কয়েন, লেভেল, স্ট্যাটস আর জিনিস সব আবার শুরু হবে। সাউন্ড সেটিংস থাকবে। এটা ফেরানো যাবে না।"
 
 #. settings_sheet.gd _confirm_reset()
-#: scripts/ui/sheets/settings_sheet.gd:529
+#: scripts/ui/sheets/settings_sheet.gd:539
 msgid "Reset"
 msgstr "রিসেট"
 
 #. settings_sheet.gd _confirm_reset()
-#: scripts/ui/sheets/settings_sheet.gd:540
+#: scripts/ui/sheets/settings_sheet.gd:550
 msgid "Progress reset."
 msgstr "প্রোগ্রেস রিসেট হয়েছে।"
 
 #. settings_sheet.gd _items()
-#: scripts/ui/sheets/settings_sheet.gd:685
+#: scripts/ui/sheets/settings_sheet.gd:695
 msgid "Made by Flipfold Studio."
 msgstr "বানিয়েছে Flipfold Studio"
 
 #. settings_sheet.gd _items()
-#: scripts/ui/sheets/settings_sheet.gd:686
+#: scripts/ui/sheets/settings_sheet.gd:696
 msgid "Built with Godot. © Juan Linietsky, Ariel Manzur and contributors. MIT licence."
 msgstr "Godot দিয়ে বানানো। © Juan Linietsky, Ariel Manzur ও কন্ট্রিবিউটররা। MIT লাইসেন্স।"
 
 #. settings_sheet.gd _items()
-#: scripts/ui/sheets/settings_sheet.gd:687
+#: scripts/ui/sheets/settings_sheet.gd:697
 msgid "Sounds"
 msgstr "সাউন্ড"
 
 #. settings_sheet.gd _items()
-#: scripts/ui/sheets/settings_sheet.gd:687
+#: scripts/ui/sheets/settings_sheet.gd:697
 msgid "Kenney (kenney.nl), CC0 licence. The music and some effects are original to this game."
 msgstr "Kenney (kenney.nl), CC0 লাইসেন্স। মিউজিক আর কিছু ইফেক্ট এই গেমের নিজস্ব।"
 
 #. settings_sheet.gd _items()
-#: scripts/ui/sheets/settings_sheet.gd:688
+#: scripts/ui/sheets/settings_sheet.gd:698
 msgid "Fonts"
 msgstr "ফন্ট"
 
 #. settings_sheet.gd _items()
-#: scripts/ui/sheets/settings_sheet.gd:688
+#: scripts/ui/sheets/settings_sheet.gd:698
 msgid "Lilita One, Nunito, Baloo Da 2 and Noto Sans Bengali, SIL Open Font License 1.1."
 msgstr "Lilita One, Nunito, Baloo Da 2 ও Noto Sans Bengali, SIL Open Font License 1.1।"
 

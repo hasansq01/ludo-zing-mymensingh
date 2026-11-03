@@ -1,6 +1,6 @@
 extends Control
 ## Dev preview: shows one sheet over a warm background, saves a screenshot and quits.
-## godot --path . res://dev/preview_sheets.tscn -- settings|profile|howto [out_dir]
+## godot --path . res://dev/preview_sheets.tscn -- settings|profile|howto [lowphone] [bn] [out_dir]
 
 const OUT := "/private/tmp/claude-501/-Users-shihabshaharia-Coding-ludo-zing-mymensingh/d8feebe6-eee1-4f48-a116-aa2f313481c9/scratchpad/agent_sheets"
 
@@ -31,6 +31,11 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("/"):
 			out = a
+	if args.has("lowphone"):   # Graphics as a Low phone sees it (Medium / High greyed out)
+		Quality._detected = "low"
+		Quality.force("")
+	if args.has("bn"):
+		L10n.apply("bn")
 	var sheet: Sheet
 	match which:
 		"profile":

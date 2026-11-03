@@ -168,6 +168,9 @@ func _ready() -> void:
 	BootTrace.end("splash gone")
 	_start_account()
 	crash_watch.check_previous.call_deferred()   # did the last run die? (one report, sent a few seconds later)
+	if not Quality.lowered.is_empty():          # the last run died on a tier this phone can't hold (CrashWatch.begin)
+		toast(tr("The game closed on %s graphics, so it now runs on %s.") % [tr(str(Quality.lowered.from).capitalize()),
+			tr(str(Quality.lowered.to).capitalize())])
 	if ShaderCensus.requested():                # debug: draw every material once, list the shader cache
 		home.visible = true
 		_set_screen("home")
