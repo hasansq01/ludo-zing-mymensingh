@@ -52,7 +52,8 @@
   check('every variant keeps a pawn height (0.9 – 1.3)', !bad.height.length, bad.height);
   check('the body of every variant uses the player colour (and drives the movable glow)', !bad.colour.length, bad.colour);
   check('every variant stays under 3,600 triangles', !bad.tris.length, bad.tris);
-  check('Fruity: a different fruit head per colour', new Set([0, 1, 2, 3].map(c => K.meshes('fruity', c)[1].geometry.uuid)).size === 4);
+  check('Fruity: a different fruit head per colour', new Set([0, 1, 2, 3].map(c => K.meshes('fruity', c).filter(m => m.userData.head).map(m => m.geometry.uuid).join())).size === 4);
+  check('every themed skin has its own body (not the Classic one), except Royal Crown and Marble', K.LIST.filter(x => !['classic', 'royal', 'marble'].includes(x.id)).every(x => K.meshes(x.id, 0)[0].geometry !== K.meshes('classic', 0)[0].geometry));
 
   // ---- swapping skins on the board ----
   L.newGame(['human', 'human', 'human', 'human'], false); await sleep(400);

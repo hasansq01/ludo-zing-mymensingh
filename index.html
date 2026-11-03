@@ -1461,6 +1461,7 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
         <h3 class="set-h">Privacy &amp; help</h3>
         <div class="set-row"><span class="set-lab">Privacy<small>Your stats and items are saved with your game progress and are not shared.</small></span></div>
         <div class="set-row"><span class="set-lab">Help<small>Rules, pairs and safe squares.</small></span><button class="pm-btn set-btn" type="button" id="btnHow">How to play</button></div>
+        <div class="set-row" id="setBuild" hidden><span class="set-lab">Version<small id="setBuildTxt"></small></span></div>
       </div>
     </div>
     <div class="set-actions">
@@ -1842,6 +1843,9 @@ let ytAudio = true, halted = false, haltedAt = 0, ytReadySent = false;
 let AC = null;   // Web Audio context, created on the first sound (the SDK may call the audio callback right away)
 if (IN_YT) document.body.classList.add('yt');
 const CLOUD = IN_YT && !DEMO;   // the YouTube cloud save (never in demo mode)
+// which build this is (branch · commit · date), stamped by tools/build.ps1; the source page has none. Shown in Settings,
+// so anyone can tell whether the website runs the newest version.
+{ const b = document.querySelector('meta[name="ludo-build"]'); if (b && b.content) { document.getElementById('setBuildTxt').textContent = b.content; document.getElementById('setBuild').hidden = false; } }
 const Store = {   // one save blob { v, prefs, profile }: YouTube cloud save inside YouTube, browser storage elsewhere
   data: {}, ready: false, timer: 0,
   async load() {
@@ -3190,188 +3194,256 @@ const PawnSkins = (() => {
   });
   const mapped = (key, h, tex, o = {}) => mat(key + h, () => glossy(0xffffff, Object.assign({ map: tex(h), glow: h }, o)));
 
-  /* ---- the 12 skins: build(c) -> { mat: the player-colour material, parts: [[geometry, material, shadow?]] } ---- */
+  /* ---- the 12 skins (after the user's reference sheet, 2026-11-04: each theme has its own body, not the Classic
+     one with a hat): build(c) -> { mat: the player-colour material, parts: [[geometry, material, shadow?, head?]],
+     look / pivot: the Top View head tilt (see pose) }. Every body keeps the Classic base: bottom at y 0, radius .38. */
   const body = m => [pawnGeo, m], head = (m, h = false) => [HEAD(), m, true, h], H = true;   // H: a head part (tips back to face a Top View camera)
+  const lathe = (k, pts, seg = 32) => geo('lathe:' + k, () => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg));
+  const rOf = pts => y => { for (let k = 1; k < pts.length; k++) if (y <= pts[k][1]) { const [r0, y0] = pts[k - 1], [r1, y1] = pts[k]; return r0 + (r1 - r0) * (y - y0) / ((y1 - y0) || 1); } return 0; };
+  // bodies: the bell (Candy, Fruity, Blossom, Pirate, Dragon: the head sits straight on it, no collar), the robe
+  // (Wizard), the suit (Robo Bot, Space Explorer: a capsule on a coloured foot), the crystal column (Ice)
+  const BELL = [[0, 0], [.37, 0], [.38, .04], [.355, .09], [.31, .16], [.26, .27], [.215, .4], [.18, .52], [.16, .6], [.12, .66], [0, .68]];
+  const ROBE = [[0, 0], [.37, 0], [.38, .04], [.365, .09], [.33, .19], [.28, .33], [.225, .47], [.175, .58], [.13, .65], [0, .67]];
+  const FOOT = [[0, 0], [.36, 0], [.38, .03], [.38, .08], [.35, .12], [0, .12]];
+  const SUIT = [[0, .1], [.3, .1], [.3, .3], [.285, .42], [.245, .52], [.18, .59], [.09, .625], [0, .63]];
+  const COLUMN = [[0, 0], [.33, 0], [.34, .05], [.29, .12], [.235, .3], [.2, .46], [.23, .55], [.15, .64], [0, .66]];
+  const bellR = rOf(BELL), suitR = rOf(SUIT);
+  const HEADY = .79;   // head centre on the new bodies (Classic: .74)
+  const ball = (r, y = HEADY, s = 1, seg = 22) => [new THREE.SphereGeometry(r, seg, Math.round(seg * .65)), { p: [0, y, 0], s }];
+  const onSurf = (rAt, y, a = 0, dz = 0, tilt = -.35) => ({ p: [Math.sin(a) * (rAt(y) + dz), y, Math.cos(a) * (rAt(y) + dz)], r: [tilt, a, 0], o: 'YXZ' });
+  const VCG = () => mat('vcg', () => new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .2, clearcoat: 1, clearcoatRoughness: .1 }));
+  const vine = (h, band) => canvasTex('vine' + h, 256, 256, (g, w, H2) => {
+    g.fillStyle = h; g.fillRect(0, 0, w, H2);
+    const wave = (x, dy = 0) => H2 * .62 - x / w * H2 * .5 + Math.sin(x / w * Math.PI * 4) * 16 + dy;
+    g.strokeStyle = band; g.lineWidth = 15; g.lineCap = 'round'; g.beginPath();
+    for (let x = -10; x <= w + 10; x += 6) x < -4 ? g.moveTo(x, wave(x)) : g.lineTo(x, wave(x)); g.stroke();
+    g.fillStyle = '#4caf50';
+    for (let k = 0; k < 6; k++) { const x = k * w / 6 + 18, y = wave(x, k % 2 ? 20 : -20); g.save(); g.translate(x, y); g.rotate(k % 2 ? .6 : -.6); g.beginPath(); g.ellipse(0, 0, 11, 5.5, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
+  });
+  const scalesLow = h => canvasTex('scaleLow' + h, 128, 256, (g, w, H2) => {
+    g.fillStyle = h; g.fillRect(0, 0, w, H2);
+    const s = 16;
+    for (let row = 0; row * s * .7 < H2 * .62; row++) for (let k = -1; k <= w / s; k++) {
+      const x = k * s + (row % 2 ? s / 2 : 0) + s / 2, y = H2 - row * s * .7;
+      g.fillStyle = shade(h, .1); g.beginPath(); g.arc(x, y, s * .5, Math.PI, 0); g.fill();
+      g.strokeStyle = shade(h, .32); g.lineWidth = 1.6; g.beginPath(); g.arc(x, y, s * .5, Math.PI, 0); g.stroke();
+    }
+  });
+  const sector = (r, a0, a1, rIn = 0) => { const s = new THREE.Shape(); if (rIn) { s.absarc(0, 0, r, a0, a1, false); s.absarc(0, 0, rIn, a1, a0, true); } else { s.moveTo(0, 0); s.absarc(0, 0, r, a0, a1, false); s.lineTo(0, 0); } return s; };
+  const ext = (shape, depth, bevel = .006) => new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 14 });
   const B = {
     classic: (h, c) => { const m = toks[c][0].classicMat; return { mat: m, parts: [body(m), head(m)] }; },
+    // Royal Crown: the classic pawn under a tall gold crown set with coloured jewels, gold rim at the foot
     royal(h) {
       const m = mat('royal' + h, () => glossy(h));
-      const crown = geo('crown', () => merge([
-        [new THREE.CylinderGeometry(.162, .146, .085, 24, 1, true), { p: [0, .905, 0] }],
-        ring(.152, .017, .866, 28),
-        ...around(5, a => [new THREE.ConeGeometry(.04, .09, 8), { p: [Math.sin(a) * .152, .99, Math.cos(a) * .152], r: [.12, a, 0], o: 'YXZ' }]),
-        ...around(5, a => [new THREE.SphereGeometry(.022, 6, 4), { p: [Math.sin(a) * .158, 1.04, Math.cos(a) * .158] }]),
+      const crown = geo('crown2', () => merge([
+        [new THREE.CylinderGeometry(.165, .145, .1, 20, 1, true), { p: [0, .91, 0] }],
+        ring(.146, .02, .862, 24), ring(.166, .016, .958, 24),
+        ...around(5, a => [new THREE.ConeGeometry(.045, .115, 8), { p: [Math.sin(a) * .155, 1.01, Math.cos(a) * .155], r: [.1, a, 0], o: 'YXZ' }]),
+        ...around(5, a => [new THREE.SphereGeometry(.024, 8, 6), { p: [Math.sin(a) * .16, 1.075, Math.cos(a) * .16] }]),
       ]));
-      const gems = geo('crownGems', () => merge(around(5, a => [new THREE.SphereGeometry(.026, 8, 6), { p: [Math.sin(a + .63) * .163, .905, Math.cos(a + .63) * .163], s: [1, 1.2, .7], r: [0, a + .63, 0] }])));
-      return { mat: m, look: .5, pivot: .74, parts: [body(m), head(m, H), [crown, GOLD(), true, H], [TRIM(), GOLD()], [gems, m, false, H]] };
+      const gems = geo('crownGems2', () => { const C = ['#e5484d', '#3b7be0', '#2fa86b', '#9b6be0', '#e5484d'];
+        return merge(around(5, (a, k) => [new THREE.OctahedronGeometry(.03, 0), { p: [Math.sin(a) * .167, .91, Math.cos(a) * .167], s: [1, 1.25, .6], r: [0, a, 0], col: C[k] }])); });
+      const rim = geo('royalRim', () => merge([ring(.345, .032, .07, 32), ring(.245, .022, .535, 24)]));
+      return { mat: m, look: .5, pivot: .74, parts: [body(m), head(m, H), [crown, GOLD(), true, H], [gems, VCG(), false, H], [rim, GOLD()]] };
     },
+    // Ice Crystal: a faceted crystal column and gem head, a fan of crystals on top and a ring of shards round the foot
     ice(h) {
-      const m = mat('ice' + h, () => glossy(tint(h, .1), { flatShading: true, roughness: .12, glow: h }));
-      const shard = mat('shard' + h, () => glossy(tint(h, .62), { flatShading: true, roughness: .08, glow: h }));
-      const iceBody = geo('iceBody', () => new THREE.LatheGeometry(LATHE.map(([x, y]) => new THREE.Vector2(x, y)), 10));
-      const iceHead = geo('iceHead', () => merge([[new THREE.IcosahedronGeometry(.2, 0), { p: [0, .76, 0], s: [1, 1.12, 1] }]]));
-      const shards = geo('shards', () => merge([
-        ...around(6, (a, k) => [new THREE.OctahedronGeometry(.06, 0), { p: [Math.sin(a + .3) * .27, .19, Math.cos(a + .3) * .27], s: [k % 2 ? .8 : 1, k % 2 ? 1.8 : 2.4, k % 2 ? .8 : 1], r: [.38, a + .3, 0], o: 'YXZ' }]),
-        [new THREE.OctahedronGeometry(.055, 0), { p: [0, .99, 0], s: [1, 2.3, 1] }],
-        [new THREE.OctahedronGeometry(.045, 0), { p: [.08, .95, 0], s: [1, 2, 1], r: [0, 0, -.5] }],
-        [new THREE.OctahedronGeometry(.045, 0), { p: [-.08, .95, 0], s: [1, 2, 1], r: [0, 0, .5] }],
+      const m = mat('ice' + h, () => glossy(tint(h, .12), { flatShading: true, roughness: .08, glow: h }));
+      const shard = mat('shard' + h, () => glossy(tint(h, .5), { flatShading: true, roughness: .05, glow: h }));
+      const col = lathe('column', COLUMN, 8);
+      const gemHead = geo('iceHead2', () => merge([[new THREE.IcosahedronGeometry(.19, 0), { p: [0, .78, 0], s: [1, 1.1, 1] }]]));
+      const top = geo('iceTop', () => merge([
+        [new THREE.OctahedronGeometry(.07, 0), { p: [0, 1.05, 0], s: [1, 2.8, 1] }],
+        ...around(5, (a, k) => [new THREE.OctahedronGeometry(k % 2 ? .045 : .055, 0), { p: [Math.sin(a) * .09, .99, Math.cos(a) * .09], s: [1, k % 2 ? 2.2 : 2.7, 1], r: [.45, a, 0], o: 'YXZ' }]),
       ]));
-      return { mat: m, parts: [[iceBody, m], [iceHead, m], [shards, shard]] };
+      const foot = geo('iceFoot', () => merge(around(12, (a, k) => [new THREE.OctahedronGeometry(k % 2 ? .052 : .066, 0),
+        { p: [Math.sin(a) * .27, .17, Math.cos(a) * .27], s: [1, k % 2 ? 2.2 : 2.7, 1], r: [.5, a, 0], o: 'YXZ' }])));
+      return { mat: m, look: .5, pivot: .78, parts: [[col, m], [gemHead, m, true, H], [top, shard, true, H], [foot, shard]] };
     },
+    // Candy Pop: a candy-striped bell with a frosted cupcake head and sprinkles
     candy(h) {
       const m = mapped('candy', h, stripes), hm = mat('candyHead' + h, () => glossy(h));
       const cream = mat('cream', () => glossy(0xfff4e6, { roughness: .35 }));
-      const frost = geo('frost', () => merge([
-        [new THREE.SphereGeometry(.207, 24, 8, 0, Math.PI * 2, 0, 1.05), { p: [0, .74, 0] }],
-        ...around(6, (a, k) => [new THREE.SphereGeometry(.036, 8, 6), { p: [Math.sin(a) * .176, .83 - (k % 2) * .025, Math.cos(a) * .176], s: [1, 1.7, 1] }]),
-        ring(.245, .026, .535),
+      const frost = geo('frost2', () => merge([
+        [new THREE.SphereGeometry(.212, 26, 10, 0, Math.PI * 2, 0, 1.42), { p: [0, HEADY, 0] }],
+        ...around(7, (a, k) => [new THREE.SphereGeometry(.03, 8, 6), { p: [Math.sin(a) * .204, HEADY - .055 - (k % 2) * .025, Math.cos(a) * .204], s: [1, 1.7, .7], r: [0, a, 0] }]),
       ]));
-      const sprinkles = geo('sprinkles', () => { const R = rng(3), C = ['#ff6fa8', '#5ac8fa', '#ffd23f', '#7ed957', '#ffffff', '#b38bff'];
-        return merge(Array.from({ length: 12 }, (_, k) => { const th = .18 + R() * .78, ph = R() * Math.PI * 2, n = V(Math.sin(th) * Math.sin(ph), Math.cos(th), Math.sin(th) * Math.cos(ph));
-          return [new THREE.CylinderGeometry(.011, .011, .055, 5), { p: [n.x * .208, .74 + n.y * .208, n.z * .208], r: [th - Math.PI / 2, ph, R() * 3], o: 'YXZ', col: C[k % C.length] }]; })); });
-      return { mat: m, parts: [body(m), [HEAD(), hm], [frost, cream], [sprinkles, VC(), false]] };
+      const sprinkles = geo('sprinkles2', () => { const R = rng(3), C = ['#ff6fa8', '#5ac8fa', '#ffd23f', '#7ed957', '#ff8a3d', '#b38bff'];
+        return merge(Array.from({ length: 14 }, (_, k) => { const th = .15 + R() * .95, ph = R() * Math.PI * 2, n = V(Math.sin(th) * Math.sin(ph), Math.cos(th), Math.sin(th) * Math.cos(ph));
+          return [new THREE.CylinderGeometry(.012, .012, .055, 5), { p: [n.x * .214, HEADY + n.y * .214, n.z * .214], r: [th - Math.PI / 2, ph, R() * 3], o: 'YXZ', col: C[k % C.length] }]; })); });
+      return { mat: m, look: .5, pivot: HEADY, parts: [[lathe('bell', BELL), m], [geo('ball', () => merge([ball(.2)])), hm, true, H], [frost, cream, true, H], [sprinkles, VC(), false, H]] };
     },
+    // Marble: the classic pawn in swirled marble on a gold foot
     marble(h) {
       const m = mapped('marble', h, marble, { roughness: .16 });
-      return { mat: m, parts: [body(m), head(m), [TRIM(), GOLD()]] };
+      return { mat: m, parts: [body(m), head(m), [geo('marbleRim', () => merge([ring(.345, .034, .07, 40)])), GOLD()]] };
     },
+    // Robo Bot: a white robot, the player's colour on its foot, chest light, ears and antenna; glowing eyes in a
+    // dark visor
     robo(h) {
-      const m = mat('robo' + h, () => glossy(h)), eye = GLOW(tint(h, .55)), S = [1.2, .95, 1.05];
-      const rhead = geo('roboHead', () => merge([[new THREE.SphereGeometry(.2, 24, 14), { p: [0, .77, 0], s: S }]]));
-      const visor = geo('visor', () => merge([[new THREE.SphereGeometry(.212, 20, 8, Math.PI / 2 - .95, 1.9, .98, 1.0), { p: [0, .77, 0], s: S }]]));
-      const pt = (ph, th, r = .216) => [-Math.cos(ph) * Math.sin(th) * r * S[0], .77 + Math.cos(th) * r * S[1], Math.sin(ph) * Math.sin(th) * r * S[2]];
-      const eyes = geo('roboEyes', () => merge([
-        ...[-1, 1].map(s => { const p = pt(Math.PI / 2 + s * .33, 1.45); return [new THREE.SphereGeometry(.036, 10, 8), { p, s: [1, 1.25, .45], r: [0, Math.atan2(p[0], p[2]), 0] }]; }),
-        [new THREE.SphereGeometry(.034, 10, 8), { p: [0, 1.045, 0] }],
+      const m = mat('robo' + h, () => glossy(h)), eye = GLOW(tint(h, .3)), S = [1.22, 1, 1.08], Y = .82;
+      const suit = lathe('suit', SUIT), foot = lathe('foot', FOOT);
+      const rhead = geo('roboHead2', () => merge([[new THREE.SphereGeometry(.19, 26, 16), { p: [0, Y, 0], s: S }], ring(.13, .03, .63, 20)]));
+      const visor = geo('visor2', () => merge([[new THREE.SphereGeometry(.197, 22, 10, Math.PI / 2 - 1.05, 2.1, 1.0, 1.05), { p: [0, Y, 0], s: S }]]));
+      const pt = (ph, th, r = .2) => [-Math.cos(ph) * Math.sin(th) * r * S[0], Y + Math.cos(th) * r * S[1], Math.sin(ph) * Math.sin(th) * r * S[2]];
+      const eyes = geo('roboEyes2', () => merge([
+        ...[-1, 1].map(s => { const p = pt(Math.PI / 2 + s * .36, 1.5); return [new THREE.SphereGeometry(.04, 12, 8), { p, s: [1, 1.3, .4], r: [0, Math.atan2(p[0], p[2]), 0] }]; }),
+        [new THREE.SphereGeometry(.036, 10, 8), { p: [0, Y + .26, 0] }],
       ]));
-      const chest = geo('roboChest', () => merge([[new THREE.SphereGeometry(.03, 10, 8), { p: [0, .3, bodyR(.3) + .022], s: [1, 1, .6] }]]));
-      const metal = geo('roboMetal', () => merge([
-        ...[-1, 1].map(s => [new THREE.CylinderGeometry(.065, .065, .05, 18), { p: [s * .245, .77, 0], r: [0, 0, Math.PI / 2] }]),
-        [new THREE.CylinderGeometry(.012, .012, .09, 6), { p: [0, .99, 0] }],
-      ]));
-      const plate = geo('roboPlate', () => merge([
-        [new THREE.CylinderGeometry(.058, .058, .02, 18), Object.assign(onBody(.3, .006), { r: [Math.PI / 2 - .42, 0, 0] })],
-        ring(.215, .022, .19),
-      ]));
-      return { mat: m, look: 1.3, pivot: .77, parts: [body(m), [rhead, m, true, H], [visor, DARK(), true, H], [metal, WHITE(), true, H], [eyes, eye, false, H], [plate, WHITE()], [chest, eye, false]] };
+      const ears = geo('roboEars2', () => merge([-1, 1].map(s => [new THREE.CylinderGeometry(.06, .06, .05, 18), { p: [s * .232, Y, 0], r: [0, 0, Math.PI / 2] }])));
+      const stick = geo('roboStick', () => merge([[new THREE.CylinderGeometry(.012, .012, .08, 6), { p: [0, Y + .2, 0] }]]));
+      const plate = geo('roboPlate2', () => merge([[new THREE.CylinderGeometry(.06, .06, .02, 18), onSurf(suitR, .34, 0, .004, Math.PI / 2 - .2)]]));
+      const plateRim = geo('roboPlateRim', () => merge([[new THREE.TorusGeometry(.065, .013, 6, 20), onSurf(suitR, .34, 0, .012, -.2)]]));
+      const chest = geo('roboChest2', () => merge([[new THREE.SphereGeometry(.035, 12, 8), Object.assign(onSurf(suitR, .34, 0, .016, -.2), { s: [1, 1, .55] })]]));
+      return { mat: m, look: 1.3, pivot: Y, parts: [[foot, m], [suit, WHITE()], [rhead, WHITE(), true, H], [visor, DARK(), true, H], [ears, m, true, H], [stick, WHITE(), true, H], [eyes, eye, false, H], [plate, m], [plateRim, WHITE()], [chest, eye, false]] };
     },
+    // Little Wizard: a robe with a scarf, a big floppy hat (no face) and gold stars
     wizard(h, c) {
-      const m = mat('wiz' + h, () => glossy(h)), hat = mat('wizHat' + h, () => glossy(shade(h, .28), { glow: h }));
+      const m = mat('wiz' + h, () => glossy(h)), scarf = mat('scarf' + h, () => glossy(tint(h, .3), { glow: h }));
       const star = mat('wizStar' + c, () => glossy(c === 2 ? 0xff8a3d : 0xffd84a, { emissive: lin(c === 2 ? 0xff8a3d : 0xffd84a), emissiveIntensity: .25 }));
-      const t = .5, cone = geo('wizHat', () => merge([
-        [new THREE.CylinderGeometry(.27, .285, .03, 32), { p: [0, .86, 0] }],
-        [new THREE.CylinderGeometry(.06, .17, .2, 22), { p: [0, .975, 0] }],
-        [new THREE.SphereGeometry(.06, 14, 8), { p: [0, 1.075, 0] }],
-        [new THREE.ConeGeometry(.06, .16, 16), { p: [Math.sin(t) * .08, 1.075 + Math.cos(t) * .08, 0], r: [0, 0, -t] }],
+      const robe = lathe('robe', ROBE), robeR = rOf(ROBE);
+      const t = .75, hat = geo('wizHat2', () => merge([
+        [new THREE.SphereGeometry(.165, 22, 14), { p: [0, .76, 0] }],
+        [new THREE.CylinderGeometry(.31, .32, .035, 34), { p: [0, .855, 0], r: [.08, 0, 0] }],
+        [new THREE.CylinderGeometry(.085, .2, .2, 24), { p: [0, .96, 0] }],
+        [new THREE.SphereGeometry(.085, 14, 8), { p: [0, 1.06, 0] }],
+        [new THREE.ConeGeometry(.085, .2, 16), { p: [Math.sin(t) * .1, 1.06 + Math.cos(t) * .1, 0], r: [0, 0, -t] }],
       ]));
-      const stars = geo('wizStars', () => merge([[starGeo(.055), { p: [0, .965, .123], r: [-.5, 0, 0] }], ring(.168, .018, .893, 28)]));
-      const robeStar = geo('wizRobeStar', () => merge([[starGeo(.06), onBody(.31)]]));
-      return { mat: m, look: .8, pivot: .74, parts: [body(m), head(m, H), [cone, hat, true, H], [stars, star, true, H], [robeStar, star]] };
+      const scarfG = geo('wizScarf', () => merge([ring(.15, .045, .63, 24), ...[[-.045, -.5], [.04, .35]].map(([x, rz]) => [new THREE.SphereGeometry(.05, 10, 8), { p: [x, .54, robeR(.54) + .02], s: [.8, 1.6, .45], r: [-.3, 0, rz] }])]));
+      const stars = geo('wizStars2', () => merge([[starGeo(.06), { p: [0, .955, .155], r: [-.62, 0, 0] }]]));
+      const robeStar = geo('wizRobeStar2', () => merge([[starGeo(.065), onSurf(robeR, .3, 0, 0, -.38)]]));
+      return { mat: m, look: .8, pivot: .76, parts: [[robe, m], [hat, m, true, H], [stars, star, true, H], [scarfG, scarf], [robeStar, star]] };
     },
+    // Fruity: a bell with a juicy drip at the top and a fruit for a head: strawberry, watermelon slice, orange,
+    // blueberry (red, green, yellow, blue)
     fruity(h, c) {
-      const m = mat('fruit' + h, () => glossy(h)), key = ['strawberry', 'apple', 'lemon', 'blueberry'][c];
-      const navy = mat('berryCrown', () => glossy(0x1f2c6e, { roughness: .4 }));
+      const m = mat('fruit' + h, () => glossy(h)), drip = mat('drip' + h, () => glossy(shade(h, .18), { glow: h })), key = ['strawberry', 'melon', 'orange', 'blueberry'][c];
+      const navy = mat('berryCrown2', () => glossy(0x4a5fc4, { roughness: .4 }));
       const leaf = (p, ry, tilt = .5, s = 1) => [new THREE.SphereGeometry(.07, 12, 6), { p, s: [.5 * s, .16 * s, 1 * s], r: [tilt, ry, 0], o: 'YXZ' }];
-      const F = {
+      const Y = .8, F = {
         strawberry: () => {
-          const prof = [[0, -.2], [.07, -.18], [.14, -.11], [.19, -.01], [.2, .07], [.16, .14], [.08, .18], [0, .19]];
-          const R = rng(11), rAt = y => { for (let k = 1; k < prof.length; k++) if (y <= prof[k][1]) { const [r0, y0] = prof[k - 1], [r1, y1] = prof[k]; return r0 + (r1 - r0) * (y - y0) / (y1 - y0); } return 0; };
-          return { head: merge([[new THREE.LatheGeometry(prof.map(([x, y]) => new THREE.Vector2(x, y)), 24), { p: [0, .76, 0] }]]),
-            dots: merge(Array.from({ length: 16 }, (_, k) => { const y = -.14 + (k % 4) * .065 + R() * .02, a = k * 2.4, r = rAt(y) + .004;
-              return [new THREE.SphereGeometry(.014, 6, 4), { p: [Math.sin(a) * r, .76 + y, Math.cos(a) * r], s: [1, 1.4, .6], r: [0, a, 0], col: '#ffe38a' }]; })),
-            green: merge([...around(6, a => leaf([Math.sin(a) * .08, .935, Math.cos(a) * .08], a, .35)), [new THREE.CylinderGeometry(.014, .02, .07, 6), { p: [0, .97, 0] }]]) };
+          const prof = [[0, -.2], [.07, -.18], [.14, -.11], [.195, -.01], [.205, .07], [.165, .14], [.08, .18], [0, .19]], rAt = rOf(prof), R = rng(11);
+          return { head: merge([[new THREE.LatheGeometry(prof.map(([x, y]) => new THREE.Vector2(x, y)), 24), { p: [0, Y, 0] }]]), headMat: 'h',
+            dots: merge(Array.from({ length: 18 }, (_, k) => { const y = -.14 + (k % 4) * .065 + R() * .02, a = k * 2.4, r = rAt(y) + .004;
+              return [new THREE.SphereGeometry(.015, 6, 4), { p: [Math.sin(a) * r, Y + y, Math.cos(a) * r], s: [1, 1.4, .6], r: [0, a, 0], col: '#ffe38a' }]; })),
+            green: merge([...around(6, a => leaf([Math.sin(a) * .085, Y + .175, Math.cos(a) * .085], a, .3, 1.1)), [new THREE.CylinderGeometry(.015, .02, .07, 6), { p: [0, Y + .21, 0] }]]) };
         },
-        apple: () => ({ head: merge([[new THREE.SphereGeometry(.2, 24, 16), { p: [0, .76, 0], s: [1.08, .95, 1.08] }]]),
-          brown: merge([[new THREE.CylinderGeometry(.013, .018, .085, 6), { p: [.01, .97, 0], r: [0, 0, -.2] }]]),
-          green: merge([leaf([.07, .965, 0], Math.PI / 2, .35, 1.1)]) }),
-        lemon: () => ({ head: merge([[new THREE.SphereGeometry(.19, 24, 16), { p: [0, .76, 0], s: [1.22, .95, .98] }], ...[-1, 1].map(s => [new THREE.SphereGeometry(.045, 10, 8), { p: [s * .228, .76, 0], s: [1.3, .9, .9] }])]),
-          green: merge([leaf([0, .935, .04], 0, .45, 1.1)]), brown: merge([[new THREE.CylinderGeometry(.012, .015, .05, 6), { p: [0, .94, 0] }]]) }),
-        blueberry: () => ({ head: merge([[new THREE.SphereGeometry(.2, 24, 16), { p: [0, .76, 0], s: [1.07, .93, 1.07] }]]),
-          crown: merge([...around(5, a => [new THREE.ConeGeometry(.026, .07, 6), { p: [Math.sin(a) * .045, .94, Math.cos(a) * .045], r: [.6, a, 0], o: 'YXZ' }]), [new THREE.CylinderGeometry(.05, .05, .02, 12), { p: [0, .935, 0] }]]) }),
+        melon: () => {
+          const a0 = Math.PI * 1.5 - .72, a1 = Math.PI * 1.5 + .72, z = -.06, at = V(0, Y + .15, 0);
+          const T = (g, o = {}) => [g, Object.assign({ p: [at.x, at.y, z + (o.dz || 0)] }, o)];
+          const R = rng(5);
+          return { flesh: merge([T(ext(sector(.255, a0, a1), .12))]), rind: merge([T(ext(sector(.3, a0, a1, .275), .12), { dz: -.004 })]), white: merge([T(ext(sector(.277, a0, a1, .255), .121))]),
+            seeds: merge(Array.from({ length: 7 }, (_, k) => { const a = a0 + .18 + (k / 6) * (a1 - a0 - .36), r = .12 + (k % 2) * .07 + R() * .02;
+              return [new THREE.SphereGeometry(.014, 6, 4), { p: [Math.cos(a) * r, at.y + Math.sin(a) * r, z + .128], s: [.8, 1.4, .5], r: [0, 0, a + Math.PI / 2], col: '#2b1b1b' }]; })) };
+        },
+        orange: () => ({ head: merge([ball(.2, Y, [1.05, .97, 1.05])]), headMat: 'o',
+          brown: merge([[new THREE.CylinderGeometry(.014, .018, .05, 6), { p: [0, Y + .2, 0] }]]),
+          green: merge([leaf([.06, Y + .215, .02], Math.PI / 2 - .3, .25, 1.25)]) }),
+        blueberry: () => ({ head: merge([ball(.205, Y, [1.06, .94, 1.06])]), headMat: 'h',
+          crown: merge([...around(5, a => [new THREE.ConeGeometry(.03, .075, 6), { p: [Math.sin(a) * .05, Y + .19, Math.cos(a) * .05], r: [.7, a, 0], o: 'YXZ' }]), [new THREE.CylinderGeometry(.055, .055, .02, 12), { p: [0, Y + .185, 0] }]]) }),
       };
-      const g = geo('fruit:' + key, F[key]);
-      const parts = [body(m), [g.head, m, true, H]];
+      const g = geo('fruit2:' + key, F[key]);
+      const drips = geo('fruitDrip', () => merge([[new THREE.LatheGeometry([[bellR(.5) + .01, .5], [bellR(.56) + .014, .56], [bellR(.62) + .014, .62], [.13, .67], [0, .69]].map(([x, y]) => new THREE.Vector2(x, y)), 32), {}],
+        ...around(9, (a, k) => [new THREE.SphereGeometry(.03, 8, 6), { p: [Math.sin(a) * (bellR(.47 - (k % 2) * .04) + .004), .47 - (k % 2) * .04, Math.cos(a) * (bellR(.47 - (k % 2) * .04) + .004)], s: [1, 1.7, .6], r: [0, a, 0] }])]));
+      const parts = [[lathe('bell', BELL), m], [drips, drip]];
+      if (g.head) parts.push([g.head, g.headMat === 'o' ? mat('orangeFruit', () => glossy(0xff9a1f)) : m, true, H]);
+      if (g.flesh) parts.push([g.flesh, mat('melonFlesh', () => glossy(0xff4b5c)), true, H], [g.rind, mat('melonRind', () => glossy(0x2e8b3e)), true, H], [g.white, WHITE(), false, H], [g.seeds, VC(), false, H]);
       if (g.dots) parts.push([g.dots, VC(), false, H]);
       if (g.green) parts.push([g.green, LEAF(), true, H]);
       if (g.brown) parts.push([g.brown, STEM(), false, H]);
       if (g.crown) parts.push([g.crown, navy, true, H]);
-      return { mat: m, look: .9, pivot: .76, parts };
+      return { mat: m, look: .9, pivot: Y, parts };
     },
+    // Blossom: a bell wrapped in a leafy vine, a big flower for a head (pink, blue, green, yellow petals)
     blossom(h, c) {
-      const m = mat('blos' + h, () => glossy(h)), mid = mat('blosMid' + c, () => glossy(c === 2 ? 0xff7a3d : 0xffd34d, { roughness: .45 }));
-      const M = new THREE.Matrix4().compose(V(0, .8, .02), new THREE.Quaternion().setFromEuler(new THREE.Euler(-.55, 0, 0)), V(1, 1, 1));
-      const petals = geo('petals', () => merge(around(6, a => [new THREE.SphereGeometry(.1, 14, 10), { p: [Math.sin(a) * .125, Math.cos(a) * .125, 0], r: [0, 0, -a], s: [.62, 1, .34] }]), M));
-      const centre = geo('blosMid', () => merge([[new THREE.SphereGeometry(.08, 16, 10), { p: [0, 0, .02], s: [1, 1, .55] }]], M));
-      const green = geo('blosGreen', () => merge([
-        [new THREE.SphereGeometry(.15, 16, 8), { p: [0, 0, -.035], s: [1, 1, .3] }],
-      ], M));
-      const leaves = geo('blosLeaves', () => merge([
-        [new THREE.CylinderGeometry(.04, .05, .2, 8), { p: [0, .62, 0] }],
-        ...[-1, 1].map(s => [new THREE.SphereGeometry(.08, 12, 6), { p: [s * .25, .58, .02], s: [1.35, .22, .62], r: [0, s * -.25, s * -.35] }]),
-        ...[[.09, .26, .6], [-.11, .36, .2]].map(([x, y, a]) => { const r = bodyR(y); return [new THREE.SphereGeometry(.05, 10, 6), { p: [Math.sin(x * 4) * r, y, Math.cos(x * 4) * r + .004], s: [1.3, .7, .3], r: [-.4, x * 4, a] , o: 'YXZ' }]; }),
+      const m = mapped('blos2', h, x => vine(x, c === 2 ? '#5cae3a' : tint(x, .62)));
+      const petal = mat('petal' + c, () => glossy(['#ff86b0', '#8be07a', '#ffd84a', '#5fb0ff'][c], { roughness: .35 }));
+      const mid = mat('blosMid2' + c, () => glossy(c === 2 ? 0xe5484d : 0xffd23f, { roughness: .45 }));
+      const M = new THREE.Matrix4().compose(V(0, .83, .03), new THREE.Quaternion().setFromEuler(new THREE.Euler(-.22, 0, 0)), V(1, 1, 1));
+      const petals = geo('petals2', () => merge(around(5, a => [new THREE.SphereGeometry(.105, 16, 10), { p: [Math.sin(a) * .14, Math.cos(a) * .14, 0], r: [0, 0, -a], s: [.8, 1.05, .32] }]), M));
+      const centre = geo('blosMid2', () => merge([[new THREE.SphereGeometry(.085, 16, 10), { p: [0, 0, .03], s: [1, 1, .6] }]], M));
+      const back = geo('blosBack', () => merge([[new THREE.SphereGeometry(.13, 16, 8), { p: [0, 0, -.04], s: [1, 1, .35] }]], M));
+      const leaves = geo('blosLeaves2', () => merge([
+        [new THREE.CylinderGeometry(.05, .07, .14, 10), { p: [0, .66, 0] }],
+        ...[-1, 1].map(s => [new THREE.SphereGeometry(.08, 12, 6), { p: [s * .2, .63, .03], s: [1.4, .22, .6], r: [0, s * -.3, s * -.4] }]),
       ]));
-      return { mat: m, look: 1, pivot: .8, parts: [body(m), [petals, m, true, H], [centre, mid, true, H], [green, LEAF(), true, H], [leaves, LEAF()]] };
+      return { mat: m, look: 1, pivot: .83, parts: [[lathe('bell', BELL), m], [petals, petal, true, H], [centre, mid, true, H], [back, LEAF(), true, H], [leaves, LEAF()]] };
     },
+    // Pirate: a bell with a belt and bandana, an eye patch and a tricorn with a skull and gold trim
     pirate(h) {
       const m = mat('pir' + h, () => glossy(h)), belt = mat('belt', () => glossy(0x5b3a22, { roughness: .45 }));
       const felt = mat('felt', () => glossy(0x2b2530, { roughness: .55, clearcoat: .4, clearcoatRoughness: .5 }));
-      const F = new THREE.Matrix4().compose(V(0, .835, .06), new THREE.Quaternion().setFromEuler(new THREE.Euler(-.3, 0, 0)), V(1, 1, 1));   // the front flap's frame
-      const hat = geo('pirHat', () => {
-        const cr = new THREE.Shape();   // bicorne front: a crescent with pointed ends
+      const band = mat('bandana' + h, () => glossy(tint(h, .35), { glow: h }));
+      const dy = HEADY - .74;
+      const F = new THREE.Matrix4().compose(V(0, .845 + dy, .06), new THREE.Quaternion().setFromEuler(new THREE.Euler(-.3, 0, 0)), V(1.12, 1.12, 1));   // the front flap's frame
+      const hat = geo('pirHat2', () => {
+        const cr = new THREE.Shape();   // tricorn front: a crescent with pointed ends
         cr.moveTo(-.29, .01); cr.quadraticCurveTo(-.22, .21, 0, .215); cr.quadraticCurveTo(.22, .21, .29, .01); cr.quadraticCurveTo(0, .09, -.29, .01);
         return merge([
-          [new THREE.SphereGeometry(.2, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), { p: [0, .84, -.01], s: [1, .66, 1] }],
-          [new THREE.CylinderGeometry(.25, .25, .026, 28), { p: [0, .852, -.01], s: [1.1, 1, .85] }],
-          [new THREE.TorusGeometry(.193, .012, 5, 28), { p: [0, .755, 0], r: [Math.PI / 2 - .25, 0, .3] }],
-          [new THREE.SphereGeometry(.058, 12, 8), { p: [-.07, .775, .17], s: [1, .9, .35], r: [-.15, -.4, 0] }],
-        ].concat([[new THREE.ExtrudeGeometry(cr, { depth: .03, bevelEnabled: true, bevelThickness: .01, bevelSize: .01, bevelSegments: 1, curveSegments: 10 }), {}]].map(([g, o]) => [merge([[g, o]], F), {}])));
+          [new THREE.SphereGeometry(.205, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2), { p: [0, .84 + dy, -.01], s: [1, .7, 1] }],
+          [new THREE.CylinderGeometry(.26, .26, .026, 24), { p: [0, .852 + dy, -.01], s: [1.12, 1, .88] }],
+          [new THREE.TorusGeometry(.204, .012, 5, 28), { p: [0, .76 + dy, 0], r: [Math.PI / 2 - .25, 0, .3] }],
+          [new THREE.SphereGeometry(.06, 12, 8), { p: [-.074, .775 + dy, .186], s: [1, .9, .35], r: [-.15, -.4, 0] }],
+          [merge([[ext(cr, .03, .01), {}]], F), {}],
+        ]);
       });
-      const skull = geo('pirSkull', () => merge([
-        [new THREE.SphereGeometry(.034, 10, 8), { p: [0, .125, .045], s: [1, .95, .45] }],
-        ...[-1, 1].map(s => [new THREE.CylinderGeometry(.009, .009, .09, 5), { p: [0, .12, .043], r: [0, 0, s * .8] }]),
+      const trim = geo('pirTrim', () => merge([...[[-.29, .01, -.22, .21, 0, .215], [0, .215, .22, .21, .29, .01]].map(([x0, y0, cx, cy, x1, y1]) =>
+        [new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(V(x0, y0, .042), V(cx, cy, .042), V(x1, y1, .042)), 12, .011, 5), {}])], F));
+      const skull = geo('pirSkull2', () => merge([
+        [new THREE.SphereGeometry(.048, 12, 8), { p: [0, .13, .048], s: [1, .95, .45] }],
+        ...[-1, 1].map(s => [new THREE.CylinderGeometry(.012, .012, .13, 5), { p: [0, .115, .045], r: [0, 0, s * .85] }]),
       ], F));
-      const beltG = geo('pirBelt', () => merge([[new THREE.CylinderGeometry(.205, .218, .055, 28, 1, true), { p: [0, .215, 0] }]]));
-      const buckle = geo('pirBuckle', () => merge([[new THREE.BoxGeometry(.075, .062, .022), { p: [0, .215, .218], r: [-.42, 0, 0] }], ring(.245, .022, .535)]));
-      return { mat: m, look: 1, pivot: .74, parts: [body(m), head(m, H), [hat, felt, true, H], [skull, WHITE(), false, H], [beltG, belt], [buckle, GOLD()]] };
+      const beltG = geo('pirBelt2', () => merge([[new THREE.CylinderGeometry(bellR(.24) + .01, bellR(.18) + .01, .06, 24, 1, true), { p: [0, .21, 0] }]]));
+      const buckle = geo('pirBuckle2', () => merge([[new THREE.TorusGeometry(.03, .011, 5, 4), Object.assign(onSurf(bellR, .21, 0, .018, -.35), { s: [1.25, 1, 1] })]]));
+      const bandana = geo('pirBandana', () => merge([ring(.15, .04, .64, 24), ...[-1, 1].map(s => [new THREE.SphereGeometry(.045, 10, 8), { p: [s * .045, .6, .17], s: [1.2, .8, .5], r: [0, 0, s * .5] }]), [new THREE.SphereGeometry(.03, 10, 8), { p: [0, .615, .175] }]]));
+      return { mat: m, look: 1, pivot: HEADY, parts: [[lathe('bell', BELL), m], [geo('ball', () => merge([ball(.2)])), m, true, H], [hat, felt, true, H], [trim, GOLD(), false, H], [skull, WHITE(), false, H], [beltG, belt], [buckle, GOLD()], [bandana, band]] };
     },
+    // Space Explorer: a white space suit on a coloured foot, a big white helmet with a visor in the player's colour
     space(h) {
-      const m = mat('space' + h, () => glossy(h)), visor = mat('visor' + h, () => glossy(shade(h, .45), { roughness: .05, glow: h })), shellM = mat('shell' + h, () => glossy(tint(h, .7), { glow: h }));
-      const shell = geo('helmet', () => merge([[new THREE.SphereGeometry(.225, 28, 18), { p: [0, .76, 0] }]]));
-      const collar = geo('helmetCollar', () => merge([ring(.235, .034, .57)]));
-      const glass = geo('helmetGlass', () => merge([[new THREE.SphereGeometry(.236, 24, 12, Math.PI / 2 - 1.1, 2.2, .42, 1.28), { p: [0, .76, 0], s: [1, 1, 1.02] }]]));
-      const ears = geo('helmetEars', () => merge([...[-1, 1].map(s => [new THREE.CylinderGeometry(.062, .062, .06, 18), { p: [s * .232, .76, 0], r: [0, 0, Math.PI / 2] }])]));
-      const shine = geo('helmetShine', () => merge([[new THREE.SphereGeometry(.03, 10, 6), { p: [-.068, .94, .14], s: [1.4, .7, .4], r: [-.75, -.45, .3] }]]));
-      const badge = geo('spaceStar', () => merge([[starGeo(.06), onBody(.31)]]));
-      return { mat: m, look: 1.3, pivot: .76, parts: [body(m), [shell, shellM, true, H], [collar, shellM], [glass, visor, true, H], [ears, m, true, H], [shine, GLOW('#ffffff'), false, H], [badge, GOLD()]] };
+      const m = mat('space' + h, () => glossy(h)), visor = mat('visor2' + h, () => glossy(shade(h, .38), { roughness: .04, glow: h }));
+      const Y = .82, suit = lathe('suit', SUIT), foot = lathe('foot', FOOT);
+      const shell = geo('helmet2', () => merge([[new THREE.SphereGeometry(.24, 30, 18), { p: [0, Y, 0] }], ring(.17, .035, .615, 24)]));
+      const glass = geo('helmetGlass2', () => merge([[new THREE.SphereGeometry(.25, 26, 12, Math.PI / 2 - 1, 2, .62, 1.3), { p: [0, Y, 0], s: [1, 1, 1.02] }]]));
+      const ears = geo('helmetEars2', () => merge([...[-1, 1].map(s => [new THREE.CylinderGeometry(.06, .06, .05, 18), { p: [s * .245, Y, 0], r: [0, 0, Math.PI / 2] }])]));
+      const shine = geo('helmetShine2', () => merge([[new THREE.SphereGeometry(.032, 10, 6), { p: [-.075, Y + .17, .16], s: [1.5, .7, .4], r: [-.75, -.45, .3] }]]));
+      const badge = geo('spaceBadge', () => merge([[new THREE.CylinderGeometry(.075, .075, .02, 20), Object.assign(onSurf(suitR, .32, 0, .004, Math.PI / 2 - .15))]]));
+      const star = geo('spaceStar2', () => merge([[starGeo(.055), onSurf(suitR, .32, 0, .014, -.15)]]));
+      return { mat: m, look: 1.3, pivot: Y, parts: [[foot, m], [suit, WHITE()], [shell, WHITE(), true, H], [glass, visor, true, H], [ears, m, true, H], [shine, GLOW('#ffffff'), false, H], [badge, m], [star, GOLD()]] };
     },
+    // Dragon: a scaly bell, gold horns, a crest, little bat wings at the sides and a gem on the chest
     dragon(h) {
-      const m = mapped('dragon', h, scales), dark = mat('dragDark' + h, () => glossy(shade(h, .3), { glow: h }));
-      const horn = mat('horn', () => glossy(0xfff0c8, { roughness: .35 }));
-      const horns = geo('horns', () => merge([...[-1, 1].map(s => [new THREE.ConeGeometry(.042, .14, 10), { p: [s * .095, .93, -.01], r: [-.2, 0, -s * .45] }])]));
+      const m = mapped('dragon2', h, scalesLow), hm = mat('dragHead' + h, () => glossy(h));
+      const wingM = mat('wing' + h, () => glossy(tint(h, .28), { glow: h, side: THREE.DoubleSide }));
+      const horn = mat('horn2', () => glossy(0xf5c542, { roughness: .3, emissive: lin(0x9a6a10), emissiveIntensity: .1 }));
+      const crestM = mat('crest' + h, () => glossy(shade(h, .25), { glow: h }));
+      const horns = geo('horns2', () => merge([...[-1, 1].flatMap(s => [
+        [new THREE.CylinderGeometry(.036, .05, .12, 10), { p: [s * .11, HEADY + .18, -.01], r: [-.15, 0, -s * .55] }],
+        [new THREE.ConeGeometry(.036, .15, 10), { p: [s * .175, HEADY + .29, -.03], r: [-.25, 0, s * .2] }],
+      ])]));
+      const crest = geo('dragCrest', () => merge([.25, .7, 1.15].map((th, k) => [new THREE.ConeGeometry(.04 - k * .006, .1, 6), { p: [0, HEADY + Math.cos(th) * .19, -Math.sin(th) * .19], r: [-th, 0, 0], s: [.5, 1, 1] }])));
       const wing = new THREE.Shape();
-      [[0, 0], [.05, .09], [.17, .15], [.15, .07], [.12, .085], [.1, .03], [.06, .04], [.03, -.04]].forEach(([x, y], k) => wing[k ? 'lineTo' : 'moveTo'](x, y));
-      const spikes = geo('dragSpikes', () => merge([.55, 1.0, 1.45].map((th, k) => [new THREE.ConeGeometry(.035 - k * .004, .085, 8), { p: [0, .74 + Math.cos(th) * .18, -Math.sin(th) * .18], r: [-th, 0, 0] }])));
-      const extras = geo('dragExtras', () => merge([
-        ...[-1, 1].map(s => [new THREE.ExtrudeGeometry(wing, { depth: .022, bevelEnabled: true, bevelThickness: .008, bevelSize: .008, bevelSegments: 1 }), { p: [s * .08, .34, -.1], r: [0, s * .55, 0], s: [s, 1, 1] }]),
-      ]));
-      const gem = geo('dragGem', () => merge([[new THREE.OctahedronGeometry(.045, 0), { p: [0, .32, bodyR(.32) + .012], s: [.9, 1.2, .5], r: [-.42, 0, 0] }]]));
-      return { mat: m, look: .8, pivot: .74, parts: [body(m), head(m, H), [horns, horn, true, H], [spikes, dark, true, H], [extras, dark], [gem, GOLD(), false]] };
+      wing.moveTo(0, 0); wing.lineTo(.02, .1); wing.quadraticCurveTo(.1, .16, .17, .12); wing.quadraticCurveTo(.15, .08, .16, .04);
+      wing.quadraticCurveTo(.12, .06, .11, .02); wing.quadraticCurveTo(.08, .04, .06, -.01); wing.quadraticCurveTo(.03, .01, 0, 0);
+      const wings = geo('dragWings', () => merge([-1, 1].map(s => [ext(wing, .016, .005), { p: [s * .14, .38, -.05], r: [0, s * .35, 0], s: [s * 1.35, 1.35, 1] }])));
+      const gem = geo('dragGem2', () => merge([[new THREE.OctahedronGeometry(.05, 0), Object.assign(onSurf(bellR, .36, 0, .012, -.3), { s: [.85, 1.25, .5] })]]));
+      return { mat: m, look: .8, pivot: HEADY, parts: [[lathe('bell', BELL), m], [geo('ball', () => merge([ball(.2)])), hm, true, H], [horns, horn, true, H], [crest, crestM, true, H], [wings, wingM], [gem, GOLD(), false]] };
     },
   };
 
   const LIST = [
     { id: 'classic', name: 'Classic',        price: 0,    desc: 'The glossy pawn you know.',              g: 'linear-gradient(160deg,#fff6ea,#f1dcc4)' },
-    { id: 'royal',   name: 'Royal Crown',    price: 3000, desc: 'A little crown and gold trim.',          g: 'linear-gradient(160deg,#fff1c2,#e9bf5c)' },
-    { id: 'ice',     name: 'Ice Crystal',    price: 3500, desc: 'Faceted crystal with icy shards.',       g: 'linear-gradient(160deg,#eef8ff,#a9d2f2)' },
-    { id: 'candy',   name: 'Candy Pop',      price: 2500, desc: 'Candy stripes, frosting, sprinkles.',    g: 'linear-gradient(160deg,#ffe8f3,#f6b2d0)' },
+    { id: 'royal',   name: 'Royal Crown',    price: 3000, desc: 'A tall jewelled crown on a gold foot.',          g: 'linear-gradient(160deg,#fff1c2,#e9bf5c)' },
+    { id: 'ice',     name: 'Ice Crystal',    price: 3500, desc: 'A crystal pawn crowned with shards.',       g: 'linear-gradient(160deg,#eef8ff,#a9d2f2)' },
+    { id: 'candy',   name: 'Candy Pop',      price: 2500, desc: 'Candy stripes and a sprinkled cupcake top.',    g: 'linear-gradient(160deg,#ffe8f3,#f6b2d0)' },
     { id: 'marble',  name: 'Marble',         price: 2000, desc: 'Swirled marble on a gold rim.',          g: 'linear-gradient(160deg,#f6f1ea,#cfc3b4)' },
-    { id: 'robo',    name: 'Robo Bot',       price: 4000, desc: 'A tiny robot with glowing eyes.',        g: 'linear-gradient(160deg,#e9f1f7,#a8bfd2)' },
-    { id: 'wizard',  name: 'Little Wizard',  price: 4000, desc: 'A pointy hat and lucky stars.',          g: 'linear-gradient(160deg,#ece4ff,#a995d8)' },
-    { id: 'fruity',  name: 'Fruity',         price: 2500, desc: 'Strawberry, apple, lemon, blueberry.',   g: 'linear-gradient(160deg,#fff4d6,#f5c27a)' },
-    { id: 'blossom', name: 'Blossom',        price: 2500, desc: 'A flower in bloom and fresh leaves.',    g: 'linear-gradient(160deg,#fbeff2,#d8eccd)' },
-    { id: 'pirate',  name: 'Pirate',         price: 3500, desc: 'Captain’s hat, eye patch, gold buckle.', g: 'linear-gradient(160deg,#f3e6d2,#c9a77c)' },
-    { id: 'space',   name: 'Space Explorer', price: 5000, desc: 'An astronaut helmet and visor.',         g: 'linear-gradient(160deg,#dfe6ff,#7b84c9)' },
-    { id: 'dragon',  name: 'Dragon',         price: 6000, desc: 'Horns, scales and little wings.',        g: 'linear-gradient(160deg,#ffe6cf,#e98f6a)' },
+    { id: 'robo',    name: 'Robo Bot',       price: 4000, desc: 'A little white robot with glowing eyes.',        g: 'linear-gradient(160deg,#e9f1f7,#a8bfd2)' },
+    { id: 'wizard',  name: 'Little Wizard',  price: 4000, desc: 'A robe, a scarf and a big starry hat.',          g: 'linear-gradient(160deg,#ece4ff,#a995d8)' },
+    { id: 'fruity',  name: 'Fruity',         price: 2500, desc: 'Strawberry, watermelon, orange, blueberry.',   g: 'linear-gradient(160deg,#fff4d6,#f5c27a)' },
+    { id: 'blossom', name: 'Blossom',        price: 2500, desc: 'A flower head and a leafy vine.',    g: 'linear-gradient(160deg,#fbeff2,#d8eccd)' },
+    { id: 'pirate',  name: 'Pirate',         price: 3500, desc: 'Tricorn, eye patch, bandana and belt.', g: 'linear-gradient(160deg,#f3e6d2,#c9a77c)' },
+    { id: 'space',   name: 'Space Explorer', price: 5000, desc: 'A space suit and a big visor helmet.',         g: 'linear-gradient(160deg,#dfe6ff,#7b84c9)' },
+    { id: 'dragon',  name: 'Dragon',         price: 6000, desc: 'Gold horns, scales and little wings.',        g: 'linear-gradient(160deg,#ffe6cf,#e98f6a)' },
   ];
   const byId = id => LIST.find(s => s.id === id);
   const built = {};

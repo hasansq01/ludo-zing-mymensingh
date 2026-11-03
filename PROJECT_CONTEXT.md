@@ -11,6 +11,15 @@ Update both files when a significant decision, feature or bug fix lands. Last re
 ## What it is
 A mobile-first 3D Ludo game for the browser, played on a round table inside a cozy room (four room themes). Built entirely with Claude.
 Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-mymensingh.pages.dev
+**Website deploys are automatic (2026-11-04, after the user repeatedly found new features missing from the live site,
+which only changed when someone uploaded the zip by hand):** `.github/workflows/deploy-web.yml` builds with
+`tools/build.ps1` on every push that touches the web game and publishes `dist/` with `wrangler pages deploy`:
+`main` → https://ludo-king-mymensingh.pages.dev, other branches → `https://<branch>.ludo-king-mymensingh.pages.dev`.
+Needs the repository secrets `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` (setup in README).
+A feature is live only once its branch is merged into `main` (or on its branch link). The build stamps
+`<meta name="ludo-build">` (branch · commit · date; `LUDO_BUILD` or git), shown in Settings › Account › Version
+(`#setBuild`, hidden on the source page). The Android app is a separate Godot build (`godot/`) with its own catalogue
+(e.g. its own pawn skins): web features don't reach it by themselves.
 (Cloudflare Pages, free plan, project `ludo-king-mymensingh`, deployed by uploading the build zip).
 
 ## Android / Godot port (started 2026-10-23)
@@ -85,7 +94,7 @@ release (12-tester closed test for 14 days).
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
 | `tests/emotes.js` | 61 emote tests (incl. the 16 required reactions, 4 sets of 6, every set one emote per mood, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/demo.js` | 15 demo-mode tests (everything owned and priced 0, Shop has no enabled Buy / prices / Locked tags, Dice tab still lists the dice, Collection fully unlocked, profile repair keeps everything owned); source page with `?vt=1&demo=1`, after the splash. |
-| `tests/pawn-skins.js` | 47 pawn skin tests (12 skins x 4 colours build; base at y 0, inside the Classic footprint (also with Top View heads tipped back), Top View tilt / upright faces / taps, 3D View untouched, height 0.9–1.3, body in the player colour, < 3,600 triangles; swapping never changes state / layout / rings; shared geometry + materials; pickables; facing; real moves for all colours, canvas taps pick the right pawn, stacks + pairs lay out exactly like Classic, captures, Pair Mode; buy / refuse / no double charge / save / Shop + Inventory tabs / Compare all / profile repair); source page with `?vt=1`, visible pane, after the splash. |
+| `tests/pawn-skins.js` | 48 pawn skin tests (themed skins have their own bodies) (12 skins x 4 colours build; base at y 0, inside the Classic footprint (also with Top View heads tipped back), Top View tilt / upright faces / taps, 3D View untouched, height 0.9–1.3, body in the player colour, < 3,600 triangles; swapping never changes state / layout / rings; shared geometry + materials; pickables; facing; real moves for all colours, canvas taps pick the right pawn, stacks + pairs lay out exactly like Classic, captures, Pair Mode; buy / refuse / no double charge / save / Shop + Inventory tabs / Compare all / profile repair); source page with `?vt=1`, visible pane, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -230,7 +239,15 @@ release (12-tester closed test for 14 days).
 - **Pawn skins (Ludo, 2026-11-03):** `PawnSkins` module (right after the token code). 12 cosmetic themes x the 4 player
   colours: Classic (free, default, the original pawn untouched), Royal Crown 3,000, Ice Crystal 3,500, Candy Pop 2,500,
   Marble 2,000, Robo Bot 4,000, Little Wizard 4,000, Fruity 2,500 (strawberry / apple / lemon / blueberry head by colour),
-  Blossom 2,500, Pirate 3,500, Space Explorer 5,000, Dragon 6,000 (`PawnSkins.LIST`). Built in code (no assets): each
+  Blossom 2,500, Pirate 3,500, Space Explorer 5,000, Dragon 6,000 (`PawnSkins.LIST`). Shapes follow the user's reference sheet
+  (2026-11-04: "each pawn set are unique designs"): Classic, Royal Crown and Marble keep the classic body; the others
+  have their own: a bell (`BELL`, no collar, head at y .79) for Candy Pop (frosted cupcake head, sprinkles), Fruity
+  (juice drips; strawberry / watermelon slice / orange / blueberry head for red / green / yellow / blue), Blossom (vine
+  texture, flower head facing front), Pirate (belt, bandana, eye patch, tricorn with skull and gold trim), Dragon
+  (scales on the lower body, gold horns, crest, bat wings, chest gem); a robe (`ROBE`) for Little Wizard (scarf, floppy
+  hat, no face); a white suit on a coloured foot (`SUIT` + `FOOT`) for Robo Bot and Space Explorer (white is the main
+  colour there, as in the reference, with the player colour on the foot, chest, ears and visor); a faceted crystal
+  column (`COLUMN`) with crystal fans on top and round the foot for Ice Crystal. Built in code (no assets): each
   skin's `build(css, c)` returns its player-colour material (= `t.mat`, so the movable glow works) and parts; accessories
   are merged into one mesh per material (`merge()`, which also bakes positions and flips mirrored parts), geometry is
   cached per skin and shared by all 16 tokens, materials per skin + colour; candy stripes / marble / dragon scales are
@@ -253,7 +270,7 @@ release (12-tester closed test for 14 days).
   rendered once with the game renderer into a render target, cached), Equipped / Owned / Locked, Buy / Use;
   `buyPawnSkin` (commitProfile: coins + own + equip; refuses without coins / when owned) / `usePawnSkin`.
   "Compare all" (`#pawnAllSheet`, `openPawnAll`) shows the 12 skins side by side. Godot port: not done in this checkout.
-  Tests: `tests/pawn-skins.js` (47).
+  Tests: `tests/pawn-skins.js` (48).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;
