@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- accent of our notifications (icon tint in the shade): Palette.GOLD_FILL -->
+    <color name="lz_notif_color">#FFFFC93C</color>
+</resources>

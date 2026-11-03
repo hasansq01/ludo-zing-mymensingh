@@ -1,0 +1,533 @@
+# Ludo Zing online rooms: protocol v1
+
+Friend rooms and quick match for **Ludo** and **Snakes & Ladders** (see "Game types" and "Quick match"). One
+Cloudflare Durable Object (`Room`) per room code, one `Matchmaker` per quick-match queue. The server is
+**authoritative**: it rolls the dice, validates every action with its TypeScript ports of `LudoRules` /
+`SnakesLaddersRules` (`server/src/rules/`), runs bots for absent players, and keeps the match in its SQLite storage.
+
+Clients are **deterministic replicas**. Every client keeps its own `LudoRules` state (GDScript) and applies the
+server's actions, in order, with the same rules functions it uses offline (`apply_roll`, `move`, `answer_pair`), so all
+the existing animations and HUD messages work unchanged. After every action the server sends the hash of its state;
+a client whose own hash differs asks for a full snapshot (`sync_req`) and replaces its state.
+
+## Transport
+
+- `POST /v1/rooms` → `200 {"code": "K7QX2M"}`: reserves a fresh room code (6 chars from
+  `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, no 0/O/1/I/L). The creator then connects like everyone else and becomes host.
+- `GET /v1/rooms/<CODE>` → `200 {"code", "open": bool, "members": n, "started": bool}` or `404`.
+- `GET /v1/rooms/<CODE>/ws` with `Upgrade: websocket` → the room socket. Unknown code → `404` (no upgrade).
+- `GET /v1/health` → `{"ok": true}`.
+- `GET /v1/config` → `{"motd": "", "maintenance": false, "min_online": 0, "latest": 10}` (`Cache-Control: public,
+  max-age=60`): a message of the day for Home, whether online play is in maintenance, and the app version policy (set
+  in the admin console, `ADMIN_API.md`): `min_online` is the lowest app version code allowed online (0: nobody is
+  blocked), `latest` the newest one on Google Play (the app offers an update when its own is lower).
+- App versions: the app reports its version code (`version/code`) as `app` in the `hello` of the room socket and of
+  the quick-match socket, and as the `X-App-Version` header on `POST /v1/rooms`. A missing or bad one counts as 10
+  (versions 10 and older send none). Below `min_online`: `POST /v1/rooms` → `426 {"error": "update_required", "msg",
+  "min"}`; a hello gets `error update_required` (`msg`, `min`) and close 4000, nothing is joined or queued.
+- Maintenance: `POST /v1/rooms` → `503 {"error": "maintenance", "msg": "<motd or a default text>"}`; show `msg`.
+  Rooms that already exist keep working (joining by code still works).
+- Hosts: production `wss://ludo-zing-rooms.flipfold.workers.dev`; local dev `ws://<mac-ip>:8787` (`npm run dev` in
+  `server/`); the Android emulator reaches the Mac at `ws://10.0.2.2:8787`.
+- Every message is one JSON object with a `"t"` (type) field. Text frames only. Max 4 KB per client message.
+
+## Identity
+
+- Each client has a random **player id** (`pid`, 16+ chars, generated once and kept on the device) and per-room
+  **token** issued by the server in `welcome`. Reconnecting with the token (same room) takes back the same seat.
+- Names are trimmed, 1–16 characters (default "Player"); avatar and frame are catalog ids (strings ≤ 32 chars).
+- **Pawn skins** (`pawn`, Catalog.PAWNS: `trim`, `marble`, `crown` ...; `""` = Classic): everyone at the table sees
+  each player's skin. The server keeps a hello's `pawn` only when it is a known skin the member's account owns
+  (`pawns_owned`); anything else (no account, not owned, unknown, Classic) is sent as `""`. A hello without `pawn`
+  (an older client) gets the account's equipped skin. Ghosts wear a weighted mix (`ghosts.ts GHOST_PAWNS`).
+- **Accounts** (ONLINE_V2.md §1): `hello` may carry `session` (from `POST /v1/auth/guest`). The member then belongs
+  to that account (rewards at `over`, bans, level). Without a session (old clients) the server looks up the pid's
+  account (`devices`); a pid with no account still plays, but earns nothing. An invalid or expired session is not an
+  error in rooms: the pid's account is used instead. The same account on another device takes back its member.
+- `level` (seats, lobby members) is the account's level from its XP (1 when unknown).
+
+## Client → server
+
+| t | fields | when |
+|---|---|---|
+| `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?, vote?, app?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
+| `settings` | `teams?: bool, game?: "ludo" \| "sl"` | host, lobby only (friend rooms). A `pair_ask` from older clients is accepted and ignored |
+| `start` | – | host, lobby; needs ≥ 2 members (teams: exactly 4). After `over` it is a `rematch` (older clients' Play again), or the old instant rematch while someone can't vote |
+| `rematch` | – | friend rooms, after `over`: Play again (or Play on the prompt), you say yes; the first one opens the vote (see "Play again") |
+| `roll` | `n` | your turn, phase `roll` |
+| `move` | `n, i` (token index 0–3, as `LudoRules.move`) | your turn, phase `choose` |
+| `pair` | `n, yes` | your turn, phase `pair_ask` |
+| `back` | – | you were turned into a bot (timeouts) and tapped "I'm back" |
+| `sync_req` | – | your hash didn't match, or after a reconnect hiccup |
+| `leave` | – | leave the room (lobby: frees the seat; in a match: a bot takes the seat for good) |
+| `emote` | `id` | any time (see "Emotes") |
+| `ping` | – | keep-alive every 20 s; send exactly `{"t":"ping"}` (see "Keep-alive") |
+| `away` | `on: bool` | the app went to the background (`true`) / came back (`false`); for push notifications only (see "Away and event pushes") |
+| `reroll` | `n` | within a `reroll_offer`'s window: pay and roll again (see "Re-roll") |
+
+`n` is the index of the action this request would become (the client's `n` = number of actions applied so far).
+A request with a stale `n` is ignored with `error {code: "stale"}` (protects against double taps and races).
+
+## Server → client
+
+| t | fields |
+|---|---|
+| `welcome` | `token, id` (your member id), `code`, `host` (member id) |
+| `lobby` | `code, host, members: [{id, name, avatar, frame, pawn, level, online, color}], settings: {teams, game}, max: 4` |
+| `start` | `n: 0, game, seats, state, h` |
+| `act` | `n, a, h` (one action, see below; `n` = its index, `h` = server state hash after applying it) |
+| `sync` | `n, game, seats, state, h` (full snapshot; replaces the client state) |
+| `turn` | `c, deadline, now` (colour to act, epoch ms deadline for the current step, server clock) |
+| `presence` | `id, online` |
+| `over` | `finished: [colours in final order], winner` (colour, or −1); sent once, at the end of the game (see "Play on after the first finish") |
+| `error` | `code, msg` |
+| `emote` | `c, id` (+ `member` when `c` = -1; see "Emotes") |
+| `pong` | `now` (only from other ping shapes; the exact `{"t":"ping"}` gets `{"t":"pong"}`, see "Keep-alive") |
+| `rematch` | `by, until, now, players: [{id, name, avatar, frame, vote: "yes" \| "no" \| "wait"}]`, at the close also `result: "go" \| "few"` (+ `ffa: true`); see "Play again" |
+
+`seats`: `[{color, id, name, avatar, frame, pawn, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
+LudoRules state (JSON) with `players[c]` = `"human"` (a member), `"cpu"` (a bot) or `"off"`, and `names[c]` = the
+member's name. Clients replace their own seat's display name with "You" locally (presentation only; never hashed).
+
+### Actions (`a`)
+
+| k | fields | client applies |
+|---|---|---|
+| `roll` | `c, v` | `LudoRules.apply_roll(s, v)` |
+| `move` | `c, i` | `LudoRules.move(s, i)` |
+| `pair` | `c, yes` | `LudoRules.answer_pair(s, yes)` |
+| `mode` | `c, mode: "cpu" \| "human"` | `s.players[c] = mode` (a bot takes over / the player is back) |
+| `end` | – (no `c`) | `LudoRules.end_game(s)`: the server ends the match early (see "Play on after the first finish") |
+
+The server only ever sends legal actions. Bots and timeouts produce ordinary `roll` / `move` / `pair` actions, so a
+client never runs AI for online matches.
+
+### Play on after the first finish
+
+A match does not end when the first side finishes: like real Ludo, the others play on for the next places. The
+rules (the same in GDScript and TS, so clients get there from the acts alone):
+
+- A side finishes when a colour has all four pawns home (Teams: when both partners have, the team finishing
+  together; Snakes & Ladders: when a player reaches 100). The rules record it in `s.finished` (S&L: player indices)
+  and emit `{type: "finished", c, place, team?}` (Ludo; `team` = both colours in Teams) / `{type: "finished", turn,
+  c, place}` (S&L). That side is skipped by the turn order from then on (`next_active`); its pawns stay home. A 6 or
+  a capture on the finishing move gives no extra roll (the turn passes). In Teams a colour home on its own still
+  rolls (Free Hand, `{type: "all_home", c}`), until its partner is home too.
+- The game is over when fewer than two sides are unfinished, or when no unfinished side has a `"human"` seat
+  (`players[c] == "human"`; S&L `cpu == false`). This is checked when a side finishes (a `mode` act alone never ends
+  a game). Then the unfinished sides are ranked by progress (`standings()`), `s.finished` becomes the full order,
+  `s.winner` is the first finisher, and one `game_over {winner, team, order}` (S&L `win {turn, order}`) ends the
+  event list. `over` follows the act, with that order in `finished`.
+- `{k: "end"}` (`end_game` / `endGame`): the server's way to end a match early, ranking the unfinished sides by
+  progress exactly as above. The Room sends it after an action when no **real** person is left unfinished (every
+  unfinished seat is a quick-match ghost or a seat whose member left) while the result is for someone (a person still
+  seated, or one who finished and left since): ghosts are `"human"` in the state, so the rules alone would make you
+  watch them. (Nobody finished and every person left: a quick match is abandoned, as before.) It is refused (no events,
+  no change) once the game is over.
+- Grants (see "Online rewards"): the first side is **win**, every other side that finished or was ranked at the end
+  is **finish**; **left** only for a seat that was away (left, or played by a bot) when its side was ranked, so a
+  player who finished and then left keeps their outcome. A seat that has finished never becomes a bot (disconnects
+  and `leave` send no `mode` act for it).
+- Clients show each finish as it happens (the place on that player's tile; your own finish: a card with Keep
+  watching / Home, where Home leaves the room and the reward is still granted at `over`).
+
+### Colours
+
+Members are seated in join order. At `start` the playing colours are: 2 players → Red, Yellow (0, 2: opposite
+corners); 3 → Red, Green, Yellow (0, 1, 2); 4 → all. Teams needs 4 (Red + Yellow vs Green + Blue).
+
+## Play again (friend rooms)
+
+After `over` (owner 2026-11-01) anyone in a friend room can ask for the next match; nobody is put into one without
+saying yes. The server keeps the vote, its clock and who is in; clients only show it. Quick rooms have no rematch
+(`rematch` → `bad_action`; Play again = queue again).
+
+Apps from version 10 say `vote: true` in their `hello` (they answer the vote's messages). While anyone in the room
+is on an older app (no `vote`), the old Play again stays: only the host starts the next match, at once with
+everyone (`start` or `rematch` from the host; from anyone else `not_host`), and no vote opens: an older app ignores
+`rematch` messages and would be dropped when the vote closes.
+
+- `{t: "rematch"}` from a member while the room is `over`: they say **yes**. The first one opens the vote: everyone
+  else in the room is asked (`vote: "wait"`), and away members get the "Rematch?" push (see "Away and event pushes").
+  Later ones add their yes; several at the same moment are simply all yes (one vote, `by` = the first). A repeat is
+  ignored. In the lobby or during a match: `bad_action`. An older client's `start` after `over` is the same as
+  `rematch` (there is no instant rematch any more).
+- `{t: "rematch", by, until, now, players}` goes to everyone in the room when the vote opens and on every change:
+  `by` asked first, `until` is when it closes (server ms, 30 s after it opened; `now` = the server clock), `players`
+  every member asked, in join order, with `vote` `"yes"`, `"wait"` (still deciding) or `"no"` (left the room).
+  Clients show it: the prompt ("Rafi wants to play again", Play / Leave) for those still deciding, the ticks for
+  everyone, a countdown to `until`.
+- **No** is `leave` (Leave on the prompt, Home on the result): the member leaves the room as in the lobby (close
+  4002); the others see their `vote: "no"`.
+- Joining the room by code while a vote is open is a yes (the newcomer is added to `players`). A member who comes
+  back within the window (token, or the same pid / account) gets `sync`, `over`, `lobby` and then the vote, and can
+  still answer. While a vote is open, its members are not dropped by the disconnect grace: the vote decides.
+- The vote **closes** as soon as nobody is `"wait"`, or at `until` (the room's alarm; it is stored with the room, so
+  it survives an eviction). The last `rematch` carries `result`, then only those who said yes stay in the room:
+  - The others (Leave, no answer, offline the whole time: a no) are removed: any socket of theirs gets
+    `error {code: "rematch_out"}` and closes with 4002. They may join again with the code like anyone once the room
+    is open (after that match's `over`, or in the lobby); while the new match runs, a hello is `started`.
+  - `result: "go"` (2 or more said yes): `start` follows for them, seated in join order (the usual colours). The host
+    stays host if they said yes, else the next member in join order. Ludo **Teams** needs exactly 4: with 2 or 3 yes
+    the match is free-for-all instead, the room's teams setting turns off and the message has `ffa: true`. A yes-sayer
+    offline at the close gets a fresh 20 s grace (then a bot plays the seat).
+  - `result: "few"` (fewer than 2): no match. The room goes back to its lobby (`lobby` with `status: "lobby"`): the
+    one who said yes waits there as host and invites others with the code; `start` works as before.
+
+## Emotes
+
+Quick reactions (24 stickers in 4 packs, ids and packs in `EMOTES.md`). They never touch the match: no action, no `n`,
+no hash, no timer; they are not stored in the action log.
+
+- Client → server `{t: "emote", id}`: any time after `hello` (lobby or match). `id` is one of the 24 emote ids.
+- Server → everyone **except the sender**: `{t: "emote", c, id}`, `c` = the sender's colour. In a lobby (no match yet)
+  `c` is `-1` and the message carries `member` (the sender's member id): `{t: "emote", c: -1, member, id}`. The sender
+  shows its own reaction locally at once and gets nothing back.
+- Ownership: the sender's account must own the pack containing `id` (`starter` always; a member with no account owns
+  only `starter`). The packs are read from the account (`owned.emote_sets`), cached per member until its next `hello`
+  (a reconnect re-reads them). A refused emote: `error {code: "emote_locked"}`.
+- Rate limit per member: 1 emote per 2 s and 6 per 30 s; over it: `error {code: "emote_rate"}`. Clients ignore both
+  quietly. An unknown `id` (or a missing one) is `error {code: "bad_message"}`.
+- The general 20 msg/s limit still applies, but the first 5 emote messages per second per socket are not counted
+  against it, so a spammed picker cannot starve rolls and moves.
+- Quick-match ghosts emote like people (same `{t: "emote", c, id}`, nothing else on the wire): after their own
+  capture, being captured (S&L: a snake), a 6, finishing, a person's emote, or (rarely) another ghost's, with a
+  per-ghost personality and memory, 1.0-3.5 s later (longer on their own turn), obeying the same 1 per 2 s / 6 per
+  30 s limits, from starter plus one random paid pack. They are indistinguishable from a person's emote. Ghost
+  emotes are alarm-driven and stored with the match (they survive hibernation). Details: EMOTES.md "Ghost behaviour".
+
+## State hash
+
+FNV-1a 32-bit over the UTF-8 bytes of this string, written as 8 lowercase hex digits:
+
+```
+tok(16 ints, colour-major, comma-joined) | pairs("c.a.b" in array order, comma-joined) | turn | dice | sixes |
+phase | winner | free(4 chars "0"/"1") | finished(comma-joined) | players(comma-joined) | pending
+```
+
+joined with `|` and no spaces, where `pending` is `""` when empty or `"c.i.to.extra(0/1).partner"` (partner −1 if
+absent). Example for a fresh 2-player game:
+`-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1||0|0|0|roll|-1|0000||human,off,human,off|`
+`names`, `view`, `teams`, `pair_ask`, `pair_ask_by` and `pick` are not hashed. Implementations: `server/src/rules/hash.ts`,
+`godot/scripts/net/state_hash.gd` (identical outputs are tested on shared fixtures).
+
+## S&L state hash
+
+For Snakes & Ladders matches (`SnakesLaddersRules` state, see ONLINE_V2.md §5) `act.h` / `start.h` / `sync.h` are
+this hash instead: FNV-1a 32-bit (the same function as above) over the UTF-8 bytes of
+
+```
+turn | phase | sixes | winner | need_one | players | finished
+```
+
+i.e. exactly these seven fields, in this order:
+
+1. `turn`: int (index into `players`)
+2. `phase`: the string as is (`roll` / `over`)
+3. `sixes`: int
+4. `winner`: int (−1 while playing)
+5. `need_one`: `"1"` or `"0"` (an absent key is `"0"`)
+6. `players`: one entry per player in array (turn) order, comma-joined, each `c.pos.cpu.ladders.snakes.rolls`:
+   `c`, `pos`, `ladders`, `snakes` as ints, `cpu` as `"1"` / `"0"`, and `rolls` every recorded roll as one digit,
+   concatenated (`""` before the player's first roll)
+7. `finished`: the player indices in finish order, as ints, comma-joined (`""` when none, or the key is absent)
+
+joined with `|` and no spaces. Every number goes through `int()` (`Math.trunc`), so a state that came through JSON
+hashes the same. `mode`, `paid`, `name` and `you` are not hashed (`you` / `name` are per-client presentation; rewards
+are the server's). Example for a fresh 2-player game (`new_game("local", 2)`):
+`0|roll|0|-1|0|0.0.0.0.0.,1.0.0.0.0.|` → `edd54d53`.
+
+S&L actions (`a`): `roll {c, v}` → `SnakesLaddersRules.apply_roll(s, v)` (`c` is the colour of
+`s.players[s.turn]`); `mode {c, mode: "cpu" | "human"}` → for the player whose `c` is that colour,
+`p.cpu = mode == "cpu"` (no player with that colour: no change); `end {}` → `SnakesLaddersRules.end_game(s)`.
+Rolling is the only choice, so a bot or a timeout just rolls.
+
+Implementations: `server/src/rules/sl_hash.ts` (`slStateHash`, `slStateHashInput`), `godot/scripts/net/sl_state_hash.gd`
+(`SLStateHash.of`, `SLStateHash.input`). The rules port is `server/src/rules/sl.ts` (line-for-line from
+`snakes_ladders_rules.gd`, same state and events: `newGame(mode, n, color, opts)`, `land`, `applyRoll`,
+`replayReaches100`, `claimWinReward`, `claimPlayReward`, `standings`, plus `applySlAction(s, a)`, `turnColor`,
+`botAction`); parity is tested on traces recorded from the GDScript rules (`godot/dev/net_parity_dump_sl.gd` →
+`server/test/fixtures/sl_traces.json`, replayed by `server/test/rules_sl_parity.test.ts`).
+
+## Ask before pairing
+
+A single landing on a loose pawn of its own colour either pairs up by itself (off the safe squares) or, for a seat
+that is asked, stops in phase `pair_ask` with a `pair_offer` event; that player answers with `pair {n, yes}` (any
+square but the start squares and the home column). Who is asked (`LudoRules.asks_pair` / `asksPair`): a `"human"`
+seat (never a bot) whose entry in `state.pair_ask_by` says so.
+
+- **Everyone's own choice**, in friend and quick rooms alike: `hello.pair_ask` (the "Ask before pairing" switch in
+  the player's Settings; a missing one is off, as before), dealt per colour at `start` as `state.pair_ask_by:
+  [bool x4]` (`state.pair_ask` is false). There is no room rule: the lobby has no switch for it and a `settings`
+  `pair_ask` is ignored. A person who never connected before the start is off for that match.
+- **Ghosts** (quick match) are asked too (`pair_ask_by` true) and answer like people after a short delay (0.8-2 s):
+  yes with `ghostPairOdds` (`server/src/ghosts.ts` `GHOST_PAIR`): 95% when an opponent single stands 1-6 squares
+  behind (a single can't take a pair, and the pair blocks it), 70% on an open square, 30% on a safe square, 25% near
+  the home lane (progress 45+).
+- **No answer**: the prompt has the `pair_ask` turn timer (10 s by default); then the server answers what would have
+  happened if the player hadn't been asked (`LudoRules.default_pair_answer` / `defaultPairAnswer`: yes off the safe
+  squares, no on them). A bot holding the seat answers the same way. Clients close an open prompt when that `pair`
+  act arrives.
+
+## Timers, bots and presence
+
+- Turn deadlines: `roll` 15 s, `choose` 20 s, `pair_ask` 10 s by default; the admin console can set each to
+  5–120 s (read at every match start, so a change applies from the next match). Clients should always use the
+  `turn.deadline` they receive, never a built-in duration (bots act after 0.8–1.4 s; a roll by a bot, then
+  its move after ~1 s so clients can animate).
+- A timeout auto-acts for that human: roll; move = `auto_move_token` or the easy AI choice; pair = `default_pair_answer`. Two
+  timeouts in a row → `mode cpu` for that colour until the player sends `back` (any later `roll`/`move` from them
+  counts as `back` too).
+- Disconnect: `presence {online: false}`; after a 20 s grace the colour becomes a bot (`mode cpu`); reconnecting
+  with the token sends `sync` and `mode human`.
+- Nobody connected (owner 2026-10-31): when no person in a running match has an open socket, the match **freezes**:
+  nothing is played (no bot, ghost or timeout step) and no grace runs. The first person back resumes it where it was
+  (`sync`, then a `turn` with a fresh deadline; the graces of the others still away go on from where they stood). A
+  friend room nobody comes back to is deleted after the empty-room timeout (the match abandoned, nothing granted); a
+  quick match is ended after 2 minutes (see "Quick match").
+- The host leaving the lobby passes host to the next member. An empty room (no sockets) is deleted after 10 min;
+  any room is deleted 2 h after its last action (Durable Object alarm).
+
+## Game types
+
+A room plays `game: "ludo"` (default) or `"sl"` (Snakes & Ladders). Friend rooms: the host picks it in the lobby with
+`settings {game}` (shown in `lobby.settings.game`; it may change between matches). Quick rooms: the queue's game.
+`start` and `sync` carry `game`; the client sets up the matching board and replica from it.
+
+What changes for `"sl"`:
+
+- `state` is the `SnakesLaddersRules` state (`new_game("local", k)`, then for player k: `c` = its colour, `name` = the
+  member's name, `cpu: false`, `you: false`; `mode: "online"`). Clients set `you` on their own player locally
+  (presentation only; not hashed). `h` is the **S&L state hash** (below).
+- Colours: members in join order get Red, Green, Yellow, Blue (`0, 1, 2, 3`; also `lobby.members[].color`). Turn
+  order is `state.players` order. `teams` / `pair_ask` are ignored (any 2-4 members can start).
+- The only request is `roll {n}` (`move` / `pair` → `bad_action`). `turn.c` is the colour of `players[turn]`;
+  the deadline is the roll timer. A 6 means the same colour rolls again (another `turn`).
+- Actions: `roll {c, v}` and `mode {c, mode}` (see "S&L state hash"). Bots, timeouts and ghosts only roll.
+- `over`: `winner` = the winner's colour (the first to 100), `finished` = every colour in final order (play on),
+  `standings` = `SnakesLaddersRules.standings` (`[{idx, color, name, place, finished, pos, progress}]`).
+
+## Quick match
+
+`GET /v1/quick/ws?game=ludo|sl&players=2|4` with `Upgrade: websocket` → the queue for that game and table size (one
+`Matchmaker` Durable Object each). Wrong game / size → `400`; no upgrade → `426`. JSON text frames as in rooms.
+
+| dir | t | fields |
+|---|---|---|
+| → | `hello` | `v: 1, session, pid, name?, avatar?, frame?, pawn?` (first message; `session` may instead be the `?session=` query parameter). name / avatar / frame / pawn default to the account's profile; they are what the others see in the match (`pawn` only when the account owns it) |
+| ← | `queued` | `position` (1-based, first come first served), `eta_s` (rough seconds until the match). Sent after hello and whenever your position changes |
+| ← | `matched` | `code`, `token`: your seat in room `code`. The last message: the **client** closes this socket (the server leaves it open, because a close right behind a frame can make some clients drop it; later messages are ignored) |
+| → | `cancel` | leave the queue; answered by `cancelled`, then close 1000. Closing the socket also leaves the queue |
+| ↔ | `ping` / `pong` | as in rooms |
+| ← | `error` | `code, msg`: `session` (missing / invalid / expired: get a new one from `POST /v1/auth/guest`, close 4000), `banned` (close 4003), `maintenance` (`msg` = the motd; close 4000), `replaced` (you queued again on another connection, which took your place; close 4001), `busy` (you are being matched on another connection; close 4000), `version`, `bad_message` |
+
+- One queue entry per account. People are matched in arrival order: as soon as `players` people wait they get a
+  table together. Otherwise, a few seconds after the first of them queued (randomised 4–9 s; 3–5 s when nobody had
+  queued for 2 minutes), everyone waiting is seated together and the empty seats are filled with other players.
+- After `matched`: connect to `GET /v1/rooms/<code>/ws` and send the usual `hello` with `token` (from `matched`),
+  `session` and `pid`. Your seat was reserved for you: the room is closed to anyone else (`error full`).
+- A quick room has **no lobby, no host and no rematch**: no `lobby` message is ever sent, `welcome.host` is `-1`,
+  `settings` / `start` → `bad_action`. The match starts (`start`) as soon as every matched person is connected, or
+  10 s after the match was made. Someone who never connects is treated like a disconnect (after the 20 s grace a
+  bot plays their seat, `mode cpu`). Play again = queue again.
+- After `over` the room stays for 2 minutes (reconnects get `sync` + `over`) and is then deleted. If every person
+  leaves (`leave`) during the match, the match is abandoned (the room is closed, nothing is granted), unless one of
+  them had already finished (play on): then the match ends with `{k: "end"}` and the finished keep their place.
+- If every person is disconnected (not left) the match freezes (see "Timers, bots and presence"). Nobody back within
+  2 minutes: the match **ends for good, settled by progress** (ECONOMY_V1.md §3 "Nobody connected"): sides that had
+  finished keep their places, the rest are ranked by progress (Ludo: pawns home, then distance; S&L: the square).
+  Nothing is broadcast as an `act`: the room keeps the final state (`phase: "over"`, `finished` = that order) and
+  someone coming back within 10 minutes gets `sync` (that state) + `over` with `ended: "away"`; after that the room is
+  gone (`not_found`).
+- Everything else in the match (turns, timers, presence, reconnects, `leave`) is as in friend rooms.
+
+## Re-roll (Economy v1, ECONOMY_V1.md §4)
+
+After a **bad roll** (Ludo: the roll ended your turn without a move, i.e. you needed a 6 or were stuck on a non-6;
+S&L: you ended on a snake), a player who hasn't re-rolled in this match and can pay (a free re-roll, or 5 gems) gets
+an offer, and the turn is held for 3 s:
+
+| dir | t | fields |
+|---|---|---|
+| ← (the roller only) | `reroll_offer` | `n` (the action count now), `until`, `now` (server ms), `free` (free re-rolls held), `gems`, `cost` (5) |
+| ← (everyone) | `hold` | `c` (the roller's colour), `until`: the next player can't act before (their `turn.deadline` is shifted by the hold) |
+| → | `reroll` | `n` |
+| ← (everyone) | `rerolled` | `c`, `paid` (`free` \| `gems`) |
+| ← (everyone) | `sync` | the state before the bad roll (`n` back to that roll's index) |
+| ← (everyone) | `act` | the new roll (a fresh server roll, not a guaranteed 6), then play goes on as usual |
+
+Errors: `hold` (`until`: someone else's roll during the hold; retry then), `reroll_used`, `reroll_closed` (no offer,
+window over, the state moved on, a stale `n`), `gems` (can't pay). Once per player per match. Ghosts (quick match)
+sometimes take theirs (same messages, `paid: "free"`). A re-roll never touches the hash rules: clients just apply
+the `sync` and the `act`.
+
+## Coin tables (Economy v1, ECONOMY_V1.md §3)
+
+`GET /v1/quick/ws?game=&players=&table=<id>`: `practice` (default, free), `t100`, `t500`, `t2k`, `t10k`, `t50k`
+(levels 1, 1, 3, 6, 10, 15). One queue per game, size and table. At `hello` the entry is taken; errors before the
+close: `coins` (+`short`), `locked` (+`level`). Leaving the queue gives it back; leaving the match forfeits it; a
+match that never starts (no-show) or an admin closes refunds it. `over` carries `match_id` and, in quick matches,
+`table: {tier, entry, payouts: {"<colour>": coins}, bonus: {"<colour>": coins}, refunds: {"<colour>": coins}}`:
+
+- `payouts`: the pot payouts by place. pool = floor(size × entry × 95 / 100) (the fee is 5%). 2 players: 1st gets the
+  pool; 4 players: 1st / 2nd / 3rd floor(pool × 60 / 30 / 10 / 100), 4th nothing (the rounding remainder is the
+  house's). Seats that left are skipped (the next seats move up).
+- `bonus` (owner 2026-10-31): the house bonus of the 1st paid place, floor(pool × 20 / 100), new coins on top of its
+  payout (paid tables only; `{}` at Practice). Shown for whoever is 1st.
+- `refunds`: entries given back by the settlement by progress (a person who was away placed 1st without a clear lead:
+  no prize, no bonus, the entry back). Usually `{}`.
+
+Example, 100 table, 4 players: payouts 228 / 114 / 38 / 0, bonus 76 to 1st (304 in all). `over.ended: "away"` marks a
+match ended by the settlement (absent otherwise). The `double` ad doubles the payout only (not the bonus).
+
+## Online rewards
+
+Friend rooms as below (coins: Ludo win 300, finish 50; S&L 200 / 25; owner 2026-10-31); quick matches: XP as below,
+coins from the coin table (or 50 / 10 at the practice table, see "Coin tables"). A match ended by the settlement by
+progress grants each seat the outcome of its place (not "left"), except a refunded 1st place ("finish"). At `over` (friend rooms and quick rooms) the server grants each seat's account once per match (match id
+`<code>-<start ms>`): **win** (your side finished first), **finish** (your side finished later, or was ranked by
+progress at the end), **left** (you were away, i.e. had left or a bot was playing your seat, when your side was
+ranked: 0; finishing and then leaving keeps win / finish). Amounts: ONLINE_V2.md "Economy decisions". The client refreshes its
+profile (`GET /v1/me`) after `over`; rewards are not part of any room message.
+
+## Recent players, friends and invites
+
+HTTP only (`src/social.ts`, D1 migration `0007_social.sql`); no room message changes. Authed like ONLINE_V2.md
+"Common" (session required: guests have accounts too, so everything works for them).
+
+- **Who played** is recorded by the Room when a match **starts** (friend rooms and quick matches): each seat with an
+  account gets every other seat on its recent list (one row per person, newest 30, with the game and when). Quick
+  matches' ghosts go on the list exactly like people: each ghost seat gets a handle when it is seated and keeps the
+  name / avatar / frame / level it had at the table (its level in a list creeps up a little as days pass, as people's
+  do); nothing in any answer tells it from a person.
+- **People** are known by `uid`, a public handle (16 hex chars), never by account id. A person in an answer is always
+  `{uid, name, avatar, frame, level}` (live from the account; "You" / empty names shown as "Player").
+  `GET /v1/leaderboard` rows carry `uid` too (long-press to add a friend).
+- **Friends are one-way** (a favourites list): adding someone neither asks nor tells them; at most 100.
+- **Invites**: only to someone on your recent or friends list, only into the friend room you are in (lobby or
+  between matches, with a free seat). The person gets a push (`kind: "invite"`, channel `game`, link `room:<CODE>`,
+  tag `invite:<CODE>`, TTL 10 min; at most 6 invite pushes per person per hour) and the invite in
+  `GET /v1/social/invites`. An invite **expires** after 10 minutes, or as soon as the room's match starts.
+  **Limits**: one invite from the same person to the same person per 10 minutes (`scope: "person"`), 20 per hour and
+  60 per day per inviter (`scope: "total"`). **Privacy**: an invite to someone whose "Invites from players" is off,
+  or to a ghost, is answered, stored and rate-limited exactly like one a person ignores (the push is sent after the
+  answer); decline ("Not now") is never reported to the inviter.
+
+| method | path | body → result |
+|---|---|---|
+| GET | `/v1/social` | → `{recent: [{uid, name, avatar, frame, level, game, played_at, friend}], friends: [{uid, name, avatar, frame, level, added_at, game, played_at}], prefs: {invites}, max: {recent: 30, friends: 100}}` (times unix s; a friend never played with has `game` / `played_at` null; newest first) |
+| POST | `/v1/social/friends` | `{uid}` (from a list or the leaderboard) or `{code, member}` (a member id of the room you are in: the lobby, a match) → `{ok, friend: person}` (idempotent); `404 not_found`, `400` yourself, `409 {error: "friends_full", max}` |
+| DELETE | `/v1/social/friends` | `{uid}` → `{ok}` |
+| POST | `/v1/social/invites` | `{uid, code}` → `{ok, expires_at}`; `404 not_found` (not on your lists), `409 not_in_room \| room_full \| started` (your room can't take them), `429 {error: "rate", scope: "person" \| "total", retry_at}` |
+| GET | `/v1/social/invites` | → `{invites: [{id, from: person, code, game, sent_at, expires_at}]}` (pending, newest first, at most 10) |
+| POST | `/v1/social/invites/accept` | `{id}` or `{code}` (a tapped push knows only the room) → `{ok, code, game}`, then join the room as with a code; `410 {error: "gone"}` when it expired, the inviter left or the room can't take you |
+| POST | `/v1/social/invites/decline` | `{id}` or `{code}` → `{ok}` |
+| POST | `/v1/social/prefs` | `{invites: bool}` → `{ok, prefs}` (off also ends the pending ones) |
+
+Room RPC for these (not client messages): `socialSeat(account, member)` (the account or ghost at a seat, for a
+member of the room) and `inviteCheck(account)` (a member of an open friend room: its game and the member's name).
+The daily cron deletes invites after 2 days and ghost rows no list refers to after 30 days. Account erase removes the
+account's lists, prefs and invites, and its handle from everyone else's lists.
+
+## Errors (`error.code`)
+
+`version` (unsupported v), `not_found`, `full` (4 members), `started` (match in progress and you have no seat),
+`not_host`, `not_your_turn`, `bad_action` (illegal for the rules), `stale`, `too_few`, `teams_need_4`, `rate`
+(over 20 messages/s), `rematch_out` (a Play again vote closed without your yes: you are out of the room, close 4002; see
+"Play again"), `rate`
+(over 20 messages/s), `bad_message`, `emote_locked` / `emote_rate` (see "Emotes"), `banned` (your pid is banned from online play; `msg` says so, with the
+reason; the socket then closes with 4003: on hello, or while you are in a room when the ban happens), `kicked` (an
+admin removed you from the room; the socket then closes with 4002). `banned` also covers a banned account (by
+session or by the pid's account). In a quick room `full` means you have no seat in it.
+
+## Server behaviour details (as implemented in `server/src/room.ts`)
+
+Clarifications of the tables above; nothing here changes a message the client sends.
+
+- **Codes** in URLs are case-insensitive. Wrong method → `405`; `/ws` without `Upgrade: websocket` → `426`; more
+  than 16 sockets on one room → `503`. A reserved code nobody joins expires after the 10 min empty-room timeout.
+- **hello**: `pid` must be 16–64 chars of `[A-Za-z0-9_-]` (else `bad_message` and close). A matching `token` **or**
+  the same `pid` reclaims the member (and seat); the member's older socket is closed with code `4001`. Names have
+  control characters removed and are cut to 16 characters (never rejected; empty → "Player"); an avatar / frame
+  that is not ≤ 32 chars of `[A-Za-z0-9_.:-]` becomes `""`.
+- **Close codes**: `4000` after a fatal error (`version`, `full`, `started`, bad hello, `not_found`), `4001`
+  replaced by a newer connection of the same member, `4002` after your own `leave` (or an admin kick, preceded by
+  `error {code: "kicked"}`; or a Play again vote that went on without you, preceded by `error {code: "rematch_out"}`), `4003` banned (preceded by `error {code: "banned"}`; don't auto-reconnect), `4004` the
+  room was deleted (stale / empty cleanup or closed by an admin; preceded by `error {code: "not_found"}`).
+- **hello and bans**: the server checks the pid against the ban list (one D1 read, cached 60 s) before answering
+  `welcome`; messages sent before `welcome` wait for it and keep their order.
+- **Message order on connect**: `welcome`, then in the lobby (or after `over`) `lobby` to everyone; in a match
+  `presence {online: true}` to the others, `sync` + `turn` to you, and `act mode human` if a bot had your seat.
+  After `over`, a reconnecting client gets `sync` + `over` + `lobby`. Quick rooms: never `lobby` (before the start
+  only `welcome`; after `over` `sync` + `over`).
+- **After every action** the server sends `act`, then `turn` (unless the game is over). `turn` is sent for bot
+  steps too; its `deadline` is when the bot will act. While nobody is connected the match is frozen (nothing is
+  played, no `turn`) and resumes when someone reconnects.
+- `act.a.c` is `state.turn` (the roller, also under Free Hand). For `move`, `i` is the unit's lead token (`units()`
+  `token`); a client may send either pawn of a pair.
+- **Validation order**: shape (`n` must be an integer, else `bad_message`) → `stale` → `not_your_turn` → phase /
+  legality (`bad_action`). A `move` whose `i` is not 0–3 or not movable is `bad_action`. `settings` / `start`
+  during a match are `bad_action`. A `back` when your seat is not a bot is ignored. A `pair` (like `roll` / `move`)
+  from a player whose seat is a bot counts as `back`: the server emits `act mode human` first, then the action.
+- Timeouts act with `auto_move_token`, else the **easy** AI; bots play the **normal** AI.
+- **`lobby`** also carries `status` (`"lobby" | "playing" | "over"`); a member's `color` is the colour they would
+  get if the host started now. It is also sent during a match when the host changes (the host left).
+- **Lobby disconnects**: the member stays (`online: false`) for the 20 s grace (5 min when its last socket had said
+  `{t: "away", on: true}`: the app went to the background, e.g. to share the invite), then is dropped (`lobby` sent); a
+  later hello joins as a new member at the end of the order.
+- **`over`** also carries `standings: [{color, place, finished, progress}]` (`LudoRules.standings`), and is
+  followed by `lobby` (`status: "over"`). The room is then back under lobby rules: people may join (up to 4) or
+  leave and the host may change settings; the next match comes from the Play again vote (see "Play again"; a new
+  `start`, `n: 0`, for those who said yes). Members still offline after the game are dropped after the grace,
+  except while a vote they are in is open.
+- **`leave` in a match**: the others get `presence {online: false}` and `act mode cpu`; the bot keeps that colour
+  for the rest of the match, and the old token no longer works (`started`).
+- **Quick-match seats the server plays** (ONLINE_V2.md §3, owner decision: no disclosure): to clients they are
+  ordinary members in every message (`players[c] = "human"`, `bot: false`, `online: true`, a name, a free avatar,
+  a level, a `turn.deadline` from the normal turn timer, the same actions as a person's requests). Which seats they
+  are is stored in the Room only and shown in the admin console (`adminSnapshot`: `ghost: true` on members / seats;
+  matches rows: `ghosts`, `human_won`, `players[].ghost`). Server internals: `src/ghosts.ts`, `src/room.ts`.
+- **Accounts on hello**: the legacy pid ban, the session's account (banned → `banned`) and the pid's account are
+  checked before `welcome` (cached 60 s); the account's level is read from its profile. Lookups fail open.
+- **Keep-alive**: the exact text `{"t":"ping"}` is answered by the runtime's WebSocket auto-response with exactly
+  `{"t":"pong"}` (no `now`) without waking the Durable Object, and it does not count toward the rate limit. Clients
+  take the round trip from ping to pong and the server clock from `turn.now` (corrected by half the last round trip).
+  A ping with any other shape (extra fields, spacing) still reaches the DO and gets `{t: "pong", now}`.
+- **Rate limit**: a fixed 1 s window per socket, `ping` (other than the auto-answered one) included; the first message over 20 gets `error rate`, the
+  rest of that window is dropped silently.
+- **Storage / timers**: one storage value per room (members, settings, match state, `n`, deadlines, strikes, bot
+  RNG) and one Durable Object alarm set to the earliest of: turn deadline / bot action, disconnect graces, empty-room
+  (10 min) and stale-room (2 h since the last action or lobby change) cleanup. Sockets use the hibernation API, so
+  an idle room is evicted from memory and resumes from storage on the next message. Quick rooms add the auto-start
+  time, the 2 min after `over` (10 min after a settlement by progress), and grant retries (30 s, 60 s, ... 5 tries) to
+  the alarm. A frozen match (nobody connected) has one alarm only: the 2 min settlement (quick) or the empty-room
+  cleanup (friend rooms). The daily cron calls the `sweepStale()` RPC on rooms rows that look stale: a room with no
+  person connected is deleted (a running friend match is recorded as abandoned; a running quick match is settled by
+  progress instead and deletes itself later).
+- **Matchmaker storage**: the queue is the waiting sockets' attachments (account, identity, queue time, wait) plus
+  one storage value (game, size, empty-since, sequence) and one alarm (the next fill time / hello timeout of 10 s),
+  so an evicted queue resumes as it was.
+- **Away and event pushes** (NOTIFICATIONS.md): `away` may be sent any time after `hello` (before it, and from a
+  socket that is not a member, it is ignored); it is answered with nothing, changes no message anyone gets (not
+  `presence`, not `lobby`), nothing in the match (`n`, the hash, timers) and is not saved (it lives on the socket: a
+  new connection starts not away). `on` that is not a bool → `bad_message`. A member counts as **away** when every
+  open socket of theirs said `away: true`, or they have none (also during the disconnect grace). Friend rooms only
+  (never quick rooms, never ghosts), only for members with an account and a device with Game alerts on, sent in
+  the background through FCM with `link: "room:<CODE>"` and one notification tag per room (a phone shows the latest):
+  - "It's your turn" when a turn (`roll` phase, a person holding the seat, not a bot) starts for an away member while
+    someone else in the room is here (not away; their name is in the text, the host's first); at most once per
+    member per 3 min, and once per turn.
+  - "Friend joined" to an away host when a new member joins the lobby (or after `over`); at most once per 3 min.
+  - "Rematch?" to every away member when a match ends (`over`, back under lobby rules) while someone is here; at most
+    once per member per 3 min.
+- **Tests only**: the Room has test hooks (fixed dice, starting token positions, a time scale, a rate limit) that
+  work only when the `TEST_MODE` binding is `"1"`, which only `vitest.config.ts` sets; no route reaches them.
+
+## Rules module API (`server/src/rules/ludo.ts`)
+
+A line-for-line port of `godot/scripts/core/ludo_rules.gd` with the same names in camelCase and the same state
+shape and event objects: `newGame(players, teams, opts)`, `applyRoll(s, v)`, `move(s, i)`, `answerPair(s, yes)`, `defaultPairAnswer(s)`, `asksPair(s, c)`,
+`movables(s)`, `units(s)`, `autoMoveToken(s)`, `pickAi(s, mv, rng, level)`, `winners(s)`, `standings(s)`, `endGame(s)`,
+`sideDone(s, c)`, `applyAction(s, a)` (all five action kinds), plus the
+helpers. `stateHash(s)` lives in `hash.ts`. Parity with GDScript is tested by replaying traces recorded from the
+GDScript rules (`godot/dev/net_parity_dump.gd` → `server/test/fixtures/ludo_traces.json`).

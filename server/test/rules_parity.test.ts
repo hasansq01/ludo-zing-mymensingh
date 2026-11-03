@@ -1,0 +1,160 @@
+// Parity with the GDScript rules: replays every game recorded by godot/dev/net_parity_dump.gd with the TS port and
+// checks, after every action, the events (deep equal), the full state (deep equal) and the state hash (TS stateHash
+// vs the GDScript StateHash.of recorded in the trace). Regenerate the fixture from the repo root with
+//   godot --headless --path godot -s res://dev/net_parity_dump.gd
+import { describe, expect, it } from "vitest";
+import tracesJson from "./fixtures/ludo_traces.json?raw";
+import * as Ludo from "../src/rules/ludo";
+import type { Action, LudoState } from "../src/rules/ludo";
+import { stateHash } from "../src/rules/hash";
+import { Mulberry32 } from "../src/rules/rng";
+import { deepEqual } from "./rules_helpers";
+
+type Step = [string, number, number | boolean | string, number, string, Record<string, unknown>, Extra?];
+interface Extra {
+  auto?: number;
+  units?: unknown[];
+  pair_default?: boolean;
+}
+interface Game {
+  seed: number;
+  args: { players: string[]; teams: boolean; opts: { pair_ask?: boolean; pair_ask_by?: boolean[] } };
+  levels: string[];
+  s0: LudoState;
+  h0: string;
+  steps: Step[];
+  end?: { standings: unknown[]; winners: number[]; win_reward: number; play_reward: number };
+}
+interface Traces {
+  version: number;
+  games: Game[];
+  ev: unknown[][];
+}
+
+const T = JSON.parse(tracesJson) as Traces;
+
+function toAction(st: Step): Action {
+  const [k, c, val] = st;
+  switch (k) {
+    case "roll":
+      return { k, c, v: val as number };
+    case "move":
+      return { k, c, i: val as number };
+    case "pair":
+      return { k, c, yes: val as boolean };
+    case "mode":
+      return { k, c, mode: val as "cpu" | "human" };
+    case "end":
+      return { k };
+  }
+  throw new Error(`unknown action ${k}`);
+}
+
+/** Applies one step's state diff (tok: changed rows only) to the expected state. */
+function applyDiff(exp: Record<string, unknown>, diff: Record<string, unknown>): void {
+  for (const [k, v] of Object.entries(diff)) {
+    if (k === "tok") {
+      for (const [c, row] of v as [number, number[]][]) (exp.tok as number[][])[c] = structuredClone(row);
+    } else {
+      exp[k] = structuredClone(v);
+    }
+  }
+}
+
+function fail(where: string, got: unknown, want: unknown): never {
+  expect(got, where).toEqual(want); // a readable diff
+  throw new Error(where);
+}
+
+describe("GDScript parity traces", () => {
+  it("fixture is present and covers the interesting cases", () => {
+    expect(T.version).toBe(1);
+    expect(T.games.length).toBeGreaterThanOrEqual(100);
+    const types = new Set<string>();
+    for (const evs of T.ev) for (const e of evs) types.add((e as { type: string }).type);
+    for (const t of ["rolled", "three_sixes", "need_six", "free_hand", "stuck", "choose", "move", "capture", "split",
+      "pair_offer", "pair_formed", "home", "all_home", "finished", "turn", "game_over"]) {
+      expect(types.has(t), t).toBe(true);
+    }
+    const kinds = new Set(T.games.flatMap((g) => g.steps.map((s) => s[0])));
+    expect([...kinds].sort()).toEqual(["end", "mode", "move", "pair", "roll"]);
+    // play on: games with several finishers, a finish the game goes on after, a team finishing, "end" mid-game
+    const evOf = (g: Game) => g.steps.map((st) => T.ev[st[3]] as { type: string; place?: number; team?: number[] }[]);
+    const finishes = (g: Game) => evOf(g).flat().filter((e) => e.type === "finished").length;
+    expect(T.games.filter((g) => finishes(g) >= 3).length).toBeGreaterThanOrEqual(5);
+    expect(T.games.some((g) => evOf(g).some((l) => l.some((e) => e.type === "finished") && l.at(-1)?.type === "turn")))
+      .toBe(true);
+    expect(T.games.some((g) => evOf(g).flat().some((e) => e.type === "finished" && e.team?.length === 2))).toBe(true);
+    expect(T.games.some((g) => g.steps.some((st) => st[0] === "end" && T.ev[st[3]].length > 0))).toBe(true);
+    expect(T.games.some((g) => g.steps.some((st) => st[0] === "end" && T.ev[st[3]].length === 0))).toBe(true);
+    expect(T.games.some((g) => g.args.teams && g.end)).toBe(true);
+    expect(new Set(T.games.map((g) => g.args.players.filter((p) => p !== "off").length))).toEqual(new Set([2, 3, 4]));
+    // "Ask before pairing" per colour (quick matches): some seats asked, some pairing by themselves, in one game
+    const byGames = T.games.filter((g) => g.args.opts.pair_ask_by);
+    expect(byGames.length).toBeGreaterThanOrEqual(10);
+    const mixed = byGames.filter((g) => {
+      const by = g.args.opts.pair_ask_by!;
+      const flat = evOf(g).flat() as { type: string; c?: number; human?: boolean }[];
+      return flat.some((e) => e.type === "pair_offer" && by[e.c!]) &&
+        flat.some((e, j) => e.type === "pair_formed" && e.human && !by[e.c!] && flat[j - 1]?.type !== "pair_offer");
+    });
+    expect(mixed.length).toBeGreaterThanOrEqual(1);
+    // the default answer (timeouts, bots) is recorded at every pair question: both answers come up
+    const dflt = T.games.flatMap((g) => g.steps.filter((st) => st[6]?.pair_default !== undefined).map((st) => st[6]!.pair_default));
+    expect(dflt.length).toBeGreaterThanOrEqual(50);
+    expect(new Set(dflt)).toEqual(new Set([true, false]));
+    for (const g of byGames) {
+      const by = g.args.opts.pair_ask_by!;
+      // no colour whose entry is off is ever asked (a Free Hand roller's own entry decides, so check the roller)
+      for (const st of g.steps) {
+        for (const e of T.ev[st[3]] as { type: string }[]) if (e.type === "pair_offer") expect(by[st[1]], `game ${g.seed}`).toBe(true);
+      }
+    }
+  });
+
+  for (const g of T.games) {
+    const seats = g.args.players.map((p) => p[0]).join("");
+    it(`game ${g.seed} (${seats}${g.args.teams ? " teams" : ""}${g.args.opts.pair_ask ? " ask" : ""}${g.args.opts.pair_ask_by ? " ask-by" : ""}, ${g.steps.length} steps)`, () => {
+      const s = Ludo.newGame(g.args.players, g.args.teams, g.args.opts);
+      if (!deepEqual(s, g.s0)) fail("new_game", s, g.s0);
+      expect(stateHash(s)).toBe(g.h0);
+      const exp = structuredClone(g.s0) as unknown as Record<string, unknown>;
+      const rng = new Mulberry32(g.seed);
+      for (let n = 0; n < g.steps.length; n++) {
+        const st = g.steps[n];
+        const a = toAction(st);
+        const ev = Ludo.applyAction(s, a);
+        const where = `game ${g.seed} step ${n} ${JSON.stringify(a)}`;
+        if (!deepEqual(ev, T.ev[st[3]])) fail(`${where}: events`, ev, T.ev[st[3]]);
+        applyDiff(exp, st[5]);
+        if (!deepEqual(s, exp)) fail(`${where}: state`, s, exp);
+        const h = stateHash(s);
+        if (h !== st[4]) fail(`${where}: hash`, h, st[4]);
+        const extra = st[6];
+        if (extra?.pair_default !== undefined) {
+          if (Ludo.defaultPairAnswer(s) !== extra.pair_default) fail(`${where}: defaultPairAnswer`, Ludo.defaultPairAnswer(s), extra.pair_default);
+        }
+        if (extra?.auto !== undefined) {
+          if (Ludo.autoMoveToken(s) !== extra.auto) fail(`${where}: auto_move_token`, Ludo.autoMoveToken(s), extra.auto);
+          if (!deepEqual(Ludo.units(s), extra.units)) fail(`${where}: units`, Ludo.units(s), extra.units);
+        }
+        if (s.phase === "choose" && n % 3 === 0) {
+          // the bots: every level picks a legal unit and thinking never changes the state
+          const mv = Ludo.movables(s);
+          for (const level of Ludo.LEVELS) {
+            const i = Ludo.pickAi(s, mv, rng, level);
+            if (!mv.includes(i)) fail(`${where}: pickAi ${level}`, i, mv);
+          }
+          if (stateHash(s) !== h || !deepEqual(s, exp)) fail(`${where}: pickAi changed the state`, s, exp);
+        }
+      }
+      if (g.end) {
+        expect(s.phase).toBe("over");
+        expect(Ludo.standings(s)).toEqual(g.end.standings);
+        expect(Ludo.winners(s)).toEqual(g.end.winners);
+        expect(Ludo.winReward(s)).toBe(g.end.win_reward);
+        expect(Ludo.playReward(s)).toBe(g.end.play_reward);
+      }
+    });
+  }
+});

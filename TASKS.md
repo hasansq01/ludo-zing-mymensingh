@@ -1,7 +1,7 @@
 # Tasks — Ludo Zing Mymensingh
 
 See `PROJECT_CONTEXT.md` for details. Update this list whenever work starts, finishes or is dropped.
-Last reviewed: 2026-10-19.
+Last reviewed: 2026-10-30.
 
 ## Completed
 - [x] 3D WebGL Ludo core: board, tokens, dice, turns, captures, exact finish, three-6s rule.
@@ -85,6 +85,50 @@ Last reviewed: 2026-10-19.
       fonts load, no console errors; welcome, home top bar, Settings and Profile checked at 390x844.
 
 ## In progress
+- [ ] **Godot / Android port** (decided 2026-10-23, see PROJECT_CONTEXT.md):
+  - [x] Step 1: Godot 4.7.2 installed; `godot/` project; Ludo + Snakes & Ladders rules ported as pure modules;
+        272/272 headless checks pass (`tools/godot-test.sh`); planted rule bugs are caught.
+  - [x] Step 2 (2026-10-24): playable Android build. 3D café (five rooms), Ludo board + pawns, Snakes & Ladders 3D
+        board, 3D dice, splash, home, setup, HUDs, pause / win, settings, profile, how to play, sound + music, saves,
+        shop / inventory, daily reward / spin / free coins; Android export pipeline (`tools/android-build.sh`);
+        lighting matched to the web render by pixel sampling; tested on the Android emulator (taps + autoplay soak).
+  - [x] Step 3: online friend rooms for Ludo on Cloudflare Workers + Durable Objects (`server/`, live; tested with
+        unit/parity/room tests, simulated 2–4 player games incl. drop/rejoin on production, and the Android release
+        APK on the emulator against production).
+  - [x] Step 4 (`6c10e19`): quick match, accounts and server coins, leaderboards, Snakes & Ladders online.
+  - [x] Play on after the first finish (owner 2026-10-25): Ludo (Individual + Teams) and Snakes & Ladders go on until
+        the places are decided; grants and offline claims by placing.
+  - [x] Emotes (`48a8171`, `f735a1e`): 24 animated stickers in 4 packs, sounds, shop, online relay, bot emotes.
+  - [x] Notifications (`8bc8e37`, `0933daf`): local reminders, FCM push alerts, admin campaigns.
+  - [x] New home screen, layout D (`02da34a`); admin Usage page (`afcbe28`).
+  - [ ] **Economy v1** (owner's goal, 2026-10-26; contract `server/ECONOMY_V1.md`):
+    - [x] Server (`3b77d00`, deployed, migration 0005 on remote D1): gems, coin tables 100 / 500 / 2,000 / 10,000 /
+          50,000 + practice, entries held and settled, re-rolls, AdMob SSV and Play purchase checks, refunds cron,
+          weekly gem prizes, admin gems grant / remove and Economy page. 1015/1015 server tests (2026-10-27).
+    - [x] Game (`7815ec2`, `1400d44`): gem wallet + store, coin-table picker, broke popup, re-roll button and held note,
+          rewarded videos (AdMob + UMP consent), Play Billing plugin, 2,500 starting coins. 2455/2455 Godot tests.
+    - [x] AdMob: app + rewarded unit, SSV URL verified, European regulations consent message published (2026-10-27).
+    - [x] Phone (v4): re-roll used (free and 5 gems).
+    - [x] Phone (v6, 2026-10-30): version 6 installed from Play internal testing; test gem purchases (80 and 1,200) granted
+          once each on the server; coin match 100 table paid out 180 of a 200 pot; re-roll charged 5 gems.
+    - [x] Google Play Games sign-in (2026-10-30): Play Games Services project linked to Cloud project ludo-zing-a1b7c,
+          consent screen (Testing), Android clients (Play signing `9A:C7:56:CB…`, upload key) and a Web client; Worker secrets
+          GOOGLE_WEB_CLIENT_ID / _SECRET; game settings `play_games/app_id` and `web_client_id`. Verified on the phone:
+          "SYNCED", account `acc_trk4…` linked to the Google player. Testers: Play Games Testers and Cloud test users must
+          list each Google account until the Play Games project and the consent screen are published.
+    - [ ] **AdMob review (waiting, 2026-10-30):** the account was resubmitted and shows "being verified" (24 h, up to 2
+          weeks). The app is not linked to a store listing (not public on Play), which AdMob lists as the step that prompts
+          the app review. Until approval the ad unit answers "Cannot determine request type" (error 1), so no rewarded video
+          has loaded and `ad_rewards` is empty. When it loads: watch "+2 gems", confirm the `ad_rewards` row is granted via
+          the SSV callback. This is the last open item of the Economy v1 goal.
+  - [ ] **Crash reporting** (2026-10-31, a tester's Infinix Hot 16 Pro+ "crashes mid game", nothing in Play's
+        Crashes & ANRs): built, not deployed. Game: `CrashWatch` breadcrumbs in `user://diag/`, file logging on phones,
+        exit reasons + native tombstones from the notifications plugin (`Diag.kt`), one report per dead run to
+        `POST /v1/diag/crash`; server: migration 0006 `crash_reports`, 90-day retention, admin Crashes page; privacy page
+        line. Native debug symbols: `tools/android-symbols.sh`. To ship: apply 0006 to remote D1, deploy, new build
+        (version code 9), upload its symbols, then read the tester's report in the admin console.
+  - [ ] Step 5: Play Store release. Internal testing is live (Oclasp org account, testers TeamDD, v5 0.2.0); store
+        listing, content rating, data safety and policy pages are done. Production after Economy v1 is verified.
 - [ ] **User:** approve the restyled top bar (reference-style HUD, second version) so the home screenshot baseline can
       be updated (screenshot differs 5.35%, only in the bar region x 12-377, y 9-64; all layout checks and locked
       numbers pass).

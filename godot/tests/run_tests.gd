@@ -1,0 +1,103 @@
+extends SceneTree
+## Runs every rule test suite headless and exits with 1 when any check fails:
+##   godot --headless --path godot -s res://tests/run_tests.gd
+## (or tools/godot-test.sh from the repo root). `-- --only=social,net_ui` runs the suites whose file names contain one of them.
+
+const SUITES := [
+	"res://tests/test_pair_rules.gd",
+	"res://tests/test_team_rules.gd",
+	"res://tests/test_pair_capture_split.gd",
+	"res://tests/test_snakes_ladders.gd",
+	"res://tests/test_snake_bite.gd",
+	"res://tests/test_sl_rewards.gd",
+	"res://tests/test_ludo_flow.gd",
+	"res://tests/test_ludo_standings.gd",
+	"res://tests/test_play_on.gd",
+	"res://tests/test_play_on_client.gd",
+	"res://tests/test_bot_levels.gd",
+	"res://tests/test_tutorial.gd",
+	"res://tests/test_save_prefs.gd",
+	"res://tests/test_shop.gd",
+	"res://tests/test_pawns.gd",
+	"res://tests/test_rewards.gd",
+	"res://tests/test_collection.gd",
+	"res://tests/test_sl_scenes.gd",
+	"res://tests/test_info.gd",
+	"res://tests/test_match_store.gd",
+	"res://tests/test_fmt.gd",
+	"res://tests/test_components_a.gd",
+	"res://tests/test_components_b.gd",
+	"res://tests/test_lobby.gd",
+	"res://tests/test_home.gd",
+	"res://tests/test_thumbs.gd",
+	"res://tests/test_quality.gd",
+	"res://tests/test_state_hash.gd",
+	"res://tests/test_sl_state_hash.gd",
+	"res://tests/test_net.gd",
+	"res://tests/test_net_ui.gd",
+	"res://tests/test_net_online.gd",
+	"res://tests/test_rematch.gd",
+	"res://tests/test_net_ping.gd",
+	"res://tests/test_play_games.gd",
+	"res://tests/test_notifier.gd",
+	"res://tests/test_billing.gd",
+	"res://tests/test_ads.gd",
+	"res://tests/test_account.gd",
+	"res://tests/test_account_ui.gd",
+	"res://tests/test_econ_wallet.gd",
+	"res://tests/test_emote_art.gd",
+	"res://tests/test_emote_shop.gd",
+	"res://tests/test_emote_sfx.gd",
+	"res://tests/test_emotes_hud.gd",
+	"res://tests/test_notif_plan.gd",
+	"res://tests/test_back_online.gd",
+	"res://tests/test_coin_tables.gd",
+	"res://tests/test_reroll.gd",
+	"res://tests/test_notifications.gd",
+	"res://tests/test_sheet_stack.gd",
+	"res://tests/test_crash_watch.gd",
+	"res://tests/test_pair_online.gd",
+	"res://tests/test_share.gd",
+	"res://tests/test_l10n.gd",
+	"res://tests/test_social.gd",
+	"res://tests/test_app_update.gd",
+	"res://tests/test_app_rating.gd",
+	"res://tests/test_leak_probe.gd",
+	"res://tests/test_unit_choice.gd",
+	"res://tests/test_redraw_free.gd",
+]
+
+## Suites whose run() is a coroutine that the runner waits for (the others run to their first wait, as before).
+const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_stack.gd", "res://tests/test_crash_watch.gd", "res://tests/test_pair_online.gd", "res://tests/test_share.gd",
+	"res://tests/test_social.gd", "res://tests/test_app_update.gd", "res://tests/test_app_rating.gd",
+	"res://tests/test_leak_probe.gd", "res://tests/test_unit_choice.gd",
+	"res://tests/test_redraw_free.gd"]
+
+func _initialize() -> void:
+	var save := root.get_node_or_null("Save")  # a suite that stops halfway can't write its throwaway profile to save.json
+	if save != null:
+		save.set("writes_off", true)
+	await process_frame                       # the info-bubble checks need a live scene tree
+	TranslationServer.set_locale("en")        # the checks read English UI text, whatever this computer's language
+	var failed := 0
+	var total := 0
+	var only := PackedStringArray()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--only="):
+			only = a.trim_prefix("--only=").split(",", false)
+	for path in SUITES:
+		if not only.is_empty() and not Array(only).any(func(o: String) -> bool: return path.get_file().contains(o)):
+			continue
+		var suite = load(path).new()
+		if path in ASYNC_SUITES:
+			await suite.run()                  # (waits for frames: the live match tests)
+		else:
+			suite.run()
+		var bad: Array = suite.results.filter(func(r): return not r.ok)
+		total += suite.results.size()
+		failed += bad.size()
+		print("%s: %d passed, %d failed" % [path.get_file(), suite.results.size() - bad.size(), bad.size()])
+		for r in bad:
+			print("  FAIL %s  got %s" % [r.name, r.got])
+	print("TOTAL: %d passed, %d failed" % [total - failed, failed])
+	quit(1 if failed else 0)
