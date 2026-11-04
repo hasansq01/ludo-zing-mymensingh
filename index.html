@@ -7495,7 +7495,7 @@ function personSVG(p) {
     case 'afro':  back = `<circle cx="20" cy="13.5" r="11.2" fill="${H}"/>`; front = `<path d="M12.2 15.5C12.5 10 16 8.6 20 8.6C24 8.6 27.5 10 27.8 15.5C25 12.8 15 12.8 12.2 15.5Z" fill="${H}"/>`; break;
     case 'side':  front = `<path d="M12 17C11 9 15 6.5 20 6.5C26 6.5 29 9 28.5 17L27.2 13C23 13 18 12.2 15 9.8C14 12 13 14 12 17Z" fill="${H}"/>`; break;
     case 'buzz':  front = `<path d="M12.3 15C12.5 9.5 16 7.8 20 7.8C24 7.8 27.5 9.5 27.7 15C25 12.6 15 12.6 12.3 15Z" fill="${H}"/>`;
-      face = `<path d="M12.6 18.4C12.8 25.2 16 27.2 20 27.2C24 27.2 27.2 25.2 27.4 18.4C26.4 22 24 23.4 20 23.4C16 23.4 13.6 22 12.6 18.4Z" fill="${H}"/>`; break;
+      if (!p.fh) face = `<path d="M12.6 18.4C12.8 25.2 16 27.2 20 27.2C24 27.2 27.2 25.2 27.4 18.4C26.4 22 24 23.4 20 23.4C16 23.4 13.6 22 12.6 18.4Z" fill="${H}"/>`; break;   // the buzz cut's own beard (Sabbir); avatars that set fh choose their own
     case 'manbun': front = `<circle cx="20" cy="5.4" r="3.1" fill="${H}"/><path d="${crop}" fill="${H}"/>`; break;
     case 'spiky': front = `<path d="M12 16L11.4 9.8L14.6 11L15 6.4L18 9L20 4.8L22 9L25 6.4L25.4 11L28.6 9.8L28 16C25 13 15 13 12 16Z" fill="${H}"/>`; break;
     case 'cap':   front = `<path d="M12.2 17L12.6 13H27.4L27.8 17C26 15.4 14 15.4 12.2 17Z" fill="${H}"/><path d="M11.6 14.2C11.6 7.6 15.6 6 20 6C24.4 6 28.4 7.6 28.4 14.2Z" fill="${p.ac}"/><path d="M19 12.8L33.2 13.4C33.4 15 31.4 15.6 28 15.4L19 15Z" fill="${p.ac}"/><path d="M11.6 14.2C11.6 7.6 15.6 6 20 6C17 8 16.2 10.6 16.6 14.2Z" fill="${shade}"/>`; break;
@@ -7516,6 +7516,13 @@ function personSVG(p) {
     case 'wavy':  back = `<path d="M10.6 17C10 8.5 14.5 5.6 20 5.6C25.5 5.6 30 8.5 29.4 17C31.4 20 29 22.4 30.8 25.4C32.4 28.2 29.6 31 30.4 33.6C26.4 35 13.6 35 9.6 33.6C10.4 31 7.6 28.2 9.2 25.4C11 22.4 8.6 20 10.6 17Z" fill="${H}"/>`;
       front = `<path d="M12 16.6C11.6 9 15.2 7 20 7C24.8 7 28.4 9 28 16.6C25 12.6 15 12.6 12 16.6Z" fill="${H}"/><path d="M12.4 12.4C15 9.4 25 9.4 27.6 12.4" fill="none" stroke="${p.ac}" stroke-width="2.2" stroke-linecap="round"/>`; break;
     case 'bangs': back = `<path d="${longBack}" fill="${H}"/>`; front = `<path d="M12 16.2C11.8 9.2 15.4 7 20 7C24.6 7 28.2 9.2 28 16.2C27.6 14.6 27.2 14 26.4 14H13.6C12.8 14 12.4 14.6 12 16.2Z" fill="${H}"/><path d="M25.4 8.2L29.4 6.2L29 10ZM25.4 8.2L28.8 11.6L25.2 11Z" fill="${p.ac}"/><circle cx="25.6" cy="9.2" r="1.3" fill="${p.ac}"/>`; break;
+    // added 2026-11-04 for the WORLD avatars
+    case 'bald':  front = `<ellipse cx="16.6" cy="11.6" rx="2.6" ry="1.3" transform="rotate(-20 16.6 11.6)" fill="#fff" opacity=".28"/>`; break;
+    case 'fade':  front = `<path d="M12.3 15C12.2 8.4 14.8 5.4 20 5.4C25.2 5.4 27.8 8.4 27.7 15C26 13 14 13 12.3 15Z" fill="${H}"/><path d="M12.3 15C12.4 13 13 12.4 14 12.2V15.6Z M27.7 15C27.6 13 27 12.4 26 12.2V15.6Z" fill="${H}" opacity=".55"/>`; break;
+    case 'straight': back = `<path d="M10.8 17C10.4 8.5 14.6 5.6 20 5.6C25.4 5.6 29.6 8.5 29.2 17L29.8 34.2H10.2Z" fill="${H}"/>`;
+      front = `<path d="M12 17.6C11.6 9.4 15 7 20 7.2C18.6 9.2 16.6 12.6 12 17.6ZM28 17.6C28.4 9.4 25 7 20 7.2C21.4 9.2 23.4 12.6 28 17.6Z" fill="${H}"/>`; break;
+    case 'locs':  back = [11, 13.6, 26.4, 29].map(x => `<rect x="${x - 1.3}" y="12" width="2.6" height="${x === 11 || x === 29 ? 21 : 19}" rx="1.3" fill="${H}"/>`).join('');
+      front = `<path d="M12 16.2C11.6 9 15.2 6.8 20 6.8C24.8 6.8 28.4 9 28 16.2C25 12.8 15 12.8 12 16.2Z" fill="${H}"/>` + [15.4, 18.4, 21.6, 24.6].map(x => `<path d="M${x} 8.6V13.4" stroke="#000" stroke-opacity=".18" stroke-width=".7" stroke-linecap="round"/>`).join(''); break;
   }
   // outfit and its detail
   const T = p.top;
@@ -7534,12 +7541,38 @@ function personSVG(p) {
   const neck = `<path d="M17 22.6H23V28.8C21.4 30 18.6 30 17 28.8Z" fill="${S}"/><path d="M17 24.6C18.8 26 21.2 26 23 24.6V22.6H17Z" fill="${shade}"/>`;
   const ears = earsOn ? `<circle cx="12.1" cy="18.4" r="1.9" fill="${S}"/><circle cx="27.9" cy="18.4" r="1.9" fill="${S}"/>` : '';
   const head = `${ears}<ellipse cx="20" cy="17.4" rx="${p.hs === 'hijab' ? 7.2 : 8}" ry="${p.hs === 'hijab' ? 8.2 : 9}" fill="${S}"/>`;
-  const f = p.g === 'f';
-  const eyes = `<ellipse cx="16.8" cy="18.2" rx="1.15" ry="1.35" fill="${ink}"/><ellipse cx="23.2" cy="18.2" rx="1.15" ry="1.35" fill="${ink}"/><circle cx="17.2" cy="17.7" r=".4" fill="#fff"/><circle cx="23.6" cy="17.7" r=".4" fill="#fff"/>` +
-    (f ? `<path d="M15.2 17.3L14.6 16.6M24.8 17.3L25.4 16.6" stroke="${ink}" stroke-width=".7" stroke-linecap="round"/>` : `<path d="M15.2 15.6Q16.8 14.8 18.4 15.5M21.6 15.5Q23.2 14.8 24.8 15.6" fill="none" stroke="${p.hs === 'hijab' ? ink : H}" stroke-width="${f ? .7 : 1}" stroke-linecap="round"/>`);
-  const mouth = f ? `<path d="M18 21.8Q20 23.8 22 21.8Q20 22.6 18 21.8Z" fill="#d9536a"/>` : `<path d="M17.8 21.6Q20 23.6 22.2 21.6" fill="none" stroke="${ink}" stroke-width=".9" stroke-linecap="round"/>`;
+  /* face: eye shape (round / almond / narrow / big) and colour, lashes, brows, nose, mouth and facial hair; with none
+     of these fields set the original faces come out unchanged (lashes and lips for 'f', brows and a smile for 'm') */
+  const f = p.g === 'f', EY = 18.2, ec = p.eyeCol;
+  const eyeShape = {
+    round: x => `<ellipse cx="${x}" cy="${EY}" rx="1.15" ry="1.35"/>`,
+    big: x => `<ellipse cx="${x}" cy="${EY - .1}" rx="1.45" ry="1.75"/>`,
+    almond: x => `<path d="M${x - 1.7} ${EY + .1}Q${x} ${EY - 1.4} ${x + 1.7} ${EY - .1}Q${x + .1} ${EY + 1.3} ${x - 1.7} ${EY + .1}Z"/>`,
+    narrow: x => `<ellipse cx="${x}" cy="${EY + .2}" rx="1.35" ry=".72"/>`,
+  }, es = eyeShape[p.eye] ? p.eye : 'round';
+  let eyes = `<g fill="${ec || ink}">${eyeShape[es](16.8)}${eyeShape[es](23.2)}</g>`;
+  if (ec) eyes += [16.8, 23.2].map(x => `<circle cx="${x}" cy="${EY + .1}" r="${es === 'narrow' ? .45 : .65}" fill="${ink}"/>`).join('');
+  eyes += es === 'round' ? `<circle cx="17.2" cy="17.7" r=".4" fill="#fff"/><circle cx="23.6" cy="17.7" r=".4" fill="#fff"/>`
+    : es === 'big' ? `<circle cx="17.3" cy="17.4" r=".55" fill="#fff"/><circle cx="23.7" cy="17.4" r=".55" fill="#fff"/>`
+    : `<circle cx="17.2" cy="${EY - .2}" r=".3" fill="#fff"/><circle cx="23.6" cy="${EY - .2}" r=".3" fill="#fff"/>`;
+  if (es === 'narrow') eyes += `<path d="M15.2 ${EY - .5}Q16.8 ${EY - 1.1} 18.4 ${EY - .5}M21.6 ${EY - .5}Q23.2 ${EY - 1.1} 24.8 ${EY - .5}" fill="none" stroke="${ink}" stroke-width=".55" stroke-linecap="round"/>`;
+  if (p.lash ?? f) eyes += `<path d="M15.2 17.3L14.6 16.6M24.8 17.3L25.4 16.6" stroke="${ink}" stroke-width=".7" stroke-linecap="round"/>`;
+  const browW = { thin: .7, soft: 1, thick: 1.7 }[p.brow || (f ? 'none' : 'soft')];
+  if (browW) eyes += `<path d="M15.2 15.6Q16.8 14.8 18.4 15.5M21.6 15.5Q23.2 14.8 24.8 15.6" fill="none" stroke="${p.hs === 'hijab' || p.hs === 'bald' ? ink : H}" stroke-width="${browW}" stroke-linecap="round"/>`;
+  const nose = { small: `<path d="M19.4 20.3Q20 21.1 20.6 20.3" fill="none" stroke="${shade}" stroke-width=".8" stroke-linecap="round"/>`,
+    wide: `<path d="M18.6 20Q18.9 21.3 20 21.1Q21.1 21.3 21.4 20" fill="none" stroke="${shade}" stroke-width=".85" stroke-linecap="round"/>` }[p.nose] || '';
+  const mouth = nose + ({
+    lips: `<path d="M18 21.8Q20 23.8 22 21.8Q20 22.6 18 21.8Z" fill="#d9536a"/>`,
+    smile: `<path d="M17.8 21.6Q20 23.6 22.2 21.6" fill="none" stroke="${ink}" stroke-width=".9" stroke-linecap="round"/>`,
+    grin: `<path d="M17.5 21.4Q20 25 22.5 21.4Z" fill="#fff" stroke="${ink}" stroke-width=".75" stroke-linejoin="round"/>`,
+    neutral: `<path d="M18.4 22.3Q20 22.8 21.6 22.3" fill="none" stroke="${ink}" stroke-width=".85" stroke-linecap="round"/>`,
+  }[p.mouth] || (f ? `<path d="M18 21.8Q20 23.8 22 21.8Q20 22.6 18 21.8Z" fill="#d9536a"/>` : `<path d="M17.8 21.6Q20 23.6 22.2 21.6" fill="none" stroke="${ink}" stroke-width=".9" stroke-linecap="round"/>`));
+  const jaw = 'M12.6 18.4C12.8 25.2 16 27.2 20 27.2C24 27.2 27.2 25.2 27.4 18.4C26.4 22 24 23.4 20 23.4C16 23.4 13.6 22 12.6 18.4Z';
+  const stache = `<path d="M17 21Q18.6 19.6 20 20.6Q21.4 19.6 23 21Q21.6 21.4 20 21.1Q18.4 21.4 17 21Z" fill="${H}"/>`;
+  face += { stubble: `<path d="${jaw}" fill="${H}" opacity=".3"/>`, moustache: stache, goatee: stache + `<ellipse cx="20" cy="25.2" rx="1.9" ry="1.5" fill="${H}"/>`, beard: `<path d="${jaw}" fill="${H}"/>` + stache }[p.fh] || '';
   const cheeks = `<circle cx="15.2" cy="21" r="1.5" fill="#ff8f9b" opacity=".35"/><circle cx="24.8" cy="21" r="1.5" fill="#ff8f9b" opacity=".35"/>`;
   if (p.acc === 'glasses') acc = `<g fill="none" stroke="${p.ac}" stroke-width=".9"><circle cx="16.8" cy="18.2" r="2.5"/><circle cx="23.2" cy="18.2" r="2.5"/><path d="M19.3 18H20.7"/></g>`;
+  if (p.acc === 'shades') acc = `<g fill="#1d1922" stroke="${p.ac}" stroke-width=".7"><path d="M14 16.8H19.4Q19.6 20.4 16.7 20.4Q14 20.4 14 16.8Z"/><path d="M20.6 16.8H26Q26 20.4 23.3 20.4Q20.4 20.4 20.6 16.8Z"/></g><path d="M19.4 17.2H20.6" stroke="${p.ac}" stroke-width=".7"/><path d="M15 17.6L16.2 19" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-linecap="round"/>`;
   if (p.acc === 'earrings') acc = `<circle cx="12.1" cy="21.2" r="1" fill="${p.ac}"/><circle cx="27.9" cy="21.2" r="1" fill="${p.ac}"/>`;
   return `<svg viewBox="0 0 40 40" aria-hidden="true">${back}${outfit}${neck}${head}${face}${eyes}${mouth}${cheeks}${front}${acc}</svg>`;
 }
@@ -7565,6 +7598,23 @@ const CHARS = [   // 10 male + 10 female; the first of each is free, the rest co
   { id: 'ch-nusrat',  name: 'Nusrat',  g: 'f', price: 10750, a1: '#d9ecff', a2: '#8fb3ef', skin: '#f6d2b8', hair: '#5b3a22', hs: 'wavy',   top: '#ff9ec7', od: 'collar', ac: '#2fb39c' },
   { id: 'ch-ayesha',  name: 'Ayesha',  g: 'f', price: 11500, a1: '#ffdcd6', a2: '#ee8a7c', skin: '#8d5a3b', hair: '#1b1416', hs: 'bangs',  top: '#2fb39c', od: 'scarf', ac: '#ffd45e' },
 ].map(c => ({ ...c, art: 'person' }));
+/* More characters (2026-11-04): 12 free avatars with a wide range of looks, drawn with the same personSVG parts as
+   the others plus its newer face options (eye shape and colour, nose, brows, facial hair). Shown together as one
+   group in Collection › Characters. */
+const WORLD = [
+  { id: 'w-hana',   name: 'Hana',   g: 'f', a1: '#ffe0ec', a2: '#f28bb0', skin: '#f6d9c2', hair: '#1b1416', hs: 'straight', eye: 'narrow', nose: 'small', top: '#ff9ec7', od: 'collar' },
+  { id: 'w-kenji',  name: 'Kenji',  g: 'm', a1: '#dfe7ff', a2: '#7d97e8', skin: '#f3d3b5', hair: '#1b1416', hs: 'side', eye: 'narrow', nose: 'small', top: '#2b2f45', od: 'v' },
+  { id: 'w-mei',    name: 'Mei',    g: 'f', a1: '#d6f4ea', a2: '#5fc4a3', skin: '#f6d9c2', hair: '#2a1d18', hs: 'buns', eye: 'almond', nose: 'small', top: '#e5484d', od: 'necklace', ac: '#f4c430' },
+  { id: 'w-linh',   name: 'Linh',   g: 'f', a1: '#fff0c9', a2: '#f0b84a', skin: '#e3b18a', hair: '#1b1416', hs: 'long', eye: 'almond', nose: 'small', top: '#2fa86b', od: 'v' },
+  { id: 'w-emma',   name: 'Emma',   g: 'f', a1: '#d8f1ff', a2: '#68b8ea', skin: '#ffe3cf', hair: '#e8c26a', hs: 'wavy', eyeCol: '#3b7be0', nose: 'small', top: '#9b6be0', od: 'collar', ac: '#ff7fae' },
+  { id: 'w-lukas',  name: 'Lukas',  g: 'm', a1: '#e3f4c8', a2: '#9ccc5a', skin: '#f6d2b8', hair: '#8a5a32', hs: 'crop', eyeCol: '#3f8a4a', nose: 'small', fh: 'stubble', top: '#3b7be0', od: 'hoodie' },
+  { id: 'w-sofia',  name: 'Sofia',  g: 'f', a1: '#ffe1d1', a2: '#f39a6b', skin: '#f3c6a5', hair: '#c4572a', hs: 'bob', eyeCol: '#8a6a2a', nose: 'small', top: '#2fb39c', od: 'necklace', acc: 'earrings', ac: '#f4c430' },
+  { id: 'w-oliver', name: 'Oliver', g: 'm', a1: '#fff1c2', a2: '#e9c14c', skin: '#ffe3cf', hair: '#d9783a', hs: 'curls', eyeCol: '#3b7be0', nose: 'small', top: '#e5484d', od: 'stripe' },
+  { id: 'w-jayden', name: 'Jayden', g: 'm', a1: '#cdeff5', a2: '#4fb6c9', skin: '#6b4128', hair: '#1b1416', hs: 'fade', nose: 'wide', mouth: 'grin', top: '#f4a340', od: 'hoodie' },
+  { id: 'w-maya',   name: 'Maya',   g: 'f', a1: '#fce4ff', a2: '#d58be8', skin: '#8d5a3b', hair: '#1b1416', hs: 'locs', nose: 'wide', top: '#f4c430', od: 'necklace', acc: 'earrings', ac: '#f4c430' },
+  { id: 'w-carlos', name: 'Carlos', g: 'm', a1: '#ffd6cf', a2: '#ef7e6f', skin: '#c68a5e', hair: '#2a1d18', hs: 'quiff', nose: 'small', fh: 'moustache', top: '#2fa86b', od: 'collar' },
+  { id: 'w-ava',    name: 'Ava',    g: 'f', a1: '#e7dcff', a2: '#a98cf0', skin: '#f3c6a5', hair: '#5b3a22', hs: 'pony', eyeCol: '#6b3f22', nose: 'small', top: '#3b7be0', od: 'v', ac: '#e5484d' },
+].map(c => ({ ...c, price: 0, art: 'person' }));
 const AVATARS = [
   { id: 'pawn-red',    name: 'Red Pawn',    art: 'pawn',  a1: '#ff8a80', a2: '#e5484d' },
   { id: 'pawn-green',  name: 'Green Pawn',  art: 'pawn',  a1: '#8be3b0', a2: '#2fa86b' },
@@ -7575,6 +7625,7 @@ const AVATARS = [
   { id: 'robot',       name: 'Robot',       art: 'robot', a1: '#b8e7ff', a2: '#3a8fd0', unlock: { ach: 'streak' } },
   { id: 'crown',       name: 'Crown',       art: 'crown', a1: '#c99bff', a2: '#6a35c0', unlock: { level: 5 } },
   ...CHARS,   // after the originals, so AVATARS[0] (the fallback) stays Red Pawn
+  ...WORLD,
 ];
 const FRAMES = [
   { id: 'classic', name: 'Wood' },
@@ -7783,8 +7834,8 @@ function charCard(a) {   // Characters tab: Free / Owned / Equipped tag, or pric
 function renderCollection() {
   selectTab($('ppColTabs'), colTab);
   if (colTab === 'chars') {
-    $('ppCol').innerHTML = [['m', 'Male'], ['f', 'Female']].map(([g, label]) =>
-      `<h4 class="col-h">${label}</h4>` + CHARS.filter(c => c.g === g).map(charCard).join('')).join('');
+    $('ppCol').innerHTML = [['m', 'Male'], ['f', 'Female']].map(([g, label]) => `<h4 class="col-h">${label}</h4>` + CHARS.filter(c => c.g === g).map(charCard).join('')).join('') +
+      `<h4 class="col-h">More characters</h4>` + WORLD.map(charCard).join('');
     return;
   }
   $('ppCol').innerHTML = colItems().map(it => `<div class="cit${it.eq ? ' eq' : ''}${it.open ? '' : ' locked'}">${it.art}<b>${esc(it.name)}</b>` +
@@ -8264,7 +8315,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { DEMO, PawnSkins, buyPawnSkin, usePawnSkin, openPawnAll, toks, pickables, camera, ensureProfile, TEXT_PACKS, TEXT_EMOTES, buyTextPack, useTextPack, packPhrases, EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { WORLD, CHARS, AVATARS, personSVG, avById, renderProfile, DEMO, PawnSkins, buyPawnSkin, usePawnSkin, openPawnAll, toks, pickables, camera, ensureProfile, TEXT_PACKS, TEXT_EMOTES, buyTextPack, useTextPack, packPhrases, EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
