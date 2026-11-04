@@ -83,6 +83,21 @@ Last reviewed: 2026-10-30.
 - [x] Second deploy (2026-10-19, on the user's request): everything above marked "second deploy", including the restyled top
       bar that is not yet approved for the home screenshot baseline. Verified live: all 6 files match the build byte for byte,
       fonts load, no console errors; welcome, home top bar, Settings and Profile checked at 390x844.
+- [x] Snakes & Ladders 3D board: the in-board snakes and ladders are now flat 2D cartoon art printed into the board's face
+      texture (`paintLadders` / `paintSnakes`), replacing the 3D tube snakes and rod ladders. Same squares, paths, colours
+      and rules; scenery, table, framing snakes, camera and UI unchanged. Checked in the 3D and Top camera views (2026-10-26).
+      Not committed or deployed yet.
+- [x] Candy Kingdom scene board redesign (S&L only, existing scene / shop / ownership): pink-peach-cream-mint tiles
+      (`tiles`), faint sprinkles, candy-cane striped lip with peppermints + gumdrops on the rim (`candyTrim`), candy-striped
+      flat snakes (`candyStripes`), candy-cane ladders with mint rungs. Jungle default unchanged; no Ludo code touched.
+      Checked in 3D and Top views (2026-10-26).
+- [x] Desert Temple scene board redesign (S&L only, existing scene / shop): ivory-sandstone-beige tiles, faint terracotta
+      glyphs (sun / pyramid / diamond) on every third tile, sandstone frame, deep-teal lip with gold diamonds, sun
+      medallions on the corners, terracotta tiles mid-side, wooden ladders, turquoise / emerald / terracotta / gold snakes
+      with pale back diamonds. Board trim is now generic per scene (`B.trim`, `B.marks`, `B.snakePattern`); Candy
+      Kingdom moved onto it and re-checked. Checked in 3D and Top views (2026-10-26).
+- [x] Enchanted Jungle scene is free (price 0) and owned by every player (free scenes are always added to `P.scenes` on
+      load), so anyone can pick it with Use. Jungle Clearing stays the equipped default (2026-10-26).
 
 ## In progress
 - [ ] **Godot / Android port** (decided 2026-10-23, see PROJECT_CONTEXT.md):
