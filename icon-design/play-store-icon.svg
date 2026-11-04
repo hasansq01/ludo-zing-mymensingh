@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Ludo Zing Mymensingh</title>
+  <defs>
+    <!-- warm café tabletop -->
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#ffd59a"/>
+      <stop offset=".45" stop-color="#f6a456"/>
+      <stop offset="1" stop-color="#c25e26"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff6dc" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#fff6dc" stop-opacity="0"/>
+    </radialGradient>
+    <!-- cel shading: lit left, a hard shadow band on the right -->
+    <linearGradient id="red" x1="0" x2="1">
+      <stop offset="0" stop-color="#ff5a5e"/><stop offset=".6" stop-color="#ee3a3f"/>
+      <stop offset=".6" stop-color="#c8242d"/><stop offset="1" stop-color="#b81f28"/>
+    </linearGradient>
+    <linearGradient id="redBase" x1="0" x2="1">
+      <stop offset="0" stop-color="#c8242d"/><stop offset=".6" stop-color="#b01d26"/>
+      <stop offset=".6" stop-color="#8e1820"/><stop offset="1" stop-color="#8e1820"/>
+    </linearGradient>
+    <clipPath id="boardTop"><ellipse cx="256" cy="380" rx="154" ry="54"/></clipPath>
+  </defs>
+
+  <!-- background: honey wood with soft growth rings -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="#fff3d6" stroke-opacity=".14" stroke-width="5">
+    <ellipse cx="256" cy="430" rx="250" ry="120"/>
+    <ellipse cx="256" cy="430" rx="330" ry="170"/>
+    <ellipse cx="256" cy="430" rx="410" ry="220"/>
+  </g>
+  <g fill="none" stroke="#8a3a12" stroke-opacity=".1" stroke-width="4">
+    <ellipse cx="256" cy="430" rx="290" ry="145"/>
+    <ellipse cx="256" cy="430" rx="370" ry="195"/>
+  </g>
+
+  <!-- soft light behind the pieces so they pop -->
+  <circle cx="256" cy="226" r="205" fill="url(#glow)"/>
+
+  <!-- the board: a round Ludo plate in the four colours -->
+  <path d="M74 380A182 70 0 0 0 438 380V402A182 70 0 0 1 74 402Z" fill="#b8582a" stroke="#3a2418" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M88 405A168 60 0 0 0 424 405" fill="none" stroke="#d9773a" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="256" cy="380" rx="182" ry="70" fill="#fff3dc" stroke="#3a2418" stroke-width="9"/>
+  <g clip-path="url(#boardTop)">
+    <rect x="100" y="320" width="156" height="60" fill="#34b766"/>
+    <rect x="256" y="320" width="156" height="60" fill="#ffc52b"/>
+    <rect x="256" y="380" width="156" height="60" fill="#3b82ec"/>
+    <rect x="100" y="380" width="156" height="60" fill="#ee3a3f"/>
+    <path d="M100 380H412M256 320V440" stroke="#fff3dc" stroke-width="9"/>
+  </g>
+  <ellipse cx="256" cy="380" rx="154" ry="54" fill="none" stroke="#3a2418" stroke-width="5" stroke-opacity=".35"/>
+
+
+  <!-- the die, tumbling through the air over the green corner (its shadow falls on the board) -->
+  <ellipse cx="168" cy="352" rx="46" ry="11" fill="#3a2418" opacity=".18"/>
+  <g transform="translate(150 266) scale(.95) translate(-186 -334)">
+  <g transform="rotate(-10 186 236)">
+    <g stroke="#3a2418" stroke-width="10" stroke-linejoin="round">
+      <path d="M186 146L262 186V280L186 320L110 280V186Z" fill="#3a2418"/>
+    </g>
+    <path d="M110 186L186 226V320L110 280Z" fill="#f4ece0"/>
+    <path d="M186 226L262 186V280L186 320Z" fill="#dfd2bf"/>
+    <path d="M110 186L186 146L262 186L186 226Z" fill="#ffffff"/>
+    <path d="M186 226V318M112 186L186 226L260 186" fill="none" stroke="#3a2418" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M128 182L186 152" stroke="#ffffff" stroke-width="7" stroke-linecap="round" opacity=".9"/>
+    <!-- pips: one red on top, three on the left, two on the right -->
+    <g transform="matrix(76 -40 76 40 110 186)"><circle cx=".5" cy=".5" r=".15" fill="#e5313a"/></g>
+    <g transform="matrix(76 40 0 94 110 186)" fill="#3a2418"><circle cx=".25" cy=".24" r=".11"/><circle cx=".5" cy=".5" r=".11"/><circle cx=".75" cy=".76" r=".11"/></g>
+    <g transform="matrix(76 -40 0 94 186 226)" fill="#3a2418"><circle cx=".28" cy=".28" r=".11"/><circle cx=".72" cy=".72" r=".11"/></g>
+  </g>
+  </g>
+
+  <!-- the hero: a big red pawn -->
+  <g transform="translate(266 404) scale(1.14) translate(-320 -398)">
+  <ellipse cx="320" cy="398" rx="86" ry="20" fill="#3a2418" opacity=".25"/>
+  <g stroke="#3a2418" stroke-width="10" stroke-linejoin="round">
+    <path d="M246 376A74 22 0 0 0 394 376V392A74 22 0 0 1 246 392Z" fill="url(#redBase)"/>
+    <ellipse cx="320" cy="376" rx="74" ry="22" fill="url(#red)"/>
+    <path d="M266 372C274 336 294 310 300 282H340C346 310 366 336 374 372C356 384 284 384 266 372Z" fill="url(#red)"/>
+    <ellipse cx="320" cy="282" rx="46" ry="14" fill="url(#red)"/>
+    <circle cx="320" cy="222" r="54" fill="url(#red)"/>
+  </g>
+  <!-- highlights -->
+  <ellipse cx="298" cy="198" rx="18" ry="11" fill="#fff" opacity=".85" transform="rotate(-35 298 198)"/>
+  <circle cx="284" cy="222" r="5" fill="#fff" opacity=".7"/>
+  <path d="M290 330Q284 350 280 366" stroke="#ff9a9a" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <path d="M290 280h20" stroke="#ff9a9a" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- two bold sparkles -->
+  <path d="M410 104Q414 126 436 130Q414 134 410 156Q406 134 384 130Q406 126 410 104Z" fill="#fff8e6" stroke="#3a2418" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M440 222Q443 237 458 240Q443 243 440 258Q437 243 422 240Q437 237 440 222Z" fill="#fff8e6" stroke="#3a2418" stroke-width="4" stroke-linejoin="round"/>
+</svg>

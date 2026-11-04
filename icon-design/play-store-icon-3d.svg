@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Ludo Zing Mymensingh</title>
+  <defs>
+    <!-- soft shadows -->
+    <filter id="blur12" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="blur6" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="blur3" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>
+    <!-- a faint warm glow behind everything (the only orange) -->
+    <radialGradient id="warm" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffb066" stop-opacity=".42"/>
+      <stop offset=".6" stop-color="#ff9a3d" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#ff9a3d" stop-opacity="0"/>
+    </radialGradient>
+    <!-- board -->
+    <linearGradient id="boardSide" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a63c8"/><stop offset="1" stop-color="#0c2458"/>
+    </linearGradient>
+    <linearGradient id="boardSideX" x1="0" x2="1">
+      <stop offset="0" stop-color="#0a1f4d" stop-opacity=".55"/><stop offset=".3" stop-color="#0a1f4d" stop-opacity="0"/>
+      <stop offset=".7" stop-color="#0a1f4d" stop-opacity="0"/><stop offset="1" stop-color="#0a1f4d" stop-opacity=".6"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d5e3f4"/>
+    </linearGradient>
+    <linearGradient id="qRed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b72"/><stop offset="1" stop-color="#d42a3c"/></linearGradient>
+    <linearGradient id="qGreen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4fd98a"/><stop offset="1" stop-color="#1f9a5a"/></linearGradient>
+    <linearGradient id="qYellow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#f0a91c"/></linearGradient>
+    <linearGradient id="qBlue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5fb4ff"/><stop offset="1" stop-color="#1d5fd0"/></linearGradient>
+    <radialGradient id="sheen" cx="30%" cy="20%" r="70%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="boardTop"><ellipse cx="256" cy="360" rx="168" ry="62"/></clipPath>
+    <!-- pawn: glossy blue, lit from the upper left, navy in the shadows, a cyan rim light on the right -->
+    <linearGradient id="pawnBody" x1="0" x2="1">
+      <stop offset="0" stop-color="#1a4bb0"/><stop offset=".18" stop-color="#3f8ef2"/><stop offset=".34" stop-color="#9ad4ff"/>
+      <stop offset=".5" stop-color="#3a86ee"/><stop offset=".8" stop-color="#1747a8"/><stop offset=".93" stop-color="#0d2a6e"/><stop offset="1" stop-color="#2aa6e8"/>
+    </linearGradient>
+    <linearGradient id="pawnBase" x1="0" x2="1">
+      <stop offset="0" stop-color="#123c94"/><stop offset=".3" stop-color="#3a86ee"/><stop offset=".45" stop-color="#7cc2ff"/>
+      <stop offset=".75" stop-color="#1747a8"/><stop offset=".95" stop-color="#0b2462"/><stop offset="1" stop-color="#29a3e6"/>
+    </linearGradient>
+    <linearGradient id="pawnBaseSide" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b52bd"/><stop offset="1" stop-color="#0a2258"/>
+    </linearGradient>
+    <radialGradient id="pawnHead" cx="36%" cy="30%" r="78%">
+      <stop offset="0" stop-color="#e2f4ff"/><stop offset=".16" stop-color="#8fd0ff"/><stop offset=".48" stop-color="#3482ee"/>
+      <stop offset=".82" stop-color="#1544a6"/><stop offset="1" stop-color="#0b2768"/>
+    </radialGradient>
+    <!-- die: white with cool shading -->
+    <linearGradient id="dTop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eaf2fb"/></linearGradient>
+    <linearGradient id="dLeft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f8fd"/><stop offset="1" stop-color="#d3deec"/></linearGradient>
+    <linearGradient id="dRight" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9e4f1"/><stop offset="1" stop-color="#aebfd6"/></linearGradient>
+    <radialGradient id="pip" cx="40%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#5bb2ff"/><stop offset=".6" stop-color="#1f62d6"/><stop offset="1" stop-color="#0c2d78"/>
+    </radialGradient>
+  </defs>
+
+  <!-- background accent: a faint warm glow (the canvas itself stays transparent) -->
+  <circle cx="256" cy="256" r="240" fill="url(#warm)"/>
+
+  <!-- the whole subject, lifted and enlarged a little so it sits centred in the square -->
+  <g transform="translate(256 258) scale(1.08) translate(-256 -320)">
+  <!-- the board: a round Ludo plate in the four colours -->
+  <ellipse cx="256" cy="414" rx="214" ry="44" fill="#0a1d48" opacity=".45" filter="url(#blur12)"/>
+  <path d="M56 360A200 76 0 0 0 456 360V386A200 76 0 0 1 56 386Z" fill="url(#boardSide)"/>
+  <path d="M56 360A200 76 0 0 0 456 360V386A200 76 0 0 1 56 386Z" fill="url(#boardSideX)"/>
+  <path d="M62 384A194 72 0 0 0 450 384" fill="none" stroke="#7fd4ff" stroke-width="2.5" stroke-opacity=".5"/>
+  <ellipse cx="256" cy="360" rx="200" ry="76" fill="url(#rim)"/>
+  <g clip-path="url(#boardTop)">
+    <rect x="88" y="298" width="168" height="62" fill="url(#qGreen)"/>
+    <rect x="256" y="298" width="168" height="62" fill="url(#qYellow)"/>
+    <rect x="256" y="360" width="168" height="62" fill="url(#qBlue)"/>
+    <rect x="88" y="360" width="168" height="62" fill="url(#qRed)"/>
+    <path d="M88 360H424M256 298V422" stroke="#f4f8fd" stroke-width="8"/>
+    <ellipse cx="256" cy="360" rx="168" ry="62" fill="url(#sheen)"/>
+  </g>
+  <ellipse cx="256" cy="360" rx="168" ry="62" fill="none" stroke="#0c2458" stroke-opacity=".25" stroke-width="3"/>
+  <ellipse cx="256" cy="360" rx="200" ry="76" fill="none" stroke="#ffffff" stroke-opacity=".8" stroke-width="2"/>
+
+  <!-- the die, resting on the green corner, turned a little -->
+  <ellipse cx="172" cy="346" rx="74" ry="16" fill="#0a1d48" opacity=".42" filter="url(#blur6)"/>
+  <g transform="rotate(-12 178 256)">
+    <!-- a rounded silhouette, then the three faces -->
+    <path d="M178 168L254 206V298L178 336L102 298V206Z" fill="#c9d6e6" stroke="#c9d6e6" stroke-width="18" stroke-linejoin="round"/>
+    <path d="M102 206L178 244V336L102 298Z" fill="url(#dLeft)"/>
+    <path d="M178 244L254 206V298L178 336Z" fill="url(#dRight)"/>
+    <path d="M102 206L178 168L254 206L178 244Z" fill="url(#dTop)"/>
+    <!-- soft bevels along the edges -->
+    <path d="M104 206L178 244L252 206" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" opacity=".9"/>
+    <path d="M178 246V334" stroke="#9fb3cc" stroke-width="3" opacity=".7"/>
+    <path d="M120 196L176 168" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".9"/>
+    <!-- blue pips: one on top, three on the left, two on the right -->
+    <g transform="matrix(76 -38 76 38 102 206)"><circle cx=".5" cy=".5" r=".15" fill="url(#pip)"/></g>
+    <g transform="matrix(76 38 0 92 102 206)" fill="url(#pip)"><circle cx=".26" cy=".25" r=".11"/><circle cx=".5" cy=".5" r=".11"/><circle cx=".74" cy=".75" r=".11"/></g>
+    <g transform="matrix(76 -38 0 92 178 244)" fill="url(#pip)"><circle cx=".28" cy=".28" r=".11"/><circle cx=".72" cy=".72" r=".11"/></g>
+  </g>
+
+  <!-- the hero: a glossy blue pawn -->
+  <ellipse cx="322" cy="404" rx="88" ry="20" fill="#0a1d48" opacity=".55" filter="url(#blur6)"/>
+  <path d="M250 384A72 21 0 0 0 394 384V398A72 21 0 0 1 250 398Z" fill="url(#pawnBaseSide)"/>
+  <ellipse cx="322" cy="384" rx="72" ry="21" fill="url(#pawnBase)"/>
+  <path d="M268 381C277 346 297 322 303 298H341C347 322 367 346 376 381C356 393 288 393 268 381Z" fill="url(#pawnBody)"/>
+  <ellipse cx="322" cy="298" rx="46" ry="13" fill="url(#pawnBase)"/>
+  <ellipse cx="322" cy="292" rx="40" ry="8" fill="#9ad4ff" opacity=".35"/>
+  <circle cx="322" cy="238" r="56" fill="url(#pawnHead)"/>
+  <!-- contact shadow where the head meets the collar -->
+  <ellipse cx="322" cy="290" rx="30" ry="6" fill="#0a2258" opacity=".45" filter="url(#blur3)"/>
+  <!-- highlights and a cyan rim light -->
+  <ellipse cx="300" cy="212" rx="20" ry="12" fill="#fff" opacity=".9" transform="rotate(-35 300 212)" filter="url(#blur3)"/>
+  <ellipse cx="296" cy="208" rx="9" ry="5" fill="#fff" transform="rotate(-35 296 208)"/>
+  <path d="M362 206A56 56 0 0 1 366 270" fill="none" stroke="#7fe3ff" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+  <path d="M296 330Q288 352 283 372" stroke="#d6f0ff" stroke-width="6" fill="none" stroke-linecap="round" opacity=".75" filter="url(#blur3)"/>
+  <path d="M370 366Q362 344 350 326" stroke="#6fdcff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".55"/>
+  <path d="M262 380A62 14 0 0 0 300 392" stroke="#bfe6ff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/>
+  </g>
+</svg>
