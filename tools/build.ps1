@@ -50,6 +50,13 @@ $src = [regex]::Replace($src, '// Test hook for tests/pair-rules\.js[^\n]*\n[^\n
 if ($src -match 'window\.__ludo') { throw 'Test hook still present' }
 $i = $src.IndexOf('<div id="stage">')
 if ($i -lt 0) { throw 'Stage container not found in index.html' }
+# Build stamp (shown in Settings > Version): LUDO_BUILD from the GitHub workflow, else branch / commit / date from git
+$build = $env:LUDO_BUILD
+if (-not $build) {
+  $br = (git -C $root rev-parse --abbrev-ref HEAD 2>$null); $sha = (git -C $root rev-parse --short HEAD 2>$null)
+  $build = (@($br, $sha, (Get-Date -Format 'yyyy-MM-dd'), 'local') | Where-Object { $_ }) -join ' · '
+}
+$build = [System.Net.WebUtility]::HtmlEncode($build)
 $head = @'
 <!doctype html>
 <html lang="en">
@@ -59,6 +66,7 @@ $head = @'
 <link rel="stylesheet" href="fonts.css">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}</style>
 '@
+$head += "<meta name=`"ludo-build`" content=`"$build`">`n"
 $html = $head + $src.Substring(0, $i) + "</head>`n<body>`n" + $src.Substring($i) + "`n</body>`n</html>`n"
 
 if (Test-Path $dist) { Remove-Item -Recurse -Force $dist }

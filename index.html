@@ -880,6 +880,16 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .emset-prev.eight>span:not(.tag){width:84%}
 .room-prev .tag.prem{left:auto;right:6px;background:linear-gradient(#ffe48c,#f2b632);color:#5a3a00}
 .room-prev .tag.lock{background:rgba(74,43,61,.75);color:#fff}
+.demo-note{display:none}
+html.demo .demo-note{display:block;margin:-4px 0 0;padding:6px 10px;border-radius:12px;background:#e7f5e4;color:#2f6b3a;font-weight:800;font-size:.8rem;text-align:center}
+.room-prev.pawn-prev{aspect-ratio:4/3}
+.room-prev.pawn-prev img{object-fit:contain}
+.pane-note .pawn-all-btn{margin-left:auto;padding:4px 10px;border-radius:999px;background:#fff;color:var(--ink);font-weight:800;font-size:.72rem;box-shadow:0 2px 0 var(--line-strong)}
+.card.pawn-all-card{position:relative;overflow:visible;width:100%;max-width:520px}   /* visible: the close button sits over the corner */
+.pawn-all{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-height:min(68vh,600px);overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
+.pawn-all figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px;border-radius:12px;background:var(--g)}
+.pawn-all img{width:100%;aspect-ratio:4/3;object-fit:contain}
+.pawn-all figcaption{font-weight:800;font-size:.72rem;color:var(--ink);text-align:center}
 .emset-card{position:relative;max-width:380px}
 .emset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 4px}
 .emset-cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px 6px;border-radius:16px;background:#fffaf2;border:2px solid #3a2418;box-shadow:0 3px 0 rgba(58,36,24,.2);animation:emPickIn .3s calc(var(--i,0) * 60ms) both}
@@ -1474,6 +1484,7 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
         <h3 class="set-h">Privacy &amp; help</h3>
         <div class="set-row"><span class="set-lab">Privacy<small>Your stats and items are saved with your game progress and are not shared.</small></span></div>
         <div class="set-row"><span class="set-lab">Help<small>Rules, pairs and safe squares.</small></span><button class="pm-btn set-btn" type="button" id="btnHow">How to play</button></div>
+        <div class="set-row" id="setBuild" hidden><span class="set-lab">Version<small id="setBuildTxt"></small></span></div>
       </div>
     </div>
     <div class="set-actions">
@@ -1568,6 +1579,7 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
   <symbol id="tiRoom" viewBox="0 0 24 24"><g fill="#563044"><path d="M5 8.5A3.5 3.5 0 0 1 8.5 5h7A3.5 3.5 0 0 1 19 8.5V11H5z"/><path d="M2 11.6A1.6 1.6 0 0 1 3.6 10h.8A1.6 1.6 0 0 1 6 11.6V13h12v-1.4a1.6 1.6 0 0 1 1.6-1.6h.8a1.6 1.6 0 0 1 1.6 1.6V18H2z"/><rect x="3.4" y="17.5" width="2.2" height="3" rx=".7"/><rect x="18.4" y="17.5" width="2.2" height="3" rx=".7"/></g></symbol>
   <symbol id="tiScene" viewBox="0 0 24 24"><path d="M2 20l6.5-10 4 6 2.5-3.5L22 20z" fill="#fffaf3" stroke="#563044" stroke-width="1.8" stroke-linejoin="round"/><circle cx="17" cy="6.5" r="2.6" fill="#ffd56a" stroke="#563044" stroke-width="1.6"/></symbol>
   <symbol id="tiEmote" viewBox="0 0 24 24"><path d="M4 4.5h16a2.5 2.5 0 0 1 2.5 2.5v9a2.5 2.5 0 0 1-2.5 2.5h-9l-4.5 3.5v-3.5H4A2.5 2.5 0 0 1 1.5 16V7A2.5 2.5 0 0 1 4 4.5z" fill="#fffaf3" stroke="#563044" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="11.5" r="4.6" fill="#ffd56a" stroke="#563044" stroke-width="1.4"/><circle cx="10.4" cy="10.6" r=".8" fill="#563044"/><circle cx="13.6" cy="10.6" r=".8" fill="#563044"/><path d="M10 12.6q2 1.8 4 0" stroke="#563044" stroke-width="1.2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="tiPawn" viewBox="0 0 24 24"><g stroke="#563044" stroke-width="1.7" stroke-linejoin="round"><path d="M9 12.2h6l-1 2.2 2.6 4.6H7.4L10 14.4z" fill="#fffaf3"/><rect x="5.5" y="18.6" width="13" height="3" rx="1.5" fill="#fffaf3"/><circle cx="12" cy="7.4" r="4.2" fill="#ffd56a"/></g></symbol>
   <symbol id="tiDice" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.4" fill="#fffaf3" stroke="#563044" stroke-width="1.8"/><g fill="#563044"><circle cx="8.3" cy="8.3" r="1.6"/><circle cx="15.7" cy="8.3" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="8.3" cy="15.7" r="1.6"/><circle cx="15.7" cy="15.7" r="1.6"/></g></symbol>
   <symbol id="tiCoins" viewBox="0 0 24 24"><g stroke="#563044" stroke-width="1.4" stroke-linejoin="round"><path d="M4 14v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" fill="#d9952a"/><ellipse cx="12" cy="14" rx="8" ry="3" fill="#ffd56a"/><path d="M4 5.5v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" fill="#d9952a"/><ellipse cx="12" cy="5.5" rx="8" ry="3" fill="#ffe08a"/></g></symbol>
   <symbol id="tiChar" viewBox="0 0 24 24"><path d="M4 22c0-4.6 3.6-7 8-7s8 2.4 8 7z" fill="#fffaf3" stroke="#563044" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="5" fill="#fffaf3" stroke="#563044" stroke-width="1.8"/><path d="M7.2 8.6C7.6 5.2 10 3.8 12 3.8s4.6 1.2 4.8 4.8C14.6 7 10.6 6.6 7.2 8.6z" fill="#563044"/></symbol>
@@ -1581,11 +1593,13 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
 <div class="sheet" id="shopSheet" hidden>
   <div class="card shop-card">
     <h2>Shop</h2>
-    <p>Rooms, Snakes &amp; Ladders scenes, dice and emote sets. Win games and claim free coins to earn more.</p>
+    <p>Rooms, Snakes &amp; Ladders scenes, dice, pawns and emote sets. Win games and claim free coins to earn more.</p>
+    <p class="demo-note">Demo version: everything is free and already yours.</p>
     <div class="gtabs four" id="shopTabs" role="tablist" aria-label="Shop categories" data-tray="shopPane">
       <button type="button" role="tab" data-tab="rooms" aria-selected="true" aria-controls="shopRooms" style="--tc:#E09478;--tc2:#B5624A"><svg aria-hidden="true"><use href="#tiRoom"/></svg><span>Rooms</span></button>
       <button type="button" role="tab" data-tab="scenes" aria-selected="false" aria-controls="shopScenes" tabindex="-1" style="--tc:#8FB8DE;--tc2:#5A86B0"><svg aria-hidden="true"><use href="#tiScene"/></svg><span>Scenes</span></button>
       <button type="button" role="tab" data-tab="dice" aria-selected="false" aria-controls="shopDice" tabindex="-1" style="--tc:#91B58A;--tc2:#5F8A57"><svg aria-hidden="true"><use href="#tiDice"/></svg><span>Dice</span></button>
+      <button type="button" role="tab" data-tab="pawns" aria-selected="false" aria-controls="shopPawns" tabindex="-1" style="--tc:#C9A6E0;--tc2:#8E66AE"><svg aria-hidden="true"><use href="#tiPawn"/></svg><span>Pawns</span></button>
       <button type="button" role="tab" data-tab="emotes" aria-selected="false" aria-controls="shopEmotes" tabindex="-1" style="--tc:#E9A0B4;--tc2:#B8667E"><svg aria-hidden="true"><use href="#tiEmote"/></svg><span>Emotes</span></button>
       <button type="button" role="tab" data-tab="coins" aria-selected="false" aria-controls="shopItems" tabindex="-1" style="--tc:#E7B85F;--tc2:#B98A2E"><svg aria-hidden="true"><use href="#tiCoins"/></svg><span>Coins</span></button>
     </div>
@@ -1593,6 +1607,7 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
       <div class="items" id="shopRooms" role="tabpanel" data-pane="rooms"></div>
       <div class="items" id="shopScenes" role="tabpanel" data-pane="scenes" hidden></div>
       <div class="items" id="shopDice" role="tabpanel" data-pane="dice" hidden></div>
+      <div class="items" id="shopPawns" role="tabpanel" data-pane="pawns" hidden></div>
       <div class="items" id="shopEmotes" role="tabpanel" data-pane="emotes" hidden></div>
       <div class="items" id="shopItems" role="tabpanel" data-pane="coins" hidden></div>
     </div>
@@ -1637,21 +1652,33 @@ html.vt *,html.vt *::before,html.vt *::after{transition:none!important;animation
   </div>
 </div>
 
+<!-- All pawn skins side by side (Shop / Inventory > Pawns > Compare all): one picture per skin, 4 colours each -->
+<div class="sheet" id="pawnAllSheet" hidden>
+  <div class="card pawn-all-card">
+    <h2>All Pawns</h2>
+    <p>Every skin in all four player colours.</p>
+    <div class="pawn-all" id="pawnAllGrid"></div>
+    <button class="x-btn" type="button" data-close aria-label="Close" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="#fff" stroke-width="4.2" stroke-linecap="round"/></svg></button>
+  </div>
+</div>
+
 <!-- Inventory -->
 <div class="sheet" id="invSheet" hidden>
   <div class="card shop-card">
     <h2>Inventory</h2>
-    <p>Pick your room, your Snakes &amp; Ladders scene, your dice and the emote set you play with.</p>
+    <p>Pick your room, your Snakes &amp; Ladders scene, your dice, your pawns and the emote set you play with.</p>
     <div class="gtabs four" id="invTabs" role="tablist" aria-label="Inventory categories" data-tray="invPane">
       <button type="button" role="tab" data-tab="rooms" aria-selected="true" aria-controls="invRooms" style="--tc:#E09478;--tc2:#B5624A"><svg aria-hidden="true"><use href="#tiRoom"/></svg><span>Rooms</span></button>
       <button type="button" role="tab" data-tab="scenes" aria-selected="false" aria-controls="invScenes" tabindex="-1" style="--tc:#8FB8DE;--tc2:#5A86B0"><svg aria-hidden="true"><use href="#tiScene"/></svg><span>Scenes</span></button>
       <button type="button" role="tab" data-tab="dice" aria-selected="false" aria-controls="invItems" tabindex="-1" style="--tc:#91B58A;--tc2:#5F8A57"><svg aria-hidden="true"><use href="#tiDice"/></svg><span>Dice</span></button>
+      <button type="button" role="tab" data-tab="pawns" aria-selected="false" aria-controls="invPawns" tabindex="-1" style="--tc:#C9A6E0;--tc2:#8E66AE"><svg aria-hidden="true"><use href="#tiPawn"/></svg><span>Pawns</span></button>
       <button type="button" role="tab" data-tab="emotes" aria-selected="false" aria-controls="invEmotes" tabindex="-1" style="--tc:#E9A0B4;--tc2:#B8667E"><svg aria-hidden="true"><use href="#tiEmote"/></svg><span>Emotes</span></button>
     </div>
     <div class="shop-pane gtray" id="invPane">
       <div class="items" id="invRooms" role="tabpanel" data-pane="rooms"></div>
       <div class="items" id="invScenes" role="tabpanel" data-pane="scenes" hidden></div>
       <div class="items" id="invItems" role="tabpanel" data-pane="dice" hidden></div>
+      <div class="items" id="invPawns" role="tabpanel" data-pane="pawns" hidden></div>
       <div class="items" id="invEmotes" role="tabpanel" data-pane="emotes" hidden></div>
     </div>
     <button class="x-btn" type="button" data-close aria-label="Close inventory" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="#fff" stroke-width="4.2" stroke-linecap="round"/></svg></button>
@@ -1824,6 +1851,13 @@ if (VT) {
   Math.random = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   document.documentElement.classList.add('vt');
 }
+/* Demo mode (?demo=1, or window.LUDO_DEMO = true before this script): everything in the Shop and Collection is free and
+   already owned (prices 0, all rooms / scenes / dice / pawns / emote sets / characters / avatars unlocked; see demoFree
+   and ensureProfile). Demo progress is kept in its own browser storage (ludoDemo* keys) and never touches a real
+   player's save, their account or the YouTube cloud save. Without the flag nothing here changes. */
+const DEMO = /[?&]demo=1(&|$)/.test(location.search) || window.LUDO_DEMO === true;
+const LSK = DEMO ? 'ludoDemo' : 'ludoRoyale';   // browser-storage key prefix
+if (DEMO) document.documentElement.classList.add('demo');
 // The deployed build always loads the SDK, but it only counts inside YouTube: outside, its isAudioEnabled() reports
 // false, which silenced every sound on the website. So YT is null unless the SDK says this is the Playables player.
 const YT = typeof ytgame !== 'undefined' && ytgame.IN_PLAYABLES_ENV ? ytgame : null;
@@ -1831,11 +1865,15 @@ const IN_YT = !!YT;
 let ytAudio = true, halted = false, haltedAt = 0, ytReadySent = false;
 let AC = null;   // Web Audio context, created on the first sound (the SDK may call the audio callback right away)
 if (IN_YT) document.body.classList.add('yt');
+const CLOUD = IN_YT && !DEMO;   // the YouTube cloud save (never in demo mode)
+// which build this is (branch · commit · date), stamped by tools/build.ps1; the source page has none. Shown in Settings,
+// so anyone can tell whether the website runs the newest version.
+{ const b = document.querySelector('meta[name="ludo-build"]'); if (b && b.content) { document.getElementById('setBuildTxt').textContent = b.content; document.getElementById('setBuild').hidden = false; } }
 const Store = {   // one save blob { v, prefs, profile }: YouTube cloud save inside YouTube, browser storage elsewhere
   data: {}, ready: false, timer: 0,
   async load() {
     if (VT) { this.data = {}; this.ready = true; return; }   // test mode: a fresh profile every run
-    if (IN_YT) {
+    if (CLOUD) {
       try {   // give up after 10 s so loading can't hang; the game then plays without saving this session
         const s = await Promise.race([YT.game.loadData(), new Promise((_, no) => setTimeout(() => no(new Error('load timeout')), 10000))]);
         this.data = s ? JSON.parse(s) : {}; this.ready = true;
@@ -1843,22 +1881,22 @@ const Store = {   // one save blob { v, prefs, profile }: YouTube cloud save ins
       catch (e) { this.data = {}; this.ready = false; try { YT.health.logWarning(); } catch (e2) {} }   // never overwrite a cloud save we couldn't read
       return;
     }
-    try { this.data = { prefs: JSON.parse(localStorage.getItem('ludoRoyalePrefs') || 'null'), profile: JSON.parse(localStorage.getItem('ludoRoyaleProfile') || 'null') }; }
+    try { this.data = { prefs: JSON.parse(localStorage.getItem(LSK + 'Prefs') || 'null'), profile: JSON.parse(localStorage.getItem(LSK + 'Profile') || 'null') }; }
     catch (e) { this.data = {}; }
     this.ready = true;
   },
   save(key, value) {
     this.data[key] = JSON.parse(JSON.stringify(value));
     if (VT) return true;   // test mode never writes saved progress
-    if (IN_YT) {
+    if (CLOUD) {
       if (!this.ready) return false;
       clearTimeout(this.timer);
       this.timer = setTimeout(() => this.flush(), 400);   // a burst of changes becomes one cloud save
       return true;
     }
     try {
-      localStorage.setItem(key === 'prefs' ? 'ludoRoyalePrefs' : 'ludoRoyaleProfile', JSON.stringify(value));
-      localStorage.setItem('ludoRoyaleSavedAt', String(Date.now()));
+      localStorage.setItem(key === 'prefs' ? LSK + 'Prefs' : LSK + 'Profile', JSON.stringify(value));
+      localStorage.setItem(LSK + 'SavedAt', String(Date.now()));
     } catch (e) { return false; }
     Account.changed();   // signed-in players: copy the change to their account (debounced)
     return true;
@@ -1868,17 +1906,17 @@ const Store = {   // one save blob { v, prefs, profile }: YouTube cloud save ins
     this.data = { prefs: blob && blob.prefs || null, profile: blob && blob.profile || null };
     try {
       ['prefs', 'profile'].forEach(k => {
-        const key = k === 'prefs' ? 'ludoRoyalePrefs' : 'ludoRoyaleProfile';
+        const key = k === 'prefs' ? LSK + 'Prefs' : LSK + 'Profile';
         this.data[k] ? localStorage.setItem(key, JSON.stringify(this.data[k])) : localStorage.removeItem(key);
       });
-      localStorage.setItem('ludoRoyaleSavedAt', String(blob && blob.updatedAt || Date.now()));
+      localStorage.setItem(LSK + 'SavedAt', String(blob && blob.updatedAt || Date.now()));
     } catch (e) {}
   },
-  savedAt() { try { return +localStorage.getItem('ludoRoyaleSavedAt') || 0; } catch (e) { return 0; } },
+  savedAt() { try { return +localStorage.getItem(LSK + 'SavedAt') || 0; } catch (e) { return 0; } },
   snapshot() { return { prefs: this.data.prefs || null, profile: this.data.profile || null }; },
   flush() {
     clearTimeout(this.timer);
-    if (!IN_YT || !this.ready) return;
+    if (!CLOUD || !this.ready) return;
     this.data.v = 1;
     YT.game.saveData(JSON.stringify(this.data)).catch(() => { try { YT.health.logWarning(); } catch (e) {} });
   },
@@ -1893,8 +1931,8 @@ const FIREBASE_CONFIG = null;
 /* e.g. const FIREBASE_CONFIG = { apiKey: 'AIza…', authDomain: 'your-project.firebaseapp.com', projectId: 'your-project', appId: '1:…:web:…' }; */
 const Account = (() => {
   const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-  const available = !IN_YT && !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
-  const LS_ACC = 'ludoRoyaleAccount', LS_GUEST = 'ludoRoyaleGuestBackup', SS_PENDING = 'ludoRoyaleAuthPending';
+  const available = !IN_YT && !DEMO && !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+  const LS_ACC = LSK + 'Account', LS_GUEST = LSK + 'GuestBackup', SS_PENDING = LSK + 'AuthPending';
   let fb = null, auth = null, db = null, user = null, pushTimer = 0, restoreHook = () => {}, statusHook = () => {};
   const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const set = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
@@ -1918,7 +1956,7 @@ const Account = (() => {
     const a = acc.profile || {}, g = guest && guest.profile;
     if (!g) return acc;
     const p = JSON.parse(JSON.stringify(a));
-    ['owned', 'rooms', 'claimed', 'avOwned'].forEach(k => { p[k] = [...new Set([...(a[k] || []), ...(g[k] || [])])]; });
+    ['owned', 'rooms', 'claimed', 'avOwned', 'pawnSkins'].forEach(k => { p[k] = [...new Set([...(a[k] || []), ...(g[k] || [])])]; });
     ['xp', 'coins', 'lastFree'].forEach(k => { p[k] = Math.max(+a[k] || 0, +g[k] || 0); });
     if (g.lastSpin && (!a.lastSpin || new Date(g.lastSpin) > new Date(a.lastSpin))) p.lastSpin = g.lastSpin;
     p.stats = Object.assign({}, a.stats);
@@ -3069,11 +3107,441 @@ const toks = COLORS.map((col, c) => {
     pairRing.rotation.x = Math.PI / 2; pairRing.position.y = .05; pairRing.visible = false;
     g.add(pairRing);
     scene.add(g);
-    const t = { c, i, g, ring, pairRing, mat, anim: false, paired: false, target: toWorld(gridOf(c, -1, i)), scale: 1 };
+    const t = { c, i, g, ring, pairRing, mat, classicMat: mat, skin: [body, head], anim: false, paired: false, target: toWorld(gridOf(c, -1, i)), scale: 1 };
     g.position.copy(t.target);
     return t;
   });
 });
+
+/* ---------- Pawn skins (cosmetic only) ----------
+   12 themes x the 4 player colours. Every skin keeps the Classic pawn's base, footprint (radius .38) and pivot (the
+   token group's origin), so selection, stacking, pairs, hops and captures are untouched: a skin only swaps the meshes
+   inside each token's group. The player colour is the main material of every skin (it is also t.mat, so the movable
+   glow still works). Geometry is built once per skin (accessories are merged into one mesh per material) and shared by
+   all 16 tokens; materials are cached per skin and colour. Non-Classic skins turn to face the camera (camAz) so faces,
+   visors and patches read from every seat. Profile: P.pawnSkins (owned ids, always incl. classic), P.pawnSkin. */
+const PawnSkins = (() => {
+  const geos = {}, mats = {}, texs = {};
+  const geo = (k, f) => geos[k] || (geos[k] = f());
+  const mat = (k, f) => mats[k] || (mats[k] = f());
+  const sc = h => new THREE.Color(h);                                     // sRGB
+  const mix = (h, to, k) => '#' + sc(h).lerp(sc(to), k).getHexString();
+  const tint = (h, k) => mix(h, 0xffffff, k), shade = (h, k) => mix(h, 0x000000, k);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const rng = seed => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };   // own PRNG: leaves the seeded Math.random of ?vt=1 alone
+  // materials: glossy = the pawn's candy clear coat (and the emissive the movable glow drives)
+  const glossy = (h, { glow = h, ...o } = {}) => new THREE.MeshPhysicalMaterial(Object.assign({ color: lin(h), roughness: .3, clearcoat: 1, clearcoatRoughness: .12, emissive: lin(glow), emissiveIntensity: 0 }, o));
+  const GOLD = () => mat('gold', () => glossy(0xf4bd3c, { metalness: .35, roughness: .28, emissive: lin(0x9a6a10), emissiveIntensity: .12, side: THREE.DoubleSide }));
+  const WHITE = () => mat('white', () => glossy(0xf7f4ee));
+  const DARK = () => mat('dark', () => glossy(0x24202b, { roughness: .25 }));
+  const LEAF = () => mat('leaf', () => glossy(0x55b046, { roughness: .4 }));
+  const STEM = () => mat('stem', () => glossy(0x7a4a21, { roughness: .5 }));
+  const VC = () => mat('vc', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .4 }));
+  const GLOW = h => mat('glow' + h, () => new THREE.MeshBasicMaterial({ color: lin(h) }));
+
+  /* merge(parts, M): bakes [geometry, {p, r (Euler, order o), s, col}] parts into one non-indexed geometry, under an
+     optional parent matrix M. Mirrored parts (negative scale) get their winding flipped so they still face out. */
+  function merge(parts, M) {
+    const pos = [], nor = [], uv = [], col = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    let anyCol = false;
+    parts.forEach(([g0, o = {}]) => {
+      const g = g0.index ? g0.toNonIndexed() : g0.clone(), s = o.s == null ? 1 : o.s;
+      m.compose(V(...(o.p || [0, 0, 0])), q.setFromEuler(e.set(...(o.r || [0, 0, 0]), o.o || 'XYZ')), typeof s === 'number' ? V(s, s, s) : V(...s));
+      if (M) m.premultiply(M);
+      g.applyMatrix4(m);
+      const P = g.attributes.position.array, N = g.attributes.normal.array, U = g.attributes.uv ? g.attributes.uv.array : null;
+      const flip = m.determinant() < 0, n = P.length / 3, c = o.col ? lin(o.col) : null;
+      if (c) anyCol = true;
+      for (let t = 0; t < n; t += 3) for (const k of flip ? [0, 2, 1] : [0, 1, 2]) {
+        const v = t + k;
+        pos.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]); nor.push(N[v * 3], N[v * 3 + 1], N[v * 3 + 2]);
+        uv.push(U ? U[v * 2] : 0, U ? U[v * 2 + 1] : 0);
+        col.push(c ? c.r : 1, c ? c.g : 1, c ? c.b : 1);
+      }
+      g.dispose();
+    });
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    if (anyCol) out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return out;
+  }
+  const ring = (R, r, y, seg = 32) => [new THREE.TorusGeometry(R, r, 6, seg), { p: [0, y, 0], r: [Math.PI / 2, 0, 0] }];
+  const around = (n, f) => Array.from({ length: n }, (_, k) => f(k / n * Math.PI * 2, k));
+  // the Classic pieces, positioned: the body is pawnGeo itself; the head is baked at its height
+  const HEAD = () => geo('head', () => merge([[headGeo, { p: [0, .74, 0] }]]));
+  const LATHE = [[0,0],[.37,0],[.38,.05],[.33,.1],[.23,.16],[.17,.3],[.13,.47],[.24,.51],[.24,.56],[.12,.6],[0,.6]];
+  const bodyR = y => { for (let k = 4; k < 6; k++) { const [r0, y0] = LATHE[k], [r1, y1] = LATHE[k + 1]; if (y <= y1) return r0 + (r1 - r0) * (y - y0) / (y1 - y0); } return .13; };
+  const TRIM = () => geo('trim', () => merge([ring(.336, .028, .083, 32), ring(.245, .022, .535, 24)]));   // gold trim on the base's top edge (inside the footprint) + collar
+  function starGeo(r) {
+    const s = new THREE.Shape();
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, rr = k % 2 ? r * .45 : r; s[k ? 'lineTo' : 'moveTo'](Math.sin(a) * rr, Math.cos(a) * rr); }
+    return new THREE.ExtrudeGeometry(s, { depth: r * .25, bevelEnabled: true, bevelThickness: r * .12, bevelSize: r * .1, bevelSegments: 1 });
+  }
+  const onBody = (y, dz = 0) => ({ p: [0, y, bodyR(y) + dz], r: [-.42, 0, 0] });   // a badge on the body's front slope
+
+  /* canvas textures (one per colour, built on first use). u runs around the pawn, v up it. */
+  function canvasTex(key, w, h, draw) {
+    return texs[key] || (texs[key] = (() => {
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      draw(cv.getContext('2d'), w, h);
+      const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;
+      return t;
+    })());
+  }
+  const stripes = h => canvasTex('stripe' + h, 128, 128, (g, w, H) => {
+    g.fillStyle = '#fff8f2'; g.fillRect(0, 0, w, H); g.fillStyle = h;
+    for (let k = -4; k < 8; k++) { const x = k * 32; g.beginPath(); g.moveTo(x, H); g.lineTo(x + 19, H); g.lineTo(x + 19 + 64, 0); g.lineTo(x + 64, 0); g.fill(); }
+  });
+  const marble = h => canvasTex('marble' + h, 256, 128, (g, w, H) => {
+    const R = rng(7);
+    g.fillStyle = h; g.fillRect(0, 0, w, H);
+    g.lineCap = 'round';
+    for (let k = 0; k < 9; k++) {
+      const y0 = R() * H, a = 12 + R() * 26, f = 1 + Math.floor(R() * 2), ph = R() * 6.3, lw = 2 + R() * 9;
+      g.strokeStyle = k % 3 === 2 ? shade(h, .28) + '99' : 'rgba(255,255,255,' + (.35 + R() * .35) + ')'; g.lineWidth = lw;
+      g.beginPath();
+      for (let x = 0; x <= w; x += 4) { const y = y0 + Math.sin(x / w * Math.PI * 2 * f + ph) * a + Math.sin(x / w * Math.PI * 6 + ph * 2) * a * .3; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
+    }
+  });
+  const scales = h => canvasTex('scale' + h, 128, 128, (g, w, H) => {
+    g.fillStyle = h; g.fillRect(0, 0, w, H);
+    const s = 16;
+    for (let row = 0; row * s * .7 < H + s; row++) for (let k = -1; k <= w / s; k++) {
+      const x = k * s + (row % 2 ? s / 2 : 0) + s / 2, y = H - row * s * .7;
+      g.fillStyle = tint(h, .18); g.beginPath(); g.arc(x, y, s * .5, Math.PI, 0); g.fill();
+      g.strokeStyle = shade(h, .3); g.lineWidth = 1.6; g.beginPath(); g.arc(x, y, s * .5, Math.PI, 0); g.stroke();
+    }
+  });
+  const mapped = (key, h, tex, o = {}) => mat(key + h, () => glossy(0xffffff, Object.assign({ map: tex(h), glow: h }, o)));
+
+  /* ---- the 12 skins (after the user's reference sheet, 2026-11-04: each theme has its own body, not the Classic
+     one with a hat): build(c) -> { mat: the player-colour material, parts: [[geometry, material, shadow?, head?]],
+     look / pivot: the Top View head tilt (see pose) }. Every body keeps the Classic base: bottom at y 0, radius .38. */
+  const body = m => [pawnGeo, m], head = (m, h = false) => [HEAD(), m, true, h], H = true;   // H: a head part (tips back to face a Top View camera)
+  const lathe = (k, pts, seg = 32) => geo('lathe:' + k, () => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg));
+  const rOf = pts => y => { for (let k = 1; k < pts.length; k++) if (y <= pts[k][1]) { const [r0, y0] = pts[k - 1], [r1, y1] = pts[k]; return r0 + (r1 - r0) * (y - y0) / ((y1 - y0) || 1); } return 0; };
+  // bodies: the bell (Candy, Fruity, Blossom, Pirate, Dragon: the head sits straight on it, no collar), the robe
+  // (Wizard), the suit (Robo Bot, Space Explorer: a capsule on a coloured foot), the crystal column (Ice)
+  const BELL = [[0, 0], [.37, 0], [.38, .04], [.355, .09], [.31, .16], [.26, .27], [.215, .4], [.18, .52], [.16, .6], [.12, .66], [0, .68]];
+  const ROBE = [[0, 0], [.37, 0], [.38, .04], [.365, .09], [.33, .19], [.28, .33], [.225, .47], [.175, .58], [.13, .65], [0, .67]];
+  const FOOT = [[0, 0], [.36, 0], [.38, .03], [.38, .08], [.35, .12], [0, .12]];
+  const SUIT = [[0, .1], [.3, .1], [.3, .3], [.285, .42], [.245, .52], [.18, .59], [.09, .625], [0, .63]];
+  const COLUMN = [[0, 0], [.33, 0], [.34, .05], [.29, .12], [.235, .3], [.2, .46], [.23, .55], [.15, .64], [0, .66]];
+  const bellR = rOf(BELL), suitR = rOf(SUIT);
+  const HEADY = .79;   // head centre on the new bodies (Classic: .74)
+  const ball = (r, y = HEADY, s = 1, seg = 22) => [new THREE.SphereGeometry(r, seg, Math.round(seg * .65)), { p: [0, y, 0], s }];
+  const onSurf = (rAt, y, a = 0, dz = 0, tilt = -.35) => ({ p: [Math.sin(a) * (rAt(y) + dz), y, Math.cos(a) * (rAt(y) + dz)], r: [tilt, a, 0], o: 'YXZ' });
+  const VCG = () => mat('vcg', () => new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .2, clearcoat: 1, clearcoatRoughness: .1 }));
+  const vine = (h, band) => canvasTex('vine' + h, 256, 256, (g, w, H2) => {
+    g.fillStyle = h; g.fillRect(0, 0, w, H2);
+    const wave = (x, dy = 0) => H2 * .62 - x / w * H2 * .5 + Math.sin(x / w * Math.PI * 4) * 16 + dy;
+    g.strokeStyle = band; g.lineWidth = 15; g.lineCap = 'round'; g.beginPath();
+    for (let x = -10; x <= w + 10; x += 6) x < -4 ? g.moveTo(x, wave(x)) : g.lineTo(x, wave(x)); g.stroke();
+    g.fillStyle = '#4caf50';
+    for (let k = 0; k < 6; k++) { const x = k * w / 6 + 18, y = wave(x, k % 2 ? 20 : -20); g.save(); g.translate(x, y); g.rotate(k % 2 ? .6 : -.6); g.beginPath(); g.ellipse(0, 0, 11, 5.5, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
+  });
+  const scalesLow = h => canvasTex('scaleLow' + h, 128, 256, (g, w, H2) => {
+    g.fillStyle = h; g.fillRect(0, 0, w, H2);
+    const s = 16;
+    for (let row = 0; row * s * .7 < H2 * .62; row++) for (let k = -1; k <= w / s; k++) {
+      const x = k * s + (row % 2 ? s / 2 : 0) + s / 2, y = H2 - row * s * .7;
+      g.fillStyle = shade(h, .1); g.beginPath(); g.arc(x, y, s * .5, Math.PI, 0); g.fill();
+      g.strokeStyle = shade(h, .32); g.lineWidth = 1.6; g.beginPath(); g.arc(x, y, s * .5, Math.PI, 0); g.stroke();
+    }
+  });
+  const sector = (r, a0, a1, rIn = 0) => { const s = new THREE.Shape(); if (rIn) { s.absarc(0, 0, r, a0, a1, false); s.absarc(0, 0, rIn, a1, a0, true); } else { s.moveTo(0, 0); s.absarc(0, 0, r, a0, a1, false); s.lineTo(0, 0); } return s; };
+  const ext = (shape, depth, bevel = .006) => new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 14 });
+  const B = {
+    classic: (h, c) => { const m = toks[c][0].classicMat; return { mat: m, parts: [body(m), head(m)] }; },
+    // Royal Crown: the classic pawn under a tall gold crown set with coloured jewels, gold rim at the foot
+    royal(h) {
+      const m = mat('royal' + h, () => glossy(h));
+      const crown = geo('crown2', () => merge([
+        [new THREE.CylinderGeometry(.165, .145, .1, 20, 1, true), { p: [0, .91, 0] }],
+        ring(.146, .02, .862, 24), ring(.166, .016, .958, 24),
+        ...around(5, a => [new THREE.ConeGeometry(.045, .115, 8), { p: [Math.sin(a) * .155, 1.01, Math.cos(a) * .155], r: [.1, a, 0], o: 'YXZ' }]),
+        ...around(5, a => [new THREE.SphereGeometry(.024, 8, 6), { p: [Math.sin(a) * .16, 1.075, Math.cos(a) * .16] }]),
+      ]));
+      const gems = geo('crownGems2', () => { const C = ['#e5484d', '#3b7be0', '#2fa86b', '#9b6be0', '#e5484d'];
+        return merge(around(5, (a, k) => [new THREE.OctahedronGeometry(.03, 0), { p: [Math.sin(a) * .167, .91, Math.cos(a) * .167], s: [1, 1.25, .6], r: [0, a, 0], col: C[k] }])); });
+      const rim = geo('royalRim', () => merge([ring(.345, .032, .07, 32), ring(.245, .022, .535, 24)]));
+      return { mat: m, look: .5, pivot: .74, parts: [body(m), head(m, H), [crown, GOLD(), true, H], [gems, VCG(), false, H], [rim, GOLD()]] };
+    },
+    // Ice Crystal: a faceted crystal column and gem head, a fan of crystals on top and a ring of shards round the foot
+    ice(h) {
+      const m = mat('ice' + h, () => glossy(tint(h, .12), { flatShading: true, roughness: .08, glow: h }));
+      const shard = mat('shard' + h, () => glossy(tint(h, .5), { flatShading: true, roughness: .05, glow: h }));
+      const col = lathe('column', COLUMN, 8);
+      const gemHead = geo('iceHead2', () => merge([[new THREE.IcosahedronGeometry(.19, 0), { p: [0, .78, 0], s: [1, 1.1, 1] }]]));
+      const top = geo('iceTop', () => merge([
+        [new THREE.OctahedronGeometry(.07, 0), { p: [0, 1.05, 0], s: [1, 2.8, 1] }],
+        ...around(5, (a, k) => [new THREE.OctahedronGeometry(k % 2 ? .045 : .055, 0), { p: [Math.sin(a) * .09, .99, Math.cos(a) * .09], s: [1, k % 2 ? 2.2 : 2.7, 1], r: [.45, a, 0], o: 'YXZ' }]),
+      ]));
+      const foot = geo('iceFoot', () => merge(around(12, (a, k) => [new THREE.OctahedronGeometry(k % 2 ? .052 : .066, 0),
+        { p: [Math.sin(a) * .27, .17, Math.cos(a) * .27], s: [1, k % 2 ? 2.2 : 2.7, 1], r: [.5, a, 0], o: 'YXZ' }])));
+      return { mat: m, look: .5, pivot: .78, parts: [[col, m], [gemHead, m, true, H], [top, shard, true, H], [foot, shard]] };
+    },
+    // Candy Pop: a candy-striped bell with a frosted cupcake head and sprinkles
+    candy(h) {
+      const m = mapped('candy', h, stripes), hm = mat('candyHead' + h, () => glossy(h));
+      const cream = mat('cream', () => glossy(0xfff4e6, { roughness: .35 }));
+      const frost = geo('frost2', () => merge([
+        [new THREE.SphereGeometry(.212, 26, 10, 0, Math.PI * 2, 0, 1.42), { p: [0, HEADY, 0] }],
+        ...around(7, (a, k) => [new THREE.SphereGeometry(.03, 8, 6), { p: [Math.sin(a) * .204, HEADY - .055 - (k % 2) * .025, Math.cos(a) * .204], s: [1, 1.7, .7], r: [0, a, 0] }]),
+      ]));
+      const sprinkles = geo('sprinkles2', () => { const R = rng(3), C = ['#ff6fa8', '#5ac8fa', '#ffd23f', '#7ed957', '#ff8a3d', '#b38bff'];
+        return merge(Array.from({ length: 14 }, (_, k) => { const th = .15 + R() * .95, ph = R() * Math.PI * 2, n = V(Math.sin(th) * Math.sin(ph), Math.cos(th), Math.sin(th) * Math.cos(ph));
+          return [new THREE.CylinderGeometry(.012, .012, .055, 5), { p: [n.x * .214, HEADY + n.y * .214, n.z * .214], r: [th - Math.PI / 2, ph, R() * 3], o: 'YXZ', col: C[k % C.length] }]; })); });
+      return { mat: m, look: .5, pivot: HEADY, parts: [[lathe('bell', BELL), m], [geo('ball', () => merge([ball(.2)])), hm, true, H], [frost, cream, true, H], [sprinkles, VC(), false, H]] };
+    },
+    // Marble: the classic pawn in swirled marble on a gold foot
+    marble(h) {
+      const m = mapped('marble', h, marble, { roughness: .16 });
+      return { mat: m, parts: [body(m), head(m), [geo('marbleRim', () => merge([ring(.345, .034, .07, 40)])), GOLD()]] };
+    },
+    // Robo Bot: a white robot, the player's colour on its foot, chest light, ears and antenna; glowing eyes in a
+    // dark visor
+    robo(h) {
+      const m = mat('robo' + h, () => glossy(h)), eye = GLOW(tint(h, .3)), S = [1.22, 1, 1.08], Y = .82;
+      const suit = lathe('suit', SUIT), foot = lathe('foot', FOOT);
+      const rhead = geo('roboHead2', () => merge([[new THREE.SphereGeometry(.19, 26, 16), { p: [0, Y, 0], s: S }], ring(.13, .03, .63, 20)]));
+      const visor = geo('visor2', () => merge([[new THREE.SphereGeometry(.197, 22, 10, Math.PI / 2 - 1.05, 2.1, 1.0, 1.05), { p: [0, Y, 0], s: S }]]));
+      const pt = (ph, th, r = .2) => [-Math.cos(ph) * Math.sin(th) * r * S[0], Y + Math.cos(th) * r * S[1], Math.sin(ph) * Math.sin(th) * r * S[2]];
+      const eyes = geo('roboEyes2', () => merge([
+        ...[-1, 1].map(s => { const p = pt(Math.PI / 2 + s * .36, 1.5); return [new THREE.SphereGeometry(.04, 12, 8), { p, s: [1, 1.3, .4], r: [0, Math.atan2(p[0], p[2]), 0] }]; }),
+        [new THREE.SphereGeometry(.036, 10, 8), { p: [0, Y + .26, 0] }],
+      ]));
+      const ears = geo('roboEars2', () => merge([-1, 1].map(s => [new THREE.CylinderGeometry(.06, .06, .05, 18), { p: [s * .232, Y, 0], r: [0, 0, Math.PI / 2] }])));
+      const stick = geo('roboStick', () => merge([[new THREE.CylinderGeometry(.012, .012, .08, 6), { p: [0, Y + .2, 0] }]]));
+      const plate = geo('roboPlate2', () => merge([[new THREE.CylinderGeometry(.06, .06, .02, 18), onSurf(suitR, .34, 0, .004, Math.PI / 2 - .2)]]));
+      const plateRim = geo('roboPlateRim', () => merge([[new THREE.TorusGeometry(.065, .013, 6, 20), onSurf(suitR, .34, 0, .012, -.2)]]));
+      const chest = geo('roboChest2', () => merge([[new THREE.SphereGeometry(.035, 12, 8), Object.assign(onSurf(suitR, .34, 0, .016, -.2), { s: [1, 1, .55] })]]));
+      return { mat: m, look: 1.3, pivot: Y, parts: [[foot, m], [suit, WHITE()], [rhead, WHITE(), true, H], [visor, DARK(), true, H], [ears, m, true, H], [stick, WHITE(), true, H], [eyes, eye, false, H], [plate, m], [plateRim, WHITE()], [chest, eye, false]] };
+    },
+    // Little Wizard: a robe with a scarf, a big floppy hat (no face) and gold stars
+    wizard(h, c) {
+      const m = mat('wiz' + h, () => glossy(h)), scarf = mat('scarf' + h, () => glossy(tint(h, .3), { glow: h }));
+      const star = mat('wizStar' + c, () => glossy(c === 2 ? 0xff8a3d : 0xffd84a, { emissive: lin(c === 2 ? 0xff8a3d : 0xffd84a), emissiveIntensity: .25 }));
+      const robe = lathe('robe', ROBE), robeR = rOf(ROBE);
+      const t = .75, hat = geo('wizHat2', () => merge([
+        [new THREE.SphereGeometry(.165, 22, 14), { p: [0, .76, 0] }],
+        [new THREE.CylinderGeometry(.31, .32, .035, 34), { p: [0, .855, 0], r: [.08, 0, 0] }],
+        [new THREE.CylinderGeometry(.085, .2, .2, 24), { p: [0, .96, 0] }],
+        [new THREE.SphereGeometry(.085, 14, 8), { p: [0, 1.06, 0] }],
+        [new THREE.ConeGeometry(.085, .2, 16), { p: [Math.sin(t) * .1, 1.06 + Math.cos(t) * .1, 0], r: [0, 0, -t] }],
+      ]));
+      const scarfG = geo('wizScarf', () => merge([ring(.15, .045, .63, 24), ...[[-.045, -.5], [.04, .35]].map(([x, rz]) => [new THREE.SphereGeometry(.05, 10, 8), { p: [x, .54, robeR(.54) + .02], s: [.8, 1.6, .45], r: [-.3, 0, rz] }])]));
+      const stars = geo('wizStars2', () => merge([[starGeo(.06), { p: [0, .955, .155], r: [-.62, 0, 0] }]]));
+      const robeStar = geo('wizRobeStar2', () => merge([[starGeo(.065), onSurf(robeR, .3, 0, 0, -.38)]]));
+      return { mat: m, look: .8, pivot: .76, parts: [[robe, m], [hat, m, true, H], [stars, star, true, H], [scarfG, scarf], [robeStar, star]] };
+    },
+    // Fruity: a bell with a juicy drip at the top and a fruit for a head: strawberry, watermelon slice, orange,
+    // blueberry (red, green, yellow, blue)
+    fruity(h, c) {
+      const m = mat('fruit' + h, () => glossy(h)), drip = mat('drip' + h, () => glossy(shade(h, .18), { glow: h })), key = ['strawberry', 'melon', 'orange', 'blueberry'][c];
+      const navy = mat('berryCrown2', () => glossy(0x4a5fc4, { roughness: .4 }));
+      const leaf = (p, ry, tilt = .5, s = 1) => [new THREE.SphereGeometry(.07, 12, 6), { p, s: [.5 * s, .16 * s, 1 * s], r: [tilt, ry, 0], o: 'YXZ' }];
+      const Y = .8, F = {
+        strawberry: () => {
+          const prof = [[0, -.2], [.07, -.18], [.14, -.11], [.195, -.01], [.205, .07], [.165, .14], [.08, .18], [0, .19]], rAt = rOf(prof), R = rng(11);
+          return { head: merge([[new THREE.LatheGeometry(prof.map(([x, y]) => new THREE.Vector2(x, y)), 24), { p: [0, Y, 0] }]]), headMat: 'h',
+            dots: merge(Array.from({ length: 18 }, (_, k) => { const y = -.14 + (k % 4) * .065 + R() * .02, a = k * 2.4, r = rAt(y) + .004;
+              return [new THREE.SphereGeometry(.015, 6, 4), { p: [Math.sin(a) * r, Y + y, Math.cos(a) * r], s: [1, 1.4, .6], r: [0, a, 0], col: '#ffe38a' }]; })),
+            green: merge([...around(6, a => leaf([Math.sin(a) * .085, Y + .175, Math.cos(a) * .085], a, .3, 1.1)), [new THREE.CylinderGeometry(.015, .02, .07, 6), { p: [0, Y + .21, 0] }]]) };
+        },
+        melon: () => {
+          const a0 = Math.PI * 1.5 - .72, a1 = Math.PI * 1.5 + .72, z = -.06, at = V(0, Y + .15, 0);
+          const T = (g, o = {}) => [g, Object.assign({ p: [at.x, at.y, z + (o.dz || 0)] }, o)];
+          const R = rng(5);
+          return { flesh: merge([T(ext(sector(.255, a0, a1), .12))]), rind: merge([T(ext(sector(.3, a0, a1, .275), .12), { dz: -.004 })]), white: merge([T(ext(sector(.277, a0, a1, .255), .121))]),
+            seeds: merge(Array.from({ length: 7 }, (_, k) => { const a = a0 + .18 + (k / 6) * (a1 - a0 - .36), r = .12 + (k % 2) * .07 + R() * .02;
+              return [new THREE.SphereGeometry(.014, 6, 4), { p: [Math.cos(a) * r, at.y + Math.sin(a) * r, z + .128], s: [.8, 1.4, .5], r: [0, 0, a + Math.PI / 2], col: '#2b1b1b' }]; })) };
+        },
+        orange: () => ({ head: merge([ball(.2, Y, [1.05, .97, 1.05])]), headMat: 'o',
+          brown: merge([[new THREE.CylinderGeometry(.014, .018, .05, 6), { p: [0, Y + .2, 0] }]]),
+          green: merge([leaf([.06, Y + .215, .02], Math.PI / 2 - .3, .25, 1.25)]) }),
+        blueberry: () => ({ head: merge([ball(.205, Y, [1.06, .94, 1.06])]), headMat: 'h',
+          crown: merge([...around(5, a => [new THREE.ConeGeometry(.03, .075, 6), { p: [Math.sin(a) * .05, Y + .19, Math.cos(a) * .05], r: [.7, a, 0], o: 'YXZ' }]), [new THREE.CylinderGeometry(.055, .055, .02, 12), { p: [0, Y + .185, 0] }]]) }),
+      };
+      const g = geo('fruit2:' + key, F[key]);
+      const drips = geo('fruitDrip', () => merge([[new THREE.LatheGeometry([[bellR(.5) + .01, .5], [bellR(.56) + .014, .56], [bellR(.62) + .014, .62], [.13, .67], [0, .69]].map(([x, y]) => new THREE.Vector2(x, y)), 32), {}],
+        ...around(9, (a, k) => [new THREE.SphereGeometry(.03, 8, 6), { p: [Math.sin(a) * (bellR(.47 - (k % 2) * .04) + .004), .47 - (k % 2) * .04, Math.cos(a) * (bellR(.47 - (k % 2) * .04) + .004)], s: [1, 1.7, .6], r: [0, a, 0] }])]));
+      const parts = [[lathe('bell', BELL), m], [drips, drip]];
+      if (g.head) parts.push([g.head, g.headMat === 'o' ? mat('orangeFruit', () => glossy(0xff9a1f)) : m, true, H]);
+      if (g.flesh) parts.push([g.flesh, mat('melonFlesh', () => glossy(0xff4b5c)), true, H], [g.rind, mat('melonRind', () => glossy(0x2e8b3e)), true, H], [g.white, WHITE(), false, H], [g.seeds, VC(), false, H]);
+      if (g.dots) parts.push([g.dots, VC(), false, H]);
+      if (g.green) parts.push([g.green, LEAF(), true, H]);
+      if (g.brown) parts.push([g.brown, STEM(), false, H]);
+      if (g.crown) parts.push([g.crown, navy, true, H]);
+      return { mat: m, look: .9, pivot: Y, parts };
+    },
+    // Blossom: a bell wrapped in a leafy vine, a big flower for a head (pink, blue, green, yellow petals)
+    blossom(h, c) {
+      const m = mapped('blos2', h, x => vine(x, c === 2 ? '#5cae3a' : tint(x, .62)));
+      const petal = mat('petal' + c, () => glossy(['#ff86b0', '#8be07a', '#ffd84a', '#5fb0ff'][c], { roughness: .35 }));
+      const mid = mat('blosMid2' + c, () => glossy(c === 2 ? 0xe5484d : 0xffd23f, { roughness: .45 }));
+      const M = new THREE.Matrix4().compose(V(0, .83, .03), new THREE.Quaternion().setFromEuler(new THREE.Euler(-.22, 0, 0)), V(1, 1, 1));
+      const petals = geo('petals2', () => merge(around(5, a => [new THREE.SphereGeometry(.105, 16, 10), { p: [Math.sin(a) * .14, Math.cos(a) * .14, 0], r: [0, 0, -a], s: [.8, 1.05, .32] }]), M));
+      const centre = geo('blosMid2', () => merge([[new THREE.SphereGeometry(.085, 16, 10), { p: [0, 0, .03], s: [1, 1, .6] }]], M));
+      const back = geo('blosBack', () => merge([[new THREE.SphereGeometry(.13, 16, 8), { p: [0, 0, -.04], s: [1, 1, .35] }]], M));
+      const leaves = geo('blosLeaves2', () => merge([
+        [new THREE.CylinderGeometry(.05, .07, .14, 10), { p: [0, .66, 0] }],
+        ...[-1, 1].map(s => [new THREE.SphereGeometry(.08, 12, 6), { p: [s * .2, .63, .03], s: [1.4, .22, .6], r: [0, s * -.3, s * -.4] }]),
+      ]));
+      return { mat: m, look: 1, pivot: .83, parts: [[lathe('bell', BELL), m], [petals, petal, true, H], [centre, mid, true, H], [back, LEAF(), true, H], [leaves, LEAF()]] };
+    },
+    // Pirate: a bell with a belt and bandana, an eye patch and a tricorn with a skull and gold trim
+    pirate(h) {
+      const m = mat('pir' + h, () => glossy(h)), belt = mat('belt', () => glossy(0x5b3a22, { roughness: .45 }));
+      const felt = mat('felt', () => glossy(0x2b2530, { roughness: .55, clearcoat: .4, clearcoatRoughness: .5 }));
+      const band = mat('bandana' + h, () => glossy(tint(h, .35), { glow: h }));
+      const dy = HEADY - .74;
+      const F = new THREE.Matrix4().compose(V(0, .845 + dy, .06), new THREE.Quaternion().setFromEuler(new THREE.Euler(-.3, 0, 0)), V(1.12, 1.12, 1));   // the front flap's frame
+      const hat = geo('pirHat2', () => {
+        const cr = new THREE.Shape();   // tricorn front: a crescent with pointed ends
+        cr.moveTo(-.29, .01); cr.quadraticCurveTo(-.22, .21, 0, .215); cr.quadraticCurveTo(.22, .21, .29, .01); cr.quadraticCurveTo(0, .09, -.29, .01);
+        return merge([
+          [new THREE.SphereGeometry(.205, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2), { p: [0, .84 + dy, -.01], s: [1, .7, 1] }],
+          [new THREE.CylinderGeometry(.26, .26, .026, 24), { p: [0, .852 + dy, -.01], s: [1.12, 1, .88] }],
+          [new THREE.TorusGeometry(.204, .012, 5, 28), { p: [0, .76 + dy, 0], r: [Math.PI / 2 - .25, 0, .3] }],
+          [new THREE.SphereGeometry(.06, 12, 8), { p: [-.074, .775 + dy, .186], s: [1, .9, .35], r: [-.15, -.4, 0] }],
+          [merge([[ext(cr, .03, .01), {}]], F), {}],
+        ]);
+      });
+      const trim = geo('pirTrim', () => merge([...[[-.29, .01, -.22, .21, 0, .215], [0, .215, .22, .21, .29, .01]].map(([x0, y0, cx, cy, x1, y1]) =>
+        [new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(V(x0, y0, .042), V(cx, cy, .042), V(x1, y1, .042)), 12, .011, 5), {}])], F));
+      const skull = geo('pirSkull2', () => merge([
+        [new THREE.SphereGeometry(.048, 12, 8), { p: [0, .13, .048], s: [1, .95, .45] }],
+        ...[-1, 1].map(s => [new THREE.CylinderGeometry(.012, .012, .13, 5), { p: [0, .115, .045], r: [0, 0, s * .85] }]),
+      ], F));
+      const beltG = geo('pirBelt2', () => merge([[new THREE.CylinderGeometry(bellR(.24) + .01, bellR(.18) + .01, .06, 24, 1, true), { p: [0, .21, 0] }]]));
+      const buckle = geo('pirBuckle2', () => merge([[new THREE.TorusGeometry(.03, .011, 5, 4), Object.assign(onSurf(bellR, .21, 0, .018, -.35), { s: [1.25, 1, 1] })]]));
+      const bandana = geo('pirBandana', () => merge([ring(.15, .04, .64, 24), ...[-1, 1].map(s => [new THREE.SphereGeometry(.045, 10, 8), { p: [s * .045, .6, .17], s: [1.2, .8, .5], r: [0, 0, s * .5] }]), [new THREE.SphereGeometry(.03, 10, 8), { p: [0, .615, .175] }]]));
+      return { mat: m, look: 1, pivot: HEADY, parts: [[lathe('bell', BELL), m], [geo('ball', () => merge([ball(.2)])), m, true, H], [hat, felt, true, H], [trim, GOLD(), false, H], [skull, WHITE(), false, H], [beltG, belt], [buckle, GOLD()], [bandana, band]] };
+    },
+    // Space Explorer: a white space suit on a coloured foot, a big white helmet with a visor in the player's colour
+    space(h) {
+      const m = mat('space' + h, () => glossy(h)), visor = mat('visor2' + h, () => glossy(shade(h, .38), { roughness: .04, glow: h }));
+      const Y = .82, suit = lathe('suit', SUIT), foot = lathe('foot', FOOT);
+      const shell = geo('helmet2', () => merge([[new THREE.SphereGeometry(.24, 30, 18), { p: [0, Y, 0] }], ring(.17, .035, .615, 24)]));
+      const glass = geo('helmetGlass2', () => merge([[new THREE.SphereGeometry(.25, 26, 12, Math.PI / 2 - 1, 2, .62, 1.3), { p: [0, Y, 0], s: [1, 1, 1.02] }]]));
+      const ears = geo('helmetEars2', () => merge([...[-1, 1].map(s => [new THREE.CylinderGeometry(.06, .06, .05, 18), { p: [s * .245, Y, 0], r: [0, 0, Math.PI / 2] }])]));
+      const shine = geo('helmetShine2', () => merge([[new THREE.SphereGeometry(.032, 10, 6), { p: [-.075, Y + .17, .16], s: [1.5, .7, .4], r: [-.75, -.45, .3] }]]));
+      const badge = geo('spaceBadge', () => merge([[new THREE.CylinderGeometry(.075, .075, .02, 20), Object.assign(onSurf(suitR, .32, 0, .004, Math.PI / 2 - .15))]]));
+      const star = geo('spaceStar2', () => merge([[starGeo(.055), onSurf(suitR, .32, 0, .014, -.15)]]));
+      return { mat: m, look: 1.3, pivot: Y, parts: [[foot, m], [suit, WHITE()], [shell, WHITE(), true, H], [glass, visor, true, H], [ears, m, true, H], [shine, GLOW('#ffffff'), false, H], [badge, m], [star, GOLD()]] };
+    },
+    // Dragon: a scaly bell, gold horns, a crest, little bat wings at the sides and a gem on the chest
+    dragon(h) {
+      const m = mapped('dragon2', h, scalesLow), hm = mat('dragHead' + h, () => glossy(h));
+      const wingM = mat('wing' + h, () => glossy(tint(h, .28), { glow: h, side: THREE.DoubleSide }));
+      const horn = mat('horn2', () => glossy(0xf5c542, { roughness: .3, emissive: lin(0x9a6a10), emissiveIntensity: .1 }));
+      const crestM = mat('crest' + h, () => glossy(shade(h, .25), { glow: h }));
+      const horns = geo('horns2', () => merge([...[-1, 1].flatMap(s => [
+        [new THREE.CylinderGeometry(.036, .05, .12, 10), { p: [s * .11, HEADY + .18, -.01], r: [-.15, 0, -s * .55] }],
+        [new THREE.ConeGeometry(.036, .15, 10), { p: [s * .175, HEADY + .29, -.03], r: [-.25, 0, s * .2] }],
+      ])]));
+      const crest = geo('dragCrest', () => merge([.25, .7, 1.15].map((th, k) => [new THREE.ConeGeometry(.04 - k * .006, .1, 6), { p: [0, HEADY + Math.cos(th) * .19, -Math.sin(th) * .19], r: [-th, 0, 0], s: [.5, 1, 1] }])));
+      const wing = new THREE.Shape();
+      wing.moveTo(0, 0); wing.lineTo(.02, .1); wing.quadraticCurveTo(.1, .16, .17, .12); wing.quadraticCurveTo(.15, .08, .16, .04);
+      wing.quadraticCurveTo(.12, .06, .11, .02); wing.quadraticCurveTo(.08, .04, .06, -.01); wing.quadraticCurveTo(.03, .01, 0, 0);
+      const wings = geo('dragWings', () => merge([-1, 1].map(s => [ext(wing, .016, .005), { p: [s * .14, .38, -.05], r: [0, s * .35, 0], s: [s * 1.35, 1.35, 1] }])));
+      const gem = geo('dragGem2', () => merge([[new THREE.OctahedronGeometry(.05, 0), Object.assign(onSurf(bellR, .36, 0, .012, -.3), { s: [.85, 1.25, .5] })]]));
+      return { mat: m, look: .8, pivot: HEADY, parts: [[lathe('bell', BELL), m], [geo('ball', () => merge([ball(.2)])), hm, true, H], [horns, horn, true, H], [crest, crestM, true, H], [wings, wingM], [gem, GOLD(), false]] };
+    },
+  };
+
+  const LIST = [
+    { id: 'classic', name: 'Classic',        price: 0,    desc: 'The glossy pawn you know.',              g: 'linear-gradient(160deg,#fff6ea,#f1dcc4)' },
+    { id: 'royal',   name: 'Royal Crown',    price: 3000, desc: 'A tall jewelled crown on a gold foot.',          g: 'linear-gradient(160deg,#fff1c2,#e9bf5c)' },
+    { id: 'ice',     name: 'Ice Crystal',    price: 3500, desc: 'A crystal pawn crowned with shards.',       g: 'linear-gradient(160deg,#eef8ff,#a9d2f2)' },
+    { id: 'candy',   name: 'Candy Pop',      price: 2500, desc: 'Candy stripes and a sprinkled cupcake top.',    g: 'linear-gradient(160deg,#ffe8f3,#f6b2d0)' },
+    { id: 'marble',  name: 'Marble',         price: 2000, desc: 'Swirled marble on a gold rim.',          g: 'linear-gradient(160deg,#f6f1ea,#cfc3b4)' },
+    { id: 'robo',    name: 'Robo Bot',       price: 4000, desc: 'A little white robot with glowing eyes.',        g: 'linear-gradient(160deg,#e9f1f7,#a8bfd2)' },
+    { id: 'wizard',  name: 'Little Wizard',  price: 4000, desc: 'A robe, a scarf and a big starry hat.',          g: 'linear-gradient(160deg,#ece4ff,#a995d8)' },
+    { id: 'fruity',  name: 'Fruity',         price: 2500, desc: 'Strawberry, watermelon, orange, blueberry.',   g: 'linear-gradient(160deg,#fff4d6,#f5c27a)' },
+    { id: 'blossom', name: 'Blossom',        price: 2500, desc: 'A flower head and a leafy vine.',    g: 'linear-gradient(160deg,#fbeff2,#d8eccd)' },
+    { id: 'pirate',  name: 'Pirate',         price: 3500, desc: 'Tricorn, eye patch, bandana and belt.', g: 'linear-gradient(160deg,#f3e6d2,#c9a77c)' },
+    { id: 'space',   name: 'Space Explorer', price: 5000, desc: 'A space suit and a big visor helmet.',         g: 'linear-gradient(160deg,#dfe6ff,#7b84c9)' },
+    { id: 'dragon',  name: 'Dragon',         price: 6000, desc: 'Gold horns, scales and little wings.',        g: 'linear-gradient(160deg,#ffe6cf,#e98f6a)' },
+  ];
+  const byId = id => LIST.find(s => s.id === id);
+  const built = {};
+  const build = (id, c) => built[id + c] || (built[id + c] = B[id](COLORS[c].css, c));
+  // a fresh set of meshes for one pawn (the geometry and materials are shared)
+  function meshes(id, c, tok) {
+    return build(id, c).parts.map(([g, m, shadow = true, head = false]) => {
+      const mesh = new THREE.Mesh(g, m);
+      mesh.castShadow = shadow; mesh.userData.head = head;
+      if (tok) mesh.userData.tok = tok;
+      return mesh;
+    });
+  }
+  let current = 'classic';
+  // swap the meshes of all 16 tokens; the group, its rings, position, scale and state stay as they are
+  function apply(id) {
+    if (!B[id]) id = 'classic';
+    if (id === current && toks[0][0].skin) return;
+    toks.flat().forEach(t => {
+      (t.skin || []).forEach(m => { t.g.remove(m); const k = pickables.indexOf(m); if (k >= 0) pickables.splice(k, 1); });
+      t.skin = meshes(id, t.c, { c: t.c, i: t.i });
+      t.skin.forEach(m => { t.g.add(m); pickables.push(m); });
+      t.mat = build(id, t.c).mat;
+      t.g.rotation.y = 0;
+    });
+    current = id;
+  }
+  /* Top View: straight down, a pawn shows only the top of its head, so the faces, visors and patches that make a skin
+     would vanish. Each themed skin's head parts tip back by up to its `look` angle about the head centre (`pivot`), so
+     the face looks up at the camera while the pawn keeps its footprint. k = 0 in 3D View (unchanged), 1 in Top View,
+     in between while the camera eases. */
+  function pose(t, k) {
+    const b = built[current + t.c];
+    if (!b || !b.look) return;
+    const a = -b.look * k, y = b.pivot, c = Math.cos(a), s = Math.sin(a);
+    t.skin.forEach(m => { if (m.userData.head) { m.rotation.x = a; m.position.set(0, y - y * c, -y * s); } });
+  }
+  // triangles of one pawn (for tests and the docs)
+  const tris = (id, c = 0) => build(id, c).parts.reduce((n, [g]) => n + (g.index ? g.index.count : g.attributes.position.count) / 3, 0);
+
+  /* shop pictures: the four colours in a row, rendered once per skin with the game's renderer into a small image */
+  const pics = {};
+  let picScene = null, picCam = null;
+  function pic(id) {
+    if (pics[id]) return pics[id];
+    if (!picScene) {
+      picScene = new THREE.Scene();
+      picScene.add(new THREE.HemisphereLight(0xfff6ea, 0x8a6f63, .75));
+      const key = new THREE.DirectionalLight(0xffffff, .95); key.position.set(-2, 5, 6); picScene.add(key);
+      const rim = new THREE.DirectionalLight(0xffe2c4, .35); rim.position.set(3, 2, -4); picScene.add(rim);
+      picCam = new THREE.PerspectiveCamera(30, 4 / 3, .1, 50);
+      picCam.position.set(0, 1.5, 3.85); picCam.lookAt(0, .5, -.1);
+    }
+    const w = 320, h = 240, sw = w * 2, sh = h * 2, row = new THREE.Group();
+    [0, 3, 1, 2].forEach((c, k) => { const g = new THREE.Group(); meshes(id, c).forEach(m => g.add(m)); g.position.set((k - 1.5) * .64, 0, k % 2 ? -.32 : .08); row.add(g); });   // red, blue, green, yellow, staggered
+    picScene.add(row);
+    const rt = new THREE.WebGLRenderTarget(sw, sh); rt.texture.encoding = THREE.sRGBEncoding;
+    const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(rt); renderer.clear(); renderer.render(picScene, picCam);
+    const px = new Uint8Array(sw * sh * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, sw, sh, px);
+    renderer.setRenderTarget(null); renderer.setClearColor(cc, ca);
+    rt.dispose(); picScene.remove(row);
+    const big = document.createElement('canvas'); big.width = sw; big.height = sh;
+    const bg = big.getContext('2d'), img = bg.createImageData(sw, sh);
+    for (let y = 0; y < sh; y++) img.data.set(px.subarray((sh - 1 - y) * sw * 4, (sh - y) * sw * 4), y * sw * 4);
+    bg.putImageData(img, 0, 0);
+    const small = document.createElement('canvas'); small.width = w; small.height = h;
+    const sg = small.getContext('2d'); sg.imageSmoothingQuality = 'high'; sg.drawImage(big, 0, 0, w, h);
+    return pics[id] = small.toDataURL('image/png');
+  }
+
+  return { LIST, byId, apply, pic, tris, meshes, pose, get current() { return current; }, get faces() { return current !== 'classic'; } };
+})();
 
 /* ---------- Camera + render loop ---------- */
 // In a game the camera is fixed behind the player's corner; on the home screen it drifts slowly around the café.
@@ -3247,6 +3715,7 @@ function frameLoop(now) {
   });
 
   const pulse = (Math.sin(now / 180) + 1) / 2;
+  const look = Math.max(0, Math.min(1, (camEl - GAME_EL) / (TOP_EL - GAME_EL)));   // 0 in 3D View, 1 in Top View
   toks.flat().forEach(t => {
     if (!t.anim) { t.g.position.lerp(t.target, .22); }
     const s = t.g.scale.x + (t.scale - t.g.scale.x) * .2;
@@ -3255,6 +3724,8 @@ function frameLoop(now) {
     t.ring.visible = on;
     if (on) { t.ring.scale.setScalar(1 + pulse * .18); t.ring.material.opacity = .5 + pulse * .5; }
     t.pairRing.visible = t.paired;
+    t.g.rotation.y = PawnSkins.faces ? camAz + camRoll : 0;   // themed pawns face the camera, upright on screen (Classic is round, so it never turns)
+    if (PawnSkins.faces) PawnSkins.pose(t, look);
     t.mat.emissiveIntensity = 0;
   });
   if (movableSet.size) toks.flat().forEach(t => { if (movableSet.has(t.c * 4 + t.i)) t.mat.emissiveIntensity = .12 + pulse * .2; });
@@ -5015,10 +5486,16 @@ const FREE_EVERY = 4 * 3600e3, FREE_AMOUNT = 300, WIN_REWARD = 200;
 const PRIZES = [100, 250, 150, 500, 100, 1000, 200, 300];
 const P = { name: 'You', coins: 5000, lastSpin: '', lastFree: 0, owned: ['classic'], dice: 'classic' };
 const P_DEFAULT = JSON.stringify(P);   // a fresh profile, used when switching between a guest and an account
+// demo mode: every catalogue price becomes 0 (ensureProfile then owns everything)
+function demoFree() {
+  [ROOM_LIST, Object.values(SKINS), SL_SCENES, EMOTE_SETS, TEXT_PACKS, CHARS, AVATARS, PawnSkins.LIST].forEach(list => list.forEach(it => { if ('price' in it) it.price = 0; }));
+}
 function loadProfile() {
+  if (DEMO) demoFree();
   if (Store.data.profile && typeof Store.data.profile === 'object') Object.assign(P, Store.data.profile);
   if (!SKINS[P.dice]) P.dice = 'classic';
   ensureProfile();   // older saves just gain the newer fields
+  PawnSkins.apply(P.pawnSkin);
 }
 function saveProfile() { return Store.save('profile', P); }
 
@@ -5099,15 +5576,16 @@ function renderShop() {
     `<button type="button" data-free ${fl > 0 ? 'disabled' : ''}>${fl > 0 ? 'In ' + fmtDur(fl) : 'Claim'}</button></div>`;
   let html = '';
   Object.entries(SKINS).forEach(([id, s]) => {
-    if (!s.price) return;
+    if (id === 'classic') return;   // the free starter die isn't sold (by id: in demo mode every price is 0)
     const owned = P.owned.includes(id), short = s.price - P.coins;
     const label = owned ? 'Owned' : short > 0 ? `Need ${fmtCoins(short)}` : 'Buy';
-    html += `<div class="item">${miniDie(s)}<b>${s.name}</b>${coinTag(fmtCoins(s.price))}<button type="button" data-buy="${id}" ${owned || short > 0 ? 'disabled' : ''}>${label}</button></div>`;
+    html += `<div class="item">${miniDie(s)}<b>${s.name}</b>${DEMO ? '' : coinTag(fmtCoins(s.price))}<button type="button" data-buy="${id}" ${owned || short > 0 ? 'disabled' : ''}>${label}</button></div>`;
   });
   $('shopDice').innerHTML = html;
   renderRooms($('shopRooms'), true);
   renderScenes($('shopScenes'), true);
   renderEmoteSets($('shopEmotes'), true);
+  renderPawnSkins($('shopPawns'), true);
   showShopTab(shopTab, false);
 }
 function renderInv() {
@@ -5118,6 +5596,7 @@ function renderInv() {
   renderRooms($('invRooms'), false);
   renderScenes($('invScenes'), false);
   renderEmoteSets($('invEmotes'), false);
+  renderPawnSkins($('invPawns'), false);
   showInvTab(invTab, false);
 }
 
@@ -5274,6 +5753,60 @@ $('emSetAct').addEventListener('click', () => {
   if (b.dataset.emsetView) { sfx('select'); openEmoteSet(b.dataset.emsetView); return; }
   if (b.dataset.emsetBuy) buyEmoteSet(b.dataset.emsetBuy); else if (b.dataset.emsetUse) useEmoteSet(b.dataset.emsetUse);
   else if (b.dataset.tpackBuy) buyTextPack(b.dataset.tpackBuy); else if (b.dataset.tpackUse) useTextPack(b.dataset.tpackUse);
+  rerender();
+}));
+/* Pawn skins (Shop > Pawns, Inventory > Pawns): buy = coins + ownership + equip in one commitProfile (a failed save
+   charges nothing; an owned skin is never sold twice); Use equips an owned skin. The equipped skin dresses all 16
+   pawns on the board (PawnSkins.apply swaps meshes only, never game state). */
+let pawnBusy = false;
+function buyPawnSkin(id) {
+  const s = PawnSkins.byId(id);
+  if (!s || pawnBusy || P.pawnSkins.includes(id)) return false;
+  if (P.coins < s.price) { sfx('error'); toast(`You need ${fmtCoins(s.price - P.coins)} more coins for ${s.name}.`); return false; }
+  pawnBusy = true;
+  const ok = commitProfile(() => { P.coins -= s.price; P.pawnSkins.push(id); P.pawnSkin = id; });
+  pawnBusy = false;
+  if (!ok) { toast('Couldn’t save on this device. No coins were spent.'); return false; }
+  renderCoins(true); PawnSkins.apply(id);
+  sfx('buy'); toast(`${s.name} pawns unlocked and equipped`);
+  return true;
+}
+function usePawnSkin(id) {
+  if (!P.pawnSkins.includes(id) || P.pawnSkin === id) return;
+  P.pawnSkin = id; saveProfile(); PawnSkins.apply(id);
+  sfx('select'); toast(`${PawnSkins.byId(id).name} pawns equipped`);
+}
+// a skin's card: its picture (the four colours), then Buy / Use / Equipped
+function renderPawnSkins(el, shop) {
+  el.innerHTML = `<p class="pane-note">Pawn skins for Ludo<button type="button" class="pawn-all-btn" data-pawn-all>Compare all</button></p>` + PawnSkins.LIST.filter(s => shop || P.pawnSkins.includes(s.id)).map(s => {
+    const owned = P.pawnSkins.includes(s.id), on = P.pawnSkin === s.id;
+    const btn = on ? '<button type="button" disabled>Equipped</button>'
+      : owned ? `<button type="button" data-pawn-use="${s.id}">Use</button>`
+      : `<button type="button" data-pawn-buy="${s.id}">Buy</button>`;
+    return `<div class="item${on ? ' eq' : ''}" data-skin="${s.id}"><div class="room-prev pawn-prev" style="--g:${s.g}"><img alt="${s.name} pawns in red, blue, green and yellow" data-pawn-pic="${s.id}" hidden>${on ? '<span class="tag">Equipped</span>' : owned ? '<span class="tag">Owned</span>' : '<span class="tag lock">Locked</span>'}</div>` +
+      `<b>${s.name}</b><small>${s.desc}</small>${owned ? '' : coinTag(fmtCoins(s.price))}<div class="btns">${btn}</div></div>`;
+  }).join('');
+  if (!el.hidden) pawnPics(el);
+}
+// pictures only while the Pawns tab shows; one per frame so opening the tab stays smooth (each is cached)
+function pawnPics(root) {
+  root.querySelectorAll('img[data-pawn-pic]').forEach((img, k) => {
+    if (img.src) return;
+    setTimeout(() => {
+      if (!img.isConnected) return;
+      try { img.src = PawnSkins.pic(img.dataset.pawnPic); img.hidden = false; } catch (e) { console.warn('Pawn preview failed', e); }
+    }, 30 + k * 40);
+  });
+}
+function openPawnAll() {
+  $('pawnAllGrid').innerHTML = PawnSkins.LIST.map(s => `<figure style="--g:${s.g}"><img alt="" data-pawn-pic="${s.id}" hidden><figcaption>${s.name}</figcaption></figure>`).join('');
+  openSheet('pawnAllSheet');
+  pawnPics($('pawnAllGrid'));
+}
+[['shopPawns', () => renderShop()], ['invPawns', () => renderInv()]].forEach(([eid, rerender]) => $(eid).addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.hasAttribute('data-pawn-all')) { sfx('select'); openPawnAll(); return; }
+  if (b.dataset.pawnBuy) buyPawnSkin(b.dataset.pawnBuy); else if (b.dataset.pawnUse) usePawnSkin(b.dataset.pawnUse);
   rerender();
 }));
 function useScene(id) {
@@ -5493,11 +6026,11 @@ function showPane(row, pane, key, resetScroll) {
 }
 /* shop category tabs */
 let shopTab = 'rooms';
-function showShopTab(tab, resetScroll = true) { shopTab = tab; showPane($('shopTabs'), $('shopPane'), tab, resetScroll); if (tab === 'scenes') { sceneThumbs($('shopScenes')); Info.auto($('shopScenes')); } }
+function showShopTab(tab, resetScroll = true) { shopTab = tab; showPane($('shopTabs'), $('shopPane'), tab, resetScroll); if (tab === 'pawns') pawnPics($('shopPawns')); if (tab === 'scenes') { sceneThumbs($('shopScenes')); Info.auto($('shopScenes')); } }
 initTabs($('shopTabs'), t => { showShopTab(t); sfx('select'); });
 /* inventory category tabs */
 let invTab = 'rooms';
-function showInvTab(tab, resetScroll = true) { invTab = tab; showPane($('invTabs'), $('invPane'), tab, resetScroll); if (tab === 'scenes') { sceneThumbs($('invScenes')); Info.auto($('invScenes')); } }
+function showInvTab(tab, resetScroll = true) { invTab = tab; showPane($('invTabs'), $('invPane'), tab, resetScroll); if (tab === 'pawns') pawnPics($('invPawns')); if (tab === 'scenes') { sceneThumbs($('invScenes')); Info.auto($('invScenes')); } }
 initTabs($('invTabs'), t => { showInvTab(t); sfx('select'); });
 function onShopClick(e) {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
@@ -5635,7 +6168,7 @@ function dailyRefresh() { const b = $('dailyBadge'); if (b) b.hidden = !dailySta
 // the latest saved copy of this profile's claim (another tab may have claimed already); browser storage only
 function storedDailyLast() {
   if (IN_YT || VT) return null;
-  try { const p = JSON.parse(localStorage.getItem('ludoRoyaleProfile') || 'null'); return p && p.id === P.id && p.daily ? p.daily : null; } catch (e) { return null; }
+  try { const p = JSON.parse(localStorage.getItem(LSK + 'Profile') || 'null'); return p && p.id === P.id && p.daily ? p.daily : null; } catch (e) { return null; }
 }
 let dailyBusy = false;
 function claimDaily() {
@@ -7095,6 +7628,15 @@ function ensureProfile() {   // fill only missing fields, never overwrite saved 
   if (!Array.isArray(P.textPacks)) P.textPacks = [];
   P.textPacks = [...new Set(['basic', ...P.textPacks])].filter(id => textPack(id));
   if (!P.textPacks.includes(P.textPack)) P.textPack = 'basic';
+  // pawn skins: Classic is always owned and is the default; only known skins count
+  if (!Array.isArray(P.pawnSkins)) P.pawnSkins = [];
+  P.pawnSkins = [...new Set(['classic', ...P.pawnSkins])].filter(id => PawnSkins.byId(id));
+  if (!P.pawnSkins.includes(P.pawnSkin)) P.pawnSkin = 'classic';
+  if (DEMO) {   // demo: everything is owned (equipped choices are kept)
+    P.owned = Object.keys(SKINS); P.rooms = ROOM_LIST.map(r => r.id); P.scenes = SL_SCENES.map(x => x.id);
+    P.emoteSets = EMOTE_SETS.map(x => x.id); P.pawnSkins = PawnSkins.LIST.map(x => x.id);
+    P.textPacks = TEXT_PACKS.map(x => x.id);
+  }
 }
 function levelInfo(xp) {   // level n needs 100 + 50·(n−1) XP to reach n+1
   let level = 1, need = 100;
@@ -7104,6 +7646,7 @@ function levelInfo(xp) {   // level n needs 100 + 50·(n−1) XP to reach n+1
 const achDone = a => (P.stats[a.stat] || 0) >= a.goal;
 const achById = id => ACH.find(a => a.id === id);
 function isUnlocked(item) {
+  if (DEMO) return true;   // demo: every character and avatar is free
   if (item.price) return (P.avOwned || []).includes(item.id);   // bought characters
   if (!item.unlock) return true;
   if (item.unlock.level) return levelInfo(P.xp).level >= item.unlock.level;
@@ -7721,7 +8264,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { ensureProfile, TEXT_PACKS, TEXT_EMOTES, buyTextPack, useTextPack, packPhrases, EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { DEMO, PawnSkins, buyPawnSkin, usePawnSkin, openPawnAll, toks, pickables, camera, ensureProfile, TEXT_PACKS, TEXT_EMOTES, buyTextPack, useTextPack, packPhrases, EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();

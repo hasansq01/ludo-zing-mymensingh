@@ -11,6 +11,15 @@ Update both files when a significant decision, feature or bug fix lands. Last re
 ## What it is
 A mobile-first 3D Ludo game for the browser, played on a round table inside a cozy room (four room themes). Built entirely with Claude.
 Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-mymensingh.pages.dev
+**Website deploys are automatic (2026-11-04, after the user repeatedly found new features missing from the live site,
+which only changed when someone uploaded the zip by hand):** `.github/workflows/deploy-web.yml` builds with
+`tools/build.ps1` on every push that touches the web game and publishes `dist/` with `wrangler pages deploy`:
+`main` → https://ludo-king-mymensingh.pages.dev, other branches → `https://<branch>.ludo-king-mymensingh.pages.dev`.
+Needs the repository secrets `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` (setup in README).
+A feature is live only once its branch is merged into `main` (or on its branch link). The build stamps
+`<meta name="ludo-build">` (branch · commit · date; `LUDO_BUILD` or git), shown in Settings › Account › Version
+(`#setBuild`, hidden on the source page). The Android app is a separate Godot build (`godot/`) with its own catalogue
+(e.g. its own pawn skins): web features don't reach it by themselves.
 (Cloudflare Pages, free plan, project `ludo-king-mymensingh`, deployed by uploading the build zip).
 
 ## Android / Godot port (started 2026-10-23)
@@ -84,6 +93,8 @@ release (12-tester closed test for 14 days).
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
 | `tests/emotes.js` | 89 emote tests (incl. text emotes: 4 packs of 8 + team phrases, phrase stickers, picker Text tab, Pair Mode team phrases, CPU start line, pack buy / refuse / save / equip / repair; incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
+| `tests/demo.js` | 15 demo-mode tests (everything owned and priced 0, Shop has no enabled Buy / prices / Locked tags, Dice tab still lists the dice, Collection fully unlocked, profile repair keeps everything owned); source page with `?vt=1&demo=1`, after the splash. |
+| `tests/pawn-skins.js` | 48 pawn skin tests (themed skins have their own bodies) (12 skins x 4 colours build; base at y 0, inside the Classic footprint (also with Top View heads tipped back), Top View tilt / upright faces / taps, 3D View untouched, height 0.9–1.3, body in the player colour, < 3,600 triangles; swapping never changes state / layout / rings; shared geometry + materials; pickables; facing; real moves for all colours, canvas taps pick the right pawn, stacks + pairs lay out exactly like Classic, captures, Pair Mode; buy / refuse / no double charge / save / Shop + Inventory tabs / Compare all / profile repair); source page with `?vt=1`, visible pane, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -237,6 +248,50 @@ release (12-tester closed test for 14 days).
   a capturing CPU adds Sorry! / Lucky! / Easy!, winners and losers add GG / Well played!, and at the start of a game
   (`react('start')`, not in `?vt=1`) a computer may say Good luck! / Have fun! / Hi!.
   Tests: `tests/emotes.js` (89).
+- **Demo version (2026-11-03, user's request):** open the game with `?demo=1` (e.g. `index.html?demo=1`, or set
+  `window.LUDO_DEMO = true` before the game script) and everything that is normally bought is free and already owned:
+  rooms, S&L scenes, dice, pawn skins, emote sets, characters, avatars, frames and nameplates (`DEMO`; `demoFree()` sets
+  every catalogue price to 0 in `loadProfile`, `ensureProfile` owns everything, `isUnlocked` returns true). Badges stay
+  achievement rewards. The Shop shows a green "Demo version" note (`.demo-note`, only under `html.demo`); the Dice tab now
+  skips Classic by id instead of by price. Demo progress lives in its own browser storage (`LSK` prefix `ludoDemo*`
+  instead of `ludoRoyale*`), never in the YouTube cloud save (`CLOUD = IN_YT && !DEMO`) and never syncs to an account
+  (`Account.available` is false). Without the flag nothing changes. The build (`tools/build.ps1`) has no separate demo
+  output: the demo is the same `index.html` opened with `?demo=1`. Tests: `tests/demo.js` (15).
+- **Pawn skins (Ludo, 2026-11-03):** `PawnSkins` module (right after the token code). 12 cosmetic themes x the 4 player
+  colours: Classic (free, default, the original pawn untouched), Royal Crown 3,000, Ice Crystal 3,500, Candy Pop 2,500,
+  Marble 2,000, Robo Bot 4,000, Little Wizard 4,000, Fruity 2,500 (strawberry / apple / lemon / blueberry head by colour),
+  Blossom 2,500, Pirate 3,500, Space Explorer 5,000, Dragon 6,000 (`PawnSkins.LIST`). Shapes follow the user's reference sheet
+  (2026-11-04: "each pawn set are unique designs"): Classic, Royal Crown and Marble keep the classic body; the others
+  have their own: a bell (`BELL`, no collar, head at y .79) for Candy Pop (frosted cupcake head, sprinkles), Fruity
+  (juice drips; strawberry / watermelon slice / orange / blueberry head for red / green / yellow / blue), Blossom (vine
+  texture, flower head facing front), Pirate (belt, bandana, eye patch, tricorn with skull and gold trim), Dragon
+  (scales on the lower body, gold horns, crest, bat wings, chest gem); a robe (`ROBE`) for Little Wizard (scarf, floppy
+  hat, no face); a white suit on a coloured foot (`SUIT` + `FOOT`) for Robo Bot and Space Explorer (white is the main
+  colour there, as in the reference, with the player colour on the foot, chest, ears and visor); a faceted crystal
+  column (`COLUMN`) with crystal fans on top and round the foot for Ice Crystal. Built in code (no assets): each
+  skin's `build(css, c)` returns its player-colour material (= `t.mat`, so the movable glow works) and parts; accessories
+  are merged into one mesh per material (`merge()`, which also bakes positions and flips mirrored parts), geometry is
+  cached per skin and shared by all 16 tokens, materials per skin + colour; candy stripes / marble / dragon scales are
+  small canvas textures (own PRNG, so `?vt=1`'s seeded `Math.random` is untouched). Rules: base at y 0 and everything
+  inside the Classic footprint (radius .38), same pivot (the token group), height 0.9–1.3, body in the player colour,
+  under 3,600 triangles per pawn. `PawnSkins.apply(id)` only swaps the meshes inside each token group (and their entries
+  in `pickables`); rings, positions, scales and game state are never touched. The equipped skin dresses all 16 pawns
+  (every colour). Themed skins turn to face the camera (`g.rotation.y = camAz + camRoll` in `frameLoop`, so faces are
+  also upright on the rolled Top View screen; Classic stays at 0). Top View (2026-11-03, user's report that skins were
+  unreadable from above): straight down, a pawn showed only the top of its head, so each themed skin's head parts
+  (parts flagged `H` in its build) tip back by its `look` angle about the head centre `pivot` (`PawnSkins.pose(t, k)`;
+  k eases 0 → 1 with the camera elevation from 62° to 89.5°, so 3D View and the home screen are unchanged) and the
+  face, visor, patch, flower or fruit looks up at the camera. Angles: Robo Bot / Space Explorer 1.3, Pirate / Blossom
+  1.0, Fruity .9, Little Wizard / Dragon .8, Royal Crown .5; Ice, Candy, Marble and Classic need none (their look is
+  on top already). The tipped heads stay inside the footprint (tested). Note: close-ups rendered into a default
+  WebGLRenderTarget (16-bit depth) show ring artefacts on the visors; the game screen (24-bit) does not.
+  Profile: `P.pawnSkins` (owned, always incl. classic; joined by `mergeProgress`), `P.pawnSkin` (equipped;
+  `ensureProfile` repairs; `loadProfile` applies). Shop > Pawns and Inventory > Pawns (`renderPawnSkins`; tab colour
+  lilac #C9A6E0, icon `#tiPawn`): card = rendered picture of the four colours (`PawnSkins.pic(id)`, 320x240 PNG,
+  rendered once with the game renderer into a render target, cached), Equipped / Owned / Locked, Buy / Use;
+  `buyPawnSkin` (commitProfile: coins + own + equip; refuses without coins / when owned) / `usePawnSkin`.
+  "Compare all" (`#pawnAllSheet`, `openPawnAll`) shows the 12 skins side by side. Godot port: not done in this checkout.
+  Tests: `tests/pawn-skins.js` (48).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;
@@ -333,7 +388,7 @@ release (12-tester closed test for 14 days).
   each card shows "w/ <partner colour>", a "Done · need 6" / "Free Hand" chip, and the partner whose pawns the roll
   moves gets a dashed outline; status messages name it ("rolled 4 for Yellow").
 - **Profile `P`:** name, id (`LKM-XXXX-XXXX`), guestSince (first "Continue as Guest" time), avatar, frame, plate, badge, xp, coins, lastSpin, lastFree, owned dice, dice,
-  `stats{played,wins,losses,streak,bestStreak,coinsEarned,pairsFormed,ppGames}`, `claimed[]`, `rooms[]` (owned themes, always includes the free `night` and `cafe`), `room` (selected theme). `ensureProfile()` fills missing fields;
+  `stats{played,wins,losses,streak,bestStreak,coinsEarned,pairsFormed,ppGames}`, `claimed[]`, `rooms[]` (owned themes, always includes the free `night` and `cafe`), `room` (selected theme), `pawnSkins[]` / `pawnSkin` (pawn skins, see Pawn skins). `ensureProfile()` fills missing fields;
   `commitProfile()` rolls back on a failed save.
 
 ## Gameplay rules (as implemented)
