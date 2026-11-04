@@ -608,10 +608,10 @@ body.jungle-ready .sl.is-landing{background:transparent}
 .sl-dice{flex:none;width:72px;height:72px;border-radius:20px;display:grid;place-items:center;background:#ffc94a;border:3px solid #fff;
   box-shadow:inset 0 -5px 0 #e39a1d,0 4px 0 rgba(74,43,61,.2)}
 .sl-dice:disabled{background:#ead3b2;box-shadow:inset 0 -5px 0 #d4b48c,0 2px 0 rgba(74,43,61,.12);cursor:default}
-.sl-dice:not(:disabled){animation:nudge 1.1s ease-in-out infinite}
+.sl-dice:not(:disabled){animation:diceNudge 1.1s ease-in-out infinite}
 .sl-dice:active:not(:disabled){transform:translateY(2px)}
 .sl-dice{perspective:260px}   /* holds the same 3D cube as the Ludo dice (.cube / .face) */
-.sl-dice.rolling{animation:hop .75s ease-out}
+.sl-dice.rolling{animation:diceHop .75s ease-out}
 @media (max-height:620px){.sl{gap:7px}.sl-top h2{font-size:1.2rem}.sl-dice{width:60px;height:60px;border-radius:16px}.sl-msg{font-size:.76rem}}
 .pm{isolation:isolate}   /* each modal panel is its own stacking layer: its close button (z-index 5) can't rise above a modal opened on top */
 .pm[inert]>.x-btn{visibility:hidden}   /* a covered modal shows no close button; only the topmost one does */
@@ -809,9 +809,15 @@ body.jungle-ready .sl.is-landing{background:transparent}
 /* dice: a CSS cube that tumbles to the rolled face */
 .dice-btn{width:54px;height:54px;display:grid;place-items:center;perspective:260px;border-radius:12px}
 .dice-btn:disabled{cursor:default}
-.dice-btn.ready{animation:nudge 1.1s ease-in-out infinite}
-.dice-btn.rolling{animation:hop .75s ease-out}
-.cube{width:44px;height:44px;position:relative;transform-style:preserve-3d;transition:transform .75s cubic-bezier(.2,.7,.25,1)}
+/* Dice motion (2026-11-04, flicker fix): the waiting pulse animates `scale`, the roll hop `translate` (and eases
+   `scale` from where the pulse was, --s0, set by curScale on the tap) and the arrival on a new player's card `opacity`
+   + `scale`. So tapping mid-pulse no longer snaps the dice from 112% to 100% in one frame, and the dice popping in on
+   the next card hides the frame a moved 3D element can show before it is redrawn. */
+.dice-btn.arrive{animation:diceArrive .24s ease-out}
+.dice-btn.ready{animation:diceNudge 1.1s ease-in-out infinite}
+.dice-btn.ready.arrive{animation:diceArrive .24s ease-out,diceNudge 1.1s .24s ease-in-out infinite}
+.dice-btn.rolling{animation:diceHop .75s ease-out}
+.cube{width:44px;height:44px;position:relative;transform-style:preserve-3d;transition:transform .75s cubic-bezier(.2,.7,.25,1);will-change:transform}   /* its own layer: not re-drawn each frame while the button around it pulses or hops */
 .face{position:absolute;inset:0;border-radius:9px;background:var(--die-bg,#fdfaf2);box-shadow:inset 0 0 0 1px var(--die-edge,#e1d7c3),inset 0 -4px 0 var(--die-edge,#e6dccb);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:6px;backface-visibility:hidden}
 .face i{width:9px;height:9px;border-radius:50%;background:var(--die-pip,#22263f);place-self:center}
 .face.f1 i{width:14px;height:14px;background:var(--die-one,#d8323a)}
@@ -1003,6 +1009,10 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .tap{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:.66rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep);white-space:nowrap;text-shadow:var(--halo)}
 .slot{position:relative}
 @keyframes nudge{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+@keyframes diceNudge{0%,100%{scale:1}50%{scale:1.12}}
+@keyframes diceHop{0%{translate:0 0;scale:var(--s0,1)}30%{translate:0 -16px;scale:1}60%{translate:0 0}78%{translate:0 -5px}100%{translate:0 0;scale:1}}
+@keyframes diceArrive{0%{opacity:0;scale:.72}100%{opacity:1;scale:1}}
+@media (prefers-reduced-motion:reduce){.dice-btn.arrive,.dice-btn.ready.arrive{animation:none}}
 @keyframes hop{0%{transform:translateY(0)}30%{transform:translateY(-16px)}60%{transform:translateY(0)}78%{transform:translateY(-5px)}100%{transform:translateY(0)}}
 
 /* ---------- sheets ---------- */
@@ -3928,6 +3938,7 @@ function beginTurn() {
 async function roll(forced) {   // `forced` is only passed by tests/pair-rules.js
   if (!S || S.phase !== 'roll') return;
   const id = S.id, c = S.turn;
+  $('diceBtn').dataset.s0 = curScale($('diceBtn'));   // before updateHUD drops the pulse
   S.phase = 'rolling'; updateHUD();
   const v = forced || 1 + Math.floor(Math.random() * 6);
   await rollCube(v);
@@ -4942,12 +4953,15 @@ function updateHUD() {
     }
   });
   const slot = cards[c] && cards[c].querySelector('.slot');
-  if (slot && db.parentNode !== slot) slot.appendChild(db);
+  if (slot && db.parentNode !== slot) {   // the dice moves to the player whose turn it is and pops in there
+    slot.appendChild(db);
+    db.classList.remove('arrive'); void db.offsetWidth; db.classList.add('arrive');
+  }
   db.hidden = S.phase === 'over';
   const can = S.phase === 'roll' && isHuman(c);
   db.disabled = !can;
   db.classList.toggle('ready', can);
-  if (can && slot) slot.appendChild(tapEl); else tapEl.remove();
+  if (can && slot) { if (tapEl.parentNode !== slot) slot.appendChild(tapEl); } else tapEl.remove();   // re-adding it would restart it
   // Single / Pair choice after an even roll when both kinds of unit can move
   const pick = $('unitPick');
   const pickWas = pick.hidden;
@@ -4972,9 +4986,12 @@ function showFace(v, spin) {
   cube.style.transform = `rotateX(${spinX + fx}deg) rotateY(${spinY + fy}deg)`;
 }
 showFace(6, false);
+// the dice's current pulse size, so the roll hop starts from it instead of snapping to 100%
+const curScale = el => { const s = getComputedStyle(el).scale; return s && s !== 'none' ? s.split(' ')[0] : '1'; };
 async function rollCube(v) {
   const db = $('diceBtn');
-  db.classList.remove('ready', 'rolling'); tapEl.remove();
+  db.style.setProperty('--s0', db.dataset.s0 || curScale(db)); delete db.dataset.s0;
+  db.classList.remove('ready', 'rolling', 'arrive'); tapEl.remove();
   void db.offsetWidth;   // restart the hop animation
   db.style.animationDuration = Math.round(750 * SPEED) + 'ms';
   cube.style.transitionDuration = Math.round(750 * SPEED) + 'ms';
@@ -5871,7 +5888,7 @@ const SL = (() => {
   function skin() { const s = SKINS[P.dice] || SKINS.classic, d = $('slDice'); d.style.setProperty('--die-bg', s.bg); d.style.setProperty('--die-edge', s.edge); d.style.setProperty('--die-pip', s.pip); d.style.setProperty('--die-one', s.one); }
   async function roll(forced) {   // `forced` is only used by tests/snakes-ladders.js
     if (!G || G.phase !== 'roll' || paused) return;
-    const id = G.id, p = cur(); G.phase = 'rolling'; sync();
+    const id = G.id, p = cur(); $('slDice').style.setProperty('--s0', curScale($('slDice'))); G.phase = 'rolling'; sync();
     const v = forced || 1 + Math.floor(Math.random() * 6);
     const db = $('slDice'); db.classList.remove('rolling'); void db.offsetWidth;   // the Ludo roll: hop + tumble to the result
     db.style.animationDuration = Math.round(750 * SPEED) + 'ms'; slCube.style.transitionDuration = Math.round(750 * SPEED) + 'ms';
