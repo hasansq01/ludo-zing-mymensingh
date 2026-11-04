@@ -845,6 +845,14 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .emote-panel{position:fixed;z-index:6;box-sizing:border-box;display:grid;grid-template-columns:repeat(var(--cols,1),72px);gap:5px;padding:6px;border-radius:18px;
   background:#fff8ef;border:2.5px solid #fff;box-shadow:0 0 0 2px #f3c497,0 10px 22px rgba(80,40,30,.3);transform-origin:left center}
 .emote-panel[hidden]{display:none}
+/* picker tabs: stickers / text phrases (2026-11-04) */
+.em-tabs{grid-column:1/-1;display:flex;gap:4px}
+.em-tabs button{flex:1 1 0;min-width:0;height:28px;border-radius:10px;background:#f3e3d1;color:#5a3a2a;font-family:var(--font-display);font-size:.82rem;display:grid;place-items:center}
+.em-tabs button[aria-selected=true]{background:#ffd56a;box-shadow:inset 0 -2px 0 #e0a100}
+.em-pick-txt span{display:block;padding:0 4px;font-family:'Lilita One','Noto Sans Bengali','Hind Siliguri',system-ui,sans-serif;font-size:13px;line-height:1.05;color:#5a3a2a;text-align:center;overflow-wrap:anywhere}
+.sa-say{transform-box:fill-box;transform-origin:center;animation:saSay 1.4s var(--d,0s) ease-in-out infinite}
+@keyframes saSay{0%,100%{transform:translateY(0) rotate(-2deg) scale(1)}50%{transform:translateY(-2px) rotate(2deg) scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.sa-say{animation:none}}
 .emote-panel.show{animation:emPanelIn .24s cubic-bezier(.2,.9,.3,1.15)}
 .emote-panel.show .em-pick{animation:emPickIn .26s calc(var(--i,0) * 35ms + 60ms) cubic-bezier(.2,.9,.3,1.3) both}
 .emote-panel.closing{animation:emPanelOut .16s ease-in forwards;pointer-events:none}
@@ -860,6 +868,8 @@ body:not([data-screen="game"]) .emote-btn,body:not([data-screen="game"]) .emote-
 .emset-prev{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);place-items:center;padding:8px 6px;box-sizing:border-box}
 .emset-prev>span:not(.tag){display:block;width:96%;aspect-ratio:172/109}
 .emset-prev svg{width:100%;height:100%;overflow:visible}
+.tpack-prev{display:grid;grid-template-columns:1fr 1fr;align-content:center;gap:5px;padding:28px 6px 8px;box-sizing:border-box}
+.tpack-prev>span:not(.tag){display:grid;place-items:center;min-height:26px;padding:2px 4px;border-radius:9px;background:rgba(255,250,242,.92);color:#5a3a2a;font-family:'Lilita One','Noto Sans Bengali','Hind Siliguri',system-ui,sans-serif;font-size:.64rem;line-height:1.05;text-align:center;overflow-wrap:normal;word-break:keep-all}
 .emset-prev.eight{grid-template-rows:repeat(4,1fr);padding:28px 8px 6px;row-gap:2px}
 .emset-prev.eight>span:not(.tag){width:84%}
 .room-prev .tag.prem{left:auto;right:6px;background:linear-gradient(#ffe48c,#f2b632);color:#5a3a00}
@@ -3898,6 +3908,7 @@ function newGame(players, teams = false) {
   buildCards();
   relayout();
   beginTurn();
+  { const gid = S.id; if (!VT) setTimeout(() => { if (S && S.id === gid) Emotes.react('start'); }, 1400); }   // a computer may wish the table luck (not in ?vt=1, which must stay deterministic)
   if (teams) setMsg(`<b>Pair Mode:</b> Red &amp; Yellow vs Green &amp; Blue. ${S.players[S.turn] === 'human' && pname(S.turn) === 'You' ? 'Your turn. Tap the dice.' : `<b>${pname(S.turn)}</b> starts.`}`);
 }
 
@@ -4622,16 +4633,95 @@ const EMOTE_SETS = [
   { id: 'game', name: 'Champion Pack', price: 5000, premium: true, desc: 'Premium extras: winner, champ, roll it, peek-a-boo, thinking, hmph, give up, sleepy.', emotes: ['crown', 'champ', 'dice', 'peek', 'think', 'hmph', 'flag', 'sleepy'], g: 'linear-gradient(160deg,#ece4ff,#a995d8)' },
 ];
 const emoteSet = id => EMOTE_SETS.find(s => s.id === id);
+/* Text emotes (2026-11-04, user's request): short fixed phrases ("GG", "Good luck!"), nothing typed, so nothing
+   rude can be sent. Each is a sticker like the others: the phrase in bold in the cream bubble, gently bobbing, with a
+   small animated accent. They live in EMOTES (group 'text') so bubbles, the queue and CPU reactions treat them like
+   any emote. Packs of 8: Good Manners is free and always owned; one more pack can be equipped (TEXT_PACKS,
+   P.textPacks / P.textPack, bought in Shop › Emotes). Team phrases join the picker's Text tab in Pair Mode only. */
+const ST_TXT_FONT = `'Lilita One','Noto Sans Bengali','Hind Siliguri','Bangla MN',system-ui,sans-serif`;
+const stIcon = {
+  star: () => stStar(132, 20, 1.3) + stStar(40, 24, .8),
+  heart: () => stHeart(130, 20, 1.6, '#ff3d5e', 12),
+  clover: () => stPart('sa-twinkle', '', '', '0s', stAcc(`<circle cx="128" cy="16" r="4"/><circle cx="136" cy="16" r="4"/><circle cx="132" cy="10" r="4"/><circle cx="132" cy="21" r="4"/><path d="M132 22l3 9"/>`, '#4caf50')),
+  wave: () => stPart('sa-pop', '', '', '0s', stLine('M126 12q4 6 2 12M134 8q6 9 3 18', 2.6, '#f6b72a')),
+  bang: () => stBang(130, 20),
+  drop: () => stDrop(132, 18, 1.2, 25),
+  dice: () => stPart('sa-wobble', '', '', '0s', stAcc(`<rect x="123" y="8" width="18" height="18" rx="4.5"/>`, '#fffaf2') + `<g fill="${ST.ol}"><circle cx="128" cy="13" r="1.8"/><circle cx="136" cy="13" r="1.8"/><circle cx="128" cy="21" r="1.8"/><circle cx="136" cy="21" r="1.8"/><circle cx="132" cy="17" r="1.8"/><circle cx="128" cy="17" r="1.8"/></g>`),
+  anger: () => stAnger(130, 18),
+  q: () => stQ(132, 14),
+  puff: () => stPuff(124, 20, 1),
+  fire: () => stPart('sa-beat', '', '', '0s', stAcc(`<path d="M132 4C138 12 142 16 140 23A8 8 0 0 1 124 23C123 18 127 15 128 10C130 13 131 14 132 15C133 11 133 8 132 4Z"/>`, '#ff8a3d')),
+  house: () => stPart('sa-pop', '', '', '0s', stAcc(`<path d="M122 18L132 9L142 18V27H122Z"/>`, '#ffcf33') + `<rect x="129" y="20" width="6" height="7" fill="${ST.ol}"/>`),
+  shield: () => stPart('sa-twinkle', '', '', '0s', stAcc(`<path d="M132 6L141 10V17C141 23 137 27 132 29C127 27 123 23 123 17V10Z"/>`, '#2fb39c')),
+  link: () => stPart('sa-beat', '', '', '0s', `<g fill="none" stroke="#fff" stroke-width="7"><circle cx="127" cy="18" r="6"/><circle cx="137" cy="18" r="6"/></g><g fill="none" stroke="#f0a500" stroke-width="3.4"><circle cx="127" cy="18" r="6"/><circle cx="137" cy="18" r="6"/></g>`),
+  clock: () => stPart('sa-wobble', '', '', '0s', stAcc(`<circle cx="132" cy="18" r="9"/>`, '#fffaf2') + stLine('M132 12V18L136 20', 2, ST.ol)),
+  team: () => stHeart(126, 16, 1.2, '#3b7be0', -10) + stHeart(138, 22, 1.2, '#e5484d', 10),
+};
+// the phrase: one line (bigger) or two lines (split at the space nearest the middle), white-rimmed, outlined
+function stText(id, text, col, icon) {
+  // visible width in letters: Bangla counts by grapheme (a letter with its vowel sign is one) and its glyphs run wider
+  const seg = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter() : null;
+  const wide = l => (seg ? [...seg.segment(l)].length : [...l].length) * (/[\u0980-\u09FF]/.test(l) ? 1.45 : 1) + (/…/.test(l) ? 1 : 0);
+  const size = ls => Math.min(ls.length === 1 ? 34 : 27, 200 / Math.max(3, ...ls.map(wide)));   // fills the bubble (about 105 units wide)
+  // one line, or two lines split at the space that keeps them most even: whichever lets the text be bigger
+  const words = text.split(' ');
+  let lines = [text];
+  for (let k = 1; k < words.length; k++) {
+    const two = [words.slice(0, k).join(' '), words.slice(k).join(' ')];
+    if (size(two) > size(lines)) lines = two;
+  }
+  const fs = Math.max(17, size(lines));
+  const y0 = 60 - (lines.length - 1) * fs * .5;
+  const tx = (attrs) => lines.map((l, k) => `<text x="80.5" y="${(y0 + k * fs * 1.02).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="${ST_TXT_FONT}" font-size="${fs.toFixed(1)}" ${attrs}>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+  return stSticker(id, stPart('sa-say', '', '', '0s', tx(`fill="${col}" stroke="#fff" stroke-width="${(fs * .22).toFixed(1)}" stroke-linejoin="round" paint-order="stroke"`) + tx(`fill="${col}" stroke="${ST.ol}" stroke-width="1.5" stroke-linejoin="round" paint-order="stroke"`)) + (stIcon[icon] ? stIcon[icon]() : ''));
+}
+const TEXT_PACKS = [
+  { id: 'basic',  name: 'Good Manners', price: 0,    desc: 'Hi, good luck, have fun, GG, well played, thanks, sorry, bye.', g: 'linear-gradient(160deg,#d8f1ff,#68b8ea)' },
+  { id: 'ludo',   name: 'Ludo Talk',    price: 3000, desc: 'Roll a 6, nice roll, lucky, not again, revenge, safe, pair up, almost home.', g: 'linear-gradient(160deg,#fff0c9,#f0b84a)' },
+  { id: 'react',  name: 'Reactions',    price: 3000, desc: 'Wow, oops, so close, hurry up, wait, my turn, easy, noooo.', g: 'linear-gradient(160deg,#ffe0ec,#f28bb0)' },
+  { id: 'bangla', name: 'Bangla',       price: 3000, desc: 'ভালো খেলা, শুভকামনা, ছক্কা চাই, আয় দেখি, আবার, জিতে গেলাম, ধন্যবাদ, উফ!', g: 'linear-gradient(160deg,#d9f3e4,#6cc79a)' },
+];
+const TEXT_EMOTES = [
+  // Good Manners (free)
+  ['t-hi', 'basic', 'Hi!', '#3b7be0', 'wave'], ['t-luck', 'basic', 'Good luck!', '#2fa86b', 'clover'], ['t-fun', 'basic', 'Have fun!', '#f08a2c', 'star'],
+  ['t-gg', 'basic', 'GG', '#9b6be0', 'star'], ['t-wp', 'basic', 'Well played!', '#2fb39c', 'star'], ['t-thx', 'basic', 'Thanks!', '#e5484d', 'heart'],
+  ['t-sorry', 'basic', 'Sorry!', '#7a8ba8', 'drop'], ['t-bye', 'basic', 'Bye!', '#3b7be0', 'wave'],
+  // Ludo Talk
+  ['t-six', 'ludo', 'Roll a 6!', '#e5484d', 'dice'], ['t-nice', 'ludo', 'Nice roll!', '#2fa86b', 'dice'], ['t-lucky', 'ludo', 'Lucky!', '#2fa86b', 'clover'],
+  ['t-again', 'ludo', 'Not again!', '#7a8ba8', 'drop'], ['t-revenge', 'ludo', 'Revenge!', '#e5484d', 'fire'], ['t-safe', 'ludo', 'Safe!', '#2fb39c', 'shield'],
+  ['t-pair', 'ludo', 'Pair up!', '#f0a500', 'link'], ['t-home', 'ludo', 'Almost home!', '#9b6be0', 'house'],
+  // Reactions
+  ['t-wow', 'react', 'Wow!', '#f08a2c', 'bang'], ['t-oops', 'react', 'Oops!', '#e5484d', 'drop'], ['t-close', 'react', 'So close!', '#9b6be0', 'bang'],
+  ['t-hurry', 'react', 'Hurry up!', '#3b7be0', 'clock'], ['t-wait', 'react', 'Wait…', '#7a8ba8', 'q'], ['t-turn', 'react', 'My turn!', '#2fa86b', 'star'],
+  ['t-easy', 'react', 'Easy!', '#f0a500', 'fire'], ['t-nooo', 'react', 'Noooo!', '#e5484d', 'anger'],
+  // Bangla
+  ['t-bgg', 'bangla', 'ভালো খেলা!', '#2fa86b', 'star'], ['t-bluck', 'bangla', 'শুভকামনা!', '#3b7be0', 'clover'], ['t-bsix', 'bangla', 'ছক্কা চাই!', '#e5484d', 'dice'],
+  ['t-bcome', 'bangla', 'আয় দেখি!', '#f08a2c', 'fire'], ['t-bagain', 'bangla', 'আবার!', '#9b6be0', 'bang'], ['t-bwon', 'bangla', 'জিতে গেলাম!', '#f0a500', 'star'],
+  ['t-bthx', 'bangla', 'ধন্যবাদ!', '#e5484d', 'heart'], ['t-bugh', 'bangla', 'উফ!', '#7a8ba8', 'puff'],
+  // Team (Pair Mode only, free; not sold)
+  ['t-help', 'team', 'Help me!', '#e5484d', 'bang'], ['t-go', 'team', 'Go go go!', '#2fa86b', 'fire'], ['t-got', 'team', 'I got you!', '#3b7be0', 'shield'],
+  ['t-partner', 'team', 'Nice one, partner!', '#9b6be0', 'team'],
+].map(([id, pack, text, col, icon]) => ({ id, group: 'text', pack, name: text, text, ch: '💬', motion: 'em-beat', art: stText(id, text, col, icon) }));
+EMOTES.push(...TEXT_EMOTES);
+const textPack = id => TEXT_PACKS.find(p => p.id === id);
+const packPhrases = id => TEXT_EMOTES.filter(t => t.pack === id).map(t => t.id);
 const Emotes = (() => {
   const btn = $('emoteBtn'), panel = $('emotePanel'), layer = $('pcards'), btnHome = btn.parentNode;   // inside #stage: positions are stage px
   const em = id => EMOTES.find(e => e.id === id);
   // the equipped set's emotes (the Starter set until another is bought and equipped)
-  const owned = () => (emoteSet(P.emoteSet) || EMOTE_SETS[0]).emotes.map(em).filter(Boolean);
+  const stickers = () => (emoteSet(P.emoteSet) || EMOTE_SETS[0]).emotes.map(em).filter(Boolean);
+  // the Text tab: the equipped text pack, plus the team phrases in Pair Mode
+  const phrases = () => [...packPhrases(textPack(P.textPack) ? P.textPack : 'basic'), ...(S && S.teams ? packPhrases('team') : [])].map(em);
+  let mode = 'em';   // the picker's tab: 'em' stickers | 'text' phrases
+  const owned = () => mode === 'text' ? phrases() : stickers();
   const showing = {}, queue = {}, lastCpu = {};
   let lastAny = 0, open = false, closeTimer = 0;
-  function refresh() {   // the picker holds only the equipped set; each button enters a moment after the one before
-    panel.innerHTML = owned().map((e, k) => `<button type="button" class="em-pick" data-emote="${e.id}" style="--i:${k}" aria-label="${e.name}" title="${e.name}">${emArt(e)}</button>`).join('');
-    panel.setAttribute('aria-label', `Emotes: ${(emoteSet(P.emoteSet) || EMOTE_SETS[0]).name}`);
+  function refresh() {   // the picker holds only the equipped set (or text pack); each button enters a moment after the one before
+    const tabs = `<div class="em-tabs" role="tablist"><button type="button" role="tab" data-emtab="em" aria-selected="${mode === 'em'}" aria-label="Stickers" title="Stickers">☺</button><button type="button" role="tab" data-emtab="text" aria-selected="${mode === 'text'}" aria-label="Text" title="Text">Aa</button></div>`;
+    panel.innerHTML = tabs + owned().map((e, k) => mode === 'text'
+      ? `<button type="button" class="em-pick em-pick-txt" data-emote="${e.id}" style="--i:${k}" aria-label="${e.name}" title="${e.name}"><span>${e.text}</span></button>`
+      : `<button type="button" class="em-pick" data-emote="${e.id}" style="--i:${k}" aria-label="${e.name}" title="${e.name}">${emArt(e)}</button>`).join('');
+    panel.setAttribute('aria-label', mode === 'text' ? `Text: ${(textPack(P.textPack) || TEXT_PACKS[0]).name}` : `Emotes: ${(emoteSet(P.emoteSet) || EMOTE_SETS[0]).name}`);
     if (open) placePanel();
   }
   // filled by reset() at the start of every game (the profile, P, doesn't exist yet when this runs)
@@ -4670,14 +4760,14 @@ const Emotes = (() => {
   }
   // The picker sits along the left edge of the board, in the free band between the top and bottom player cards: one
   // column when the band is tall enough, else two or three (a narrower, shorter grid), vertically centred in the band.
-  const CW = 72, CH = 50, GAP = 5, PAD = 6;   // one picker cell: a wide sticker
+  const CW = 72, CH = 50, GAP = 5, PAD = 6, TABS = 28 + GAP;   // one picker cell: a wide sticker; the tab row above them
   function placePanel() {
     const cards = [...layer.querySelectorAll('.pcard')], hud = document.querySelector('.hud-top'), H = SH(), n = owned().length;
     const tops = cards.filter(c => c.dataset.pos[0] === 't'), bots = cards.filter(c => c.dataset.pos[0] === 'b');
     const hudB = hud ? hud.offsetTop + hud.offsetHeight : 60;
     const t0 = Math.max(hudB, ...tops.map(c => c.offsetTop + c.offsetHeight * 1.05)) + 8;
     const t1 = Math.min(H - 8, ...bots.map(c => c.offsetTop - c.offsetHeight * .05), btn.classList.contains('in-hud') || btn.hidden ? H : rel(btn).t) - 8;
-    const size = cols => { const rows = Math.ceil(n / cols); return { cols, w: cols * CW + (cols - 1) * GAP + PAD * 2, h: rows * CH + (rows - 1) * GAP + PAD * 2 }; };
+    const size = cols => { const rows = Math.ceil(n / cols); return { cols, w: cols * CW + (cols - 1) * GAP + PAD * 2, h: rows * CH + (rows - 1) * GAP + PAD * 2 + TABS }; };
     const fit = [1, 2, 3, 6].map(size).find(s => s.h <= t1 - t0) || size(6);
     panel.style.setProperty('--cols', fit.cols);
     panel.style.left = '8px';
@@ -4760,29 +4850,37 @@ const Emotes = (() => {
     if (kind === 'capture') {
       const owners = [...new Set(victims.map(v => v[0]))];
       const hurt = owners.find(o => S.players[o] === 'cpu' && isHuman(c));
-      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow', 'facepalm', 'sad', 'grr', 'hmph'], .4)) return;
-      if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool', 'tease'], .35);
+      if (hurt !== undefined && cpuSay(hurt, ['cry', 'angry', 'wow', 'facepalm', 'sad', 'grr', 'hmph', 't-again', 't-revenge', 't-nooo'], .4)) return;
+      if (S.players[c] === 'cpu' && owners.some(isHuman)) cpuSay(c, ['laugh', 'cool', 'tease', 't-sorry', 't-lucky', 't-easy'], .35);
     } else if (kind === 'win') {
       const winners = teamOn() ? [c, mateOf(c)] : [c];
       const cpuWinner = winners.find(w => S.players[w] === 'cpu');
-      if (cpuWinner !== undefined) cpuSay(cpuWinner, ['party', 'crown', 'happy'], .7);
-      else { const loser = [0, 1, 2, 3].find(o => S.players[o] === 'cpu' && !winners.includes(o)); if (loser !== undefined) cpuSay(loser, ['cheer', 'sad', 'cry'], .5); }
+      if (cpuWinner !== undefined) cpuSay(cpuWinner, ['party', 'crown', 'happy', 't-gg'], .7);
+      else { const loser = [0, 1, 2, 3].find(o => S.players[o] === 'cpu' && !winners.includes(o)); if (loser !== undefined) cpuSay(loser, ['cheer', 'sad', 'cry', 't-gg', 't-wp'], .5); }
+    } else if (kind === 'start') {   // a computer sometimes wishes the table luck
+      const cpu = [0, 1, 2, 3].filter(o => S.players[o] === 'cpu');
+      if (cpu.length) cpuSay(cpu[Math.floor(Math.random() * cpu.length)], ['t-luck', 't-fun', 't-hi'], .5);
     }
   }
   function reset() {   // a new game (or leaving one): no bubbles, queues or reaction cooldowns carried over
     setOpen(false); clearTimeout(closeTimer); panel.hidden = true; panel.classList.remove('closing', 'show');
-    refresh();   // the equipped set (the profile may have loaded or changed since)
+    mode = 'em'; refresh();   // the equipped set (the profile may have loaded or changed since)
     Object.keys(showing).forEach(k => { showing[k].remove(); delete showing[k]; });
     Object.keys(queue).forEach(k => delete queue[k]);
     Object.keys(lastCpu).forEach(k => delete lastCpu[k]); lastAny = 0;
     clearTimeout(coolTimer); panel.classList.remove('cooling'); btn.classList.remove('cooling');
   }
   btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!open); });
-  panel.addEventListener('click', e => { const b = e.target.closest('[data-emote]'); if (b && !panel.classList.contains('cooling')) { send(b.dataset.emote); cool(); } });
+  panel.addEventListener('click', e => {
+    const t = e.target.closest('[data-emtab]');
+    if (t) { if (mode !== t.dataset.emtab) { mode = t.dataset.emtab; refresh(); sfx('select'); const f = panel.querySelector('.em-pick'); if (f) f.focus({ preventScroll: true }); } return; }
+    const b = e.target.closest('[data-emote]'); if (b && !panel.classList.contains('cooling')) { send(b.dataset.emote); cool(); }
+  });
   addEventListener('pointerdown', e => { if (open && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false); }, true);
   addEventListener('keydown', e => { if (open && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setOpen(false); btn.focus({ preventScroll: true }); } }, true);
   addEventListener('resize', () => setTimeout(place, 60));
-  return { place, show, send, react, reset, setOpen, sender, refresh, get open() { return open; }, get showing() { return { ...showing }; }, get queue() { return JSON.parse(JSON.stringify(queue)); }, list: () => owned().map(e => e.id) };
+  function setMode(m) { mode = m === 'text' ? 'text' : 'em'; refresh(); }
+  return { place, show, send, react, reset, setOpen, sender, refresh, setMode, get mode() { return mode; }, get open() { return open; }, get showing() { return { ...showing }; }, get queue() { return JSON.parse(JSON.stringify(queue)); }, list: () => owned().map(e => e.id) };
 })();
 
 /* ---------- HUD ---------- */
@@ -5100,7 +5198,36 @@ function renderEmoteSets(el, shop) {
     const tag = on ? '<span class="tag">Equipped</span>' : owned ? '<span class="tag">Owned</span>' : '<span class="tag lock">Locked</span>';
     return `<div class="item${on ? ' eq' : ''}" data-set="${s.id}"><div class="room-prev emset-prev${s.emotes.length > 6 ? ' eight' : ''}" style="--g:${s.g}">${grid}${tag}${s.premium ? '<span class="tag prem">Premium</span>' : ''}</div>` +
       `<b>${s.name}</b><small>${s.desc}</small>${owned ? '' : coinTag(fmtCoins(s.price))}<div class="btns"><button type="button" class="alt" data-emset-view="${s.id}">View</button>${btn}</div></div>`;
+  }).join('') + `<p class="pane-note">Text emotes</p>` + TEXT_PACKS.filter(t => shop || P.textPacks.includes(t.id)).map(t => {
+    const owned = P.textPacks.includes(t.id), on = P.textPack === t.id;
+    const btn = on ? '<button type="button" disabled>Equipped</button>'
+      : owned ? `<button type="button" data-tpack-use="${t.id}">Use</button>`
+      : `<button type="button" data-tpack-buy="${t.id}">Buy</button>`;
+    const tag = on ? '<span class="tag">Equipped</span>' : owned ? '<span class="tag">Owned</span>' : '<span class="tag lock">Locked</span>';
+    const chips = packPhrases(t.id).map(id => `<span>${EMOTES.find(e => e.id === id).text}</span>`).join('');
+    return `<div class="item${on ? ' eq' : ''}" data-tpack="${t.id}"><div class="room-prev tpack-prev" style="--g:${t.g}">${chips}${tag}</div>` +
+      `<b>${t.name}</b>${owned ? '' : coinTag(fmtCoins(t.price))}<div class="btns">${btn}</div></div>`;
   }).join('');
+}
+/* Text packs: buy = coins + ownership + equip in one commitProfile (a failed save charges nothing; an owned pack is
+   never sold twice); Use equips an owned pack. The equipped pack fills the picker's Text tab. */
+let tpackBusy = false;
+function buyTextPack(id) {
+  const t = textPack(id);
+  if (!t || tpackBusy || P.textPacks.includes(id)) return false;
+  if (P.coins < t.price) { sfx('error'); toast(`You need ${fmtCoins(t.price - P.coins)} more coins for ${t.name}.`); return false; }
+  tpackBusy = true;
+  const ok = commitProfile(() => { P.coins -= t.price; P.textPacks.push(id); P.textPack = id; });
+  tpackBusy = false;
+  if (!ok) { toast('Couldn’t save on this device. No coins were spent.'); return false; }
+  renderCoins(true); Emotes.refresh();
+  sfx('buy'); toast(`${t.name} text emotes unlocked and equipped`);
+  return true;
+}
+function useTextPack(id) {
+  if (!P.textPacks.includes(id) || P.textPack === id) return;
+  P.textPack = id; saveProfile(); Emotes.refresh();
+  sfx('select'); toast(`${textPack(id).name} text emotes equipped`);
 }
 // View: a bigger look at the set, each emote playing its motion, with Buy / Use right there
 function openEmoteSet(id) {
@@ -5129,6 +5256,7 @@ $('emSetAct').addEventListener('click', () => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.dataset.emsetView) { sfx('select'); openEmoteSet(b.dataset.emsetView); return; }
   if (b.dataset.emsetBuy) buyEmoteSet(b.dataset.emsetBuy); else if (b.dataset.emsetUse) useEmoteSet(b.dataset.emsetUse);
+  else if (b.dataset.tpackBuy) buyTextPack(b.dataset.tpackBuy); else if (b.dataset.tpackUse) useTextPack(b.dataset.tpackUse);
   rerender();
 }));
 function useScene(id) {
@@ -6946,6 +7074,10 @@ function ensureProfile() {   // fill only missing fields, never overwrite saved 
   if (!Array.isArray(P.emoteSets)) P.emoteSets = [];
   P.emoteSets = [...new Set(['starter', ...P.emoteSets])].filter(id => EMOTE_SETS.some(s => s.id === id));
   if (!P.emoteSets.includes(P.emoteSet)) P.emoteSet = 'starter';
+  // text packs: Good Manners is always owned and is the default; only known packs count
+  if (!Array.isArray(P.textPacks)) P.textPacks = [];
+  P.textPacks = [...new Set(['basic', ...P.textPacks])].filter(id => textPack(id));
+  if (!P.textPacks.includes(P.textPack)) P.textPack = 'basic';
 }
 function levelInfo(xp) {   // level n needs 100 + 50·(n−1) XP to reach n+1
   let level = 1, need = 100;
@@ -7572,7 +7704,7 @@ $('pickSingle').addEventListener('click', () => choosePick('single'));
 $('pickPair').addEventListener('click', () => choosePick('pair'));
 
 // Test hook for tests/pair-rules.js (rule functions only; harmless in play)
-window.__ludo = { EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
+window.__ludo = { ensureProfile, TEXT_PACKS, TEXT_EMOTES, buyTextPack, useTextPack, packPhrases, EMOTE_STICKERS, Emotes, EMOTES, EMOTE_FEELS, EMOTE_SETS, buyEmoteSet, useEmoteSet, openEmoteSet, Preview, buyRoom, useRoom, ROOM_LIST, Info, INFO, buildCards, openSheet, closeSheet, syncModes, renderShop, renderInv, showShopTab, goHome, SL_SCENES, buyScene, useScene, SL, Jungle, Sound, Celebrate, HomeFx, vol, DAILY_CYCLES, dailyState, dailyData, claimDaily, openDaily, renderDaily, dayKey, get dailyBusy() { return dailyBusy; }, get soundOn() { return soundOn; }, slView: () => slView, cam: () => ({ view: camView, el: camEl * 180 / Math.PI, roll: camRoll * 180 / Math.PI, zoom: camZoom, targetZoom: camTargetZoom, viewY, fit: topCache }), get S() { return S; }, setS(v) { S = v; relayout(); }, dest, movables, moverOf, mateOf, foe, waitingSix, newGame, victimsAt, pairPartner, onStartSquare, oppPairAt, stuckReason, absIndex, OFF, SAFE, GOAL, move, answerPair, updateHUD, choosePick, roll, gameOver, get P() { return P; }, scene, renderer, Rooms, Account, Store, reloadSaved, homeFit, rimOnScreen };
 
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();

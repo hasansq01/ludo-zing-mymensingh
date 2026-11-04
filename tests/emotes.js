@@ -23,7 +23,7 @@
     check('the button sits just above your avatar (or in the HUD row when there is no room)', btn.classList.contains('in-hud') || (bb.bottom <= av.top && av.top - bb.bottom <= 12 && Math.abs((bb.left + bb.right) / 2 - (av.left + av.right) / 2) < 3), [bb, av]); }
   const need = ['happy', 'laugh', 'cool', 'angry', 'cry', 'wow', 'love', 'confused', 'facepalm', 'cheer', 'party', 'sad', 'hi', 'tease', 'grr', 'hmph'];
   check('every required reaction exists (16+)', L.EMOTES.length >= 16 && need.every(id => L.EMOTES.some(e => e.id === id)), need.filter(id => !L.EMOTES.some(e => e.id === id)));
-  check('5 sets: Pawn (free), Girl and Boy (6 core emotions each), two Premium packs of 8 extras; every emote in exactly one set', L.EMOTE_SETS.map(s => s.id).join() === 'starter,friends,boys,pawns,game' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTE_SETS.slice(0, 3).every(s => s.emotes.length === 6 && !s.premium) && L.EMOTE_SETS.slice(3).every(s => s.emotes.length === 8 && s.premium) && L.EMOTES.every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
+  check('5 sets: Pawn (free), Girl and Boy (6 core emotions each), two Premium packs of 8 extras; every emote in exactly one set', L.EMOTE_SETS.map(s => s.id).join() === 'starter,friends,boys,pawns,game' && !L.EMOTE_SETS[0].price && L.EMOTE_SETS.slice(1).every(s => s.price > 0) && L.EMOTE_SETS.slice(0, 3).every(s => s.emotes.length === 6 && !s.premium) && L.EMOTE_SETS.slice(3).every(s => s.emotes.length === 8 && s.premium) && L.EMOTES.filter(e => e.group !== 'text').every(e => L.EMOTE_SETS.filter(s => s.emotes.includes(e.id)).length === 1));
   check('the 6 core emotions: happy, laugh, cry, angry, shocked, love', L.EMOTE_FEELS.join() === 'happy,laugh,cry,angry,shocked,love');
   check('every character set has the same emotions, in the same order and with the same names', L.EMOTE_SETS.slice(0, 3).every(s => s.emotes.map(id => L.EMOTES.find(e => e.id === id).feel).join() === L.EMOTE_FEELS.join()) && new Set(L.EMOTE_SETS.slice(0, 3).map(s => s.emotes.map(id => L.EMOTES.find(e => e.id === id).name).join())).size === 1, L.EMOTE_SETS.map(s => [s.id, s.emotes.map(id => (L.EMOTES.find(e => e.id === id) || {}).feel)]));
   check('each character set is one character: pawn, girl, boy', ['pawn', 'girl', 'boy'].every((g, k) => L.EMOTE_SETS[k].emotes.every(id => L.EMOTES.find(e => e.id === id).group === g)));
@@ -49,7 +49,7 @@
   check('the panel sits along the left edge', R(panel).left - st.left <= 12 * sc && (R(panel).left + R(panel).right) / 2 < st.left + st.width / 2, [R(panel).left - st.left]);
   const cardsNow = [...document.querySelectorAll('#pcards .pcard .who, #pcards .pcard .slot, #msg, #menuBtn, #gearBtn, #emoteBtn')];
   check('the panel covers no player card, dice, HUD control or the emote button', cardsNow.every(p => !overlap(R(panel), R(p), .5)), cardsNow.filter(p => overlap(R(panel), R(p), .5)).map(p => p.className || p.id));
-  check('it pops out with the slide-in animation, buttons staggered', panel.classList.contains('show') && getComputedStyle(panel.querySelector('.em-pick:nth-child(3)')).getPropertyValue('--i').trim() === '2');
+  check('it pops out with the slide-in animation, buttons staggered', panel.classList.contains('show') && getComputedStyle(panel.querySelectorAll('.em-pick')[2]).getPropertyValue('--i').trim() === '2');
   check('picker buttons are comfortable to tap', [...panel.querySelectorAll('.em-pick')].every(b => b.offsetWidth >= 44 && b.offsetHeight >= 44));
   document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   check('a tap outside closes it (smooth fade, then hidden)', !E.open && panel.classList.contains('closing'));
@@ -132,7 +132,7 @@
   const P = L.P, keep = JSON.stringify({ coins: P.coins, emoteSets: P.emoteSets, emoteSet: P.emoteSet });
   const pals = L.EMOTE_SETS.find(s => s.id === 'pawns');
   L.goHome(); L.renderShop(); L.openSheet('shopSheet'); L.showShopTab('emotes'); await sleep(50);
-  const cards = [...$('shopEmotes').querySelectorAll('.item')];
+  const cards = [...$('shopEmotes').querySelectorAll('.item[data-set]')];
   check('Shop > Emotes: one card per set, previewing its emotes (6, or 8 for a pack, marked Premium)', cards.length === 5 && cards.every((c, k) => c.querySelectorAll('.emset-prev svg').length === (k < 3 ? 6 : 8) && !!c.querySelector('.tag.prem') === k >= 3));
   check('the cards tell Equipped / Locked apart', /Equipped/.test(cards[0].textContent) && cards.slice(1).every(c => /Locked/.test(c.textContent) && c.querySelector('[data-emset-buy]')));
   P.coins = pals.price - 1; $('shopEmotes').querySelector('[data-emset-buy="pawns"]').click();
@@ -151,7 +151,7 @@
   panel.querySelector('[data-emote="party"]').click(); await sleep(220);
   check('a Party Pack emote plays on your avatar', bubbleOf(0) && bubbleOf(0).dataset.emote === 'party');
   L.goHome(); L.renderInv(); L.openSheet('invSheet'); await sleep(30);
-  const inv = [...$('invEmotes').querySelectorAll('.item')];
+  const inv = [...$('invEmotes').querySelectorAll('.item[data-set]')];
   check('Inventory > Emotes lists only owned sets', inv.length === 2);
   $('invEmotes').querySelector('[data-emset-use="starter"]').click();
   check('Use in Inventory equips the Starter set again', P.emoteSet === 'starter');
@@ -162,6 +162,52 @@
   check('View: Buy without coins explains and spends nothing', /more coins/.test($('emSetNote').textContent) && !P.emoteSets.includes('friends'));
   L.closeSheet('emSetSheet');
   Object.assign(P, JSON.parse(keep));
+
+  // ---- text emotes ----
+  const T = L.TEXT_EMOTES, packIds = L.TEXT_PACKS.map(t => t.id).join();
+  check('text packs: Good Manners (free), Ludo Talk, Reactions, Bangla (priced)', packIds === 'basic,ludo,react,bangla' && !L.TEXT_PACKS[0].price && L.TEXT_PACKS.slice(1).every(t => t.price > 0));
+  check('8 phrases per pack, plus 4 team phrases', ['basic', 'ludo', 'react', 'bangla'].every(id => L.packPhrases(id).length === 8) && L.packPhrases('team').length === 4 && T.length === 36);
+  check('the free pack has the basics: Hi, Good luck, Have fun, GG, Well played, Thanks, Sorry, Bye', L.packPhrases('basic').map(id => T.find(t => t.id === id).text).join() === 'Hi!,Good luck!,Have fun!,GG,Well played!,Thanks!,Sorry!,Bye!');
+  check('each phrase is a sticker with the phrase written in it, big enough to read', T.every(t => /^<svg viewBox="0 0 172 109"/.test(t.art) && /class="sa-say"/.test(t.art) && [...t.art.matchAll(/font-size="([\d.]+)"/g)].every(m => +m[1] >= 17) && t.art.includes(t.text.split(' ')[0].replace('&', '&amp;'))), T.filter(t => !t.art.includes(t.text.split(' ')[0])).map(t => t.id));
+  check('Bangla phrases are written in Bangla', L.packPhrases('bangla').every(id => /[\u0980-\u09FF]/.test(T.find(t => t.id === id).text)));
+  check('a new player owns and has equipped Good Manners', JSON.stringify(L.P.textPacks) === '["basic"]' && L.P.textPack === 'basic');
+  L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(300);
+  E.setOpen(true); await sleep(30);
+  check('the picker has Stickers / Text tabs and opens on Stickers', panel.querySelectorAll('[data-emtab]').length === 2 && E.mode === 'em' && !panel.querySelector('.em-pick-txt'));
+  panel.querySelector('[data-emtab="text"]').click(); await sleep(30);
+  check('the Text tab lists the equipped pack and the picker stays open', E.open && E.mode === 'text' && [...panel.querySelectorAll('.em-pick-txt')].map(b => b.dataset.emote).join() === L.packPhrases('basic').join());
+  const txtBtns = [...panel.querySelectorAll('.em-pick-txt')], tr = txtBtns[0].getBoundingClientRect();
+  check('text buttons are comfortable to tap (needs a visible pane)', !tr.width || txtBtns.every(b => b.offsetWidth >= 44 && b.offsetHeight >= 44));
+  panel.querySelector('[data-emote="t-gg"]').click(); await sleep(220);
+  check('a phrase pops up beside your card like any emote, then the picker cools down', bubbleOf(0) && bubbleOf(0).dataset.emote === 't-gg' && /GG/.test(bubbleOf(0).getAttribute('aria-label')) && panel.classList.contains('cooling'));
+  check('no team phrases outside Pair Mode', !L.packPhrases('team').some(id => E.list().includes(id)) || E.mode !== 'text');
+  E.reset(); check('a new game opens the picker on Stickers again', E.mode === 'em');
+  L.newGame(['human', 'cpu', 'cpu', 'cpu'], true); await sleep(300);
+  E.setMode('text');
+  check('Pair Mode adds the 4 team phrases to the Text tab', E.list().join() === [...L.packPhrases('basic'), ...L.packPhrases('team')].join());
+  { const rnd2 = Math.random; Math.random = () => 0; E.reset(); E.react('start'); await sleep(1000); Math.random = rnd2;
+    check('a computer may wish the table luck at the start', [1, 2, 3].some(c => bubbleOf(c) && bubbleOf(c).dataset.emote === 't-luck')); }
+  // buying a text pack
+  { const P2 = L.P, keep2 = JSON.stringify({ coins: P2.coins, textPacks: P2.textPacks, textPack: P2.textPack });
+    L.goHome(); L.renderShop(); L.openSheet('shopSheet'); L.showShopTab('emotes'); await sleep(50);
+    const tc = [...$('shopEmotes').querySelectorAll('[data-tpack]')];
+    check('Shop › Emotes lists the 4 text packs, each previewing its 8 phrases', tc.length === 4 && tc.every(c => c.querySelectorAll('.tpack-prev > span:not(.tag)').length === 8));
+    P2.coins = 10; check('no coins: nothing bought', L.buyTextPack('ludo') === false && P2.coins === 10 && !P2.textPacks.includes('ludo'));
+    P2.coins = L.TEXT_PACKS[1].price + 10;
+    check('Buy charges once, owns and equips the pack', L.buyTextPack('ludo') === true && P2.coins === 10 && P2.textPacks.includes('ludo') && P2.textPack === 'ludo');
+    check('an owned pack is never sold twice', L.buyTextPack('ludo') === false && P2.coins === 10);
+    check('the purchase is saved', (L.Store.data.profile.textPacks || []).includes('ludo') && L.Store.data.profile.textPack === 'ludo');
+    L.closeSheet('shopSheet');
+    L.newGame(['human', 'cpu', 'cpu', 'cpu'], false); await sleep(300); E.setMode('text');
+    check('in the game the Text tab now holds Ludo Talk', E.list().join() === L.packPhrases('ludo').join());
+    L.goHome(); L.renderInv(); L.openSheet('invSheet'); await sleep(30);
+    $('invTabs').querySelector('[data-tab="emotes"]').click(); await sleep(30);
+    $('invEmotes').querySelector('[data-tpack-use="basic"]').click();
+    check('Use in Inventory equips Good Manners again', P2.textPack === 'basic');
+    L.closeSheet('invSheet');
+    P2.textPacks = ['bogus', 'react']; P2.textPack = 'bogus'; L.ensureProfile();
+    check('the profile repairs text packs (known ids only, Good Manners always owned)', JSON.stringify(P2.textPacks) === '["basic","react"]' && P2.textPack === 'basic');
+    Object.assign(P2, JSON.parse(keep2)); }
 
   // ---- leaving the game ----
   L.goHome(); await sleep(50);

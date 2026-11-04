@@ -48,7 +48,7 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
-| `tests/emotes.js` | 67 emote tests (incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
+| `tests/emotes.js` | 89 emote tests (incl. text emotes: 4 packs of 8 + team phrases, phrase stickers, picker Text tab, Pair Mode team phrases, CPU start line, pack buy / refuse / save / equip / repair; incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -184,7 +184,23 @@ Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-my
   player with a queue of 2; `sfx('emote')` follows the sound settings. Sender = the only human, or the player to move
   in Pass & Play. CPU reactions: `Emotes.react('capture'|'win')` from `move` / `gameOver` (random chance, 9s per CPU,
   4s overall, never the same twice running; cleared by `reset()` on each new game / exit). No game state is touched.
-  Tests: `tests/emotes.js` (67).
+  **Text emotes (2026-11-04, user's request):** fixed short phrases, never typed (nothing rude can be sent). Each is a
+  sticker (`stText`: the phrase in Lilita One / a Bangla font in the cream bubble, white-rimmed, gently bobbing
+  `sa-say`, sized to fill the bubble on one or two lines, Bangla measured by grapheme; plus a small animated accent
+  from `stIcon`), stored in `EMOTES` with `group: 'text'` so bubbles, queue, cooldown and CPU reactions treat them like
+  any emote (`TEXT_EMOTES`). Packs of 8 (`TEXT_PACKS`): Good Manners `basic` (free, default: Hi!, Good luck!, Have fun!,
+  GG, Well played!, Thanks!, Sorry!, Bye!), Ludo Talk `ludo` 3,000 (Roll a 6!, Nice roll!, Lucky!, Not again!,
+  Revenge!, Safe!, Pair up!, Almost home!), Reactions `react` 3,000 (Wow!, Oops!, So close!, Hurry up!, Wait…, My
+  turn!, Easy!, Noooo!), Bangla `bangla` 3,000 (ভালো খেলা!, শুভকামনা!, ছক্কা চাই!, আয় দেখি!, আবার!, জিতে গেলাম!,
+  ধন্যবাদ!, উফ!); team phrases `team` (Help me!, Go go go!, I got you!, Nice one, partner!) are free and appear only in
+  Pair Mode. Profile: `P.textPacks` (owned, always incl. basic), `P.textPack` (equipped; `ensureProfile` repairs);
+  `buyTextPack` / `useTextPack` (commitProfile, like emote sets). Shop › Emotes and Inventory › Emotes list the packs
+  under "Text emotes" after the sticker sets (card = the 8 phrases as chips). Picker: a tab row (`.em-tabs`: ☺
+  stickers / Aa text) above the cells; `Emotes.mode` 'em' | 'text', back to stickers each game; text cells show the
+  phrase (`.em-pick-txt`); `placePanel` counts the tab row. CPU lines: hurt CPU adds Not again! / Revenge! / Noooo!,
+  a capturing CPU adds Sorry! / Lucky! / Easy!, winners and losers add GG / Well played!, and at the start of a game
+  (`react('start')`, not in `?vt=1`) a computer may say Good luck! / Have fun! / Hi!.
+  Tests: `tests/emotes.js` (89).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;
