@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Godot v2 plugin registration: org.godotengine.plugin.v2.<singleton name> = init class -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.PlayGamesPlugin"
+            android:value="com.flipfold.ludozing.playgames.PlayGamesPlugin" />
+
+        <!-- com.google.android.gms.games.APP_ID is NOT declared here: the export plugin
+             (godot/addons/play_games/export_plugin.gd) injects it from the project setting
+             ludo_zing/play_games/app_id. Empty setting = plugin disabled. -->
+    </application>
+
+</manifest>
