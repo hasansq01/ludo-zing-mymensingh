@@ -608,11 +608,33 @@ static func shake(c: Control) -> void:
 ## A disabled button stays quiet when tapped; this makes the tap say why: `reason` returns the text (empty = say
 ## nothing). The button keeps its disabled look and its `disabled` state.
 static func deny_disabled(b: BaseButton, reason: Callable, shaker: Control = null) -> void:
-	b.gui_input.connect(func(e: InputEvent) -> void:
-		if b.disabled and Sheet._is_tap(e):
+	on_tap(b, func() -> void:
+		if b.disabled:
 			var why := str(reason.call())
 			if why != "":
 				deny(b, why, shaker if shaker else b))
+
+## How far a finger may travel, or the control under it scroll, in UI px and still be a tap.
+const TAP_SLOP := 12.0
+
+## Calls fn when `c` is really tapped: pressed and let go in the same place. A finger that lands on it to scroll is not a
+## tap (TouchScroll cancels the press with a release far away, and the content moving under the finger counts as moving).
+## Touch and the mouse events emulated from it make one tap. For anything inside a scrolling list.
+static func on_tap(c: Control, fn: Callable) -> void:
+	var st := {down = false, at = Vector2.ZERO, from = Vector2.ZERO}
+	c.gui_input.connect(func(e: InputEvent) -> void:
+		var press: bool = e is InputEventScreenTouch or (e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT)
+		if press and e.pressed:
+			if not st.down:
+				st.down = true
+				st.at = e.position
+				st.from = c.global_position
+		elif press and st.down:
+			st.down = false
+			if (e.position as Vector2).distance_to(st.at) <= TAP_SLOP and c.global_position.distance_to(st.from) <= TAP_SLOP and Rect2(Vector2.ZERO, c.size).has_point(e.position):
+				fn.call()
+		elif (e is InputEventMouseMotion or e is InputEventScreenDrag) and st.down and (e.position as Vector2).distance_to(st.at) > TAP_SLOP:
+			st.down = false)
 
 ## Play a sound effect through the Sound autoload when it is there (tests and tools run without it). arg: Sound.sfx's
 ## optional argument (e.g. the coin amount).

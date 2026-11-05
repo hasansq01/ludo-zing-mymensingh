@@ -86,8 +86,8 @@ func _init(code_: String, me_id_ := "", game_ := "ludo") -> void:
 	UIKit.fit_segmented(game_picker)                  # "Snakes & Ladders" gets the room it needs before anything shrinks
 	box.add_child(game_picker)
 	game_picker.mouse_filter = Control.MOUSE_FILTER_PASS    # a guest's (untappable) picker still answers a tap
-	game_picker.gui_input.connect(func(e: InputEvent) -> void:
-		if not host and Sheet._is_tap(e):
+	UIKit.on_tap(game_picker, func() -> void:
+		if not host:
 			UIKit.deny(self, tr("Only the host can pick the game."), game_picker))
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	var cap := UIKit.caption(tr("Players"))

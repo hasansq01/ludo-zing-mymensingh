@@ -16,20 +16,20 @@ const LIST := [
 const DEFAULT := "night"
 ## bg (+ fog), hemisphere [sky, ground, intensity], key [colour, intensity], table tint, dark (night captions)
 const MOOD := {
-	night = {bg = Color("#221a3a"), hemi = [Color("#8a6aa8"), Color("#8a5038"), 0.27], key = [Color("#ffd2a0"), 0.95], table = Color("#fff0dc"), dark = true},
-	cafe = {bg = Color("#6b4630"), hemi = [Color("#ffdcb8"), Color("#a86f4a"), 0.3], key = [Color("#ffdcae"), 1.05], table = Color("#fff4e6"), dark = false},
-	dream = {bg = Color("#4a3560"), hemi = [Color("#d9bcf2"), Color("#7a5a9a"), 0.3], key = [Color("#ffdce8"), 1.05], table = Color("#fff3f3"), dark = false},
-	studio = {bg = Color("#7a5230"), hemi = [Color("#ffd9a6"), Color("#a06c40"), 0.3], key = [Color("#ffd49a"), 1.08], table = Color("#fff4e2"), dark = false},
-	cloud = {bg = Color("#3d4a80"), hemi = [Color("#b6c6ff"), Color("#6a70b0"), 0.32], key = [Color("#ffe6cc"), 1.05], table = Color("#fff8f0"), dark = false},
+	night = {bg = Color("#2b2244"), hemi = [Color("#a688c0"), Color("#a06a48"), 0.4], key = [Color("#ffdcae"), 1.0], table = Color("#fff0dc"), dark = true},
+	cafe = {bg = Color("#f6e3d2"), hemi = [Color("#fff0dc"), Color("#eabf9a"), 0.47], key = [Color("#ffeccb"), 0.98], table = Color("#ffffff"), dark = false},
+	dream = {bg = Color("#f3e0f0"), hemi = [Color("#fdeaf6"), Color("#dcc6f6"), 0.47], key = [Color("#fff0f4"), 0.94], table = Color("#fff3f3"), dark = false},
+	studio = {bg = Color("#fbe9cc"), hemi = [Color("#fff2d2"), Color("#ecbf8c"), 0.47], key = [Color("#ffedc8"), 1.02], table = Color("#ffffff"), dark = false},
+	cloud = {bg = Color("#dff0ff"), hemi = [Color("#eaf3ff"), Color("#ccd8f8"), 0.49], key = [Color("#fff3e6"), 0.95], table = Color("#fff8f0"), dark = false},
 }
-## Each room's table (TableWorld.set_table_look): dark walnut and brass by moonlight, honey oak with black iron, blush
+## Each room's table (TableWorld.set_table_look): warm honey wood and gold by moonlight, pale oak with cream enamel, blush
 ## marble and rose gold, warm teak, lacquered periwinkle with cream.
 const TABLES := {
-	night = {top = Color("#a06a44"), surface = "rings", rough = 0.2, edge = Color("#4a2a1a"), leg = Color("#2c1c18"), leg_rough = 0.28, inlay = Color("#e8b850")},
-	cafe = {top = Color("#ffe0ae"), surface = "rings", rough = 0.26, edge = Color("#b06f36"), leg = Color("#2b2522"), leg_rough = 0.34, inlay = Color("#fff0d0")},
-	dream = {top = Color("#ffe6ea"), surface = "stone", rough = 0.14, edge = Color("#e6a39a"), leg = Color("#f7e6ee"), leg_rough = 0.2, inlay = Color("#f2b8a0")},
-	studio = {top = Color("#c9935f"), surface = "rings", rough = 0.3, edge = Color("#7c4522"), leg = Color("#5c3218"), leg_rough = 0.36, inlay = Color("#2a1a12")},
-	cloud = {top = Color("#aeb8f2"), surface = "", rough = 0.16, edge = Color("#fff4e2"), leg = Color("#fff4e2"), leg_rough = 0.22, inlay = Color("#ffd97a")},
+	night = {top = Color("#e8b480"), surface = "rings", rough = 0.22, edge = Color("#a86a3c"), leg = Color("#fff4e6"), leg_rough = 0.26, inlay = Color("#f4c95c")},
+	cafe = {top = Color("#fff0d0"), surface = "rings", rough = 0.26, edge = Color("#e0a064"), leg = Color("#fff8f0"), leg_rough = 0.28, inlay = Color("#fffaf0")},
+	dream = {top = Color("#fff0f2"), surface = "stone", rough = 0.14, edge = Color("#f4b8ae"), leg = Color("#fff4f8"), leg_rough = 0.2, inlay = Color("#f6c4ae")},
+	studio = {top = Color("#ffd8a8"), surface = "rings", rough = 0.28, edge = Color("#c98448"), leg = Color("#e8b078"), leg_rough = 0.32, inlay = Color("#8a5428")},
+	cloud = {top = Color("#d2daff"), surface = "", rough = 0.16, edge = Color("#fffaf0"), leg = Color("#fffaf0"), leg_rough = 0.22, inlay = Color("#ffd97a")},
 }
 ## Calibration to the three.js render. With no shadow pass (see TableWorld.SHADOWS) every light adds in linear
 ## light as in three.js, so the key spot takes the web intensity as is (per-light probes: Godot 0.94 = web 0.94 on
@@ -216,7 +216,7 @@ func _paint_night_sky(c: Control) -> void:
 func _paint_day_sky(c: Control) -> void:
 	var w := c.size.x
 	var h := c.size.y
-	var stops := [[0.0, Color("#e79a6c")], [0.6, Color("#ffc98e")], [1.0, Color("#ffe6be")]]
+	var stops := [[0.0, Color("#8fcaff")], [0.6, Color("#d6ecff")], [1.0, Color("#ffe8cc")]]
 	for k in 64:
 		var t := k / 63.0
 		var col: Color = stops[0][1]
@@ -233,14 +233,14 @@ func _paint_day_sky(c: Control) -> void:
 		var cy := rr.randf_range(h * 0.2, h * 0.75)
 		var sz := rr.randf_range(22, 44)
 		for b in [[0, 0, 1.0], [-1.1, 0.3, 0.7], [1.1, 0.3, 0.75], [-0.5, -0.35, 0.8], [0.5, -0.3, 0.7]]:
-			TexBaker.circle(c, Vector2(cx + b[0] * sz, cy + b[1] * sz), b[2] * sz, Color(1, 0.88, 0.76, 0.92))
+			TexBaker.circle(c, Vector2(cx + b[0] * sz, cy + b[1] * sz), b[2] * sz, Color(1, 1, 1, 0.92))
 	var hills := PackedVector2Array([Vector2(0, h)])
 	var x := 0.0
 	while x <= w:
 		hills.append(Vector2(x, h * 0.86 - sin(x / 70.0) * 22 - sin(x / 23.0) * 6))
 		x += 8
 	hills.append(Vector2(w, h))
-	c.draw_colored_polygon(hills, Color("#a8905c"))
+	c.draw_colored_polygon(hills, Color("#a8dca0"))
 
 func _paint_rug(c: Control) -> void:
 	var w := c.size.x
@@ -438,9 +438,9 @@ func _build_cafe(baker: TexBaker, night: bool) -> void:
 		_omni(Color("#9a8cff"), 0.35, 130, Vector3(-46, TableWorld.Y0 + 50, 0))
 		_omni(Color("#ffb070"), 0.85, 110, Vector3(30, TableWorld.Y0 + 62, 30))
 	else:
-		_omni(Color("#ffb878"), 0.62, 120, Vector3(-24, TableWorld.Y0 + 64, BZ + 8))
-		_omni(Color("#ffb070"), 0.55, 140, Vector3(-44, TableWorld.Y0 + 50, 0))
-		_omni(Color("#ffcf9a"), 0.2, 140, Vector3(34, TableWorld.Y0 + 70, 40))
+		_omni(Color("#ffd29c"), 0.52, 120, Vector3(-24, TableWorld.Y0 + 64, BZ + 8))
+		_omni(Color("#ffe6c8"), 0.42, 140, Vector3(-44, TableWorld.Y0 + 50, 0))
+		_omni(Color("#ffe6c8"), 0.28, 140, Vector3(34, TableWorld.Y0 + 70, 40))
 
 ## A group on a wall's foot line: local x runs along the wall, +z points into the room, y = 0 is the floor.
 func _wall_group(side: String, u: float) -> Node3D:

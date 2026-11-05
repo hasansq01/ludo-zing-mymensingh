@@ -3,6 +3,7 @@ extends "res://tests/test_suite.gd"
 ## Toast wrapping and one-at-a-time.
 
 func run() -> void:
+	_on_tap_checks()
 	# ---- CoinAmount: the text is Fmt's ----
 	var c := CoinAmount.new(5300, "md", "chip")
 	check("coin: short form", c.text() == Fmt.coins(5300) and c.text() == "5.3K", c.text())
@@ -167,3 +168,46 @@ func run() -> void:
 	tt.tap("dice")
 	check("tabs: tap selects + emits once", tt.selected == "dice" and got_tap == ["dice"], got_tap)
 	tt.free()
+
+## UIKit.on_tap: a tap is pressed and let go in the same place; a finger scrolling by is not one.
+func _on_tap_checks() -> void:
+	var box := Control.new()
+	box.size = Vector2(200, 100)
+	var n := [0]
+	UIKit.on_tap(box, func() -> void: n[0] += 1)
+	var press := func(on: bool, at: Vector2, touch := false) -> void:
+		var e: InputEvent
+		if touch:
+			e = InputEventScreenTouch.new()
+		else:
+			e = InputEventMouseButton.new()
+			e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = on
+		e.position = at
+		box.gui_input.emit(e)
+	var move := func(at: Vector2) -> void:
+		var e := InputEventMouseMotion.new()
+		e.position = at
+		box.gui_input.emit(e)
+	press.call(true, Vector2(50, 50))
+	check("on_tap: nothing on the press itself", n[0] == 0)
+	press.call(false, Vector2(52, 51))
+	check("on_tap: press and release in place is a tap", n[0] == 1, n[0])
+	press.call(true, Vector2(50, 50))
+	move.call(Vector2(50, 90))
+	press.call(false, Vector2(50, 50))
+	check("on_tap: the finger moved: no tap, even back in place", n[0] == 1, n[0])
+	press.call(true, Vector2(50, 50))
+	press.call(false, Vector2(5000, 5000))
+	check("on_tap: TouchScroll's cancelling release far away: no tap", n[0] == 1, n[0])
+	press.call(true, Vector2(50, 50))
+	box.position.y -= 60.0                       # the list scrolled under a still finger
+	press.call(false, Vector2(50, 50))
+	check("on_tap: the content moved under the finger: no tap", n[0] == 1, n[0])
+	box.position.y = 0.0
+	press.call(true, Vector2(50, 50), true)
+	press.call(true, Vector2(50, 50))
+	press.call(false, Vector2(50, 50), true)
+	press.call(false, Vector2(50, 50))
+	check("on_tap: touch and its emulated mouse are one tap", n[0] == 2, n[0])
+	box.free()

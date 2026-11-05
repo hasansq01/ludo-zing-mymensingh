@@ -142,7 +142,7 @@ static func build(rooms: Rooms, baker: TexBaker) -> void:
 
 	# cool daylight from above, a warm fill, a lilac wash at the rainbow
 	rooms._omni(Color("#d6ecff"), 0.41, 160, Vector3(-40, Y0 + 62, -10))
-	rooms._omni(Color("#ffc99a"), 0.3, 130, Vector3(30, Y0 + 50, 40))
+	rooms._omni(Color("#ffeed4"), 0.32, 130, Vector3(30, Y0 + 50, 40))
 	rooms._omni(Color("#e6dcff"), 0.3, 140, Vector3(10, Y0 + 70, -46))
 
 

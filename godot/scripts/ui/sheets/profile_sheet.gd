@@ -507,8 +507,8 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	top.add_child(txt)
 	var p := UIKit.list_row(top)
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
-	p.gui_input.connect(func(e: InputEvent) -> void:        # a tap on one not earned yet says what it asks for
-		if Sheet._is_tap(e) and not bool(Collection.ach_progress(id, Save.profile).get("done", false)):
+	UIKit.on_tap(p, func() -> void:                         # a tap on one not earned yet says what it asks for
+		if not bool(Collection.ach_progress(id, Save.profile).get("done", false)):
 			UIKit.deny(self, "%s: %s" % [tr(a.name), tr(str(a.desc)).trim_suffix(".").trim_suffix("।")], p, 2.2))
 
 	_ach_updaters.append(func():

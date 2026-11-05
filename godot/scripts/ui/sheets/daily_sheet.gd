@@ -427,9 +427,10 @@ class Tile extends Control:
 			_stamp = 0.0
 		queue_redraw()
 
-	func _gui_input(e: InputEvent) -> void:
-		if not Sheet._is_tap(e):
-			return
+	func _ready() -> void:
+		UIKit.on_tap(self, _tap)
+
+	func _tap() -> void:
 		accept_event()
 		match status:
 			"today": tapped.emit()

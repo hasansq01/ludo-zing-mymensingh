@@ -46,22 +46,21 @@ const WOOD := {plank = "#a9693a", grain = Color(90 / 255.0, 45 / 255.0, 20 / 255
 ## Per scene (index.html SCENES): sky gradient (top .. bottom), fog [colour, near, far], light [hemi sky, hemi ground,
 ## hemi intensity, sun colour, sun intensity, ambient], ground, clearing rgb, table [top, trim, roughness, metalness],
 ## board style (SLBoard.apply_style), sign style, the snake coiled on the table, motes [kind, colour, count, size],
-## falling leaves / sprinkles, light beams. The mood (an hour of the day for each): sun_dir (where the sun or moon is),
-## halo [colour, x, y, size, strength], stars (how many), aurora. The light from above stays near white, so the board,
-## which faces up, stays bright and true while the dim ambient lets everything standing around it fall into shade.
+## falling leaves / sprinkles, light beams. The mood: sun_dir (where the sun or moon is), halo [colour, x, y, size, strength],
+## stars (how many). Bright and joyful (the owner's team, 2026-11-06, after a darker pass): warm light with gentle depth.
 const SCENES := {
 	jungle = {
-		sky = ["#24505a", "#c98a4c", "#f2b866", "#2f4a26"], fog = ["#7b7a43", 16, 64], light = ["#fff0cc", "#2c4a2c", 0.7, "#ffbe6e", 0.75, 0.05],
-		sun_dir = Vector3(-9, 8, 7), halo = ["#ffcf80", -8.0, 13.0, 30.0, 0.8],
-		ground = "#3d6a2d", clearing = [205, 172, 104], table = ["#b87a45", "#8a552c", 0.55, 0.0],
+		sky = ["#86cfa8", "#ecdc92", "#f8e4a4", "#6aa84a"], fog = ["#c6d890", 22, 78], light = ["#fff8e0", "#4f8a3e", 0.72, "#ffe2a4", 0.88, 0.12],
+		sun_dir = Vector3(-9, 11, 8), halo = ["#fff0b8", -8.0, 13.0, 30.0, 0.7],
+		ground = "#6aae48", clearing = [232, 204, 140], table = ["#b87a45", "#8a552c", 0.55, 0.0],
 		board = {bands = ["#ffd2b0", "#ffc8c4", "#cfe9c2", "#ffe39a", "#cfe4f2"], cream = "#fff4e2", grout = "#e9c7a0", goal = "#ffd45c", star = "#f4a92a", num = "#7d4f61", num100 = "#b06d00", frame = "#fff4e6", frameR = 0.38, lip = "#f2b25c", rail = "#c47a3c", rung = "#f2b366"},
 		sign = {plank = "#a9693a", grain = Color(90 / 255.0, 45 / 255.0, 20 / 255.0), edge = "#7a4422", stroke = "#3a1a12", rope = "#c9a46a", c1 = "#e5484d", c2 = "#f4c430", top = "vine", snake = ["#5cc84f", "#2f8f3a", "#fff0b8"]},
 		table_snake = ["#ffb02e", "#e07a16", "#fff3c4"], motes = ["fly", "#fff3a0", 40, 0.45], fall = ["#7cc95a"], beams = Color(1.0, 250 / 255.0, 210 / 255.0, 0.55),
 	},
 	candy = {
-		sky = ["#352566", "#a2559f", "#f48eb2", "#5a3a7c"], fog = ["#8f5c9c", 22, 86], light = ["#ffeef8", "#5a3a7a", 0.74, "#ffc0a0", 0.5, 0.08],
-		sun_dir = Vector3(8, 7, 8), halo = ["#ffb0a0", 9.0, 9.0, 26.0, 0.7], stars = 40,
-		ground = "#b3629b", clearing = [236, 176, 204], table = ["#ff9cc6", "#e0609e", 0.25, 0.05],
+		sky = ["#d28ae0", "#fbc4de", "#ffdcea", "#ec98c8"], fog = ["#fac8e4", 28, 94], light = ["#fff6fc", "#d080b4", 0.76, "#ffead6", 0.76, 0.13],
+		sun_dir = Vector3(8, 10, 8), halo = ["#fff0d8", 9.0, 9.0, 26.0, 0.6],
+		ground = "#fbaad4", clearing = [255, 232, 236], table = ["#ff9cc6", "#e0609e", 0.25, 0.05],
 		board = {bands = ["#ffd1e8", "#d6efff", "#fff1a8", "#d8f5d0", "#e8dcff"], tiles = ["#ffc9df", "#ffd6ba", "#fff4e2", "#c2eed8"], marks = ["sprinkles", ["#ff6fae", "#5fd0b0", "#b58cff", "#3fc6c9", "#e5484d"]], cream = "#fffaf6", grout = "#f7c3da", goal = "#ffe066", star = "#ff7ab6", num = "#8a3f68", num100 = "#b0306f", frame = "#ffe6f2", frameR = 0.3, lip = "#ff8fc1",
 			trim = {lip = ["stripes", "#e5484d", "#fff8fb"], corner = ["mint", "#e5484d", "#fff8fb"], mid = ["gumdrop", ["#5fd0b0", "#b58cff", "#3fc6c9", "#ff8fbf"]]},
 			rail = "#e5484d", rung = "#7fdcbf", stripe = ["#e5484d", "#ffffff"], snakePattern = "stripes", snakes = ["#ff6fae", "#a77bf0", "#3fcf9f", "#ff7f6e", "#38c6c9", "#e5484d", "#c99bff", "#ff8fbf", "#2fbf8f", "#ff9a7a"]},
@@ -69,9 +68,9 @@ const SCENES := {
 		table_snake = ["#b58cff", "#7c4ddb", "#fff3ff"], motes = ["fly", "#ffffff", 40, 0.35], fall = ["#ff6fae", "#7ad3ff", "#ffe066", "#9be38a"], beams = null,
 	},
 	desert = {
-		sky = ["#22244f", "#864875", "#f08a4c", "#6a3a2c"], fog = ["#a8603c", 30, 108], light = ["#ffe6c8", "#5a3420", 0.7, "#ff9d55", 0.75, 0.05],
-		sun_dir = Vector3(10, 6, 7), halo = ["#ff9a4c", 10.0, 7.0, 34.0, 0.9], stars = 50,
-		ground = "#a56d3c", clearing = [220, 166, 104], table = ["#7a4a2a", "#e3b04b", 0.5, 0.65],
+		sky = ["#7ab0e6", "#f8d09a", "#ffdea8", "#de9f62"], fog = ["#f0cc98", 38, 128], light = ["#fff4dc", "#b48044", 0.7, "#ffd894", 0.94, 0.11],
+		sun_dir = Vector3(10, 10, 8), halo = ["#fff0c0", 10.0, 9.0, 34.0, 0.7],
+		ground = "#dcae70", clearing = [242, 216, 160], table = ["#7a4a2a", "#e3b04b", 0.5, 0.65],
 		board = {bands = ["#f6d9a8", "#f2c6a0", "#e9dcb0", "#f7e3b9", "#efc9a0"], tiles = ["#fff5e2", "#f1d9ae", "#e7cd9f"], marks = ["glyphs", "#c4643a"], cream = "#fff3dc", grout = "#cf9f62", goal = "#ffd45c", star = "#c4643a", num = "#5e3b22", num100 = "#9a5a00", frame = "#e8cd9c", frameR = 0.6, lip = "#e0a83a", lipM = 0.6,
 			trim = {lip = ["diamonds", "#d9a441", "#1f6f6a"], corner = ["sun", "#e0ad4a", "#1f6f6a"], mid = ["tile", ["#c4643a"]]},
 			rail = "#a8693a", rung = "#e6bf83", snakePattern = "diamonds", snakes = ["#2fb3a6", "#2f9e5f", "#c9643c", "#c9a03f", "#1f7a78", "#3fc6b8", "#4aa36a", "#d4774a", "#b8913a", "#2a8f8a"]},
@@ -79,25 +78,25 @@ const SCENES := {
 		table_snake = ["#5fb3a0", "#2f7d6e", "#f6f0d8"], motes = ["fly", "#fff1c8", 34, 0.3], fall = null, beams = Color(1.0, 240 / 255.0, 200 / 255.0, 0.45),
 	},
 	frost = {
-		sky = ["#0b1538", "#24397a", "#5a78aa", "#22355f"], fog = ["#3a5482", 22, 88], light = ["#eaf2ff", "#1c2c50", 0.76, "#ffc48a", 0.32, 0.08],
-		sun_dir = Vector3(-6, 10, 8), halo = ["#b9d0ff", -9.0, 15.0, 15.0, 0.7], stars = 70, aurora = true,
-		ground = "#7d9ac8", clearing = [182, 200, 232], table = ["#dcebf5", "#9cc7e0", 0.3, 0.05],
+		sky = ["#7ab2ee", "#d6e9fb", "#e4f1fc", "#a2c2e4"], fog = ["#d8e8f6", 30, 108], light = ["#e8f2ff", "#7f9ec4", 0.66, "#ffd9ac", 0.55, 0.1],
+		sun_dir = Vector3(-6, 12, 8), halo = ["#fff4d8", -9.0, 15.0, 22.0, 0.6],
+		ground = "#c8dcf2", clearing = [212, 230, 246], table = ["#dcebf5", "#9cc7e0", 0.3, 0.05],
 		board = {bands = ["#d7ecff", "#dff5ee", "#e8e6ff", "#d9f2ff", "#eef3ff"], cream = "#ffffff", grout = "#bcd7ea", goal = "#ffd45c", star = "#59a8e0", num = "#2f4f73", num100 = "#9a5a00", frame = "#f3fbff", frameR = 0.25, lip = "#8cc8ea", rail = "#7fb0d0", rung = "#e3f4ff"},
 		sign = {plank = "#b5835a", grain = Color(90 / 255.0, 50 / 255.0, 20 / 255.0), edge = "#7a5232", stroke = "#173a6b", rope = "#e6f0f7", c1 = "#3b7be0", c2 = "#ffffff", top = "snow", snake = ["#e5484d", "#ffffff", "#fff3f3"]},
 		table_snake = ["#3fa7d6", "#ffffff", "#eaf8ff"], motes = ["snow", "#ffffff", 110, 0.32], fall = null, beams = null,
 	},
 	cloud = {
-		sky = ["#33488c", "#9a8fd0", "#ffc8ae", "#6f7fc0"], fog = ["#b9aedd", 30, 122], light = ["#fff6ec", "#6a73b0", 0.8, "#ffc798", 0.45, 0.1],
-		sun_dir = Vector3(-8, 7, 8), halo = ["#ffd8b0", -7.0, 6.0, 34.0, 0.85], stars = 24,
+		sky = ["#74b4f4", "#c8e0fc", "#ffe6e6", "#b0d0fa"], fog = ["#e0ecfc", 38, 136], light = ["#f6f2ee", "#a8b4e6", 0.7, "#ffe6c8", 0.5, 0.12],
+		sun_dir = Vector3(-8, 10, 8), halo = ["#fff0d8", -7.0, 8.0, 34.0, 0.6],
 		ground = null, clearing = null, table = ["#f6f1ea", "#e2d7f3", 0.22, 0.12],
 		board = {bands = ["#ffe3ef", "#e1efff", "#fff3c9", "#e3f8e6", "#efe4ff"], cream = "#ffffff", grout = "#e6dcf5", goal = "#ffe07a", star = "#b48cff", num = "#5b4b8a", num100 = "#9a5a00", frame = "#ffffff", frameR = 0.22, frameM = 0.1, lip = "#c9b3ff", rail = "#f2a7cf", rung = "#ffffff"},
 		sign = {plank = "#fbf7ff", grain = Color(160 / 255.0, 140 / 255.0, 220 / 255.0), edge = "#c9b3ff", stroke = "#4b3a8a", rope = "#ffffff", c1 = "#8a5cf0", c2 = "#ff8fc1", top = "cloud", snake = ["#ff9ad0", "#ffffff", "#fff2fa"]},
 		table_snake = ["#7fd6ff", "#ffffff", "#f2fbff"], motes = ["fly", "#fff6c8", 40, 0.4], fall = null, beams = Color(1, 1, 1, 0.5),
 	},
 	enchanted = {
-		sky = ["#080b2c", "#241f6a", "#46378a", "#0d2830"], fog = ["#1d2850", 16, 56], light = ["#d6dcff", "#0e2a24", 0.78, "#bcd0ff", 0.32, 0.07],
-		sun_dir = Vector3(7, 12, 8), halo = ["#cfd8ff", 8.0, 14.0, 13.0, 0.85], stars = 90,
-		ground = "#1d4737", clearing = [66, 118, 104], table = ["#5a3524", "#e3b04b", 0.35, 0.7],
+		sky = ["#3d2f7a", "#6a4fa8", "#8f6bb8", "#2b4a5c"], fog = ["#4a4a82", 18, 62], light = ["#d8ccff", "#1f4a3a", 0.74, "#ffdca8", 0.68, 0.12],
+		sun_dir = Vector3(7, 12, 8), halo = ["#ffeec8", 8.0, 14.0, 14.0, 0.8], stars = 60,
+		ground = "#2f6b4f", clearing = [90, 156, 126], table = ["#5a3524", "#e3b04b", 0.35, 0.7],
 		board = {bands = ["#cdeee4", "#e3d7fb", "#d6f0c8", "#fbe6b8", "#cfe3f7"], cream = "#fbf7ee", grout = "#b9a6d6", goal = "#ffd45c", star = "#7ef0c8", num = "#3d2f5c", num100 = "#9a5a00", frame = "#f7ecd6", frameR = 0.3, lip = "#e3b04b", lipM = 0.7, rail = "#c99a3a", railM = 0.5, rung = "#f4d58a"},
 		sign = {plank = "#7a4a2e", grain = Color(40 / 255.0, 20 / 255.0, 10 / 255.0), edge = "#4e2c18", stroke = "#1d1240", rope = "#e3c47a", c1 = "#7ef0c8", c2 = "#ffd56a", top = "vine", vine = ["#2e7d5a", "#4fbf8a", "#2f9a6a"], snake = ["#f2c14e", "#b8862a", "#fff4d0"]},
 		table_snake = ["#3fd0c0", "#1f8a80", "#e8fff8"], motes = ["fly", "#c8ff9a", 80, 0.6], fall = ["#7ef0c8"], beams = Color(200 / 255.0, 180 / 255.0, 1.0, 0.4),
@@ -189,7 +188,7 @@ func _ready() -> void:
 	_sky.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_sky.extra_cull_margin = 16384
 	camera.add_child(_sky)
-	# the corners fall softly into shade: the eye goes to the lit table (off on the low tier: one blended quad less)
+	# a touch of warm shade in the corners: the eye goes to the table (off on the low tier: one blended quad less)
 	_vignette = MeshKit.vignette()
 	_vignette.visible = Quality.extras()
 	camera.add_child(_vignette)
@@ -368,7 +367,7 @@ func _build_world(id: String) -> void:
 	if T.clearing != null:
 		var cl: Array = T.clearing
 		var c0 := Color8(cl[0], cl[1], cl[2])
-		var c1 := Color8(maxi(cl[0] - 26, 0), maxi(cl[1] - 26, 0), maxi(cl[2] - 26, 0))
+		var c1 := Color8(maxi(cl[0] - 12, 0), maxi(cl[1] - 12, 0), maxi(cl[2] - 12, 0))
 		var gt := _radial([0.0, 0.5, 1.0], [c0, c1, Color(c1, 0.0)])
 		var m := _lam_tex(gt)
 		m.render_priority = 0
@@ -461,8 +460,7 @@ func _build_world(id: String) -> void:
 	_fit_if_needed()
 	_apply_cam(_goal(), 1.0)
 
-## The mood's sky: a soft halo where the sun or the moon is, stars, an aurora. All far behind the scene, additive, unlit,
-## one draw each (the aurora a few), and only a landing's camera looks up here.
+## The mood's sky: a soft halo where the sun or the moon is, stars. Far behind the scene, additive, unlit, one draw each.
 func _build_sky_mood(T: Dictionary) -> void:
 	var soft := _radial([0.0, 0.2, 0.55, 1.0], [Color(1, 1, 1, 1), Color(1, 1, 1, 0.5), Color(1, 1, 1, 0.12), Color(1, 1, 1, 0)], 128)
 	if T.has("halo"):
@@ -490,24 +488,6 @@ func _build_sky_mood(T: Dictionary) -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.extra_cull_margin = 64
 		_w.add_child(mi)
-	if T.get("aurora", false):
-		var t := GradientTexture2D.new()
-		t.width = 64
-		t.height = 64
-		t.fill = GradientTexture2D.FILL_LINEAR
-		t.fill_from = Vector2(0.5, 1.0)
-		t.fill_to = Vector2(0.5, 0.0)
-		t.gradient = Gradient.new()
-		t.gradient.offsets = PackedFloat32Array([0.0, 0.18, 0.6, 1.0])
-		t.gradient.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0.3), Color(1, 1, 1, 0)])
-		var bi := 0
-		for b: Array in [[-18.0, 14.0, -0.12, "#5ff2b0"], [-5.0, 17.0, 0.07, "#57d9ff"], [9.0, 15.0, -0.05, "#62f0c0"], [21.0, 13.0, 0.1, "#a58bff"]]:
-			var m := _sky_add(t, Color(b[3], 0.42))
-			var q := QuadMesh.new()
-			q.size = Vector2(19, 22)
-			_add(q, m, b[0], b[1], -40, null, {rz = b[2]})
-			_beams.append({m = m, ph = bi * 1.7})
-			bi += 1
 
 static func _sky_add(tex: Texture2D, col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()

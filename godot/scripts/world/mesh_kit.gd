@@ -94,8 +94,8 @@ static func vignette() -> MeshInstance3D:
 	m.disable_fog = true
 	m.render_priority = 100
 	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 0.5, 0.78, 1.0])
-	g.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 0.3), Color(0, 0, 0, 0.62)])
+	g.offsets = PackedFloat32Array([0.0, 0.62, 1.0])
+	g.colors = PackedColorArray([Color(0.3, 0.14, 0.1, 0), Color(0.3, 0.14, 0.1, 0), Color(0.3, 0.14, 0.1, 0.2)])
 	var t := GradientTexture2D.new()
 	t.width = 128
 	t.height = 128

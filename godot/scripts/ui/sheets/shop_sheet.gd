@@ -446,8 +446,8 @@ func _card(it: Dictionary) -> PanelContainer:
 		gem_row = gem_option(_gems(kind, id))
 		gem_row.pressed.connect(func(): _on_buy_gems(kind, id, it.name))
 		v.add_child(gem_row)
-	p.gui_input.connect(func(e: InputEvent) -> void:          # a tap on a locked card says what unlocks it
-		if lock_row.visible and Sheet._is_tap(e):
+	UIKit.on_tap(p, func() -> void:                           # a tap on a locked card says what unlocks it
+		if lock_row.visible:
 			UIKit.deny(self, ll.text + ("।" if L10n.is_bn() else "."), p, 2.0))
 	_cards.append(p)
 	_updaters.append(func():
