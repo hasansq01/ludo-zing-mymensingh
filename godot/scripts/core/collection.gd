@@ -28,56 +28,59 @@ const SAVE_FAILED_EQUIP := "Couldn’t save on this device."  # l10n
 ## Character portraits: skin, hair (colour), hs (hairstyle), top (outfit colour), od (outfit detail), acc (accessory),
 ## ac (accessory colour), g ("m" | "f"); a1 / a2 the tile gradient. The first of each gender is free.
 const CHARS := [
-	{id = "ch-arif", name = "Arif", g = "m", price = 0, a1 = "#bfe6ff", a2 = "#6fb3e8", skin = "#eebf9c", hair = "#3b2a24", hs = "crop", top = "#3b7be0", od = "v"},
-	{id = "ch-rafi", name = "Rafi", g = "m", price = 10000, a1 = "#ffe2b3", a2 = "#f3a64b", skin = "#d9a07a", hair = "#1f1a1c", hs = "quiff", top = "#2fa86b", od = "collar"},
-	{id = "ch-tanvir", name = "Tanvir", g = "m", price = 10500, a1 = "#d9f3e4", a2 = "#6cc79a", skin = "#8d5a3b", hair = "#1b1416", hs = "afro", top = "#f4a340", od = "hoodie"},
-	{id = "ch-nayeem", name = "Nayeem", g = "m", price = 11000, a1 = "#e9e0ff", a2 = "#a58bf0", skin = "#f3c6a5", hair = "#5b3a22", hs = "side", top = "#5b4bb7", od = "tie", acc = "glasses", ac = "#3a2230"},
-	{id = "ch-sabbir", name = "Sabbir", g = "m", price = 11750, a1 = "#ffd6cf", a2 = "#ef7e6f", skin = "#b97a52", hair = "#2a1d18", hs = "buzz", top = "#4a4f63", od = "stripe"},
-	{id = "ch-imran", name = "Imran", g = "m", price = 10250, a1 = "#fff1c2", a2 = "#e9c14c", skin = "#eebf9c", hair = "#6b4426", hs = "manbun", top = "#c0483f", od = "scarf", ac = "#f3d36b"},
-	{id = "ch-rakib", name = "Rakib", g = "m", price = 12000, a1 = "#cdeff5", a2 = "#4fb6c9", skin = "#d9a07a", hair = "#e2a23a", hs = "spiky", top = "#2b2f45", od = "v"},
-	{id = "ch-fahim", name = "Fahim", g = "m", price = 11250, a1 = "#ffe0ec", a2 = "#f28bb0", skin = "#f6d2b8", hair = "#3b2a24", hs = "cap", top = "#ffffff", od = "stripe", ac = "#e5484d"},
-	{id = "ch-shuvo", name = "Shuvo", g = "m", price = 10750, a1 = "#e3f4c8", a2 = "#9ccc5a", skin = "#b97a52", hair = "#1f1a1c", hs = "curls", top = "#8a5a3c", od = "collar"},
-	{id = "ch-jamil", name = "Jamil", g = "m", price = 11500, a1 = "#dfe7ff", a2 = "#7d97e8", skin = "#f3c6a5", hair = "#4a2e20", hs = "beanie", top = "#2fb39c", od = "hoodie", acc = "glasses", ac = "#e0a100"},
-	{id = "ch-nadia", name = "Nadia", g = "f", price = 0, a1 = "#ffd9e6", a2 = "#f590b4", skin = "#eebf9c", hair = "#2a1d18", hs = "long", top = "#e5484d", od = "necklace", ac = "#f4c430"},
-	{id = "ch-riya", name = "Riya", g = "f", price = 10000, a1 = "#d8f1ff", a2 = "#68b8ea", skin = "#f6d2b8", hair = "#1f1a1c", hs = "bob", top = "#f4c430", od = "collar"},
-	{id = "ch-tania", name = "Tania", g = "f", price = 10500, a1 = "#fff0c9", a2 = "#f0b84a", skin = "#d9a07a", hair = "#7a4a28", hs = "pony", top = "#7c4dff", od = "v", ac = "#ff7a9c"},
-	{id = "ch-mim", name = "Mim", g = "f", price = 11000, a1 = "#e7dcff", a2 = "#a98cf0", skin = "#8d5a3b", hair = "#1b1416", hs = "curlylong", top = "#2fa86b", od = "necklace", acc = "earrings", ac = "#f4c430"},
-	{id = "ch-sumaiya", name = "Sumaiya", g = "f", price = 11750, a1 = "#d6f4ea", a2 = "#5fc4a3", skin = "#f3c6a5", hair = "#6b3a7a", hs = "hijab", top = "#6b3a7a", od = "v"},
-	{id = "ch-priya", name = "Priya", g = "f", price = 10250, a1 = "#ffe1d1", a2 = "#f39a6b", skin = "#b97a52", hair = "#2a1d18", hs = "buns", top = "#3b7be0", od = "stripe"},
-	{id = "ch-lamia", name = "Lamia", g = "f", price = 12000, a1 = "#fce4ff", a2 = "#d58be8", skin = "#eebf9c", hair = "#c4572a", hs = "pixie", top = "#2b2f45", od = "necklace", acc = "earrings", ac = "#e9e3ff"},
-	{id = "ch-fariha", name = "Fariha", g = "f", price = 11250, a1 = "#fff6c8", a2 = "#e6cf52", skin = "#d9a07a", hair = "#1f1a1c", hs = "braids", top = "#e5484d", od = "dupatta", ac = "#f4c430"},
-	{id = "ch-nusrat", name = "Nusrat", g = "f", price = 10750, a1 = "#d9ecff", a2 = "#8fb3ef", skin = "#f6d2b8", hair = "#5b3a22", hs = "wavy", top = "#ff9ec7", od = "collar", ac = "#2fb39c"},
-	{id = "ch-ayesha", name = "Ayesha", g = "f", price = 11500, a1 = "#ffdcd6", a2 = "#ee8a7c", skin = "#8d5a3b", hair = "#1b1416", hs = "bangs", top = "#2fb39c", od = "scarf", ac = "#ffd45e"},
+	{id = "ch-arif", name = "Arif", g = "m", price = 0, a1 = "#bfe6ff", a2 = "#6fb3e8", skin = "#eebf9c", hair = "#3b2a24", hs = "crop", top = "#3b7be0", od = "v", mouth = "smile"},
+	{id = "ch-rafi", name = "Rafi", g = "m", price = 10000, a1 = "#ffe2b3", a2 = "#f3a64b", skin = "#d9a07a", hair = "#1f1a1c", hs = "quiff", top = "#2fa86b", od = "collar", mouth = "grin"},
+	{id = "ch-tanvir", name = "Tanvir", g = "m", price = 10500, a1 = "#d9f3e4", a2 = "#6cc79a", skin = "#8d5a3b", hair = "#1b1416", hs = "afro", top = "#f4a340", od = "hoodie", mouth = "laugh", look = "happy"},
+	{id = "ch-nayeem", name = "Nayeem", g = "m", price = 11000, a1 = "#e9e0ff", a2 = "#a58bf0", skin = "#f3c6a5", hair = "#5b3a22", hs = "side", top = "#5b4bb7", od = "tie", acc = "glasses", ac = "#3a2230", mouth = "smile"},
+	{id = "ch-sabbir", name = "Sabbir", g = "m", price = 11750, a1 = "#ffd6cf", a2 = "#ef7e6f", skin = "#b97a52", hair = "#2a1d18", hs = "buzz", top = "#4a4f63", od = "stripe", mouth = "grin"},
+	{id = "ch-imran", name = "Imran", g = "m", price = 10250, a1 = "#fff1c2", a2 = "#e9c14c", skin = "#eebf9c", hair = "#6b4426", hs = "manbun", top = "#c0483f", od = "scarf", ac = "#f3d36b", mouth = "smirk"},
+	{id = "ch-rakib", name = "Rakib", g = "m", price = 12000, a1 = "#cdeff5", a2 = "#4fb6c9", skin = "#d9a07a", hair = "#e2a23a", hs = "spiky", top = "#2b2f45", od = "v", mouth = "grin", look = "wink"},
+	{id = "ch-fahim", name = "Fahim", g = "m", price = 11250, a1 = "#ffe0ec", a2 = "#f28bb0", skin = "#f6d2b8", hair = "#3b2a24", hs = "cap", top = "#ffffff", od = "stripe", ac = "#e5484d", mouth = "laugh"},
+	{id = "ch-shuvo", name = "Shuvo", g = "m", price = 10750, a1 = "#e3f4c8", a2 = "#9ccc5a", skin = "#b97a52", hair = "#1f1a1c", hs = "curls", top = "#8a5a3c", od = "collar", mouth = "smile", look = "happy"},
+	{id = "ch-jamil", name = "Jamil", g = "m", price = 11500, a1 = "#dfe7ff", a2 = "#7d97e8", skin = "#f3c6a5", hair = "#4a2e20", hs = "beanie", top = "#2fb39c", od = "hoodie", acc = "glasses", ac = "#e0a100", mouth = "smirk"},
+	{id = "ch-nadia", name = "Nadia", g = "f", price = 0, a1 = "#ffd9e6", a2 = "#f590b4", skin = "#eebf9c", hair = "#2a1d18", hs = "long", top = "#e5484d", od = "necklace", ac = "#f4c430", mouth = "lips"},
+	{id = "ch-riya", name = "Riya", g = "f", price = 10000, a1 = "#d8f1ff", a2 = "#68b8ea", skin = "#f6d2b8", hair = "#1f1a1c", hs = "bob", top = "#f4c430", od = "collar", mouth = "laugh", look = "happy"},
+	{id = "ch-tania", name = "Tania", g = "f", price = 10500, a1 = "#fff0c9", a2 = "#f0b84a", skin = "#d9a07a", hair = "#7a4a28", hs = "pony", top = "#7c4dff", od = "v", ac = "#ff7a9c", mouth = "lips", look = "wink"},
+	{id = "ch-mim", name = "Mim", g = "f", price = 11000, a1 = "#e7dcff", a2 = "#a98cf0", skin = "#8d5a3b", hair = "#1b1416", hs = "curlylong", top = "#2fa86b", od = "necklace", acc = "earrings", ac = "#f4c430", mouth = "grin"},
+	{id = "ch-sumaiya", name = "Sumaiya", g = "f", price = 11750, a1 = "#d6f4ea", a2 = "#5fc4a3", skin = "#f3c6a5", hair = "#6b3a7a", hs = "hijab", top = "#6b3a7a", od = "v", mouth = "smile"},
+	{id = "ch-priya", name = "Priya", g = "f", price = 10250, a1 = "#ffe1d1", a2 = "#f39a6b", skin = "#b97a52", hair = "#2a1d18", hs = "buns", top = "#3b7be0", od = "stripe", mouth = "laugh"},
+	{id = "ch-lamia", name = "Lamia", g = "f", price = 12000, a1 = "#fce4ff", a2 = "#d58be8", skin = "#eebf9c", hair = "#c4572a", hs = "pixie", top = "#2b2f45", od = "necklace", acc = "earrings", ac = "#e9e3ff", mouth = "smirk"},
+	{id = "ch-fariha", name = "Fariha", g = "f", price = 11250, a1 = "#fff6c8", a2 = "#e6cf52", skin = "#d9a07a", hair = "#1f1a1c", hs = "braids", top = "#e5484d", od = "dupatta", ac = "#f4c430", mouth = "lips"},
+	{id = "ch-nusrat", name = "Nusrat", g = "f", price = 10750, a1 = "#d9ecff", a2 = "#8fb3ef", skin = "#f6d2b8", hair = "#5b3a22", hs = "wavy", top = "#ff9ec7", od = "collar", ac = "#2fb39c", mouth = "grin"},
+	{id = "ch-ayesha", name = "Ayesha", g = "f", price = 11500, a1 = "#ffdcd6", a2 = "#ee8a7c", skin = "#8d5a3b", hair = "#1b1416", hs = "bangs", top = "#2fb39c", od = "scarf", ac = "#ffd45e", mouth = "smile", look = "happy"},
 ]
-## More characters: free for everyone, with a wide range of looks; shown together, never labelled by origin. On top of
+## More characters: free for everyone, with a wide range of looks; shown together, never labelled by origin. Common desi names (owner 2026-11-06);
+## the ids keep the old names because saves and the server hold them. On top of
 ## the fields above: eye ("round" | "almond" | "narrow" | "big"), eyeCol, lash, brow ("none" | "thin" | "soft" | "thick"),
 ## nose ("small" | "wide"), mouth ("lips" | "smile" | "grin" | "neutral"), fh (facial hair: "stubble" | "moustache" |
-## "goatee" | "beard"). None of them set: the original face for that gender.
+## "goatee" | "beard"). None of them set: the default face for that gender. Every character also has its own expression:
+## mouth ("lips" | "smile" | "grin" | "laugh" | "smirk" | "neutral") and look ("" | "happy" | "wink").
 const WORLD := [
-	{id = "w-hana", name = "Hana", g = "f", price = 0, a1 = "#ffe0ec", a2 = "#f28bb0", skin = "#f6d9c2", hair = "#1b1416", hs = "straight", eye = "narrow", nose = "small", top = "#ff9ec7", od = "collar"},
-	{id = "w-kenji", name = "Kenji", g = "m", price = 0, a1 = "#dfe7ff", a2 = "#7d97e8", skin = "#f3d3b5", hair = "#1b1416", hs = "side", eye = "narrow", nose = "small", top = "#2b2f45", od = "v"},
-	{id = "w-mei", name = "Mei", g = "f", price = 0, a1 = "#d6f4ea", a2 = "#5fc4a3", skin = "#f6d9c2", hair = "#2a1d18", hs = "buns", eye = "almond", nose = "small", top = "#e5484d", od = "necklace", ac = "#f4c430"},
-	{id = "w-linh", name = "Linh", g = "f", price = 0, a1 = "#fff0c9", a2 = "#f0b84a", skin = "#e3b18a", hair = "#1b1416", hs = "long", eye = "almond", nose = "small", top = "#2fa86b", od = "v"},
-	{id = "w-emma", name = "Emma", g = "f", price = 0, a1 = "#d8f1ff", a2 = "#68b8ea", skin = "#ffe3cf", hair = "#e8c26a", hs = "wavy", eyeCol = "#3b7be0", nose = "small", top = "#9b6be0", od = "collar", ac = "#ff7fae"},
-	{id = "w-lukas", name = "Lukas", g = "m", price = 0, a1 = "#e3f4c8", a2 = "#9ccc5a", skin = "#f6d2b8", hair = "#8a5a32", hs = "crop", eyeCol = "#3f8a4a", nose = "small", fh = "stubble", top = "#3b7be0", od = "hoodie"},
-	{id = "w-sofia", name = "Sofia", g = "f", price = 0, a1 = "#ffe1d1", a2 = "#f39a6b", skin = "#f3c6a5", hair = "#c4572a", hs = "bob", eyeCol = "#8a6a2a", nose = "small", top = "#2fb39c", od = "necklace", acc = "earrings", ac = "#f4c430"},
-	{id = "w-oliver", name = "Oliver", g = "m", price = 0, a1 = "#fff1c2", a2 = "#e9c14c", skin = "#ffe3cf", hair = "#d9783a", hs = "curls", eyeCol = "#3b7be0", nose = "small", top = "#e5484d", od = "stripe"},
-	{id = "w-jayden", name = "Jayden", g = "m", price = 0, a1 = "#cdeff5", a2 = "#4fb6c9", skin = "#6b4128", hair = "#1b1416", hs = "fade", nose = "wide", mouth = "grin", top = "#f4a340", od = "hoodie"},
-	{id = "w-maya", name = "Maya", g = "f", price = 0, a1 = "#fce4ff", a2 = "#d58be8", skin = "#8d5a3b", hair = "#1b1416", hs = "locs", nose = "wide", top = "#f4c430", od = "necklace", acc = "earrings", ac = "#f4c430"},
-	{id = "w-carlos", name = "Carlos", g = "m", price = 0, a1 = "#ffd6cf", a2 = "#ef7e6f", skin = "#c68a5e", hair = "#2a1d18", hs = "quiff", nose = "small", fh = "moustache", top = "#2fa86b", od = "collar"},
-	{id = "w-ava", name = "Ava", g = "f", price = 0, a1 = "#e7dcff", a2 = "#a98cf0", skin = "#f3c6a5", hair = "#5b3a22", hs = "pony", eyeCol = "#6b3f22", nose = "small", top = "#3b7be0", od = "v", ac = "#e5484d"},
+	{id = "w-hana", name = "Sadia", g = "f", price = 0, a1 = "#ffe0ec", a2 = "#f28bb0", skin = "#f6d9c2", hair = "#ee5f9b", hs = "hijab", eye = "big", nose = "small", top = "#b23a78", mouth = "laugh"},
+	{id = "w-kenji", name = "Sakib", g = "m", price = 0, a1 = "#dfe7ff", a2 = "#7d97e8", skin = "#f3d3b5", hair = "#1b1416", hs = "side", eye = "narrow", nose = "small", top = "#2b2f45", od = "v", mouth = "smirk"},
+	{id = "w-mei", name = "Mitu", g = "f", price = 0, a1 = "#d6f4ea", a2 = "#5fc4a3", skin = "#f6d9c2", hair = "#2a1d18", hs = "buns", eye = "almond", nose = "small", top = "#e5484d", od = "necklace", ac = "#f4c430", mouth = "grin"},
+	{id = "w-linh", name = "Sharmin", g = "f", price = 0, a1 = "#fff0c9", a2 = "#f0b84a", skin = "#e3b18a", hair = "#2fa86b", hs = "hijab", eye = "almond", nose = "small", top = "#1f7a4d", mouth = "smile", look = "happy"},
+	{id = "w-emma", name = "Farzana", g = "f", price = 0, a1 = "#d8f1ff", a2 = "#68b8ea", skin = "#eebf9c", hair = "#2a1d18", hs = "wavy", nose = "small", top = "#9b6be0", od = "collar", ac = "#ff7fae", mouth = "laugh"},
+	{id = "w-lukas", name = "Hasan", g = "m", price = 0, a1 = "#e3f4c8", a2 = "#9ccc5a", skin = "#d9a07a", hair = "#2a1d18", hs = "crop", nose = "small", fh = "stubble", top = "#3b7be0", od = "hoodie", mouth = "smile"},
+	{id = "w-sofia", name = "Jannat", g = "f", price = 0, a1 = "#ffe1d1", a2 = "#f39a6b", skin = "#f3c6a5", hair = "#c8434f", hs = "hijab", nose = "small", top = "#8f2a3a", mouth = "lips", look = "wink"},
+	{id = "w-oliver", name = "Rahim", g = "m", price = 0, a1 = "#fff1c2", a2 = "#e9c14c", skin = "#b97a52", hair = "#1f1a1c", hs = "curls", nose = "small", top = "#e5484d", od = "stripe", mouth = "grin"},
+	{id = "w-jayden", name = "Sohel", g = "m", price = 0, a1 = "#cdeff5", a2 = "#4fb6c9", skin = "#6b4128", hair = "#1b1416", hs = "fade", nose = "wide", top = "#f4a340", od = "hoodie", mouth = "grin"},
+	{id = "w-maya", name = "Rupa", g = "f", price = 0, a1 = "#fce4ff", a2 = "#d58be8", skin = "#8d5a3b", hair = "#1b1416", hs = "locs", nose = "wide", top = "#f4c430", od = "necklace", acc = "earrings", ac = "#f4c430", mouth = "lips"},
+	{id = "w-carlos", name = "Kamal", g = "m", price = 0, a1 = "#ffd6cf", a2 = "#ef7e6f", skin = "#c68a5e", hair = "#2a1d18", hs = "quiff", nose = "small", fh = "moustache", top = "#2fa86b", od = "collar", mouth = "laugh"},
+	{id = "w-ava", name = "Tasnim", g = "f", price = 0, a1 = "#e7dcff", a2 = "#a98cf0", skin = "#c68a5e", hair = "#3b7be0", hs = "hijab", nose = "small", top = "#2452a8", mouth = "grin"},
 ]
 ## The original avatars (the Avatars tab). Red Pawn is the fallback. Characters are avatars too (avatar(id) finds both).
 const AVATARS := [
-	{id = "pawn-red", name = "Red Pawn", art = "pawn", a1 = "#ff8a80", a2 = "#e5484d"},
-	{id = "pawn-green", name = "Green Pawn", art = "pawn", a1 = "#8be3b0", a2 = "#2fa86b"},
-	{id = "pawn-yellow", name = "Yellow Pawn", art = "pawn", a1 = "#ffe27a", a2 = "#e0a100"},
-	{id = "pawn-blue", name = "Blue Pawn", art = "pawn", a1 = "#8fb7ff", a2 = "#3b7be0"},
-	{id = "latte", name = "Latte", art = "cup", a1 = "#f1d9b5", a2 = "#a8693c"},
-	{id = "dice", name = "Lucky Dice", art = "dice", a1 = "#ff9a9d", a2 = "#c3141b", unlock = {ach = "first"}},
-	{id = "robot", name = "Robot", art = "robot", a1 = "#b8e7ff", a2 = "#3a8fd0", unlock = {ach = "streak"}},
-	{id = "crown", name = "Crown", art = "crown", a1 = "#c99bff", a2 = "#6a35c0", unlock = {level = 5}},
+	{id = "pawn-red", name = "Red Pawn", art = "hero", a1 = "#ffe3da", a2 = "#f7a596", body = "#ff6f62", deep = "#c9353c"},
+	{id = "pawn-green", name = "Green Pawn", art = "sprout", a1 = "#e2f7e4", a2 = "#93dcae", body = "#46c988", deep = "#1f8f5c"},
+	{id = "pawn-yellow", name = "Yellow Pawn", art = "beats", a1 = "#fff5cf", a2 = "#fbd670", body = "#ffc83a", deep = "#d99600"},
+	{id = "pawn-blue", name = "Blue Pawn", art = "cool", a1 = "#dfeaff", a2 = "#9cbdf7", body = "#5c9bf6", deep = "#2c62c4"},
+	{id = "latte", name = "Latte", art = "latte", a1 = "#fbeeda", a2 = "#e6bd8d"},
+	{id = "dice", name = "Lucky Dice", art = "dice", a1 = "#ffc2bd", a2 = "#e0434b", unlock = {ach = "first"}},
+	{id = "robot", name = "Robot", art = "robot", a1 = "#d6f1ff", a2 = "#74bdec", unlock = {ach = "streak"}},
+	{id = "crown", name = "Crown", art = "royal", a1 = "#ebdfff", a2 = "#ac8df2", body = "#8a5cf0", deep = "#5a30b8", unlock = {level = 5}},
 ]
+
 ## Frames: the rings around the avatar tile (index.html .avatar.f-*: box-shadow rings + glow).
 ## inner / outer ring colours and widths (px at a 60 px avatar), glow colour and blur.
 const FRAMES := [
@@ -331,8 +334,8 @@ static func claimable_count(p: Dictionary = {}) -> int:
 # Drawing: avatar art as SVG (rasterised once per id and size)
 # =====================================================================================================================
 
-## The square avatar tile: the gradient (160deg), corners rounded at 28 %, the art (portraits fill it; the other
-## art sits at 62 % with a soft shadow). px = texture size (drawn smaller it stays crisp, mipmapped).
+## The square avatar tile: the gradient (160deg), corners rounded at 28 %, the art filling it (a character's bust or a
+## classic avatar's mascot). px = texture size (drawn smaller it stays crisp, mipmapped).
 static func avatar_texture(id: String, px := 256) -> Texture2D:
 	var a := avatar(id)
 	if a.is_empty():
@@ -360,23 +363,154 @@ static func tile_svg(id: String) -> String:
 		+ '<rect width="40" height="40" rx="11.2" fill="url(#g)"/><g clip-path="url(#c)">%s</g></svg>' % _art_layer(a))
 
 static func _art_layer(a: Dictionary) -> String:
-	if a.has("hs"):
-		return person_svg(a)
-	var art: String = ART[a.art]
-	var k := 24.8 / (24.0 if a.art == "pawn" else 40.0)        # 62 % of the tile
-	# drop-shadow(0 2px 2px rgba(110,60,90,.25)): the same shapes in the shadow colour, a little lower
-	var shadow := RegEx.create_from_string('(fill|stroke)="#[0-9a-fA-F]+"').sub(art, '$1="#6e3c5a"', true)
-	return ('<g transform="translate(7.6 9) scale(%s)" opacity="0.25">%s</g>' % [k, shadow]
-		+ '<g transform="translate(7.6 7.6) scale(%s)">%s</g>' % [k, art])
+	return person_svg(a) if a.has("hs") else mascot_svg(a)
 
-## The non-portrait avatar art (AV_ART; the pawn is #pawnIco on a 24 grid, the rest 40).
-const ART := {
-	pawn = '<circle cx="12" cy="6.5" r="3.6" fill="#fff8ec"/><path d="M8.6 11.2h6.8l-1.1 2.3 2.4 5.2c.3.7-.2 1.3-.9 1.3H8.2c-.7 0-1.2-.6-.9-1.3l2.4-5.2z" fill="#fff8ec"/><rect x="6" y="19.2" width="12" height="2.6" rx="1.3" fill="#fff8ec"/>',
-	cup = '<circle cx="18" cy="21" r="13" fill="#fff8ec"/><rect x="29" y="17" width="8" height="7" rx="3.5" fill="#fff8ec"/><circle cx="18" cy="21" r="9.5" fill="#6b3a1e"/><path d="M18 26.5c-5-3.2-6-6.2-3.6-7.8 1.5-1 3 0 3.6 1 .6-1 2.1-2 3.6-1 2.4 1.6 1.4 4.6-3.6 7.8z" fill="#f3e3cc"/>',
-	dice = '<rect x="6" y="6" width="28" height="28" rx="7" fill="#fff8ec"/><g fill="#22263f"><circle cx="13" cy="13" r="2.8"/><circle cx="27" cy="13" r="2.8"/><circle cx="20" cy="20" r="2.8"/><circle cx="13" cy="27" r="2.8"/><circle cx="27" cy="27" r="2.8"/></g>',
-	crown = '<path d="M6 29l-2-17 9 7 7-11 7 11 9-7-2 17z" fill="#ffe27a" stroke="#fff8ec" stroke-width="2" stroke-linejoin="round"/><rect x="6" y="30" width="28" height="4" rx="2" fill="#fff8ec"/><circle cx="20" cy="22" r="2.6" fill="#e5484d"/>',
-	robot = '<line x1="20" y1="4" x2="20" y2="10" stroke="#fff8ec" stroke-width="2.5"/><circle cx="20" cy="4.5" r="2.5" fill="#ff5a5a"/><rect x="7" y="10" width="26" height="22" rx="9" fill="#fff8ec"/><rect x="11" y="15" width="18" height="11" rx="5.5" fill="#1d2240"/><circle cx="16" cy="20.5" r="2.4" fill="#4df0ff"/><circle cx="24" cy="20.5" r="2.4" fill="#4df0ff"/>',
-}
+const INK := "#3a2230"
+const CREAM := "#fff8ec"
+const GOLD := "#ffcf4a"
+
+## A classic avatar's mascot on the 40 x 40 grid: they have faces, like the characters and the computer players.
+static func mascot_svg(a: Dictionary) -> String:
+	var out := ""
+	match str(a.art):
+		"hero":
+			out = _mascot_hero(a)
+		"sprout":
+			out = _mascot_sprout(a)
+		"beats":
+			out = _mascot_beats(a)
+		"cool":
+			out = _mascot_cool(a)
+		"royal":
+			out = _mascot_royal(a)
+		"latte":
+			out = _mascot_latte()
+		"dice":
+			out = _mascot_dice()
+		"robot":
+			out = _mascot_robot()
+	return _soft_shade(out)
+
+## The soft shade rgba(70,30,40,.16) as colour + opacity (plain hex keeps every SVG reader happy).
+static func _soft_shade(svg: String) -> String:
+	return svg.replace('fill="SH"', 'fill="#461e28" fill-opacity="0.16"').replace('stroke="SH"', 'stroke="#461e28" stroke-opacity="0.16"')
+
+## The pawn with a big round head: body, collar, head, its shade and shine (the face goes on top).
+static func _pawn(body: String, deep: String) -> String:
+	return (_path("M6.5 40C6.5 33.8 11.4 30.8 15 28.6H25C28.6 30.8 33.5 33.8 33.5 40Z", body)
+		+ _path("M6.5 40C6.5 33.8 11.4 30.8 15 28.6H17.6C14.2 31 12.6 35 12.8 40Z", "SH")
+		+ '<rect x="12" y="25.2" width="16" height="4.4" rx="2.2" fill="%s"/>' % deep
+		+ _circle(20, 15.4, 10.8, body)
+		+ _path("M13 7.2C8 11.4 8 20 12.8 23.6C16.2 26.4 21.2 26.8 24.6 25.2C17.4 25.2 11 17.6 13 7.2Z", "SH")
+		+ '<ellipse cx="15.6" cy="8.8" rx="3" ry="1.6" transform="rotate(-28 15.6 8.8)" fill="#fff" opacity=".5"/>')
+
+static func _open_eye(x: float, y: float) -> String:
+	return '<ellipse cx="%s" cy="%s" rx="1.6" ry="2" fill="%s"/>' % [x, y, INK] + _circle(x + 0.5, y - 0.7, 0.6, "#fff")
+
+static func _happy_eye(x: float, y: float) -> String:
+	return '<path d="M%s %sQ%s %s %s %s" fill="none" stroke="%s" stroke-width="1.4" stroke-linecap="round"/>' % [x - 2, y + 0.9, x, y - 1.7, x + 2, y + 0.9, INK]
+
+static func _cheeks(y: float, col := "#ff5f7e", op := 0.38) -> String:
+	return '<circle cx="13.4" cy="%s" r="1.9" fill="%s" opacity="%s"/><circle cx="26.6" cy="%s" r="1.9" fill="%s" opacity="%s"/>' % [y, col, op, y, col, op]
+
+## An open, laughing mouth with its tongue.
+static func _laugh(y: float) -> String:
+	return (_path("M16.6 %sQ20 %s 23.4 %sQ20 %s 16.6 %sZ" % [y, y + 5.4, y, y + 0.8, y], INK)
+		+ _path("M18 %sQ20 %s 22 %sQ20 %s 18 %sZ" % [y + 2.2, y + 4.2, y + 2.2, y + 1.2, y + 2.2], "#ff7f8f"))
+
+## Red: the plucky hero, a headband and a toothy grin.
+static func _mascot_hero(a: Dictionary) -> String:
+	return (_path("M28.8 11.2L36.4 7.6L35 11.6L37 15.4L29.4 14.6Z", a.deep)
+		+ _pawn(a.body, a.deep)
+		+ _path("M9.5 13.2Q20 7.8 30.5 13.2L30.8 16.2Q20 10.8 9.2 16.2Z", CREAM)
+		+ _path("M9.4 15.2Q20 9.8 30.6 15.2L30.8 16.2Q20 10.8 9.2 16.2Z", a.deep)
+		+ '<path d="M13.8 15.9L18 16.9M26.2 15.9L22 16.9" fill="none" stroke="%s" stroke-width="1.3" stroke-linecap="round"/>' % INK
+		+ _open_eye(16.3, 18.9) + _open_eye(23.7, 18.9) + _cheeks(21.8)
+		+ '<path d="M16.8 21.8H23.2Q22.8 24.8 20 24.8Q17.2 24.8 16.8 21.8Z" fill="#fff" stroke="%s" stroke-width=".9" stroke-linejoin="round"/>' % INK)
+
+## Green: the gentle one, a sprout on the head and smiling eyes.
+static func _mascot_sprout(a: Dictionary) -> String:
+	return ('<g transform="translate(0 3.2)">' + _pawn(a.body, a.deep)
+		+ '<path d="M20 5.2V1.4" fill="none" stroke="%s" stroke-width="1.5" stroke-linecap="round"/>' % a.deep
+		+ _path("M20 2C17 2.8 13.6 1.8 12.2 -1.6C16 -2.4 19.4 -1.2 20 2Z", "#a9ee9a")
+		+ _path("M20 2C23 2.8 26.4 1.8 27.8 -1.6C24 -2.4 20.6 -1.2 20 2Z", "#7ee08a")
+		+ _happy_eye(15.9, 14.8) + _happy_eye(24.1, 14.8) + _cheeks(18.2, "#ffb08a", 0.75) + _laugh(18.4) + "</g>")
+
+## Yellow: the music lover, headphones and a wink.
+static func _mascot_beats(a: Dictionary) -> String:
+	var phones := "#7a4bd6"
+	return (_pawn(a.body, a.deep)
+		+ '<path d="M8.6 16C8.4 7.6 13.4 2.8 20 2.8C26.6 2.8 31.6 7.6 31.4 16" fill="none" stroke="%s" stroke-width="2.4" stroke-linecap="round"/>' % phones
+		+ '<rect x="5.8" y="12.6" width="6" height="9.4" rx="3" fill="%s"/><rect x="28.2" y="12.6" width="6" height="9.4" rx="3" fill="%s"/>' % [phones, phones]
+		+ '<rect x="7.2" y="14.4" width="2" height="5.8" rx="1" fill="#ff8fc0"/><rect x="30.8" y="14.4" width="2" height="5.8" rx="1" fill="#ff8fc0"/>'
+		+ _open_eye(16.2, 15.6) + _happy_eye(24, 15.8) + _cheeks(19.2)
+		+ '<path d="M16.4 19.8Q20 23.8 23.6 19.8" fill="none" stroke="%s" stroke-width="1.3" stroke-linecap="round"/>' % INK
+		+ _path("M20.4 21.8Q22 21.4 22.8 20.6Q23.2 23.2 21.6 23.4Q20.4 23.4 20.4 21.8Z", "#ff7f8f"))
+
+## Blue: the cool one, shades and a crooked smile.
+static func _mascot_cool(a: Dictionary) -> String:
+	return (_path("M13.6 6.2C14.2 2.4 18.4 1.2 20.4 3.4C21.6 1 26 1.6 26.6 6.4C22.6 4 17.6 4 13.6 6.2Z", a.deep)
+		+ _pawn(a.body, a.deep)
+		+ '<path d="M9.6 13.6H30.4" fill="none" stroke="#1d1922" stroke-width="1.5" stroke-linecap="round"/>'
+		+ _path("M11 13.2H19C19.4 17.8 17.6 19.4 14.8 19.4C12 19.4 10.8 17.6 11 13.2Z", "#1d1922")
+		+ _path("M21 13.2H29C29.2 17.6 28 19.4 25.2 19.4C22.4 19.4 20.6 17.8 21 13.2Z", "#1d1922")
+		+ '<path d="M13 14.6L15.6 17.6M23 14.6L25.6 17.6" stroke="#8fd8ff" stroke-width="1.1" stroke-linecap="round"/>'
+		+ '<path d="M16.8 22.8Q20.8 24.4 24 21" fill="none" stroke="%s" stroke-width="1.3" stroke-linecap="round"/>' % INK)
+
+## Crown (level 5): the king of the board, a big gold crown and a proud smile.
+static func _mascot_royal(a: Dictionary) -> String:
+	return ('<g transform="translate(0 2.8)">' + _pawn(a.body, a.deep)
+		+ _path("M9.6 11.4L7.4 1.4L14.2 5.8L20 -0.4L25.8 5.8L32.6 1.4L30.4 11.4C24 9.4 16 9.4 9.6 11.4Z", GOLD)
+		+ _path("M9.6 11.4L7.4 1.4L14.2 5.8L13.4 10.4C12 10.6 10.8 11 9.6 11.4Z", "#f2b02c")
+		+ _path("M9.5 11.4C16 9.4 24 9.4 30.5 11.4L30.1 13.2C24 11.4 16 11.4 9.9 13.2Z", "#f09a1c")
+		+ _circle(20, 6.4, 1.7, "#ff4d6a") + _circle(14.6, 8, 1.1, "#4dd6e8") + _circle(25.4, 8, 1.1, "#4dd6e8")
+		+ _circle(7.4, 1.4, 1.1, CREAM) + _circle(20, -0.4, 1.1, CREAM) + _circle(32.6, 1.4, 1.1, CREAM)
+		+ _happy_eye(16, 16.6) + _happy_eye(24, 16.6) + _cheeks(19.4, "#ff8fb0", 0.6)
+		+ '<path d="M16.8 20.2Q20 23.4 23.2 20.2" fill="none" stroke="%s" stroke-width="1.3" stroke-linecap="round"/>' % INK
+		+ '<path d="M6.5 40C6.5 35 9 32.6 12.4 30.8C14 33 26 33 27.6 30.8C31 32.6 33.5 35 33.5 40Z" fill="%s"/>' % CREAM
+		+ _circle(13, 35.2, 0.9, INK) + _circle(20, 34.8, 0.9, INK) + "</g>")
+
+## Latte: a tall glass with foam, a straw and a sleepy, happy face.
+static func _mascot_latte() -> String:
+	return ('<path d="M25.6 8L28.8 0.6" fill="none" stroke="#ff7a8f" stroke-width="2.4" stroke-linecap="round"/>'
+		+ _path("M10.4 12H29.6L27.4 37C27.2 39 26 40 24 40H16C14 40 12.8 39 12.6 37Z", "#c98b57")
+		+ _path("M12 30H28L27.4 37C27.2 39 26 40 24 40H16C14 40 12.8 39 12.6 37Z", "#f6e4c8")
+		+ _path("M11.6 25.6C15 27.4 17.4 24.8 20 26.2C22.6 27.6 25.4 25 28.4 26.4L28 31C25 29.6 22.6 32 20 30.6C17.4 29.2 15 32 12 30.2Z", "#e3b78a")
+		+ _path("M10.4 12H14L15.4 40H16C14 40 12.8 39 12.6 37Z", "SH")
+		+ _circle(14, 9.6, 4.4, CREAM) + _circle(20, 7.6, 5.4, CREAM) + _circle(26, 9.6, 4.4, CREAM)
+		+ '<rect x="9.2" y="9.8" width="21.6" height="4.4" rx="2.2" fill="%s"/>' % CREAM
+		+ _path("M20 11.4C17.6 9.8 17.2 8.2 18.4 7.4C19.2 6.9 19.8 7.4 20 7.9C20.2 7.4 20.8 6.9 21.6 7.4C22.8 8.2 22.4 9.8 20 11.4Z", "#c98b57")
+		+ _happy_eye(16, 19) + _happy_eye(24, 19) + _cheeks(22)
+		+ '<path d="M17.6 22.2Q20 24.6 22.4 22.2" fill="none" stroke="%s" stroke-width="1.3" stroke-linecap="round"/>' % INK)
+
+## Lucky Dice: a tipsy die whose two middle pips are its eyes, with a four-leaf clover.
+static func _mascot_dice() -> String:
+	var clover := ""
+	for r: int in [0, 90, 180, 270]:
+		clover += '<ellipse cx="33" cy="4.2" rx="1.9" ry="2.5" transform="rotate(%d 33 7)" fill="#3fce7c"/>' % r
+	return ('<g transform="rotate(-7 20 21)">'
+		+ '<rect x="7" y="9.6" width="28" height="28" rx="7.5" fill="#c9202a"/>'
+		+ '<rect x="5" y="6.6" width="28" height="28" rx="7.5" fill="%s"/>' % CREAM
+		+ _path("M5 28.4C5.6 31.8 8.6 34.6 12.5 34.6H25.5C29.4 34.6 32.4 31.8 33 28.4C30 32.4 8 32.4 5 28.4Z", "SH")
+		+ _circle(10.8, 12.2, 2, "#e5484d") + _circle(27.2, 12.2, 2, "#e5484d") + _circle(10.8, 29, 2, "#e5484d") + _circle(27.2, 29, 2, "#e5484d")
+		+ _open_eye(15.2, 18.6) + _open_eye(22.8, 18.6)
+		+ '<circle cx="12.6" cy="22.2" r="1.7" fill="#ff5f7e" opacity=".38"/><circle cx="25.4" cy="22.2" r="1.7" fill="#ff5f7e" opacity=".38"/>'
+		+ '<g transform="translate(-1 0)">' + _laugh(21.6) + "</g></g>"
+		+ clover + _circle(33, 7, 0.9, "#1f9a58"))
+
+## Robot: a friendly little one, smiling eyes on a screen and a heart on its chest.
+static func _mascot_robot() -> String:
+	return ('<rect x="9" y="30" width="22" height="12" rx="4.5" fill="#8fa8c8"/>'
+		+ '<rect x="9" y="30" width="6" height="12" rx="3" fill="#461e28" fill-opacity="0.16"/>'
+		+ _path("M20 39.4C17.6 37.8 16.8 36.2 17.8 35.2C18.6 34.4 19.6 34.8 20 35.6C20.4 34.8 21.4 34.4 22.2 35.2C23.2 36.2 22.4 37.8 20 39.4Z", "#ff5f7e")
+		+ '<rect x="17" y="26.6" width="6" height="4.4" fill="#6f88a8"/>'
+		+ '<path d="M20 7V3.6" fill="none" stroke="#6f88a8" stroke-width="1.7" stroke-linecap="round"/>' + _circle(20, 2.8, 2.2, "#ff7a5c") + _circle(19.4, 2.2, 0.7, "#fff")
+		+ '<rect x="4.6" y="14.2" width="4.4" height="8.4" rx="2.2" fill="#ff7a5c"/><rect x="31" y="14.2" width="4.4" height="8.4" rx="2.2" fill="#ff7a5c"/>'
+		+ '<rect x="7" y="6.4" width="26" height="22.4" rx="9" fill="#f2f8ff"/>'
+		+ _path("M7 15.4C7 10 11 6.4 16 6.4H17C13 7.6 11.2 11 11.4 15.4C11.4 21 13 25.8 17.6 28.8H16C11 28.8 7 25 7 19.8Z", "SH")
+		+ '<rect x="10.6" y="10.4" width="18.8" height="14" rx="6" fill="#1d2748"/>'
+		+ '<g fill="none" stroke="#5ff2ff" stroke-width="1.7" stroke-linecap="round"><path d="M13.6 17.2Q15.6 14.2 17.6 17.2"/><path d="M22.4 17.2Q24.4 14.2 26.4 17.2"/><path d="M17.4 19.6Q20 22.6 22.6 19.6"/></g>'
+		+ '<circle cx="13.2" cy="20.6" r="1.3" fill="#ff5f9e" opacity=".75"/><circle cx="26.8" cy="20.6" r="1.3" fill="#ff5f9e" opacity=".75"/>')
 
 const JAW := "M12.6 18.4C12.8 25.2 16 27.2 20 27.2C24 27.2 27.2 25.2 27.4 18.4C26.4 22 24 23.4 20 23.4C16 23.4 13.6 22 12.6 18.4Z"
 
@@ -410,7 +544,7 @@ static func person_svg(p: Dictionary) -> String:
 		"manbun":
 			front = _circle(20, 5.4, 3.1, H) + _path(crop, H)
 		"spiky":
-			front = _path("M12 16L11.4 9.8L14.6 11L15 6.4L18 9L20 4.8L22 9L25 6.4L25.4 11L28.6 9.8L28 16C25 13 15 13 12 16Z", H)
+			front = _path("M12 16C11 12.6 11.6 10.8 13 10.4C12.4 8.2 14 6.8 15.6 7.6C15.6 5.2 18 4.4 19.2 6.2C19.8 4 22.4 4.2 23 6.4C24.6 5.2 26.4 6.4 26 8.2C27.8 8.2 28.6 10 27.6 11.2C28.8 12 28.8 14 28 16C25 13 15 13 12 16Z", H)
 		"cap":
 			front = (_path("M12.2 17L12.6 13H27.4L27.8 17C26 15.4 14 15.4 12.2 17Z", H)
 				+ _path("M11.6 14.2C11.6 7.6 15.6 6 20 6C24.4 6 28.4 7.6 28.4 14.2Z", AC)
@@ -449,11 +583,12 @@ static func person_svg(p: Dictionary) -> String:
 					back += '<ellipse cx="%s" cy="%s" rx="2.4" ry="2.3" fill="%s"/>' % [x, y, H]
 				back += _circle(x, 32.4, 1.4, AC)
 			front = _path("M12 17C11.6 9 15.2 7 20 7C24.8 7 28.4 9 28 17C27 13 24 11.6 20.4 11.2V9.6L19.6 11.2C16 11.6 13 13 12 17Z", H)
-		"hijab":
+		"hijab":                                 # as the Girl Set emotes: the hood, a dark under-scarf at the brow, the drape
 			ears_on = false
-			back = _path("M9.4 20.6C9 9.2 14 5 20 5C26 5 31 9.2 30.6 20.6C30.6 27 26.6 30.4 20 30.8C13.4 30.4 9.4 27 9.4 20.6Z", H)
-			front = (_path("M12.6 15.6C13 10.6 16.2 8.8 20 8.8C23.8 8.8 27 10.6 27.4 15.6C25 12.6 15 12.6 12.6 15.6Z", H)
-				+ _path("M9.6 21C11 27.6 15 30 20 30.4C17 31.6 13.4 32.6 11.2 34.6C10 31 9.4 26 9.6 21Z", "SH"))
+			back = _path("M9 20C8.6 8.8 13.8 4.6 20 4.6C26.2 4.6 31.4 8.8 31 20C31 27 26.8 30.8 20 31.2C13.2 30.8 9 27 9 20Z", H)
+			front = (_path("M12.7 16C13 10.8 16.2 8.7 20 8.7C23.8 8.7 27 10.8 27.3 16C25.2 12.8 14.8 12.8 12.7 16Z", "#3b2a24")
+				+ '<path d="M12.2 16.4C12.2 10.4 15.8 8 20 8C24.2 8 27.8 10.4 27.8 16.4" fill="none" stroke="%s" stroke-width="1"/>' % H
+				+ '<path d="M13.6 6.8Q16.4 5.4 19.2 5.3" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.2" stroke-linecap="round"/>')
 		"wavy":
 			back = _path("M10.6 17C10 8.5 14.5 5.6 20 5.6C25.5 5.6 30 8.5 29.4 17C31.4 20 29 22.4 30.8 25.4C32.4 28.2 29.6 31 30.4 33.6C26.4 35 13.6 35 9.6 33.6C10.4 31 7.6 28.2 9.2 25.4C11 22.4 8.6 20 10.6 17Z", H)
 			front = (_path("M12 16.6C11.6 9 15.2 7 20 7C24.8 7 28.4 9 28 16.6C25 12.6 15 12.6 12 16.6Z", H)
@@ -501,82 +636,97 @@ static func person_svg(p: Dictionary) -> String:
 		"dupatta":
 			od = '<path d="M8.4 33.8C12 30.2 16 29 18.6 29.2L22.6 40H15.6Z" fill="%s" opacity=".9"/>' % AC
 	var outfit := _path("M6 40C6 31.4 12 28 20 28C28 28 34 31.4 34 40Z", T) + _path("M6 40C6 31.4 12 28 20 28C14.6 30 12.4 34 12.6 40Z", "SH") + od
-	var neck := _path("M17 22.6H23V28.8C21.4 30 18.6 30 17 28.8Z", S) + _path("M17 24.6C18.8 26 21.2 26 23 24.6V22.6H17Z", "SH")
-	var ears := (_circle(12.1, 18.4, 1.9, S) + _circle(27.9, 18.4, 1.9, S)) if ears_on else ""
+	var neck := _path("M17 20H23V28.8C21.4 30 18.6 30 17 28.8Z", S) + _path("M17 23.2C18.8 25 21.2 25 23 23.2V20H17Z", "SH")
+	if p.hs == "hijab":
+		neck = (_path("M9.6 22C8.4 28.6 7.8 33 8.8 36C13 38.8 27 38.8 31.2 36C32.2 33 31.6 28.6 30.4 22Z", H)
+			+ _path("M9.6 22C8.4 28.6 7.8 33 8.8 36C10 36.8 11.6 37.4 13.4 37.8C12.4 32 12.6 27 14 22Z", "SH")
+			+ '<path d="M13.4 26.6C15.8 30 24.2 30 26.6 26.6M16 33.4Q20 35 24 33.4" fill="none" stroke="SH" stroke-width="1" stroke-linecap="round"/>')
+	var ears := (_circle(12.2, 18.6, 1.7, S) + _circle(27.8, 18.6, 1.7, S)) if ears_on else ""
 	var hijab: bool = p.hs == "hijab"
-	var head := ears + '<ellipse cx="20" cy="17.4" rx="%s" ry="%s" fill="%s"/>' % [7.2 if hijab else 8, 8.2 if hijab else 9, S]
+	var head := ears + '<ellipse cx="20" cy="17.4" rx="%s" ry="%s" fill="%s"/>' % [7.4 if hijab else 8, 8.4 if hijab else 9, S]
+	head += '<path d="M12 17.4C12 22.4 15.6 26.4 20 26.4C16.8 25.4 14.5 21.8 14.3 17.4C14.2 13.6 15.2 11 17 9C14 9.8 12 13 12 17.4Z" fill="#461e28" fill-opacity="0.09"/>'
 	var f: bool = p.g == "f"
-	var eyes := _eyes(str(p.get("eye", "round")), str(p.get("eyeCol", "")), ink)
-	if bool(p.get("lash", f)):
-		eyes += '<path d="M15.2 17.3L14.6 16.6M24.8 17.3L25.4 16.6" stroke="%s" stroke-width=".7" stroke-linecap="round"/>' % ink
-	var brow: String = {thin = ".7", soft = "1", thick = "1.7"}.get(str(p.get("brow", "none" if f else "soft")), "")
+	var eyes := _eyes(str(p.get("eye", "round")), str(p.get("eyeCol", "")), ink, str(p.get("look", "")), bool(p.get("lash", f)))
+	var brow: String = {thin = ".8", soft = "1.1", thick = "1.7"}.get(str(p.get("brow", "thin" if f else "soft")), "")
 	if brow != "":
-		eyes += '<path d="M15.2 15.6Q16.8 14.8 18.4 15.5M21.6 15.5Q23.2 14.8 24.8 15.6" fill="none" stroke="%s" stroke-width="%s" stroke-linecap="round"/>' % [ink if hijab or p.hs == "bald" else H, brow]
-	var lips := _path("M18 21.8Q20 23.8 22 21.8Q20 22.6 18 21.8Z", "#d9536a")
-	var smile := '<path d="M17.8 21.6Q20 23.6 22.2 21.6" fill="none" stroke="%s" stroke-width=".9" stroke-linecap="round"/>' % ink
+		eyes += '<path d="M14.6 15.5Q16.5 14.3 18.4 15.3M21.6 15.3Q23.5 14.3 25.4 15.5" fill="none" stroke="%s" stroke-width="%s" stroke-linecap="round"/>' % [ink if hijab or p.hs == "bald" else H, brow]
 	var mouth: String = {
-		"lips": lips,
-		"smile": smile,
-		"grin": '<path d="M17.5 21.4Q20 25 22.5 21.4Z" fill="#fff" stroke="%s" stroke-width=".75" stroke-linejoin="round"/>' % ink,
-		"neutral": '<path d="M18.4 22.3Q20 22.8 21.6 22.3" fill="none" stroke="%s" stroke-width=".85" stroke-linecap="round"/>' % ink,
-	}.get(str(p.get("mouth", "")), lips if f else smile)
-	match str(p.get("nose", "")):
-		"small":
-			mouth = '<path d="M19.4 20.3Q20 21.1 20.6 20.3" fill="none" stroke="SH" stroke-width=".8" stroke-linecap="round"/>' + mouth
-		"wide":
-			mouth = '<path d="M18.6 20Q18.9 21.3 20 21.1Q21.1 21.3 21.4 20" fill="none" stroke="SH" stroke-width=".85" stroke-linecap="round"/>' + mouth
-	var stache := _path("M17 21Q18.6 19.6 20 20.6Q21.4 19.6 23 21Q21.6 21.4 20 21.1Q18.4 21.4 17 21Z", H)
+		"lips": _path("M17.2 21.9Q18.8 21 20 21.6Q21.2 21 22.8 21.9Q20 25.2 17.2 21.9Z", "#d9536a") + '<path d="M19 23.4Q20 23.8 21 23.4" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".5" stroke-linecap="round"/>',
+		"smile": '<path d="M17.3 22Q20 24.7 22.7 22" fill="none" stroke="%s" stroke-width="1" stroke-linecap="round"/>' % ink,
+		"grin": '<path d="M17.5 21.8H22.5Q22.3 24.5 20 24.5Q17.7 24.5 17.5 21.8Z" fill="#fff" stroke="%s" stroke-width=".7" stroke-linejoin="round"/>' % ink,
+		"laugh": _path("M17.4 21.7H22.6Q22.4 25 20 25Q17.6 25 17.4 21.7Z", "#6e2233") + _path("M18.4 24Q20 23 21.6 24Q21.1 25 20 25Q18.9 25 18.4 24Z", "#ff7f8f") + _path("M17.8 21.7H22.2L22 22.4H18Z", "#fff"),
+		"smirk": '<path d="M17.6 23Q20.8 24.2 22.8 21.5" fill="none" stroke="%s" stroke-width="1" stroke-linecap="round"/>' % ink,
+		"neutral": '<path d="M18 22.5Q20 23.2 22 22.5" fill="none" stroke="%s" stroke-width="1" stroke-linecap="round"/>' % ink,
+	}.get(str(p.get("mouth", "")), "")
+	if mouth == "":
+		mouth = '<path d="M17.3 22Q20 24.7 22.7 22" fill="none" stroke="%s" stroke-width="1" stroke-linecap="round"/>' % ink
+	var nose_d: String = {"wide": "M18.5 20Q18.8 21.2 20 21Q21.2 21.2 21.5 20"}.get(str(p.get("nose", "")), "M19.2 20.2Q20 21 20.8 20.2")
+	mouth = '<path d="%s" fill="none" stroke="SH" stroke-width="1" stroke-linecap="round"/>' % nose_d + mouth
+	var stache := _path("M17 21.2Q18.6 19.8 20 20.8Q21.4 19.8 23 21.2Q21.6 21.6 20 21.3Q18.4 21.6 17 21.2Z", H)
 	match str(p.get("fh", "")):
 		"stubble":
 			face += '<path d="%s" fill="%s" opacity=".3"/>' % [JAW, H]
 		"moustache":
 			face += stache
 		"goatee":
-			face += stache + '<ellipse cx="20" cy="25.2" rx="1.9" ry="1.5" fill="%s"/>' % H
+			face += stache + '<ellipse cx="20" cy="25.6" rx="1.9" ry="1.3" fill="%s"/>' % H
 		"beard":
 			face += _path(JAW, H) + stache
-	var cheeks := '<circle cx="15.2" cy="21" r="1.5" fill="#ff8f9b" opacity=".35"/><circle cx="24.8" cy="21" r="1.5" fill="#ff8f9b" opacity=".35"/>'
+	var cheeks := '<circle cx="14.6" cy="21.4" r="1.7" fill="#ff6f83" opacity=".32"/><circle cx="25.4" cy="21.4" r="1.7" fill="#ff6f83" opacity=".32"/>'
 	match str(p.get("acc", "")):
 		"glasses":
-			acc = '<g fill="none" stroke="%s" stroke-width=".9"><circle cx="16.8" cy="18.2" r="2.5"/><circle cx="23.2" cy="18.2" r="2.5"/><path d="M19.3 18H20.7"/></g>' % AC
+			acc = '<g fill="#fff" fill-opacity=".14" stroke="%s" stroke-width="1"><circle cx="16.5" cy="18.5" r="3"/><circle cx="23.5" cy="18.5" r="3"/></g><path d="M19.5 18.2H20.5" fill="none" stroke="%s" stroke-width="1"/>' % [AC, AC]
 		"earrings":
-			acc = _circle(12.1, 21.2, 1, AC) + _circle(27.9, 21.2, 1, AC)
+			acc = _circle(12.2, 21.4, 1.1, AC) + _circle(27.8, 21.4, 1.1, AC)
 		"shades":
 			acc = ('<g fill="#1d1922" stroke="%s" stroke-width=".7"><path d="M14 16.8H19.4Q19.6 20.4 16.7 20.4Q14 20.4 14 16.8Z"/><path d="M20.6 16.8H26Q26 20.4 23.3 20.4Q20.4 20.4 20.6 16.8Z"/></g>' % AC
-				+ '<path d="M19.4 17.2H20.6" stroke="%s" stroke-width=".7"/><path d="M15 17.6L16.2 19" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-linecap="round"/>' % AC)
-	var out := back + outfit + neck + head + face + eyes + mouth + cheeks + front + acc
-	# the soft shade rgba(70,30,40,.16) as colour + opacity (plain hex keeps every SVG reader happy)
-	return out.replace('fill="SH"', 'fill="#461e28" fill-opacity="0.16"').replace('stroke="SH"', 'stroke="#461e28" stroke-opacity="0.16"')
+				+ '<path d="M19.4 17.2H20.6" fill="none" stroke="%s" stroke-width=".7"/><path d="M15 17.6L16.2 19" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-linecap="round"/>' % AC)
+	var shine := ""
+	if not ["cap", "beanie", "hijab", "bald", "buzz", "curls", "curlylong", "wavy"].has(str(p.hs)):
+		shine = '<path d="M15 10.4Q16.8 8.6 19.2 8.1" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.2" stroke-linecap="round"/>'
+	# the big head: the whole of it grows around its middle and sits a little higher, the body a little lower
+	var head_y: float = {afro = 18.8, manbun = 18.4, beanie = 18.4, curlylong = 17.6, buns = 17.2}.get(str(p.hs), 16.6)
+	var big := 'transform="translate(20 %s) scale(1.16) translate(-20 -17.4)"' % head_y
+	var out := ('<g %s>%s</g>' % [big, back]
+		+ '<g transform="translate(0 1.8)">%s</g>' % (outfit + neck)
+		+ '<g %s>%s</g>' % [big, head + face + eyes + mouth + cheeks + front + shine + acc])
+	return _soft_shade(out)
 
-## Both eyes (index.html personSVG): the shape, an iris colour if any, the highlights.
-static func _eyes(shape: String, col: String, ink: String) -> String:
-	if shape == "round" and col == "":        # the original eyes
-		return ('<ellipse cx="16.8" cy="18.2" rx="1.15" ry="1.35" fill="%s"/><ellipse cx="23.2" cy="18.2" rx="1.15" ry="1.35" fill="%s"/>' % [ink, ink]
-			+ _circle(17.2, 17.7, 0.4, "#fff") + _circle(23.6, 17.7, 0.4, "#fff"))
-	var out := '<g fill="%s">' % (col if col != "" else ink)
-	for x: float in [16.8, 23.2]:
+## Both eyes: the white, the iris (dark or eyeCol) with its shine, the upper lid (and lashes). look: "happy" = both
+## smiling arcs, "wink" = the right one. shape: "round" | "big" | "almond" | "narrow".
+static func _eyes(shape: String, col: String, ink: String, look := "", lash := false) -> String:
+	var out := ""
+	var i := 0
+	for x: float in [16.5, 23.5]:
+		var side := -1.0 if x < 20.0 else 1.0
+		if look == "happy" or (look == "wink" and i == 1):
+			out += '<path d="M%s 19.2Q%s 16.8 %s 19.2" fill="none" stroke="%s" stroke-width="1.2" stroke-linecap="round"/>' % [x - 2, x, x + 2, ink]
+			if lash:
+				out += '<path d="M%s 18.6L%s 17.8" fill="none" stroke="%s" stroke-width=".8" stroke-linecap="round"/>' % [x + side * 1.8, x + side * 2.6, ink]
+			i += 1
+			continue
+		var iris: String = col if col != "" else ink
 		match shape:
-			"big":
-				out += '<ellipse cx="%s" cy="18.1" rx="1.45" ry="1.75"/>' % x
-			"almond":
-				out += '<path d="M%s 18.3Q%s 16.8 %s 18.1Q%s 19.5 %s 18.3Z"/>' % [x - 1.7, x, x + 1.7, x + 0.1, x - 1.7]
 			"narrow":
-				out += '<ellipse cx="%s" cy="18.4" rx="1.35" ry=".72"/>' % x
+				out += '<path d="M%s 18.9Q%s 16.9 %s 18.9Q%s 20.1 %s 18.9Z" fill="#fff"/>' % [x - 2, x, x + 2, x, x - 2]
+				out += _circle(x, 18.6, 1.15, iris) + _circle(x + 0.4, 18.2, 0.35, "#fff")
+				out += '<path d="M%s 18.9Q%s 16.9 %s 18.9" fill="none" stroke="%s" stroke-width=".8" stroke-linecap="round"/>' % [x - 2.1, x, x + 2.1, ink]
+			"almond":
+				out += '<path d="M%s 18.8Q%s 16.2 %s 18.5Q%s 20.6 %s 18.8Z" fill="#fff"/>' % [x - side * 2.1, x, x + side * 2.2, x, x - side * 2.1]
+				out += _circle(x, 18.5, 1.4, iris) + _circle(x + 0.45, 18, 0.45, "#fff")
+				out += '<path d="M%s 18.8Q%s 16.2 %s 18.5" fill="none" stroke="%s" stroke-width=".85" stroke-linecap="round"/>' % [x - side * 2.2, x, x + side * 2.4, ink]
 			_:
-				out += '<ellipse cx="%s" cy="18.2" rx="1.15" ry="1.35"/>' % x
-	out += "</g>"
-	if col != "":                             # the pupil
-		for x: float in [16.8, 23.2]:
-			out += _circle(x, 18.3, 0.45 if shape == "narrow" else 0.65, ink)
-	match shape:
-		"round":
-			out += _circle(17.2, 17.7, 0.4, "#fff") + _circle(23.6, 17.7, 0.4, "#fff")
-		"big":
-			out += _circle(17.3, 17.4, 0.55, "#fff") + _circle(23.7, 17.4, 0.55, "#fff")
-		_:
-			out += _circle(17.2, 18.0, 0.3, "#fff") + _circle(23.6, 18.0, 0.3, "#fff")
-	if shape == "narrow":
-		out += '<path d="M15.2 17.7Q16.8 17.1 18.4 17.7M21.6 17.7Q23.2 17.1 24.8 17.7" fill="none" stroke="%s" stroke-width=".55" stroke-linecap="round"/>' % ink
+				var k := 1.15 if shape == "big" else 1.0
+				out += '<ellipse cx="%s" cy="18.6" rx="%s" ry="%s" fill="#fff"/>' % [x, 1.75 * k, 2.1 * k]
+				out += '<ellipse cx="%s" cy="18.75" rx="%s" ry="%s" fill="%s"/>' % [x, 1.45 * k, 1.85 * k, iris]
+				if col != "":
+					out += _circle(x, 18.85, 0.85, ink)
+				out += _circle(x + 0.5, 18, 0.6, "#fff")
+				if lash:
+					out += '<path d="M%s 17.9Q%s %s %s 17.9" fill="none" stroke="%s" stroke-width=".7" stroke-linecap="round"/>' % [x - 1.75 * k, x, 16.2 - (k - 1.0) * 2.0, x + 1.75 * k, ink]
+		if lash:
+			out += '<path d="M%s 17.7L%s 16.9" fill="none" stroke="%s" stroke-width=".8" stroke-linecap="round"/>' % [x + side * 1.8, x + side * 2.6, ink]
+		i += 1
 	return out
 
 static func _path(d: String, fill: String) -> String:

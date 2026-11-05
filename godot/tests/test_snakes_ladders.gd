@@ -18,7 +18,8 @@ func run() -> void:
 	check("every ladder goes up, every snake goes down", LA.keys().all(func(a): return LA[a] > a) and SN.keys().all(func(a): return SN[a] < a))
 	check("no square is both a ladder foot and a snake head; 100 is never a snake head", LA.keys().all(func(k): return not SN.has(k)) and not SN.has(100))
 	check("plain move", SL.land(10, 2) == {to = 12, steps = 2})
-	_check_trail_rules()
+	check("a match kept on the removed Snake Trail board can't be continued", SL.on_removed_board({G = {board = "trail", players = []}}) and SL.on_removed_board({board = "trail"}))
+	check("every other kept match can", not SL.on_removed_board({G = SL.new_game("cpu", 2)}) and not SL.on_removed_board({}))
 	for n1 in [false, true]:
 		check("[need_one %s] off the board, a 1 enters on square 1 (no ladder there any more)" % n1, SL.land(0, 1, n1).to == 1 and SL.land(0, 1, n1).steps == 1 and not SL.land(0, 1, n1).has("ladder"))
 	check("removed ladders: no 1 -> 38 and no 80 -> 100 in the board data", not LA.has(1) and not LA.has(80) and not LA.values().has(38) and not LA.values().has(100) and LA.size() == 7, LA)
@@ -166,64 +167,3 @@ func run() -> void:
 	check("vs Computer with 4 players: 3 computers", g.players.size() == 4 and g.players.filter(func(p): return p.cpu).size() == 3)
 	g = SL.new_game("local", 3)
 	check("Pass & Play with 3 players", g.players.size() == 3 and g.players.all(func(p): return not p.cpu))
-
-## Snake Trail: its own snakes and ladders, chosen by the game's board; a classic game is untouched.
-func _check_trail_rules() -> void:
-	var T := SL.TRAIL
-	check("trail: every ladder climbs", SL.TRAIL_LADDERS.keys().all(func(f): return SL.land(f - 1, 1, false, T).to == SL.TRAIL_LADDERS[f] and SL.land(f - 1, 1, false, T).has("ladder")))
-	check("trail: every snake slides", SL.TRAIL_SNAKES.keys().all(func(h): return SL.land(h - 1, 1, false, T).to == SL.TRAIL_SNAKES[h] and SL.land(h - 1, 1, false, T).has("snake")))
-	check("trail: the classic squares are plain there", SL.land(3, 1, false, T) == {to = 4, steps = 1} and SL.land(15, 1, false, T) == {to = 16, steps = 1})
-	check("classic: the trail's squares are plain", SL.land(2, 1) == {to = 3, steps = 1} and SL.land(16, 1) == {to = 17, steps = 1})
-	check("ladders go up, snakes go down", SL.TRAIL_LADDERS.keys().all(func(f): return SL.TRAIL_LADDERS[f] > f) and SL.TRAIL_SNAKES.keys().all(func(h): return SL.TRAIL_SNAKES[h] < h))
-	var ends := SL.TRAIL_LADDERS.values() + SL.TRAIL_SNAKES.values()
-	check("no ladder or snake ends on the start of another", ends.all(func(e): return not SL.TRAIL_LADDERS.has(e) and not SL.TRAIL_SNAKES.has(e)))
-	check("nothing starts or ends on 100", not SL.TRAIL_SNAKES.has(100) and not ends.has(100) and not SL.TRAIL_LADDERS.has(100))
-	var classic := SL.new_game("cpu", 2, 0)
-	var other := SL.new_game("cpu", 2, 0, {board = "nope"})
-	var trail := SL.new_game("cpu", 2, 0, {board = T})
-	check("a classic game's state has no board field (online hashes and old saves stay as they were)", not classic.has("board") and not other.has("board") and SL.board_of(classic) == "")
-	check("a trail game knows its board", trail.board == T and SL.board_of(trail) == T)
-	check("a saved state with a strange board plays classic", SL.board_of({board = "nope"}) == "" and SL.board_of({board = 7}) == "")
-	var ev := SL.apply_roll(trail, 3)
-	check("apply_roll plays the game's own board (3 climbs to 21)", trail.players[0].pos == 21 and trail.players[0].ladders == 1 and ev.any(func(e): return e.type == "move" and e.to == 21 and e.ladder))
-	SL.apply_roll(classic, 3)
-	check("... and a classic game the classic one (3 is plain)", classic.players[0].pos == 3 and classic.players[0].ladders == 0)
-	var win := _trail_win()
-	check("a path of rolls reaches 100 on the trail", SL.replay_reaches_100(win, false, T), win)
-	var wrong := false
-	var pos := 0
-	for v in win:
-		pos = SL.land(pos, v).to
-		wrong = wrong or pos == 100
-	check("... not the same rolls on the classic board, so the board must be replayed", SL.replay_reaches_100(win) == wrong and not wrong, pos)
-	var g := SL.new_game("cpu", 2, 0, {board = T})
-	g.phase = "over"
-	g.winner = 0
-	g.players[0].rolls = win
-	check("the win reward replays on the game's board", SL.claim_win_reward(g) == SL.REWARD)
-	var c := SL.new_game("cpu", 2, 0)
-	c.phase = "over"
-	c.winner = 0
-	c.players[0].rolls = win
-	check("... and refuses them on the classic board", SL.claim_win_reward(c) == 0)
-
-## Rolls that win on the trail, found by walking: the largest roll that doesn't land on a snake (no third 6 in a row).
-func _trail_win() -> Array:
-	var pos := 0
-	var out := []
-	var sixes := 0
-	while pos != 100 and out.size() < 300:
-		var best := 1
-		var to := -1
-		for v in range(1, 7):
-			if v == 6 and sixes == 2:
-				continue
-			var r := SL.land(pos, v, false, SL.TRAIL)
-			if int(r.to) > to:
-				to = r.to
-				best = v
-		sixes = sixes + 1 if best == 6 else 0
-		pos = to
-		out.append(best)
-	return out
-

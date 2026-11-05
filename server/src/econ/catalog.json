@@ -676,7 +676,7 @@
     {
       "kind": "char",
       "id": "w-hana",
-      "name": "Hana",
+      "name": "Sadia",
       "price": 0,
       "buy": false,
       "free": true,
@@ -686,7 +686,7 @@
     {
       "kind": "char",
       "id": "w-kenji",
-      "name": "Kenji",
+      "name": "Sakib",
       "price": 0,
       "buy": false,
       "free": true,
@@ -696,7 +696,7 @@
     {
       "kind": "char",
       "id": "w-mei",
-      "name": "Mei",
+      "name": "Mitu",
       "price": 0,
       "buy": false,
       "free": true,
@@ -706,7 +706,7 @@
     {
       "kind": "char",
       "id": "w-linh",
-      "name": "Linh",
+      "name": "Sharmin",
       "price": 0,
       "buy": false,
       "free": true,
@@ -716,7 +716,7 @@
     {
       "kind": "char",
       "id": "w-emma",
-      "name": "Emma",
+      "name": "Farzana",
       "price": 0,
       "buy": false,
       "free": true,
@@ -726,7 +726,7 @@
     {
       "kind": "char",
       "id": "w-lukas",
-      "name": "Lukas",
+      "name": "Hasan",
       "price": 0,
       "buy": false,
       "free": true,
@@ -736,7 +736,7 @@
     {
       "kind": "char",
       "id": "w-sofia",
-      "name": "Sofia",
+      "name": "Jannat",
       "price": 0,
       "buy": false,
       "free": true,
@@ -746,7 +746,7 @@
     {
       "kind": "char",
       "id": "w-oliver",
-      "name": "Oliver",
+      "name": "Rahim",
       "price": 0,
       "buy": false,
       "free": true,
@@ -756,7 +756,7 @@
     {
       "kind": "char",
       "id": "w-jayden",
-      "name": "Jayden",
+      "name": "Sohel",
       "price": 0,
       "buy": false,
       "free": true,
@@ -766,7 +766,7 @@
     {
       "kind": "char",
       "id": "w-maya",
-      "name": "Maya",
+      "name": "Rupa",
       "price": 0,
       "buy": false,
       "free": true,
@@ -776,7 +776,7 @@
     {
       "kind": "char",
       "id": "w-carlos",
-      "name": "Carlos",
+      "name": "Kamal",
       "price": 0,
       "buy": false,
       "free": true,
@@ -786,7 +786,7 @@
     {
       "kind": "char",
       "id": "w-ava",
-      "name": "Ava",
+      "name": "Tasnim",
       "price": 0,
       "buy": false,
       "free": true,

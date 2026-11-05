@@ -704,7 +704,7 @@ func continue_match() -> void:
 		return
 	var game := MatchStore.game()
 	var st := MatchStore.load()
-	if st.is_empty() or game not in ["ludo", "sl"]:
+	if st.is_empty() or game not in ["ludo", "sl"] or (game == "sl" and SnakesLaddersRules.on_removed_board(st)):
 		_home_toast(tr("This match can’t be continued."), "bad")
 		MatchStore.clear()
 		home.refresh()
@@ -1240,8 +1240,6 @@ func _claim_info(game: String, data: Dictionary) -> Dictionary:
 					rolls.append(int(v))
 		info.rolls = rolls
 		info.need_one = bool(g.get("need_one", false))
-		if SnakesLaddersRules.board_of(g) != "":
-			info.board = SnakesLaddersRules.board_of(g)        # (the server replays the rolls on this board's squares)
 	return info
 
 ## Your (your team's) final place in a result's standings (1-based; 0: no "you", e.g. Pass & Play): the claim's

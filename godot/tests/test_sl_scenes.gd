@@ -29,9 +29,9 @@ func _run() -> void:
 	var err: String
 
 	# ---- catalogue ----
-	check("the web scenes in shop order", SLScenes.LIST.map(func(s): return s.id) == ["jungle", "trail", "frost", "candy", "desert", "cloud", "enchanted"])
-	check("scene prices (Enchanted Jungle free since 2026-10-30, Snake Trail free)", SLScenes.LIST.map(func(s): return s.price) == [0, 0, 20000, 22000, 25000, 25000, 0])
-	_check_trail()
+	check("the six web scenes in shop order", SLScenes.LIST.map(func(s): return s.id) == ["jungle", "frost", "candy", "desert", "cloud", "enchanted"])
+	check("scene prices (Enchanted Jungle free since 2026-10-30)", SLScenes.LIST.map(func(s): return s.price) == [0, 20000, 22000, 25000, 25000, 0])
+	check("Snake Trail is gone from the shop", SLScenes.info("trail").is_empty() and not SLScenes.SCENES.has("trail"))
 	check("every scene has a world config", SLScenes.LIST.all(func(s): return SLScenes.SCENES.has(s.id)))
 	check("every scene has a card gradient", SLScenes.LIST.all(func(s): return (s.g as Array).size() == 2))
 	check("info(unknown) is empty", SLScenes.info("volcano").is_empty())
@@ -40,9 +40,14 @@ func _run() -> void:
 	p = use(fresh(0))
 	check("Jungle owned without a scenes list", SLScenes.owns_scene("jungle") and SLScenes.owned_ids() == ["jungle"])
 	check("scene in use falls back to Jungle", SLScenes.scene_in_use() == "jungle")
+	p = use(fresh(0))
+	p.scene = "trail"
+	p.scenes = ["jungle", "trail"]
+	check("a save from v16 with Snake Trail in use comes back on Jungle", SLScenes.scene_in_use() == "jungle" and SLScenes.owned_ids() == ["jungle"])
+	p = use(fresh(0))
 	check("paid scenes not owned by default", not SLScenes.owns_scene("frost") and not SLScenes.owns_scene("cloud"))
-	check("free scenes owned by everyone", SLScenes.owns_scene("jungle") and SLScenes.owns_scene("trail") and SLScenes.owns_scene("enchanted"))
-	check("owned scenes lists the free ones", SLScenes.owned_scenes().map(func(s): return s.id) == ["jungle", "trail", "enchanted"])
+	check("free scenes owned by everyone", SLScenes.owns_scene("jungle") and SLScenes.owns_scene("enchanted"))
+	check("owned scenes lists the free ones", SLScenes.owned_scenes().map(func(s): return s.id) == ["jungle", "enchanted"])
 	err = SLScenes.buy_scene("jungle")
 	check("Jungle can't be bought (already owned)", err != "" and p.coins == 0 and writes == 0, err)
 	check("equipping Jungle works with no coins and adds the fields", SLScenes.equip_scene("jungle") and p.scene == "jungle" and p.scenes == ["jungle"] and writes == 1, p)
@@ -92,46 +97,3 @@ func _run() -> void:
 	check("failed save: no coins spent, nothing owned or equipped", p.coins == 30000 and not p.has("scenes") and not p.has("scene"), p)
 	p.scenes = ["jungle", "frost"]
 	check("failed save: equip returns false and keeps the old scene", not SLScenes.equip_scene("frost") and not p.has("scene"))
-
-## Snake Trail: one winding road of 100 tiles on the board's face, its own snakes and ladders between neighbouring loops.
-func _check_trail() -> void:
-	check("only Snake Trail has its own squares", SLScenes.LIST.all(func(s): return SLScenes.layout_of(s.id) == ("trail" if s.id == "trail" else "")))
-	check("an unknown scene is on the grid", SLScenes.layout_of("nope") == "")
-	var cells := []
-	var inside := true
-	var even := true
-	for n in range(1, 101):
-		var c := SLBoard.grid_of(n, "trail")
-		cells.append(c)
-		inside = inside and c.x > 0.5 and c.x < 9.5 and c.y > 0.5 and c.y < 9.7
-		if n > 1:
-			even = even and absf(c.distance_to(cells[n - 2]) - SLTrail.pitch()) < 0.08
-	check("100 squares, all on the face", cells.size() == 100 and inside)
-	check("each square a tile's length from the last", even)
-	var apart := true
-	for i in 100:
-		for j in range(i + 1, 100):
-			apart = apart and (cells[i] as Vector2).distance_to(cells[j]) > 0.6
-	check("no two squares overlap (a pawn stands on one)", apart)
-	check("square 1 is at the bottom left, 100 at the top", cells[0].x < 2.5 and cells[0].y > 8.5 and cells[99].y < 1.5)
-	check("the grid is unchanged by the default", SLBoard.grid_of(1) == Vector2(0.5, 9.5) and SLBoard.grid_of(100) == Vector2(0.5, 0.5))
-	var ladders := SnakesLaddersRules.TRAIL_LADDERS
-	var snakes := SnakesLaddersRules.TRAIL_SNAKES
-	var near := true
-	for f in ladders:
-		near = near and SLBoard.grid_of(f, "trail").distance_to(SLBoard.grid_of(ladders[f], "trail")) < 2.0
-	check("each ladder joins neighbouring loops", near)
-	var lengths := true
-	for h in snakes:
-		var body := SLBoard.snake_body(h, 32, "trail")
-		lengths = lengths and body[0].is_equal_approx(SLBoard.grid_of(h, "trail")) and body[32].is_equal_approx(SLBoard.grid_of(snakes[h], "trail"))
-	check("a snake's body runs from its head's square to its tail's", lengths)
-	check("the classic bodies are still there beside them", SLBoard.snake_body(16, 32).size() == 33 and SLBoard.snake_body(16, 32)[0].is_equal_approx(SLBoard.grid_of(16) + SLBoard.HEAD_NUDGE))
-	var b := SLBoard.new()
-	check("a new board is on the grid", b.layout == "" and b.cell_world(1) == SLBoard.grid_to_world(SLBoard.grid_of(1)))
-	b.layout = "trail"
-	check("on the trail, pawns stand on its tiles", b.cell_world(1) == SLBoard.grid_to_world(SLBoard.grid_of(1, "trail")))
-	b.use_layout("")
-	check("use_layout: a match can put the board back on the grid", b.layout == "" and b.cell_world(50) == SLBoard.grid_to_world(SLBoard.grid_of(50)))
-	b.free()
-

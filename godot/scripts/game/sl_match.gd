@@ -398,7 +398,7 @@ func start(cfg: Dictionary) -> void:
 	_offline()
 	setup = cfg.duplicate()
 	G = SnakesLaddersRules.new_game(str(cfg.get("mode", "cpu")), int(cfg.get("n", 2)), int(cfg.get("color", 0)),
-		{need_one = _need_one_pref(), board = SLScenes.layout_of(SLScenes.scene_in_use())})
+		{need_one = _need_one_pref()})
 	var nm: Variant = cfg.get("names")                   # Pass & Play: the names typed in setup, by colour
 	if str(cfg.get("mode", "cpu")) == "local" and nm is Array and (nm as Array).size() == 4:
 		for p in G.players:
@@ -447,14 +447,6 @@ static func skins_of(players: Array, seats: Variant, mine: String) -> Array:
 
 func _open() -> void:
 	_id += 1
-	var my := _id
-	var lay := SnakesLaddersRules.board_of(G)     # the game's squares: a saved Snake Trail game comes back on its own board
-	if scenes and lay == SnakesLaddersRules.TRAIL and scenes.current != lay and scenes._baker:
-		await scenes.set_scene(scenes._baker, lay)
-	if board:
-		await board.use_layout(lay)                # (online, or a saved classic game, on the Snake Trail scene: the grid)
-	if my != _id:
-		return                                     # (left while the board repainted)
 	_busy = false
 	_again = false
 	_ff = false

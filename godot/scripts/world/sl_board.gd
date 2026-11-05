@@ -44,9 +44,6 @@ var current := -1
 var pace := 1.0                         # app-wide animation factor (Settings: Relaxed 1 / Fast 0.55), times each call's speed
 var _built := false
 var style := {}                         # SLScenes board style (apply_style); empty = the Jungle defaults above
-var layout := ""                        # the squares in use: "" the grid, "trail" SLTrail (the style's, or the match's: use_layout)
-var _style_baker: TexBaker
-var _face_id := 0                       # the newest face being painted (an older bake that finishes later is dropped)
 var _lip: MeshInstance3D
 var _pad: MeshInstance3D
 var _pad_lip: MeshInstance3D
@@ -81,8 +78,6 @@ func _on_scene() -> bool:
 func apply_style(baker: TexBaker, st: Dictionary) -> void:
 	_make()
 	style = st
-	layout = str(st.get("layout", ""))
-	_style_baker = baker
 	(get_node("Frame") as MeshInstance3D).material_override = MeshKit.mat(_sc("frame", "#fff6ee"), float(st.get("frameR", 0.3)), float(st.get("frameM", 0.0)))
 	_lip.material_override = MeshKit.mat(_sc("lip", "#f2b46e"), 0.35 if st.has("lip") else 0.3, float(st.get("lipM", 0.0)))
 	_pad.material_override = (get_node("Frame") as MeshInstance3D).material_override
@@ -93,28 +88,8 @@ func apply_style(baker: TexBaker, st: Dictionary) -> void:
 		old.queue_free()
 	if st.has("trim"):
 		await _add_trim(baker, st.trim)
-	await _paint_face(baker, st)
-
-## This board's squares for the match in play, whatever the scene's own: an online match or a saved classic game on
-## the Snake Trail scene plays the grid. Repaints the face when it changes. Coroutine.
-func use_layout(lay: String) -> void:
-	if lay == layout:
-		return
-	layout = lay
-	if _style_baker == null:
-		return
-	var st := style.duplicate()
-	st.layout = lay
-	if lay == "" and st.has("grid"):
-		st.merge(st.grid, true)
-	await _paint_face(_style_baker, st)
-
-func _paint_face(baker: TexBaker, st: Dictionary) -> void:
-	_face_id += 1
-	var my := _face_id
 	var tex := await baker.bake(Vector2i(2048, 2048), func(c: Control): paint_styled(c, st))
-	if my == _face_id:
-		top_mesh.material_override = MeshKit.tex_mat(tex, 0.5)
+	top_mesh.material_override = MeshKit.tex_mat(tex, 0.5)
 
 # ---------- board trim (the style's trim: lip, corner, mid), all on the rim and off the tiles ----------
 #   lip: ["stripes" | "diamonds", a, b]  a patterned ring raised round the face
@@ -265,10 +240,8 @@ static func cell_rc(n: int) -> Vector2i:
 	var k := (n - 1) % 10
 	return Vector2i(r, 9 - k if r % 2 else k)
 
-## Centre of square n in squares from the top-left corner of the face (texture space / C), on layout lay.
-static func grid_of(n: int, lay := "") -> Vector2:
-	if lay == "trail":
-		return SLTrail.cell(n)
+## Centre of square n in squares from the top-left corner of the face (texture space / C).
+static func grid_of(n: int) -> Vector2:
 	var rc := cell_rc(n)
 	return Vector2(rc.y + 0.5, 9 - rc.x + 0.5)
 
@@ -279,24 +252,16 @@ static func grid_to_world(g: Vector2, y := TOP) -> Vector3:
 func cell_world(n: int) -> Vector3:
 	if n <= 0:
 		return wait_spot(0)
-	return grid_to_world(grid_of(n, layout))
+	return grid_to_world(grid_of(n))
 
 ## Off-board waiting spot of player pi: in a row on the start pad in front of square 1.
 func wait_spot(pi: int) -> Vector3:
 	return Vector3(PAD_X0 + 0.72 + pi * WAIT_GAP, TABLE_Y + PAD_H + 0.02, PAD_Z)
 
-## Where ladder ends and snake tails sit on a square: below-right on the grid, clear of the number in its corner; on
-## the centre of a Snake Trail tile, the number drawn over them.
-static func _end_nudge(lay: String) -> Vector2:
-	return Vector2.ZERO if lay == "trail" else END_NUDGE
-
-static func _head_nudge(lay: String) -> Vector2:
-	return Vector2.ZERO if lay == "trail" else HEAD_NUDGE
-
 ## A wavy body from the head to the tail in squares (index.html snakePts), with its wave phase.
-static func snake_path(head: int, tail: int, phase: float, samples := SNAKE_SAMPLES, lay := "") -> PackedVector2Array:
-	var a := grid_of(head, lay) + _head_nudge(lay)
-	var b := grid_of(tail, lay) + _end_nudge(lay)
+static func snake_path(head: int, tail: int, phase: float, samples := SNAKE_SAMPLES) -> PackedVector2Array:
+	var a := grid_of(head) + HEAD_NUDGE
+	var b := grid_of(tail) + END_NUDGE
 	var d := b - a
 	var L := d.length()
 	var nrm := Vector2(-d.y, d.x) / L
@@ -311,32 +276,28 @@ static func snake_path(head: int, tail: int, phase: float, samples := SNAKE_SAMP
 
 ## The body of the snake with this head: the web version's phase (its index) unless another phase keeps the body
 ## clearly further from the other snakes' heads and tails, the ladder ends and the snakes laid before it.
-static func snake_body(head: int, samples := SNAKE_SAMPLES, lay := "") -> PackedVector2Array:
-	if not _phases.has(lay):
-		_choose_phases(lay)
-	return snake_path(head, SnakesLaddersRules.snakes_on(lay)[head], _phases[lay][head], samples, lay)
+static func snake_body(head: int, samples := SNAKE_SAMPLES) -> PackedVector2Array:
+	if _phases.is_empty():
+		_choose_phases()
+	return snake_path(head, SnakesLaddersRules.SNAKES[head], _phases[head], samples)
 
-static func _choose_phases(lay: String) -> void:
-	var ladders := SnakesLaddersRules.ladders_on(lay)
-	var snakes := SnakesLaddersRules.snakes_on(lay)
-	var en := _end_nudge(lay)
+static func _choose_phases() -> void:
 	var spots := []                         # every special square's anchor
-	for f in ladders:
-		spots.append([f, grid_of(f, lay) + en])
-		spots.append([ladders[f], grid_of(ladders[f], lay) + en])
-	for h in snakes:
-		spots.append([h, grid_of(h, lay) + _head_nudge(lay)])
-		spots.append([snakes[h], grid_of(snakes[h], lay) + en])
+	for f in SnakesLaddersRules.LADDERS:
+		spots.append([f, grid_of(f) + END_NUDGE])
+		spots.append([SnakesLaddersRules.LADDERS[f], grid_of(SnakesLaddersRules.LADDERS[f]) + END_NUDGE])
+	for h in SnakesLaddersRules.SNAKES:
+		spots.append([h, grid_of(h) + HEAD_NUDGE])
+		spots.append([SnakesLaddersRules.SNAKES[h], grid_of(SnakesLaddersRules.SNAKES[h]) + END_NUDGE])
 	var laid := []
 	var i := 0
-	var chosen := {}
-	for h in snakes:
-		var t: int = snakes[h]
+	for h in SnakesLaddersRules.SNAKES:
+		var t: int = SnakesLaddersRules.SNAKES[h]
 		var best := float(i)
 		var best_score := -1e9
 		for m in 12:
 			var ph := i + m * TAU / 12.0
-			var pts := snake_path(h, t, ph, 32, lay)
+			var pts := snake_path(h, t, ph, 32)
 			var near := 9.0
 			for j in range(3, pts.size() - 3):
 				for sp in spots:
@@ -348,10 +309,9 @@ static func _choose_phases(lay: String) -> void:
 			if score > best_score:
 				best_score = score
 				best = ph
-		chosen[h] = best
-		laid.append_array(snake_path(h, t, best, 32, lay))
+		_phases[h] = best
+		laid.append_array(snake_path(h, t, best, 32))
 		i += 1
-	_phases[lay] = chosen
 
 # ---------- board texture ----------
 
@@ -367,11 +327,8 @@ static func paint_styled(c: Control, st: Dictionary) -> void:
 	var marks: Array = st.get("marks", [])
 	var S: float = c.size.x
 	var u := S / 10.0
-	var trail: bool = st.get("layout", "") == "trail"
 	c.draw_rect(Rect2(0, 0, S, S), col_of.call("grout", GROUT))
-	if trail:
-		SLTrail.paint(c, u, st)
-	for n in (range(0) if trail else range(1, 101)):
+	for n in range(1, 101):
 		var rc := cell_rc(n)
 		var r := rc.x
 		var k := rc.y
@@ -392,21 +349,18 @@ static func paint_styled(c: Control, st: Dictionary) -> void:
 		if not marks.is_empty() and n != 100:
 			_tile_mark(c, marks, n, Vector2(x + s * 0.79, y + s * 0.77), u)     # bottom-right corner, clear of the number
 	# 100: a star on the goal
-	if not trail:
-		var g100 := grid_of(100) * u
-		c.draw_colored_polygon(TexBaker.star_points(g100 + Vector2(0, u * 0.1), u * 0.3, 0.46), col_of.call("star", STAR))
+	var g100 := grid_of(100) * u
+	c.draw_colored_polygon(TexBaker.star_points(g100 + Vector2(0, u * 0.1), u * 0.3, 0.46), col_of.call("star", STAR))
 	_paint_ladders(c, u, st)
 	_paint_snakes(c, u, st)
 	# numbers on every tile, with a soft halo
 	var font := UIKit.font_body(900)
-	var fs := int(u * (SLTrail.NUM_FS if trail else NUM_FS))
+	var fs := int(u * NUM_FS)
 	var asc := font.get_ascent(fs) * 0.86
 	for n in range(1, 101):
 		var rc := cell_rc(n)
 		var p := Vector2(rc.y * u + u * 0.1, (9 - rc.x) * u + u * 0.075 + asc)
 		var txt := str(n)
-		if trail:                               # in the middle of the tile
-			p = SLTrail.cell(n) * u + Vector2(-font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x / 2.0, asc / 2.0)
 		c.draw_string_outline(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, int(u * 0.1), Color(1, 0.98, 0.94, 0.95))
 		c.draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col_of.call("num100", NUM_100) if n == 100 else col_of.call("num", NUM))
 
@@ -483,11 +437,9 @@ static func _paint_ladders(c: CanvasItem, u: float, st: Dictionary) -> void:
 	var gw := u * 0.075
 	var ow := u * 0.045
 	var drop := Vector2(u * 0.025, u * 0.035)
-	var lay := str(st.get("layout", ""))
-	var ladders := SnakesLaddersRules.ladders_on(lay)
-	for f in ladders:
-		var a := (grid_of(f, lay) + _end_nudge(lay)) * u
-		var b := (grid_of(ladders[f], lay) + _end_nudge(lay)) * u
+	for f in SnakesLaddersRules.LADDERS:
+		var a := (grid_of(f) + END_NUDGE) * u
+		var b := (grid_of(SnakesLaddersRules.LADDERS[f]) + END_NUDGE) * u
 		var d := b - a
 		var dir := d.normalized()
 		var nrm := Vector2(-dir.y, dir.x) * u * LADDER_HALF
@@ -526,13 +478,12 @@ static func _paint_ladders(c: CanvasItem, u: float, st: Dictionary) -> void:
 static func _paint_snakes(c: CanvasItem, u: float, st: Dictionary) -> void:
 	var cols: Array = st.get("snakes", SNAKE_COL)
 	var i := 0
-	var lay := str(st.get("layout", ""))
-	for h in SnakesLaddersRules.snakes_on(lay):
+	for h in SnakesLaddersRules.SNAKES:
 		var col := Color(str(cols[i % cols.size()]))
 		var ink := col.darkened(0.5)
 		var n := 40
 		var P := PackedVector2Array()
-		for q in snake_body(h, n, lay):
+		for q in snake_body(h, n):
 			P.append(q * u)
 		var half := func(j: int) -> float:      # half the body's width at point j (the head end is the widest)
 			return u * (0.15 - 0.115 * pow(float(j) / n, 1.15))
@@ -821,13 +772,12 @@ func climb(pi: int, from_sq: int, to_sq: int, speed := 1.0) -> void:
 	var tw := _tween(t)
 	var last := [-1.0]
 	var dur := _dur(0.4 + 0.075 * cells, speed)
-	var nudge := _end_nudge(layout)
 	tw.tween_method(func(k: float):
 		var e := _ease(k)
 		var p := a.lerp(b, e)
 		var lift := clampf(minf(k, 1.0 - k) * 8.0, 0.0, 1.0)     # up onto the rungs, along, and down at the top
-		p.x += nudge.x * C * lift                                # along the painted ladder's centre line
-		p.z += nudge.y * C * lift
+		p.x += END_NUDGE.x * C * lift                            # along the painted ladder's centre line
+		p.z += END_NUDGE.y * C * lift
 		p.y = TOP + lift * (0.04 + absf(sin(e * rungs * PI)) * 0.1)      # a step per rung on the flat ladder
 		t.node.position = p
 		_trail(p, k, last, dur), 0.0, 1.0, dur)
@@ -884,7 +834,7 @@ func slide(pi: int, head: int, tail: int, speed := 1.0) -> void:
 	var g: Node3D = t.node
 	var a := g.position
 	var body := PackedVector3Array()                    # the painted body, head to tail
-	for q in snake_body(head, SNAKE_SAMPLES, layout):
+	for q in snake_body(head):
 		body.append(grid_to_world(q))
 	var b := _move_to(pi, tail)
 	var total := a.distance_to(body[0]) + body[body.size() - 1].distance_to(b)
@@ -973,7 +923,7 @@ func _glide(t: Dictionary, a: Vector3, body: PackedVector3Array, b: Vector3, tot
 ## The colour of the snake with this head (as _paint_snakes paints it).
 func _snake_color(head: int) -> Color:
 	var cols: Array = style.get("snakes", SNAKE_COL)
-	var i: int = SnakesLaddersRules.snakes_on(layout).keys().find(head)
+	var i: int = SnakesLaddersRules.SNAKES.keys().find(head)
 	return Color(str(cols[maxi(i, 0) % cols.size()]))
 
 ## Which way the head looks: the painted head's way (fw) seen from straight above (the top view); the more the camera

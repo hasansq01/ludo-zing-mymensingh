@@ -252,7 +252,7 @@ msgstr "এই রুম শপে নেই।"
 #. catalog.gd buy_text()
 #. collection.gd buy_char()
 #. sl_scenes.gd buy_scene()
-#: scripts/core/catalog.gd:232 scripts/core/catalog.gd:251 scripts/core/catalog.gd:304 scripts/core/catalog.gd:333 scripts/core/collection.gd:270 scripts/world/sl_scenes.gd:311
+#: scripts/core/catalog.gd:232 scripts/core/catalog.gd:251 scripts/core/catalog.gd:304 scripts/core/catalog.gd:333 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:293
 msgid "You already own %s."
 msgstr "%s তোমার আগে থেকেই আছে।"
 
@@ -426,221 +426,221 @@ msgstr "Ayesha"
 
 # same in Bangla: character name
 #. collection.gd
-#: scripts/core/collection.gd:57
-msgid "Hana"
-msgstr "Hana"
-
-# same in Bangla: character name
-#. collection.gd
-#: scripts/core/collection.gd:58
-msgid "Kenji"
-msgstr "Kenji"
-
-# same in Bangla: character name
-#. collection.gd
 #: scripts/core/collection.gd:59
-msgid "Mei"
-msgstr "Mei"
+msgid "Sadia"
+msgstr "Sadia"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:60
-msgid "Linh"
-msgstr "Linh"
+msgid "Sakib"
+msgstr "Sakib"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:61
-msgid "Emma"
-msgstr "Emma"
+msgid "Mitu"
+msgstr "Mitu"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:62
-msgid "Lukas"
-msgstr "Lukas"
+msgid "Sharmin"
+msgstr "Sharmin"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:63
-msgid "Sofia"
-msgstr "Sofia"
+msgid "Farzana"
+msgstr "Farzana"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:64
-msgid "Oliver"
-msgstr "Oliver"
+msgid "Hasan"
+msgstr "Hasan"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:65
-msgid "Jayden"
-msgstr "Jayden"
+msgid "Jannat"
+msgstr "Jannat"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:66
-msgid "Maya"
-msgstr "Maya"
+msgid "Rahim"
+msgstr "Rahim"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:67
-msgid "Carlos"
-msgstr "Carlos"
+msgid "Sohel"
+msgstr "Sohel"
 
 # same in Bangla: character name
 #. collection.gd
 #: scripts/core/collection.gd:68
-msgid "Ava"
-msgstr "Ava"
+msgid "Rupa"
+msgstr "Rupa"
+
+# same in Bangla: character name
+#. collection.gd
+#: scripts/core/collection.gd:69
+msgid "Kamal"
+msgstr "Kamal"
+
+# same in Bangla: character name
+#. collection.gd
+#: scripts/core/collection.gd:70
+msgid "Tasnim"
+msgstr "Tasnim"
 
 #. collection.gd
-#: scripts/core/collection.gd:72
+#: scripts/core/collection.gd:74
 msgid "Red Pawn"
 msgstr "লাল গুটি"
 
 #. collection.gd
-#: scripts/core/collection.gd:73
+#: scripts/core/collection.gd:75
 msgid "Green Pawn"
 msgstr "সবুজ গুটি"
 
 #. collection.gd
-#: scripts/core/collection.gd:74
+#: scripts/core/collection.gd:76
 msgid "Yellow Pawn"
 msgstr "হলুদ গুটি"
 
 #. collection.gd
-#: scripts/core/collection.gd:75
+#: scripts/core/collection.gd:77
 msgid "Blue Pawn"
 msgstr "নীল গুটি"
 
 # same in Bangla: café avatar name
 #. collection.gd
-#: scripts/core/collection.gd:76
+#: scripts/core/collection.gd:78
 msgid "Latte"
 msgstr "Latte"
 
 #. collection.gd
-#: scripts/core/collection.gd:77
+#: scripts/core/collection.gd:79
 msgid "Lucky Dice"
 msgstr "লাকি ডাইস"
 
 #. collection.gd
-#: scripts/core/collection.gd:78
+#: scripts/core/collection.gd:80
 msgid "Robot"
 msgstr "রোবট"
 
 #. collection.gd
-#: scripts/core/collection.gd:79
+#: scripts/core/collection.gd:81
 msgid "Crown"
 msgstr "মুকুট"
 
 #. collection.gd
-#: scripts/core/collection.gd:84
+#: scripts/core/collection.gd:87
 msgid "Wood"
 msgstr "কাঠ"
 
 #. collection.gd
-#: scripts/core/collection.gd:85
+#: scripts/core/collection.gd:88
 msgid "Gold"
 msgstr "গোল্ড"
 
 #. collection.gd
-#: scripts/core/collection.gd:86
+#: scripts/core/collection.gd:89
 msgid "Mint"
 msgstr "মিন্ট"
 
 #. collection.gd
-#: scripts/core/collection.gd:87
+#: scripts/core/collection.gd:90
 msgid "Royal"
 msgstr "রয়্যাল"
 
 #. collection.gd
-#: scripts/core/collection.gd:91
+#: scripts/core/collection.gd:94
 msgid "Plain"
 msgstr "সাধারণ"
 
 # same in Bangla: plate / dice name
 #. collection.gd
 #. rewards.gd
-#: scripts/core/collection.gd:92 scripts/core/rewards.gd:28
+#: scripts/core/collection.gd:95 scripts/core/rewards.gd:28
 msgid "Espresso"
 msgstr "এসপ্রেসো"
 
 #. collection.gd
-#: scripts/core/collection.gd:93
+#: scripts/core/collection.gd:96
 msgid "Ruby"
 msgstr "রুবি"
 
 #. collection.gd
-#: scripts/core/collection.gd:99
+#: scripts/core/collection.gd:102
 msgid "First Victory"
 msgstr "প্রথম জয়"
 
 #. collection.gd
-#: scripts/core/collection.gd:99
+#: scripts/core/collection.gd:102
 msgid "Win a game against the computer."
 msgstr "কম্পিউটারের সাথে একটা খেলা জেতো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:100
+#: scripts/core/collection.gd:103
 msgid "Winning Streak"
 msgstr "জয়ের স্ট্রিক"
 
 #. collection.gd
-#: scripts/core/collection.gd:100
+#: scripts/core/collection.gd:103
 msgid "Win 3 games in a row."
 msgstr "পরপর 3টা খেলা জেতো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:101
+#: scripts/core/collection.gd:104
 msgid "Experienced Player"
 msgstr "অভিজ্ঞ প্লেয়ার"
 
 #. collection.gd
-#: scripts/core/collection.gd:101
+#: scripts/core/collection.gd:104
 msgid "Finish 25 games."
 msgstr "25টা খেলা শেষ করো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:102
+#: scripts/core/collection.gd:105
 msgid "Master of Pairs"
 msgstr "জোড়ার ওস্তাদ"
 
 #. collection.gd
-#: scripts/core/collection.gd:102
+#: scripts/core/collection.gd:105
 msgid "Form 10 pairs."
 msgstr "10টা জোড়া বাঁধো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:103
+#: scripts/core/collection.gd:106
 msgid "Multiplayer Champion"
 msgstr "মাল্টিপ্লেয়ার চ্যাম্পিয়ন"
 
 #. collection.gd
-#: scripts/core/collection.gd:103
+#: scripts/core/collection.gd:106
 msgid "Finish 5 Pass & Play games."
 msgstr "এক ফোনে 5টা খেলা শেষ করো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:104
+#: scripts/core/collection.gd:107
 msgid "Coin Collector"
 msgstr "কয়েন কালেক্টর"
 
 #. collection.gd
-#: scripts/core/collection.gd:104
+#: scripts/core/collection.gd:107
 msgid "Earn 10,000 coins in total."
 msgstr "মোট 10,000 কয়েন জমাও।"
 
 #. collection.gd item()
-#: scripts/core/collection.gd:158
+#: scripts/core/collection.gd:161
 msgid "No badge"
 msgstr "ব্যাজ নেই"
 
 #. collection.gd unlock_text()
-#: scripts/core/collection.gd:222 scripts/core/collection.gd:231
+#: scripts/core/collection.gd:225 scripts/core/collection.gd:234
 msgid "Earn “%s”"
 msgstr "“%s” অর্জন করো"
 
@@ -650,23 +650,23 @@ msgstr "“%s” অর্জন করো"
 #. daily_sheet.gd reward_text()
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
-#: scripts/core/collection.gd:225 scripts/core/rewards.gd:139 scripts/main.gd:889 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
+#: scripts/core/collection.gd:228 scripts/core/rewards.gd:139 scripts/main.gd:889 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
 msgid "%s coins"
 msgstr "%s কয়েন"
 
 #. collection.gd unlock_text()
 #. shop_sheet.gd _unlock_note()
-#: scripts/core/collection.gd:230 scripts/ui/sheets/shop_sheet.gd:365
+#: scripts/core/collection.gd:233 scripts/ui/sheets/shop_sheet.gd:365
 msgid "Reach level %d"
 msgstr "%d লেভেলে পৌঁছাও"
 
 #. collection.gd buy_char()
-#: scripts/core/collection.gd:265
+#: scripts/core/collection.gd:268
 msgid "That character isn’t in the collection."
 msgstr "এই ক্যারেক্টার কালেকশনে নেই।"
 
 #. collection.gd buy_char()
-#: scripts/core/collection.gd:268
+#: scripts/core/collection.gd:271
 msgid "%s is free to use."
 msgstr "%s ফ্রি, এখনই লাগাও।"
 
@@ -719,7 +719,7 @@ msgstr "%d দিন আগে"
 #. Result screen · result_screen.gd _vote_chip()
 #. Result screen · result_screen.gd card_data()
 #. leaderboard_sheet.gd _render_me()
-#: scripts/core/l10n.gd:60 scripts/game/sl_match.gd:386 scripts/game/sl_match.gd:691 scripts/game/sl_match.gd:1160 scripts/ui/components/result_screen.gd:660 scripts/ui/components/result_screen.gd:1025 scripts/ui/sheets/leaderboard_sheet.gd:292
+#: scripts/core/l10n.gd:60 scripts/game/sl_match.gd:386 scripts/game/sl_match.gd:683 scripts/game/sl_match.gd:1152 scripts/ui/components/result_screen.gd:660 scripts/ui/components/result_screen.gd:1025 scripts/ui/sheets/leaderboard_sheet.gd:292
 msgid "You"
 msgstr "তুমি"
 
@@ -823,7 +823,7 @@ msgstr "বোর্ডের বাইরে"
 #. match_store.gd _summary_bit()
 #. Snakes & Ladders match · sl_match.gd square_text()
 #. Snakes & Ladders match · sl_match.gd fits_long()
-#: scripts/core/match_store.gd:65 scripts/game/sl_match.gd:1660 scripts/game/sl_match.gd:1665
+#: scripts/core/match_store.gd:65 scripts/game/sl_match.gd:1652 scripts/game/sl_match.gd:1657
 msgid "Square %d"
 msgstr "%d নম্বর ঘর"
 
@@ -1193,13 +1193,13 @@ msgstr "টিম %s"
 # REVIEW: second %s is the place word (প্রথম...); স্থান পেয়েছে = got Nth place
 #. Ludo match · ludo_match.gd _finish_text()
 #. Snakes & Ladders match · sl_match.gd _finished_one()
-#: scripts/game/ludo_match.gd:858 scripts/game/sl_match.gd:690
+#: scripts/game/ludo_match.gd:858 scripts/game/sl_match.gd:682
 msgid "%s finished %s! The others play on."
 msgstr "%s %s হয়েছে! বাকিরা খেলছে।"
 
 #. Ludo match · ludo_match.gd _finish_text()
 #. Snakes & Ladders match · sl_match.gd _finished_one()
-#: scripts/game/ludo_match.gd:858 scripts/game/sl_match.gd:691
+#: scripts/game/ludo_match.gd:858 scripts/game/sl_match.gd:683
 msgid "%s finished %s!"
 msgstr "%s %s হয়েছে!"
 
@@ -1355,7 +1355,7 @@ msgstr "%s · 8টার মধ্যে %dটা পাকা"
 #. Ludo match · ludo_match.gd result_copy()
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1088 scripts/game/sl_match.gd:767 scripts/ui/components/result_screen.gd:219
+#: scripts/game/ludo_match.gd:1088 scripts/game/sl_match.gd:759 scripts/ui/components/result_screen.gd:219
 msgid "%s wins!"
 msgstr "%s জিতেছে!"
 
@@ -1369,14 +1369,14 @@ msgstr "চারটা গুটিই পেকেছে!"
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
 #. win_card.gd title_text()
-#: scripts/game/ludo_match.gd:1090 scripts/game/sl_match.gd:767 scripts/ui/components/result_screen.gd:218 scripts/ui/components/win_card.gd:42
+#: scripts/game/ludo_match.gd:1090 scripts/game/sl_match.gd:759 scripts/ui/components/result_screen.gd:218 scripts/ui/components/win_card.gd:42
 msgid "You win!"
 msgstr "তুমি জিতেছো!"
 
 #. Ludo match · ludo_match.gd result_copy()
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd sub_text()
-#: scripts/game/ludo_match.gd:1092 scripts/game/sl_match.gd:774 scripts/ui/components/result_screen.gd:228
+#: scripts/game/ludo_match.gd:1092 scripts/game/sl_match.gd:766 scripts/ui/components/result_screen.gd:228
 msgid "%s won"
 msgstr "%s জিতেছে"
 
@@ -1394,7 +1394,7 @@ msgstr "%s · 4টার মধ্যে %dটা পাকা"
 #. Ludo match · ludo_match.gd result_copy()
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/ludo_match.gd:1098 scripts/game/sl_match.gd:770 scripts/ui/components/result_screen.gd:210
+#: scripts/game/ludo_match.gd:1098 scripts/game/sl_match.gd:762 scripts/ui/components/result_screen.gd:210
 msgid "You finished %s"
 msgstr "তুমি %s হয়েছো"
 
@@ -1407,19 +1407,19 @@ msgstr "তুমি আবার চেলেছো"
 # REVIEW: toast after a re-roll offer
 #. Ludo match · ludo_match.gd net_rerolled()
 #. Snakes & Ladders match · sl_match.gd net_rerolled()
-#: scripts/game/ludo_match.gd:1514 scripts/game/sl_match.gd:1160
+#: scripts/game/ludo_match.gd:1514 scripts/game/sl_match.gd:1152
 msgid "%s rolled again"
 msgstr "%s আবার চেলেছে"
 
 #. Ludo match · ludo_match.gd _net_wait_line()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1568 scripts/game/sl_match.gd:1232
+#: scripts/game/ludo_match.gd:1568 scripts/game/sl_match.gd:1224
 msgid "A bot is playing for you"
 msgstr "তোমার হয়ে বট খেলছে"
 
 #. Ludo match · ludo_match.gd _net_wait_line()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1570 scripts/game/sl_match.gd:1234
+#: scripts/game/ludo_match.gd:1570 scripts/game/sl_match.gd:1226
 msgid "%s is away. A bot is playing…"
 msgstr "%s নেই। বট খেলছে…"
 
@@ -1437,7 +1437,7 @@ msgstr "%s জোড়া বাঁধবে কি না ভাবছে…"
 #. Snakes & Ladders match · sl_match.gd _set_dice_turn()
 #. Snakes & Ladders match · sl_match.gd _begin()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/ludo_match.gd:1576 scripts/game/sl_match.gd:321 scripts/game/sl_match.gd:542 scripts/game/sl_match.gd:1235
+#: scripts/game/ludo_match.gd:1576 scripts/game/sl_match.gd:321 scripts/game/sl_match.gd:534 scripts/game/sl_match.gd:1227
 msgid "%s’s turn"
 msgstr "%s-এর চাল"
 
@@ -1455,170 +1455,170 @@ msgstr "আমি ফিরেছি"
 
 # REVIEW: চালছে (rolling), from glossary চালো
 #. Snakes & Ladders match · sl_match.gd _begin()
-#: scripts/game/sl_match.gd:536
+#: scripts/game/sl_match.gd:528
 msgid "%s is rolling…"
 msgstr "%s চালছে…"
 
 # REVIEW: draw text on the reroll offer; 'চালছে' may read oddly
 #. Snakes & Ladders match · sl_match.gd _begin()
 #. reroll_button.gd _draw()
-#: scripts/game/sl_match.gd:536 scripts/ui/components/reroll_button.gd:132
+#: scripts/game/sl_match.gd:528 scripts/ui/components/reroll_button.gd:132
 msgid "Rolling…"
 msgstr "চালা হচ্ছে…"
 
 #. Snakes & Ladders match · sl_match.gd _begin()
 #. Snakes & Ladders match · sl_match.gd _net_wait_line()
-#: scripts/game/sl_match.gd:542 scripts/game/sl_match.gd:1230
+#: scripts/game/sl_match.gd:534 scripts/game/sl_match.gd:1222
 msgid "Your turn"
 msgstr "তোমার চাল"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:583
+#: scripts/game/sl_match.gd:575
 msgid "%s rolled three 6s. Turn over."
 msgstr "%s পরপর তিনটা ছক্কা তুলেছে। চাল শেষ।"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:588
+#: scripts/game/sl_match.gd:580
 msgid "You need a 1 to start."
 msgstr "শুরু করতে 1 লাগবে।"
 
 # REVIEW: %s is a bold name; possessive with hyphen
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:590
+#: scripts/game/sl_match.gd:582
 msgid "%s needs a 1 to start."
 msgstr "%s-এর শুরু করতে 1 লাগবে।"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:594
+#: scripts/game/sl_match.gd:586
 msgid "You need exactly %d to finish."
 msgstr "শেষ করতে ঠিক %d লাগবে।"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:596
+#: scripts/game/sl_match.gd:588
 msgid "%s needs exactly %d to finish."
 msgstr "%s-এর শেষ করতে ঠিক %d লাগবে।"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:614
+#: scripts/game/sl_match.gd:606
 msgid "You rolled a 6. Roll again!"
 msgstr "তুমি ছক্কা তুলেছো। আবার চালো!"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:616
+#: scripts/game/sl_match.gd:608
 msgid "%s rolls again (a 6)."
 msgstr "%s ছক্কা তুলেছে, আবার চালবে।"
 
 #. Snakes & Ladders match · sl_match.gd _play_roll()
-#: scripts/game/sl_match.gd:618
+#: scripts/game/sl_match.gd:610
 msgid "Roll again!"
 msgstr "আবার চালো!"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:632
+#: scripts/game/sl_match.gd:624
 msgid "You rolled a %d."
 msgstr "তুমি %d তুলেছো।"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:632
+#: scripts/game/sl_match.gd:624
 msgid "%s rolled a %d."
 msgstr "%s %d তুলেছে।"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:646
+#: scripts/game/sl_match.gd:638
 msgid "Ladder! You climbed to %d."
 msgstr "মই! তুমি %d নম্বর ঘরে উঠেছো।"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:648
+#: scripts/game/sl_match.gd:640
 msgid "Ladder! %s climbed to %d."
 msgstr "মই! %s %d নম্বর ঘরে উঠেছে।"
 
 # REVIEW: floating pop over the pawn
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:652
+#: scripts/game/sl_match.gd:644
 msgid "Up to %d!"
 msgstr "%d-এ উঠলো!"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:658
+#: scripts/game/sl_match.gd:650
 msgid "Snake! You slid down to %d."
 msgstr "সাপ! তুমি %d নম্বর ঘরে নেমে গেছো।"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:660
+#: scripts/game/sl_match.gd:652
 msgid "Snake! %s slid down to %d."
 msgstr "সাপ! %s %d নম্বর ঘরে নেমে গেছে।"
 
 #. Snakes & Ladders match · sl_match.gd _walk()
-#: scripts/game/sl_match.gd:666
+#: scripts/game/sl_match.gd:658
 msgid "Down to %d"
 msgstr "%d-এ নামলো"
 
 #. Snakes & Ladders match · sl_match.gd _win()
-#: scripts/game/sl_match.gd:724
+#: scripts/game/sl_match.gd:716
 msgid "You reached 100!"
 msgstr "তুমি 100-এ পৌঁছেছো!"
 
 #. Snakes & Ladders match · sl_match.gd _win()
-#: scripts/game/sl_match.gd:724
+#: scripts/game/sl_match.gd:716
 msgid "%s reached 100!"
 msgstr "%s 100-এ পৌঁছেছে!"
 
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd title_text()
-#: scripts/game/sl_match.gd:759 scripts/ui/components/result_screen.gd:207
+#: scripts/game/sl_match.gd:751 scripts/ui/components/result_screen.gd:207
 msgid "Game over"
 msgstr "খেলা শেষ"
 
 #. Snakes & Ladders match · sl_match.gd result_data()
 #. Result screen · result_screen.gd sub_text()
-#: scripts/game/sl_match.gd:768 scripts/ui/components/result_screen.gd:230
+#: scripts/game/sl_match.gd:760 scripts/ui/components/result_screen.gd:230
 msgid "First to square 100!"
 msgstr "100 নম্বর ঘরে সবার আগে!"
 
 #. Snakes & Ladders match · sl_match.gd result_data()
-#: scripts/game/sl_match.gd:772
+#: scripts/game/sl_match.gd:764
 msgid "%s won · you reached 100 too"
 msgstr "%s জিতেছে · তুমিও 100-এ পৌঁছেছো"
 
 #. Snakes & Ladders match · sl_match.gd result_data()
-#: scripts/game/sl_match.gd:774
+#: scripts/game/sl_match.gd:766
 msgid "%s won · you reached square %d"
 msgstr "%s জিতেছে · তুমি %d নম্বর ঘরে ছিলে"
 
 #. Snakes & Ladders match · sl_match.gd net_rerolled()
-#: scripts/game/sl_match.gd:1160
+#: scripts/game/sl_match.gd:1152
 msgid "Someone"
 msgstr "কেউ একজন"
 
 #. Snakes & Ladders match · sl_match.gd net_status()
 #. lobby_sheet.gd _status_pill()
 #. lobby_sheet.gd set_status()
-#: scripts/game/sl_match.gd:1183 scripts/ui/sheets/lobby_sheet.gd:212 scripts/ui/sheets/lobby_sheet.gd:380
+#: scripts/game/sl_match.gd:1175 scripts/ui/sheets/lobby_sheet.gd:212 scripts/ui/sheets/lobby_sheet.gd:380
 msgid "Reconnecting…"
 msgstr "আবার কানেক্ট হচ্ছে…"
 
 #. Snakes & Ladders match · sl_match.gd _normalized()
-#: scripts/game/sl_match.gd:1447
+#: scripts/game/sl_match.gd:1439
 msgid "Off board"
 msgstr "বাইরে"
 
 #. Snakes & Ladders match · sl_match.gd set_badge()
 #. Ludo match HUD · ludo_hud.gd set_badge()
-#: scripts/game/sl_match.gd:1557 scripts/ui/ludo_hud.gd:130
+#: scripts/game/sl_match.gd:1549 scripts/ui/ludo_hud.gd:130
 msgid "Bot"
 msgstr "বট"
 
 #. Snakes & Ladders match · sl_match.gd set_badge()
 #. Ludo match HUD · ludo_hud.gd set_badge()
-#: scripts/game/sl_match.gd:1557 scripts/ui/ludo_hud.gd:130
+#: scripts/game/sl_match.gd:1549 scripts/ui/ludo_hud.gd:130
 msgid "Offline"
 msgstr "অফলাইন"
 
 # REVIEW: short tile label on narrow tiles, must stay narrow
 #. Snakes & Ladders match · sl_match.gd square_text()
 #. Result screen · result_screen.gd _result_cell()
-#: scripts/game/sl_match.gd:1660 scripts/ui/components/result_screen.gd:756
+#: scripts/game/sl_match.gd:1652 scripts/ui/components/result_screen.gd:756
 msgid "Sq %d"
 msgstr "ঘর %d"
 
@@ -1924,24 +1924,24 @@ msgid "+%s gems"
 msgstr "+%s জেম"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1357
+#: scripts/main.gd:1355
 msgid "Quit Ludo Zing?"
 msgstr "Ludo Zing থেকে বের হবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1357
+#: scripts/main.gd:1355
 msgid "Your progress is saved."
 msgstr "তোমার প্রোগ্রেস সেভ আছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1357
+#: scripts/main.gd:1355
 msgid "Quit"
 msgstr "বের হও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/main.gd:1357 scripts/net/online.gd:244 scripts/net/social.gd:429
+#: scripts/main.gd:1355 scripts/net/online.gd:244 scripts/net/social.gd:429
 msgid "Stay"
 msgstr "থাকো"
 
@@ -2917,7 +2917,7 @@ msgid "Star squares and coloured start squares are safe for everyone."
 msgstr "তারা ঘর আর রঙিন স্টার্ট ঘর সবার জন্য সেফ।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:51 scripts/ui/info.gd:86
+#: scripts/ui/info.gd:51 scripts/ui/info.gd:85
 msgid "Entering the board"
 msgstr "বোর্ডে ঢোকা"
 
@@ -2932,12 +2932,12 @@ msgid "Ladders and snakes count from your very first move."
 msgstr "প্রথম চাল থেকেই মই আর সাপ কাজ করে।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:54 scripts/ui/info.gd:89
+#: scripts/ui/info.gd:54 scripts/ui/info.gd:88
 msgid "First to reach square 100 wins."
 msgstr "যে আগে 100 নম্বর ঘরে পৌঁছাবে, সে জিতবে।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:55 scripts/ui/info.gd:90
+#: scripts/ui/info.gd:55 scripts/ui/info.gd:89
 msgid "Snakes & Ladders rules"
 msgstr "সাপ-সিঁড়ির নিয়ম"
 
@@ -2947,17 +2947,17 @@ msgid "Any roll moves your pawn onto the board and up the squares."
 msgstr "যা-ই উঠুক, গুটি বোর্ডে ঢোকে আর ঘর বেয়ে এগোয়।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:57 scripts/ui/info.gd:92
+#: scripts/ui/info.gd:57 scripts/ui/info.gd:91
 msgid "Land on the foot of a ladder to climb it. Land on a snake’s head to slide down to its tail."
 msgstr "মইয়ের গোড়ায় থামলে ওপরে উঠে যাবে। সাপের মাথায় থামলে লেজ পর্যন্ত নেমে যাবে।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:58 scripts/ui/info.gd:93
+#: scripts/ui/info.gd:58 scripts/ui/info.gd:92
 msgid "A 6 gives you another roll. Three 6s in a row end your turn."
 msgstr "ছক্কা তুললে আবার চালবে। পরপর তিনটা ছক্কায় চাল শেষ।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:59 scripts/ui/info.gd:94
+#: scripts/ui/info.gd:59 scripts/ui/info.gd:93
 msgid "You need the exact roll to land on 100. A bigger roll leaves you where you are."
 msgstr "100 নম্বর ঘরে থামতে ঠিক সংখ্যা লাগবে। বেশি উঠলে গুটি যেখানে আছে সেখানেই থাকবে।"
 
@@ -3031,47 +3031,42 @@ msgstr "দৃশ্য"
 
 #. Info bubbles and rules text · info.gd
 #: scripts/ui/info.gd:75
-msgid "A scene is the 3D world around the Snakes & Ladders board. The board, snakes, ladders and rules are the same in every scene, except Snake Trail."
-msgstr "সিন হলো সাপ-সিঁড়ির বোর্ডের চারপাশের 3D দুনিয়া। Snake Trail ছাড়া বাকি সব সিনে বোর্ড, সাপ, মই আর নিয়ম একই।"
+msgid "A scene is the 3D world around the Snakes & Ladders board. The board, snakes, ladders and rules are the same in every scene."
+msgstr "সিন হলো সাপ-সিঁড়ির বোর্ডের চারপাশের 3D দুনিয়া। বোর্ড, সাপ, মই আর নিয়ম সব সিনে একই।"
 
 #. Info bubbles and rules text · info.gd
 #: scripts/ui/info.gd:76
-msgid "Snake Trail has its own winding board with its own snakes and ladders. Online matches always use the standard board."
-msgstr "Snake Trail-এর আছে নিজের এঁকেবেঁকে চলা বোর্ড, নিজের সাপ আর মই। অনলাইন ম্যাচে সবসময় সাধারণ বোর্ডেই খেলা হয়।"
+msgid "Jungle Clearing and Enchanted Jungle are free. The others cost the coins shown, paid once, and are yours to keep."
+msgstr "Jungle Clearing আর Enchanted Jungle ফ্রি। বাকিগুলোর দাম দেখানো কয়েন, একবার দিলেই সারাজীবনের জন্য তোমার।"
 
 #. Info bubbles and rules text · info.gd
 #: scripts/ui/info.gd:77
-msgid "Jungle Clearing, Snake Trail and Enchanted Jungle are free. The others cost the coins shown, paid once, and are yours to keep."
-msgstr "Jungle Clearing, Snake Trail আর Enchanted Jungle ফ্রি। বাকিগুলোর দাম দেখানো কয়েন, একবার দিলেই সারাজীবনের জন্য তোমার।"
-
-#. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:78
 msgid "A scene you buy is put to use straight away. Switch between your scenes with [b]Use[/b]."
 msgstr "যে সিন কিনবে, সেটা সাথে সাথেই চালু হয়ে যায়। [b]লাগাও[/b] চেপে নিজের সিনগুলো বদলাতে পারবে।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:79
+#: scripts/ui/info.gd:78
 msgid "Not enough coins? Nothing is spent; the shop tells you how many more you need."
 msgstr "কয়েন কম? কিছু খরচ হবে না; শপ বলে দেবে আর কত লাগবে।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:87
+#: scripts/ui/info.gd:86
 msgid "Everyone starts off the board. You need to roll a [b]1[/b] to step onto square 1."
 msgstr "সবাই বোর্ডের বাইরে থেকে শুরু করে। 1 নম্বর ঘরে ঢুকতে [b]1[/b] তুলতে হবে।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:88
+#: scripts/ui/info.gd:87
 msgid "A 2 to 6 leaves your pawn waiting off the board, but a 6 still gives you another roll."
 msgstr "2 থেকে 6 উঠলে গুটি বাইরেই অপেক্ষা করে, তবে ছক্কায় আবার চালা যায়।"
 
 #. Info bubbles and rules text · info.gd
-#: scripts/ui/info.gd:91
+#: scripts/ui/info.gd:90
 msgid "Roll a [b]1[/b] to enter the board. Until then your pawn waits off the board."
 msgstr "বোর্ডে ঢুকতে [b]1[/b] তোলো। তার আগে গুটি বাইরে অপেক্ষা করে।"
 
 #. Info bubbles and rules text · info.gd _build()
 #. Sheets (shared dialogs) · sheet.gd _init()
-#: scripts/ui/info.gd:559 scripts/ui/sheet.gd:150
+#: scripts/ui/info.gd:558 scripts/ui/sheet.gd:150
 msgid "Close"
 msgstr "বন্ধ"
 
@@ -5233,58 +5228,47 @@ msgstr "ক্লাসিক রোদেলা জঙ্গল।"
 
 #. sl_scenes.gd
 #: scripts/world/sl_scenes.gd:22
-msgid "A winding snake-shaped trail in a sunny meadow."
-msgstr "রোদেলা মাঠে সাপের মতো এঁকেবেঁকে চলা পথ।"
-
-#. sl_scenes.gd
-#: scripts/world/sl_scenes.gd:23
 msgid "Snowy pines, a frozen pond, lanterns, falling snow."
 msgstr "বরফে ঢাকা পাইন, জমে যাওয়া পুকুর, লণ্ঠন আর ঝরে পড়া তুষার।"
 
 #. sl_scenes.gd
-#: scripts/world/sl_scenes.gd:24
+#: scripts/world/sl_scenes.gd:23
 msgid "Lollipops, gumdrops and candy-cane ladders."
 msgstr "ললিপপ, গামড্রপ আর ক্যান্ডি-কেনের মই।"
 
 #. sl_scenes.gd
-#: scripts/world/sl_scenes.gd:25
+#: scripts/world/sl_scenes.gd:24
 msgid "Sandstone ruins, palms, an oasis, golden trim."
 msgstr "বেলেপাথরের ধ্বংসাবশেষ, খেজুর গাছ, মরূদ্যান আর সোনালি কারুকাজ।"
 
 #. sl_scenes.gd
-#: scripts/world/sl_scenes.gd:26
+#: scripts/world/sl_scenes.gd:25
 msgid "Floating islands, rainbows, a pearl-white table."
 msgstr "ভাসমান দ্বীপ, রামধনু আর মুক্তো-সাদা টেবিল।"
 
 #. sl_scenes.gd
-#: scripts/world/sl_scenes.gd:27
+#: scripts/world/sl_scenes.gd:26
 msgid "Glowing mushrooms, fireflies, golden snakes."
 msgstr "জ্বলজ্বলে মাশরুম, জোনাকি আর সোনালি সাপ।"
 
 #. sl_scenes.gd buy_scene()
-#: scripts/world/sl_scenes.gd:309
+#: scripts/world/sl_scenes.gd:291
 msgid "That scene isn’t in the shop."
 msgstr "এই সিন শপে নেই।"
 
 # REVIEW: painted on the 3D sign in big letters (first line)
 #. sl_scenes.gd _make_sign()
 #. TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
-#: scripts/world/sl_scenes.gd:1187
+#: scripts/world/sl_scenes.gd:1168
 msgid "SNAKES"
 msgstr "সাপ"
 
 # REVIEW: painted on the 3D sign in big letters (second line); first line is সাপ. Needs a font with Bangla glyphs.
 #. sl_scenes.gd _make_sign()
 #. TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
-#: scripts/world/sl_scenes.gd:1187
+#: scripts/world/sl_scenes.gd:1168
 msgid "& LADDERS"
 msgstr "সিঁড়ি"
-
-#~ msgid "A scene is the 3D world around the Snakes & Ladders board. The board, snakes, ladders and rules are the same in every scene."
-#~ msgstr "সিন হলো সাপ-সিঁড়ির বোর্ডের চারপাশের 3D দুনিয়া। বোর্ড, সাপ, মই আর নিয়ম সব সিনে একই।"
-
-#~ msgid "Jungle Clearing and Enchanted Jungle are free. The others cost the coins shown, paid once, and are yours to keep."
-#~ msgstr "Jungle Clearing আর Enchanted Jungle ফ্রি। বাকিগুলোর দাম দেখানো কয়েন, একবার দিলেই সারাজীবনের জন্য তোমার।"
 
 #~ msgid "Starter Set"
 #~ msgstr "স্টার্টার সেট"
@@ -5359,6 +5343,3 @@ msgstr "সিঁড়ি"
 
 #~ msgid "Happy"
 #~ msgstr "খুশি"
-
-#~ msgid "Snake Trail"
-#~ msgstr "সাপের পথ"

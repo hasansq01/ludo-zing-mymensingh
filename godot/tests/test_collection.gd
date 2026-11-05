@@ -54,9 +54,16 @@ func _run() -> void:
 		if img.load_svg_from_string(svg, 1.0) != OK or svg.contains("null") or svg.contains(' fill="SH"') or img.get_width() != 40:
 			drawn_bad.append(c.id)
 	check("every new avatar draws cleanly", drawn_bad.is_empty(), drawn_bad)
-	check("the original characters keep their look (Sabbir's beard, Nadia's lashes and lips)", Collection.tile_svg("ch-sabbir").contains(Collection.JAW) and Collection.tile_svg("ch-nadia").contains("M15.2 17.3L14.6 16.6") and Collection.tile_svg("ch-nadia").contains("#d9536a"))
-	check("their new faces: Lukas has green eyes and stubble, Carlos a moustache, Jayden a grin", Collection.tile_svg("w-lukas").contains("#3f8a4a") and Collection.tile_svg("w-lukas").contains('opacity=".3"') and Collection.tile_svg("w-carlos").contains("M17 21Q18.6") and Collection.tile_svg("w-jayden").contains("M17.5 21.4Q20 25"))
-	check("a new avatar is found, free, unlocked and can't be sold", Collection.avatar("w-maya").name == "Maya" and Collection.is_character("w-maya") and Collection.is_unlocked("char", "w-maya", {coins = 0}) and Collection.buy_char("w-maya").contains("free"))
+	check("characters keep what sets them apart (Sabbir's beard, Nadia's lips)", Collection.tile_svg("ch-sabbir").contains(Collection.JAW) and Collection.tile_svg("ch-nadia").contains("#d9536a"))
+	check("their faces: Hasan has stubble, Kamal a moustache, Sohel a grin", Collection.tile_svg("w-lukas").contains('opacity=".3"') and Collection.tile_svg("w-carlos").contains("M17 21.2Q18.6") and Collection.tile_svg("w-jayden").contains("M17.5 21.8H22.5"))
+	check("five characters wear a hijab, four of them free, all female", (Collection.CHARS + Collection.WORLD).filter(func(c): return c.hs == "hijab" and c.g == "f").size() == 5 and Collection.WORLD.filter(func(c): return c.hs == "hijab").size() == 4)
+	check("no two characters share a name", _unique((Collection.CHARS + Collection.WORLD).map(func(c): return c.name)))
+	check("every character has its own expression", (Collection.CHARS + Collection.WORLD).all(func(c): return c.has("mouth")))
+	var moods := {}
+	for c: Dictionary in Collection.CHARS + Collection.WORLD:
+		moods[str(c.mouth) + str(c.get("look", ""))] = true
+	check("the expressions vary", moods.size() >= 6, moods.keys())
+	check("a new avatar is found, free, unlocked and can't be sold", Collection.avatar("w-maya").name == "Rupa" and Collection.is_character("w-maya") and Collection.is_unlocked("char", "w-maya", {coins = 0}) and Collection.buy_char("w-maya").contains("free"))
 	check("avatars match the web", _ids(Collection.AVATARS) == ["pawn-red", "pawn-green", "pawn-yellow", "pawn-blue", "latte", "dice", "robot", "crown"])
 	check("frames match the web", _ids(Collection.FRAMES) == ["classic", "gold", "mint", "royal"] and Collection.FRAMES.map(func(f): return f.name) == ["Wood", "Gold", "Mint", "Royal"])
 	check("plates match the web", _ids(Collection.PLATES) == ["plain", "espresso", "ruby"])
