@@ -68,8 +68,11 @@ describe("buy with gems", () => {
     expect(buy(r.profile, "dice", "crema", "gems")).toEqual({ ok: false, error: "owned" });
   });
   it("emote pack and S&L scene", () => {
-    const e = buy(rich(40), "emotes", "friends", "gems");
-    expect(e.ok && e.price === 40 && e.profile.gems === 0 && e.profile.emote_set === "friends").toBe(true);
+    const e = buy(rich(25), "emotes", "friends", "gems");
+    expect(e.ok && e.price === 25 && e.profile.gems === 0 && e.profile.emote_set === "friends").toBe(true);
+    // a game from before the 2026-11 packs shows 40 gems and is charged 40
+    const old = buy(rich(40), "emotes", "friends", "gems", true);
+    expect(old.ok && old.price === 40 && old.profile.gems === 0).toBe(true);
     const s = buy(rich(300), "scene", "frost", "gems");
     expect(s.ok && s.price === 200 && s.profile.gems === 100 && s.profile.scene === "frost").toBe(true);
   });

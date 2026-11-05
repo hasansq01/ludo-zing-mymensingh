@@ -176,7 +176,8 @@ func sfx(name: String, arg: Variant = null) -> void:
 func emote(id: String) -> void:
 	if not enabled or _app_paused or effects_volume <= 0 or master_volume <= 0:
 		return
-	var stream := _emote_stream(id)
+	# the character sets and the phrases share the sounds of the first stickers (emotes.json "sound")
+	var stream := _emote_stream(str(EmoteArt.info(id).get("sound", id)))
 	if stream == null:
 		return
 	var p: AudioStreamPlayer = null

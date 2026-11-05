@@ -126,7 +126,7 @@ func _wallet() -> void:
 	var r: Dictionary = await a.buy("room", "neon")
 	check("wallet: buy ok", r.ok and r.price == 3000, r)
 	check("wallet: the profile was reconciled in place", is_same(live, a.profile_own) and a.profile_own.coins == 5000 and a.profile_own.rooms.has("neon") and a.profile_own.room == "neon", a.profile_own)
-	check("wallet: the buy body is {kind, id, currency}", f.last("/v1/shop/buy").body == {kind = "room", id = "neon", currency = "coins"})
+	check("wallet: the buy body is {kind, id, currency, catalog}", f.last("/v1/shop/buy").body == {kind = "room", id = "neon", currency = "coins", catalog = 2})
 	r = await a.buy("room", "nope")
 	check("wallet: unknown item", not r.ok and r.error == "unknown")
 	f.profile.coins = 100

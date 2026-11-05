@@ -35,7 +35,7 @@ const TAIL_MIN := 0.2                    ## the tail stays this far (fraction of
 const CPU_GAP := 9000                    ## ms between two reactions of one computer
 const ANY_GAP := 4000                    ## ms between two computer reactions at all
 const CPU_DELAY := [0.35, 0.85]          ## s before a computer's reaction shows
-const STARTER := ["happy", "laugh", "cool", "angry", "love", "party"]
+const STARTER := ["happy", "laugh", "sob", "angry", "gasp", "love"]
 
 var seat_fn := Callable()                ## (c: int) -> Dictionary (see above)
 var avoid_fn := Callable()               ## () -> Rect2 (size 0: nothing to avoid)
@@ -205,7 +205,7 @@ static func tail_for(r: Rect2, card: Rect2) -> Dictionary:
 
 ## A computer's occasional reaction: with `chance`, unless it spoke in the last CPU_GAP ms or any computer did in
 ## the last ANY_GAP ms; never the same emote twice running. True when one is on its way.
-func cpu_say(c: int, ids: Array, chance: float) -> bool:
+func cpu_say(c: int, ids: Array, chance: float, extra_delay := 0.0) -> bool:
 	if ids.is_empty() or not _is_cpu(c) or (not always and rng.randf() >= chance):
 		return false
 	var now := _now()
@@ -218,8 +218,15 @@ func cpu_say(c: int, ids: Array, chance: float) -> bool:
 	_any_at = now
 	_cpu_at[c] = now
 	_last_cpu[c] = id
-	show_later(c, id, rng.randf_range(CPU_DELAY[0], CPU_DELAY[1]))
+	show_later(c, id, rng.randf_range(CPU_DELAY[0], CPU_DELAY[1]) + extra_delay)
 	return true
+
+## The start of a game: a computer may wish the table luck (a moment later, once the board is up).
+func react_start(seats: Array) -> bool:
+	var cpus := seats.filter(func(k): return _is_cpu(int(k)))
+	if cpus.is_empty():
+		return false
+	return cpu_say(int(cpus[rng.randi() % cpus.size()]), ["t-luck", "t-fun", "t-hi"], 0.5, 1.0)
 
 ## A capture: the victim (a computer hit by a person) sulks, else the capturing computer gloats over a person.
 func react_capture(c: int, victim_colours: Array) -> bool:
@@ -230,20 +237,20 @@ func react_capture(c: int, victim_colours: Array) -> bool:
 	if _is_human(c):
 		for o in owners:
 			if _is_cpu(o):
-				return cpu_say(o, ["cry", "angry", "wow", "facepalm", "sad"], 0.4)
+				return cpu_say(o, ["cry", "angry", "wow", "facepalm", "sad", "grr", "hmph", "t-again", "t-revenge", "t-nooo"], 0.4)
 		return false
 	if _is_cpu(c) and owners.any(func(o): return _is_human(int(o))):
-		return cpu_say(c, ["laugh", "cool", "tease"], 0.35)
+		return cpu_say(c, ["laugh", "cool", "tease", "t-sorry", "t-lucky", "t-easy"], 0.35)
 	return false
 
 ## The end: a winning computer celebrates, else a losing one congratulates (or sulks).
 func react_win(winners: Array, seats: Array) -> bool:
 	for w in winners:
 		if _is_cpu(int(w)):
-			return cpu_say(int(w), ["party", "crown", "happy"], 0.7)
+			return cpu_say(int(w), ["party", "crown", "happy", "t-gg"], 0.7)
 	for o in seats:
 		if _is_cpu(int(o)) and not winners.has(o):
-			return cpu_say(int(o), ["cheer", "sad", "cry"], 0.5)
+			return cpu_say(int(o), ["cheer", "sad", "cry", "t-gg", "t-wp"], 0.5)
 	return false
 
 ## Play on: a computer finished while the game goes on.

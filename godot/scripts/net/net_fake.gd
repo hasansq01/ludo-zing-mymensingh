@@ -286,7 +286,7 @@ class Room extends RefCounted:
 			_send(pipe, {t = "error", code = "bad_message", msg = "emote"})
 			return
 		var owned: Array = me.get("emote_sets", ["starter"])
-		if pack != "starter" and not owned.has(pack):
+		if pack != "starter" and pack != "basic" and pack != "team" and not owned.has(pack):
 			_send(pipe, {t = "error", code = "emote_locked", msg = ""})
 			return
 		var now := clock_ms()

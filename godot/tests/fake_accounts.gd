@@ -18,7 +18,7 @@ var google_body: Dictionary = {}
 var resolve_body: Dictionary = {}
 var drop_session := false                ## authed calls answer 401 unauthorized
 var board := {top = [], me = null, min_matches = 3}
-var prices := {room_neon = 3000, dice_gold = 900, emotes_pawns = 2500, emotes_friends = 4000, emotes_game = 3500}
+var prices := {room_neon = 3000, dice_gold = 900, emotes_pawns = 5000, emotes_friends = 2500, emotes_boys = 2500, emotes_game = 5000, text_ludo = 3000, text_react = 3000, text_bangla = 3000}
 ## Items sold for gems only (pawn skins): key -> gems. Bought with coins: 409 gems_only.
 var gem_only := {}
 var daily_taken := false
@@ -132,6 +132,11 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 			elif b.kind == "emotes":
 				profile.emote_sets.append(b.id)
 				profile.emote_set = b.id
+			elif b.kind == "text":
+				if not profile.has("text_packs"):
+					profile.text_packs = ["basic"]
+				profile.text_packs.append(b.id)
+				profile.text_pack = b.id
 			elif b.kind == "pawn":
 				profile.pawns_owned.append(b.id)
 				profile.pawn = b.id
@@ -139,7 +144,7 @@ func http(method: int, path: String, body: Variant, session: String) -> Dictiona
 				profile.dice_owned.append(b.id)
 			return _ok({ok = true, profile = _prof(), price = price, currency = str(b.get("currency", "coins"))})
 		"/v1/shop/equip":
-			profile[("emote_set" if b.kind == "emotes" else str(b.kind))] = b.id
+			profile[{"emotes": "emote_set", "text": "text_pack"}.get(b.kind, str(b.kind))] = b.id
 			return _ok({ok = true, profile = _prof()})
 		"/v1/rewards/daily":
 			if daily_taken:

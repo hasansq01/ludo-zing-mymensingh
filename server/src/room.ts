@@ -26,7 +26,7 @@ import { accounts, quickStat, type GameKind, type OnlineMatchGrant, type OnlineO
 import { forfeitEntry, refundEntry, refundReroll, rerollBalance, spendReroll } from "./economy";
 import { ECON_V1, tablePayouts } from "./econ/rules";
 import { applyOrder, clearLead, rankByProgress } from "./settle";
-import { ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, ghostPick, makeGhosts, newGhostMemory, packOfEmote, progressLead, type GhostMemory, type GhostSituation, type GhostTrigger, type Persona } from "./ghosts";
+import { FREE_EMOTE_PACKS, emotePacksAllowing, ghostDelay, ghostEmoteReply, ghostPack, ghostPairYes, ghostPersonas, ghostPick, makeGhosts, newGhostMemory, progressLead, type GhostMemory, type GhostSituation, type GhostTrigger, type Persona } from "./ghosts";
 import type { Matchmaker } from "./matchmaker";
 import { EVENT_TTL_S, pushAccount, pushConfigured, type PushKind } from "./push";
 import type { Pusher } from "./pusher";
@@ -2346,24 +2346,24 @@ export class Room extends DurableObject<Env> {
   private async emote(ws: WebSocket, mem: Member, msg: Record<string, unknown>): Promise<void> {
     const r = this.room!;
     const id = msg.id;
-    const pack = packOfEmote(id);
-    if (!pack) return this.error(ws, "bad_message", "unknown emote");
+    const packs = emotePacksAllowing(id);
+    if (!packs.length) return this.error(ws, "bad_message", "unknown emote");
     const now = Date.now();
     const sent = (this.emoSent.get(mem.id) ?? []).filter((t) => now - t < this.ms(30_000));
     if ((sent.length && now - sent[sent.length - 1] < this.ms(2000)) || sent.length >= 6) {
       this.emoSent.set(mem.id, sent);
       return this.error(ws, "emote_rate", "too many emotes");
     }
-    if (pack !== "starter") {
-      const key = `${mem.id}:${pack}`;
+    if (!packs.some((p) => FREE_EMOTE_PACKS.includes(p))) {
+      const key = `${mem.id}:${packs[0]}`;
       if ((this.emoLocked.get(key) ?? 0) > now) return this.error(ws, "emote_locked", "you do not own that emote pack");
       let sets = this.emoSets.get(mem.id);
-      if (!sets?.includes(pack)) {
+      if (!packs.some((p) => sets?.includes(p))) {
         sets = await this.readEmoteSets(mem);
         if (ws.readyState !== 1 || !this.room) return;
-        if (sets.includes(pack)) this.emoSets.set(mem.id, sets);
+        if (packs.some((p) => sets!.includes(p))) this.emoSets.set(mem.id, sets);
       }
-      if (!sets.includes(pack)) {
+      if (!packs.some((p) => sets!.includes(p))) {
         this.emoLocked.set(key, Date.now() + this.ms(2000));
         if (this.emoLocked.size > 256) this.emoLocked.delete(this.emoLocked.keys().next().value!);
         return this.error(ws, "emote_locked", "you do not own that emote pack");

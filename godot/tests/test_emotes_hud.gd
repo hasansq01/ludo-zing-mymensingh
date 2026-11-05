@@ -98,12 +98,31 @@ func _picker() -> void:
 	var blocked := [false]
 	p.guard = func() -> bool: return blocked[0]
 	p.open()
+	p.set_mode("text")
+	check("picker: the Text tab lists the phrases, the panel stays open", p.is_open and p.mode == "text" and p.ids[0] == "t-hi" and p.cells.size() == 8 and p.cells[0]._say != null)
+	p.teams = true
+	p.refresh()
+	check("picker: Pair Mode adds the team phrases", p.cells.size() == 12 and p.ids.back() == "t-partner")
+	var too_big: Array = []
+	for pk: Dictionary in Emotes.text_packs():
+		for tid: String in pk.emotes:
+			var one := EmotePicker.Cell.new(tid, 0)
+			p.panel.add_child(one)                # in the tree: the smaller font of a long phrase has taken effect
+			if one._say.get_minimum_size().x > EmotePicker.CW - 4 or one._say.get_minimum_size().y > EmotePicker.CH:
+				too_big.append([tid, one._say.get_minimum_size()])
+			p.panel.remove_child(one)
+			one.free()
+	check("picker: every phrase fits its cell", too_big.is_empty(), too_big)
+	check("picker: a phrase splits at the space nearest the middle", EmotePicker.two_lines("Nice one, partner!") == "Nice one,\npartner!" and EmotePicker.two_lines("GG") == "GG")
+	p.teams = false
+	p.set_mode("em")
+	check("picker: back to the stickers", p.is_open and p.mode == "em" and p.cells[0]._say == null and p.ids[0] == "happy")
 	blocked[0] = true
 	p.tick(0.0)
 	check("picker: a sheet opening (guard) closes it", not p.is_open)
 	blocked[0] = false
 	p.place_panel(180, 380)
-	check("picker: two columns in a short band", p.cols == 2 and p.panel.size.y <= 200, [p.cols, p.panel.size])
+	check("picker: more columns in a short band", p.cols == 3 and p.panel.size.y <= 200, [p.cols, p.panel.size])
 	p.place_panel(180, 290)
 	check("picker: six in a row when even three columns can't fit", p.cols == 6, p.cols)
 	p.still = 1
@@ -228,13 +247,16 @@ func _cpu_rules() -> void:
 	l.always = true
 	l.clear()
 	now[0] += EmoteLayer.CPU_GAP + 1
-	check("react: a computer captured by you sulks", l.react_capture(0, [1]) and ["cry", "angry", "wow", "facepalm", "sad"].has(l._last_cpu[1]))
+	check("react: a computer may greet the table at the start", l.react_start([0, 1, 2, 3]) and l._last_cpu.values().any(func(x): return ["t-luck", "t-fun", "t-hi"].has(x)))
+	l.clear()
 	now[0] += EmoteLayer.CPU_GAP + 1
-	check("react: a computer capturing you gloats", l.react_capture(2, [0]) and ["laugh", "cool", "tease"].has(l._last_cpu[2]))
+	check("react: a computer captured by you sulks", l.react_capture(0, [1]) and ["cry", "angry", "wow", "facepalm", "sad", "grr", "hmph", "t-again", "t-revenge", "t-nooo"].has(l._last_cpu[1]))
+	now[0] += EmoteLayer.CPU_GAP + 1
+	check("react: a computer capturing you gloats", l.react_capture(2, [0]) and ["laugh", "cool", "tease", "t-sorry", "t-lucky", "t-easy"].has(l._last_cpu[2]))
 	now[0] += EmoteLayer.CPU_GAP + 1
 	check("react: computers capturing each other say nothing", not l.react_capture(1, [3]))
 	now[0] += EmoteLayer.CPU_GAP + 1
-	check("react: a winning computer celebrates", l.react_win([3], [0, 1, 2, 3]) and ["party", "crown", "happy"].has(l._last_cpu[3]))
+	check("react: a winning computer celebrates", l.react_win([3], [0, 1, 2, 3]) and ["party", "crown", "happy", "t-gg"].has(l._last_cpu[3]))
 	now[0] += EmoteLayer.CPU_GAP + 1
 	check("react: you win: a computer congratulates (or sulks)", l.react_win([0], [0, 1, 2, 3]) and ["cheer", "sad", "cry"].has(l._last_cpu[1]))
 	now[0] += EmoteLayer.CPU_GAP + 1
@@ -484,7 +506,7 @@ func _relay() -> void:
 	check("relay: in a match the others get {t: emote, c: the sender's colour, id}", eb.size() == 1 and ec.size() == 1 and int(eb[0].c) == col_a and eb[0].id == "laugh" and col_a >= 0, [eb, col_a])
 	check("relay: never back to the sender (it shows its own at once)", (a.get_meta("emotes") as Array).is_empty())
 	now[0] += 500
-	a.send_emote("cool")
+	a.send_emote("laugh")
 	_pump(cs)
 	check("relay: a second within 2 s is refused (emote_rate)", _got(a, "error").any(func(m): return m.code == "emote_rate") and (b.get_meta("emotes") as Array).size() == 2)
 	now[0] += 2100
@@ -493,7 +515,7 @@ func _relay() -> void:
 	check("relay: a pack the account doesn't own is refused (emote_locked)", _got(a, "error").any(func(m): return m.code == "emote_locked") and (b.get_meta("emotes") as Array).size() == 2)
 	for mem in room.members:
 		if str(mem.id) == a.member_id:
-			mem.emote_sets = ["starter", "pawns"]
+			mem.emote_sets = ["starter", "game"]
 	now[0] += 2100
 	a.send_emote("champ")
 	_pump(cs)

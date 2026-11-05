@@ -83,6 +83,13 @@ func _ensure() -> void:
 	p.emote_sets = emo
 	if not p.get("emote_set") is String or not emo.has(p.emote_set):
 		p.emote_set = "starter"
+	# text emote packs (Catalog.TEXT_PACKS): owned ids (Good Manners always, first), the equipped pack
+	var txt: Array = p.get("text_packs", []) if p.get("text_packs") is Array else []
+	if not txt.has("basic"):
+		txt.insert(0, "basic")
+	p.text_packs = txt
+	if not p.get("text_pack") is String or not txt.has(p.text_pack):
+		p.text_pack = "basic"
 	# rewards: daily calendar state, last spin day, last free-coins claim (unix seconds)
 	if not p.get("daily") is Dictionary:
 		p.daily = {}

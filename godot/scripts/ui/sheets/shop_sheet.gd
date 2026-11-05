@@ -274,7 +274,10 @@ static func _sections(key: String) -> Array:
 		"pawns":
 			return [["", Catalog.PAWNS.map(func(d: Dictionary) -> Dictionary: return {kind = "pawn", id = d.id, name = d.name})]]
 		"emotes":
-			return [["", Emotes.packs().map(func(e: Dictionary) -> Dictionary: return {kind = "emotes", id = e.id, name = e.name})]]
+			return [
+				["", Emotes.packs().map(func(e: Dictionary) -> Dictionary: return {kind = "emotes", id = e.id, name = e.name})],
+				[L10n.t("Text emotes"), Emotes.text_packs().map(func(e: Dictionary) -> Dictionary: return {kind = "text", id = e.id, name = e.name})],
+			]
 		"avatars":
 			# the illustrated characters first (the one in use, then the ones owned, then by price), then the
 			# classic avatars (pawns, Latte, the earned ones) with the one in use first
@@ -296,6 +299,7 @@ static func _sections(key: String) -> Array:
 					classic.append(a)
 			return [
 				[L10n.t("Characters"), chars.map(func(c: Dictionary) -> Dictionary: return {kind = "char", id = c.id, name = c.name})],
+				[L10n.t("More characters"), Collection.WORLD.map(func(c: Dictionary) -> Dictionary: return {kind = "char", id = c.id, name = c.name})],
 				[L10n.t("Classic"), classic.map(func(a: Dictionary) -> Dictionary: return {kind = "avatar", id = a.id, name = a.name})],
 			]
 		"frames":
@@ -313,6 +317,7 @@ static func _owned(kind: String, id: String) -> bool:
 		"dice": return Catalog.owns_dice(id)
 		"pawn": return Catalog.owns_pawn(id)
 		"emotes": return Catalog.owns_emotes(id)
+		"text": return Catalog.owns_text(id)
 	return Collection.is_unlocked(kind, id)
 
 static func _in_use(kind: String, id: String) -> bool:
@@ -322,6 +327,7 @@ static func _in_use(kind: String, id: String) -> bool:
 		"dice": return Catalog.dice_in_use() == id
 		"pawn": return Catalog.pawn_in_use() == id
 		"emotes": return Catalog.emotes_in_use() == id
+		"text": return Catalog.text_in_use() == id
 		"char": return Collection.is_equipped("avatar", id)
 	return Collection.is_equipped(kind, id)
 
@@ -332,6 +338,7 @@ static func _price(kind: String, id: String) -> int:
 		"dice": return int(Catalog.dice(id).get("price", 0))
 		"pawn": return int(Catalog.pawn(id).get("price", 0))
 		"emotes": return int(Catalog.emote_pack(id).get("price", 0))
+		"text": return int(Catalog.text_pack(id).get("price", 0))
 		"char": return int(Collection.character(id).get("price", 0))
 	return 0
 
@@ -385,7 +392,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	var tag := CoinAmount.gems(_gems(kind, id), "sm", "price") if gems_only else CoinAmount.new(price, "sm", "price")
 	tag.name = "Price"
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if kind == "room" or kind == "scene" or kind == "emotes" or kind == "pawn":
+	if kind == "room" or kind == "scene" or kind == "emotes" or kind == "text" or kind == "pawn":
 		art.add_child(_view_button(kind, id))
 	art.add_child(tag)
 	tag.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 6)
@@ -495,7 +502,9 @@ static func gem_option(gems: int) -> Button:
 func _art(kind: String, id: String) -> Control:
 	match kind:
 		"emotes":
-			return _emote_art(id)
+			return _emote_art(Emotes.pack(id).get("emotes", []), bool(Emotes.pack(id).get("premium", false)))
+		"text":
+			return _emote_art((Emotes.text_pack(id).get("emotes", []) as Array).slice(0, 4), false)
 		"room":
 			return Thumbnailer.view("room", id, UIKit.R.md)
 		"scene":
@@ -533,17 +542,17 @@ func _art(kind: String, id: String) -> Control:
 		well.set_meta("art", c.get_child(0))
 	return well
 
-## The pack's six icons, two columns by three rows, on the Emotes tab's well.
-func _emote_art(id: String) -> Control:
+## A pack's icons on the Emotes tab's well: two columns (three for a Premium pack's eight), with its Premium tag.
+func _emote_art(icons: Array, premium: bool) -> Control:
 	var well := _well("emotes")
 	var g := GridContainer.new()
-	g.columns = 2
+	g.columns = 3 if icons.size() > 6 else 2
 	g.name = "Icons"
 	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	g.add_theme_constant_override("h_separation", 2)
 	g.add_theme_constant_override("v_separation", 0)
 	g.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for eid: String in Emotes.pack(id).get("emotes", []):
+	for eid: String in icons:
 		var t := TextureRect.new()
 		t.texture = EmoteArt.icon(eid)
 		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -562,11 +571,24 @@ func _emote_art(id: String) -> Control:
 	well.add_child(m)
 	m.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	well.set_meta("art", g)
+	if premium:
+		var chip := PanelContainer.new()
+		chip.name = "Premium"
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		chip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		var st := UIKit.box(Palette.HONEY_TINT, UIKit.R.sm, 1, Palette.HONEY_TINT_EDGE)
+		UIKit.pad(st, 2)
+		chip.add_theme_stylebox_override("panel", st)
+		var l := UIKit.label(tr("Premium"), UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(l)
+		well.add_child(chip)
 	return well
 
 ## A rounded well tinted with the tab's colour (Palette.CAT), behind dice / avatars / frames / plates / badges.
 func _well(kind: String) -> Control:
-	var cat: String = {dice = "dice", pawn = "pawns", emotes = "emotes", avatar = "avatars", char = "avatars", frame = "frames", plate = "plates", badge = "badges"}.get(kind, "rooms")
+	var cat: String = "emotes" if kind == "text" else {dice = "dice", pawn = "pawns", emotes = "emotes", avatar = "avatars", char = "avatars", frame = "frames", plate = "plates", badge = "badges"}.get(kind, "rooms")
 	var p := PanelContainer.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
@@ -611,7 +633,7 @@ func _view_button(kind: String, id: String) -> Button:
 	var h := UIKit.hbox(UIKit.SPACE.xs)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(UIKit.icon("ic_eye", 18))
-	if not is_narrow and kind != "emotes":  # narrow cards (and emote cards, whose icons fill the art): the eye alone
+	if not is_narrow and kind != "emotes" and kind != "text":  # narrow cards (and emote cards, whose icons fill the art): the eye alone
 		var l := UIKit.label(tr("View"), UIKit.FS.small + 1, Palette.INK, UIKit.font_body(900))
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		h.add_child(l)
@@ -763,6 +785,7 @@ static func _purchase(kind: String, id: String, currency := "coins") -> String:
 		"pawn": return Catalog.buy_pawn(id)
 		"scene": return SLScenes.buy_scene(id)
 		"emotes": return Catalog.buy_emotes(id)
+		"text": return Catalog.buy_text(id)
 		"char": return Collection.buy_char(id, true)
 	return L10n.t("That isn’t for sale.")
 
@@ -858,6 +881,7 @@ func _on_use(kind: String, id: String) -> void:
 			"pawn": ok = Catalog.equip_pawn(id)
 			"scene": ok = SLScenes.equip_scene(id)
 			"emotes": ok = Catalog.equip_emotes(id)
+			"text": ok = Catalog.equip_text(id)
 			"char": ok = Collection.equip("avatar", id)
 			_: ok = Collection.equip(kind, id)
 	if not ok:
@@ -874,7 +898,7 @@ func _announce(kind: String, id: String) -> void:
 		"room": room_changed.emit(id)
 		"dice": dice_changed.emit(id)
 		"scene": scene_changed.emit(id)
-		"emotes": emotes_changed.emit()
+		"emotes", "text": emotes_changed.emit()
 	changed.emit()
 
 ## View on a room or a scene: its live 3D preview (PreviewSheet) in place of the Shop, back here on close
@@ -883,8 +907,8 @@ func _announce(kind: String, id: String) -> void:
 func _on_view(kind: String, id: String) -> void:
 	if get_parent() == null or _closing or _busy:
 		return
-	if kind == "emotes":
-		var es := EmotePackSheet.new(id)
+	if kind == "emotes" or kind == "text":
+		var es := EmotePackSheet.new(id, kind)
 		es.changed.connect(func():
 			emotes_changed.emit()
 			changed.emit()

@@ -5,7 +5,8 @@ extends Control
 ## The button: a bare cream chat bubble with a thin warm-brown outline and three dots (no background), placed by
 ## the owner (place_button(centre), usually just above your avatar). It opens the panel: a slim cream panel along
 ## the left edge of the board, vertically centred in the band the owner gives (place_panel(top, bottom); one column
-## when the band is tall enough, else two, three or six), holding the equipped pack's six stickers. It pops out from
+## when the band is tall enough, else two, three or six), with two tabs on top: Stickers (the equipped pack's stickers)
+## and Text (the equipped text pack's phrases, plus the team phrases in Pair Mode: set `teams`). It pops out from
 ## the left (slide + scale + fade, the stickers a moment after each other) and closes with a quick fade.
 ## A pick sends (picked(id)), closes the panel and cools the picker down for COOL s (the stickers greyed, taps
 ## ignored). It closes on a pick, a tap outside it (that tap is used up: it doesn't reach the board), Escape, Back
@@ -19,6 +20,7 @@ const SZ := 44.0                         ## the button's hit area
 const ICON := 34.0                       ## the drawn chat bubble
 const CW := 72.0                         ## one picker cell: a wide sticker
 const CH := 50.0
+const TAB_H := 28.0                      ## the tab row above the cells
 const GAP := 5.0
 const PAD := 6.0
 const LEFT := 8.0
@@ -27,9 +29,12 @@ const OPEN_SEC := 0.24
 const CLOSE_SEC := 0.16
 const CELL_SEC := 0.26
 const STAGGER := 0.035
-const STARTER := ["happy", "laugh", "cool", "angry", "love", "party"]
+const STARTER := ["happy", "laugh", "sob", "angry", "gasp", "love"]
 
 var ids: Array[String] = []
+var mode := "em"                         ## the tab: "em" stickers, "text" phrases (kept from game to game)
+var teams := false                       ## Pair Mode: the team phrases join the Text tab
+var tabs: Array = []                     ## [Stickers, Text]
 var is_open := false
 var cool_left := 0.0
 var guard := Callable()                  ## () -> bool: true closes the panel (a sheet is open, the game paused)
@@ -58,6 +63,11 @@ func _init() -> void:
 	panel = PickPanel.new()
 	panel.visible = false
 	add_child(panel)
+	for m in ["em", "text"]:
+		var t := Tab.new(m)
+		t.pressed.connect(set_mode.bind(m))
+		panel.add_child(t)
+		tabs.append(t)
 	refresh()
 
 func _exit_tree() -> void:
@@ -82,18 +92,31 @@ static func equipped() -> Array[String]:
 		out.assign(STARTER)
 	return out
 
-## Rebuilds the cells from the equipped pack (each game start: the pack may have changed).
+## Rebuilds the cells from the equipped pack or text pack (each game start: they may have changed).
 func refresh() -> void:
-	ids = equipped()
+	ids = equipped() if mode == "em" else Emotes.equipped_text_ids(teams)
 	for c in cells:
 		c.queue_free()
 	cells.clear()
+	var eq := equipped()
+	for t in tabs:
+		(t as Tab).set_state(mode, eq[0] if not eq.is_empty() else "")
 	for k in ids.size():
 		var cell := Cell.new(ids[k], k)
 		cell.pressed.connect(pick.bind(ids[k]))
 		panel.add_child(cell)
 		cells.append(cell)
 	_layout_panel()
+
+## The other tab: the panel stays open with the other list.
+func set_mode(m: String) -> void:
+	if m == mode:
+		return
+	mode = m
+	UIKit.sfx("tap")
+	refresh()
+	if _kbd and not cells.is_empty():
+		(cells[0] as Control).grab_focus()
 
 ## The button's centre (the owner's layout); show = false hides it (and closes the panel).
 func place_button(center: Vector2, show_it := true) -> void:
@@ -237,16 +260,22 @@ func _layout_panel() -> void:
 		panel.position = Vector2(LEFT, round(y))
 	else:
 		panel.position.y = round(y)
+	var tw := (sz.x - PAD * 2.0 - GAP) / 2.0
+	for k in tabs.size():
+		var t: Tab = tabs[k]
+		t.position = Vector2(PAD + k * (tw + GAP), PAD)
+		t.size = Vector2(tw, TAB_H)
+	var top := PAD + TAB_H + GAP
 	for k in cells.size():
 		var cell: Cell = cells[k]
-		cell.home = Vector2(PAD + (k % cols) * (CW + GAP), PAD + (k / cols) * (CH + GAP))
+		cell.home = Vector2(PAD + (k % cols) * (CW + GAP), top + (k / cols) * (CH + GAP))
 		cell.size = Vector2(CW, CH)
 		cell.pivot_offset = cell.size / 2.0
 		cell.pose(cell.k)
 
 static func _grid_size(c: int, n: int) -> Vector2:
 	var rows := ceili(float(n) / c)
-	return Vector2(c * CW + (c - 1) * GAP + PAD * 2.0, rows * CH + (rows - 1) * GAP + PAD * 2.0)
+	return Vector2(c * CW + (c - 1) * GAP + PAD * 2.0, rows * CH + (rows - 1) * GAP + PAD * 2.0 + TAB_H + GAP)
 
 ## The panel's rect on screen (Rect2() while closed).
 func panel_rect() -> Rect2:
@@ -291,6 +320,14 @@ func _still() -> bool:
 static func _back_out(u: float, s: float) -> float:
 	var v := u - 1.0
 	return 1.0 + (s + 1.0) * v * v * v + s * v * v
+
+## A phrase for a picker cell: one line, or two split at the space nearest the middle.
+static func two_lines(text: String) -> String:
+	var at := -1
+	for k in text.length():
+		if text[k] == " " and (at < 0 or absi(k - text.length() / 2) < absi(at - text.length() / 2)):
+			at = k
+	return text if at < 0 else text.substr(0, at) + "\n" + text.substr(at + 1)
 
 ## The sticker without most of its transparent margin (the art leaves room round the speech bubble), so it reads
 ## bigger in a 72 x 50 cell.
@@ -398,6 +435,50 @@ class PickPanel extends Control:
 		draw_style_box(_face, Rect2(Vector2.ZERO, size))
 
 
+## A tab over the cells: Stickers (the equipped pack's first sticker) or Text ("Aa").
+class Tab extends Button:
+	var tab := "em"
+	var _on := false
+	var _art: TextureRect
+	var _bg_on: StyleBoxFlat
+	var _bg_off: StyleBoxFlat
+
+	func _init(tab_: String) -> void:
+		tab = tab_
+		name = "Tab_" + tab_
+		flat = true
+		focus_mode = Control.FOCUS_ALL
+		tooltip_text = tr("Stickers") if tab_ == "em" else tr("Text")
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		var empty := StyleBoxEmpty.new()
+		for s in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+			add_theme_stylebox_override(s, empty)
+		_bg_on = UIKit.box(Palette.HONEY_TINT, UIKit.R.sm, 2, Palette.HONEY_TINT_EDGE)
+		_bg_off = UIKit.box(Palette.SURFACE_2, UIKit.R.sm, 2, Palette.ROW_EDGE)
+		if tab_ == "em":
+			_art = TextureRect.new()
+			_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_art)
+			_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 2)
+		else:
+			var l := UIKit.label("Aa", 15, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(l)
+			l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	func set_state(mode: String, first_sticker: String) -> void:
+		_on = mode == tab
+		if _art and first_sticker != "":
+			_art.texture = EmotePicker.cropped(EmoteArt.icon(first_sticker))
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_style_box(_bg_on if _on else _bg_off, Rect2(Vector2.ZERO, size))
+
+
 ## One sticker in the panel (72 x 50): a soft cream well holding the sticker; greyed while the picker cools down.
 class Cell extends Button:
 	var id := ""
@@ -405,6 +486,7 @@ class Cell extends Button:
 	var home := Vector2.ZERO
 	var k := 1.0                          # its pop-in progress (0..1)
 	var _icon: TextureRect
+	var _say: Label                       # a phrase cell: the words instead of the sticker
 	var _bg: StyleBoxFlat
 	var _bg_on: StyleBoxFlat
 	var _down := false
@@ -424,13 +506,24 @@ class Cell extends Button:
 			add_theme_stylebox_override(s, empty)
 		_bg = UIKit.box(Palette.SURFACE_2, UIKit.R.md, 2, Palette.ROW_EDGE.lerp(Palette.TAN, 0.25))
 		_bg_on = UIKit.box(Palette.HONEY_TINT.lerp(Color.WHITE, 0.35), UIKit.R.md, 2, Palette.HONEY_TINT_EDGE)
-		_icon = TextureRect.new()
-		_icon.texture = EmotePicker.cropped(EmoteArt.icon(id_))
-		_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_icon.material = EmotePicker.grey_material()
-		add_child(_icon)
+		if info.get("text", false):
+			_say = UIKit.label(EmotePicker.two_lines(str(info.get("name", id_))), 13, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+			_say.autowrap_mode = TextServer.AUTOWRAP_OFF
+			_say.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			_say.add_theme_constant_override("line_spacing", -2)
+			_say.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if _say.get_minimum_size().x > CW - 4.0 or _say.get_minimum_size().y > CH:   # a long word, Bangla's tall lines
+				_say.add_theme_font_size_override("font_size", 12)
+			add_child(_say)
+			_say.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		else:
+			_icon = TextureRect.new()
+			_icon.texture = EmotePicker.cropped(EmoteArt.icon(id_))
+			_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_icon.material = EmotePicker.grey_material()
+			add_child(_icon)
 		button_down.connect(func(): _down = true; pose(k))
 		button_up.connect(func(): _down = false; pose(k))
 		mouse_entered.connect(queue_redraw)
@@ -440,6 +533,8 @@ class Cell extends Button:
 		resized.connect(_fit)
 
 	func _fit() -> void:
+		if _say:
+			return
 		_icon.position = Vector2(3, 4)
 		_icon.size = size - Vector2(6, 8)
 
@@ -456,7 +551,10 @@ class Cell extends Button:
 		if g == _grey:
 			return
 		_grey = g
-		(_icon.material as ShaderMaterial).set_shader_parameter("grey", g)
+		if _icon:
+			(_icon.material as ShaderMaterial).set_shader_parameter("grey", g)
+		if _say:
+			_say.add_theme_color_override("font_color", Palette.INK.lerp(Palette.TAN, g))
 		pose(k)
 
 	func _draw() -> void:

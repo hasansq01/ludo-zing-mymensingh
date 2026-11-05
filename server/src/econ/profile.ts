@@ -10,6 +10,7 @@ import {
   DEFAULTS,
   FREE_DICE,
   FREE_EMOTES,
+  FREE_TEXT,
   FREE_PAWN,
   FREE_ROOMS,
   STAT_KEYS,
@@ -55,6 +56,9 @@ export interface Profile {
   /** Owned emote packs (Starter always) and the equipped pack. */
   emote_sets: unknown[];
   emote_set: string;
+  /** Owned text emote packs (Good Manners always) and the equipped one. */
+  text_packs: unknown[];
+  text_pack: string;
   /** Owned Snakes & Ladders scenes; the game adds the field on the first scene purchase (Jungle is implied). */
   scenes?: unknown;
   scene?: unknown;
@@ -143,6 +147,10 @@ export function normalizeProfile(raw: unknown, newId: () => string = newPlayerId
   if (!emo.includes(FREE_EMOTES)) emo.unshift(FREE_EMOTES);
   p.emote_sets = emo;
   if (typeof p.emote_set !== "string" || !emo.includes(p.emote_set)) p.emote_set = FREE_EMOTES;
+  const txt = isArray(p.text_packs) ? p.text_packs : [];
+  if (!txt.includes(FREE_TEXT)) txt.unshift(FREE_TEXT);
+  p.text_packs = txt;
+  if (typeof p.text_pack !== "string" || !txt.includes(p.text_pack)) p.text_pack = FREE_TEXT;
   if (!isDict(p.daily)) p.daily = {};
   if (typeof p.last_spin !== "string") p.last_spin = "";
   p.last_free = Math.max(0, asInt(p, "last_free", 0));
@@ -227,6 +235,12 @@ export function ownsPawn(p: Dict, id: string): boolean {
 export function ownsEmotes(p: Dict, id: string): boolean {
   if (!item("emotes", id)) return false;
   return id === FREE_EMOTES || list(p, "emote_sets").includes(id);
+}
+
+/** Catalog.owns_text. */
+export function ownsText(p: Dict, id: string): boolean {
+  if (!item("text", id)) return false;
+  return id === FREE_TEXT || list(p, "text_packs").includes(id);
 }
 
 /** SLScenes.owned_ids: Jungle first, then the saved scenes that exist (once each). */
@@ -319,6 +333,10 @@ export function equipped(kind: string, p: Dict): string {
     case "emotes": {
       const id = str(p.emote_set);
       return ownsEmotes(p, id) ? id : FREE_EMOTES;
+    }
+    case "text": {
+      const id = str(p.text_pack);
+      return ownsText(p, id) ? id : FREE_TEXT;
     }
     case "scene": {
       const id = str(p.scene, DEFAULT_SCENE);

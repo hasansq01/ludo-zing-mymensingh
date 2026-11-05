@@ -16,11 +16,11 @@ func run() -> void:
 	check("emote sfx: 24 files exist, load, 0.25-1.3 s", bad.is_empty(), bad)
 
 	var man := EmoteArt.manifest()
-	var man_ids: Array = (man.get("emotes", []) as Array).map(func(e: Dictionary) -> String: return e.id)
-	man_ids.sort()
-	var want := IDS.duplicate()
-	want.sort()
-	check("emote sfx: ids match the art manifest", man_ids == want)
+	var lost: Array = []
+	for e: Dictionary in man.get("emotes", []):
+		if not IDS.has(str(e.get("sound", e.id))):
+			lost.append(e.id)
+	check("emote sfx: every emote in the art manifest has a sound (its own or a shared one)", lost.is_empty(), lost)
 
 	var snd := Node.new()
 	snd.set_script(load("res://scripts/audio/sound.gd"))

@@ -1,7 +1,7 @@
 // Buying and equipping (Catalog.buy_room / buy_dice / buy_pawn, SLScenes.buy_scene, Collection.buy_char, the equip
 // functions). The checks run in the game's order; nothing changes on an error. Purchases equip the item, as the Shop
 // does (rooms, dice, pawn skins and scenes by default, characters with equip_it = true).
-import { type CatalogItem, FREE_DICE, FREE_EMOTES, FREE_PAWN, item } from "./catalog";
+import { type CatalogItem, FREE_DICE, FREE_EMOTES, FREE_PAWN, FREE_TEXT, item } from "./catalog";
 import { clone, getInt, list, str } from "./gd";
 import {
   type Delta,
@@ -10,6 +10,7 @@ import {
   isUnlocked,
   ownsDice,
   ownsEmotes,
+  ownsText,
   ownsPawn,
   ownsRoom,
   ownsScene,
@@ -22,6 +23,9 @@ export type BuyResult =
   | { ok: true; profile: Profile; delta: Delta; price: number }
   | { ok: false; error: BuyError; /** Coins (error "coins") or gems (error "gems") still missing. */ short?: number };
 
+/** The emote pack prices a game from before the 2026-11 packs shows (v14, v15); it doesn't send `catalog: 2`. Drop once min_online passes them. */
+const LEGACY_EMOTE_PRICES: Readonly<Record<string, number>> = { pawns: 2500, friends: 4000, game: 3500 };
+
 /**
  * POST /v1/shop/buy {kind, id}.
  *   unknown  no such item (or a kind the Shop doesn't sell)
@@ -31,15 +35,19 @@ export type BuyResult =
  *   gems_only  currency "coins" for a pawn skin sold for gems only (no coin price: nothing is ever free by mistake)
  *   locked   an unlock-only item (avatar, frame, plate, badge) that isn't unlocked yet; when it is, "owned"
  */
-export function buy(profile: Profile, kind: string, id: string, currency: "coins" | "gems" = "coins"): BuyResult {
+export function buy(profile: Profile, kind: string, id: string, currency: "coins" | "gems" = "coins", oldClient = false): BuyResult {
   switch (kind) {
     case "room":
     case "dice":
     case "emotes":
+    case "text":
     case "scene": {
-      const it = item(kind, id);
-      if (!it) return { ok: false, error: "unknown" };
-      const owned = kind === "room" ? ownsRoom(profile, id) : kind === "dice" ? ownsDice(profile, id) : kind === "emotes" ? ownsEmotes(profile, id) : ownsScene(profile, id);
+      const found = item(kind, id);
+      if (!found) return { ok: false, error: "unknown" };
+      // a game from before the 2026-11 packs shows these prices and charges them, whatever the catalog says now
+      const was = oldClient && kind === "emotes" ? LEGACY_EMOTE_PRICES[id] : undefined;
+      const it = was === undefined ? found : { ...found, price: was, gems: Math.ceil(was / 100) };
+      const owned = kind === "text" ? ownsText(profile, id) : kind === "room" ? ownsRoom(profile, id) : kind === "dice" ? ownsDice(profile, id) : kind === "emotes" ? ownsEmotes(profile, id) : ownsScene(profile, id);
       if (owned) return { ok: false, error: "owned" };
       return pay(profile, kind, id, it, currency, (p) => {
         if (kind === "room") {
@@ -53,6 +61,12 @@ export function buy(profile: Profile, kind: string, id: string, currency: "coins
           sets.push(id);
           p.emote_sets = sets;
           p.emote_set = id;
+        } else if (kind === "text") {
+          const packs = list(p, "text_packs");
+          if (!packs.includes(FREE_TEXT)) packs.unshift(FREE_TEXT);
+          packs.push(id);
+          p.text_packs = packs;
+          p.text_pack = id;
         } else if (kind === "dice") {
           const dice = list(p, "dice_owned");
           if (!dice.includes(FREE_DICE)) dice.unshift(FREE_DICE);
@@ -126,7 +140,7 @@ function pay(profile: Profile, kind: string, id: string, it: CatalogItem, curren
 
 // ---------- equipping ----------
 
-export type EquipKind = "room" | "dice" | "pawn" | "emotes" | "scene" | "avatar" | "char" | "frame" | "plate" | "badge";
+export type EquipKind = "room" | "dice" | "pawn" | "emotes" | "text" | "scene" | "avatar" | "char" | "frame" | "plate" | "badge";
 
 export type EquipResult = { ok: true; profile: Profile; changed: boolean } | { ok: false; error: "unknown" | "locked" };
 
@@ -142,11 +156,12 @@ export function equip(profile: Profile, kind: string, id: string): EquipResult {
     case "room":
     case "dice":
     case "pawn":
-    case "emotes": {
+    case "emotes":
+    case "text": {
       if (!item(kind, id)) return { ok: false, error: "unknown" };
-      const owns = kind === "room" ? ownsRoom(p, id) : kind === "dice" ? ownsDice(p, id) : kind === "pawn" ? ownsPawn(p, id) : ownsEmotes(p, id);
+      const owns = kind === "room" ? ownsRoom(p, id) : kind === "dice" ? ownsDice(p, id) : kind === "pawn" ? ownsPawn(p, id) : kind === "text" ? ownsText(p, id) : ownsEmotes(p, id);
       if (!owns) return { ok: false, error: "locked" };
-      const field = kind === "emotes" ? "emote_set" : kind;
+      const field = kind === "emotes" ? "emote_set" : kind === "text" ? "text_pack" : kind;
       if (str(p[field]) === id) return { ok: true, profile: p, changed: false };
       const q = clone(p);
       q[field] = id;

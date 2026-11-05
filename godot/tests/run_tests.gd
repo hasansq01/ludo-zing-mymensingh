@@ -88,7 +88,13 @@ func _initialize() -> void:
 	for path in SUITES:
 		if not only.is_empty() and not Array(only).any(func(o: String) -> bool: return path.get_file().contains(o)):
 			continue
-		var suite = load(path).new()
+		var script = load(path)
+		if script == null or not script.can_instantiate():  # a suite that doesn't parse fails the run; it must not hang it
+			total += 1
+			failed += 1
+			print("%s: 0 passed, 1 failed\n  FAIL the suite did not load" % path.get_file())
+			continue
+		var suite = script.new()
 		if path in ASYNC_SUITES:
 			await suite.run()                  # (waits for frames: the live match tests)
 		else:

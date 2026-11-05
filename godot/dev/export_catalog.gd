@@ -5,7 +5,7 @@ extends SceneTree
 ## Default out: ../server/src/econ/catalog.json. A relative <out.json> is relative to the project folder (godot/).
 ##
 ## Everything is read from the game's own constants and functions, never retyped here:
-##   items        Catalog.DICE, Catalog.PAWNS, Rooms.LIST, SLScenes.LIST, Collection.CHARS / AVATARS / FRAMES / PLATES /
+##   items        Catalog.DICE, Catalog.PAWNS, Rooms.LIST, SLScenes.LIST, Collection.CHARS / WORLD / AVATARS / FRAMES / PLATES /
 ##                BADGES
 ##   achievements Collection.ACH
 ##   defaults     what Save._ensure() gives a brand-new profile (starting coins, free rooms / dice, equipped items)
@@ -51,11 +51,13 @@ static func build() -> Dictionary:
 		items.append(it)
 	for e: Dictionary in Catalog.EMOTE_PACKS:
 		items.append(_item("emotes", e, int(e.price) > 0, e.id == Catalog.FREE_EMOTES, e.id == Catalog.FREE_EMOTES))
+	for e: Dictionary in Catalog.TEXT_PACKS:
+		items.append(_item("text", e, int(e.price) > 0, e.id == Catalog.FREE_TEXT, e.id == Catalog.FREE_TEXT))
 	for r: Dictionary in Rooms.LIST:
 		items.append(_item("room", r, int(r.price) > 0, Catalog.FREE_ROOMS.has(r.id), r.id == Rooms.DEFAULT))
 	for s: Dictionary in SLScenes.LIST:
 		items.append(_item("scene", s, int(s.price) > 0, SLScenes.FREE.has(s.id), s.id == SLScenes.DEFAULT))
-	for c: Dictionary in Collection.CHARS:
+	for c: Dictionary in Collection.CHARS + Collection.WORLD:
 		items.append(_item("char", c, int(c.price) > 0, int(c.price) <= 0, false))
 	for a: Dictionary in Collection.AVATARS:
 		items.append(_item("avatar", a, false, not a.has("unlock"), a.id == Collection.DEFAULT_AVATAR))
@@ -114,7 +116,7 @@ static func _defaults() -> Dictionary:
 	var stats: Array = p.stats.keys()
 	return {
 		name = p.name, coins = int(p.coins), xp = int(p.xp), stats = stats,
-		rooms = p.rooms, room = p.room, emote_sets = p.emote_sets, emote_set = p.emote_set, dice_owned = p.dice_owned, dice = p.dice,
+		rooms = p.rooms, room = p.room, emote_sets = p.emote_sets, emote_set = p.emote_set, text_packs = p.text_packs, text_pack = p.text_pack, dice_owned = p.dice_owned, dice = p.dice,
 		pawns_owned = p.pawns_owned, pawn = p.pawn,
 		scenes = [SLScenes.DEFAULT], scene = SLScenes.DEFAULT,
 		avatar = p.avatar, frame = p.frame, plate = p.plate, badge = p.badge,

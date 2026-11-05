@@ -81,6 +81,22 @@ describe("ghost identities and timing", () => {
     }
   });
 
+  it("a ghost's character matches its name, the new free characters too", () => {
+    const WOMEN = ["w-hana", "w-mei", "w-linh", "w-emma", "w-sofia", "w-maya", "w-ava"];
+    const MEN = ["w-kenji", "w-lukas", "w-oliver", "w-jayden", "w-carlos"];
+    expect(FREE_AVATARS).toEqual(expect.arrayContaining([...WOMEN, ...MEN]));
+    const rng = new Mulberry32(7);
+    let worn = 0;
+    for (let k = 0; k < 500; k++) {
+      for (const g of makeGhosts(3, [], rng)) {
+        if (!g.avatar.startsWith("w-")) continue;
+        worn++;
+        expect((FEMALE_NAMES as readonly string[]).includes(g.name) ? WOMEN : MEN).toContain(g.avatar);
+      }
+    }
+    expect(worn).toBeGreaterThan(100);
+  });
+
   it("delays: roll 0.8-2.6 s, choose 1-3.5 s with ~8% 4-6 s, pair 0.8-2 s", () => {
     const rng = new Mulberry32(3);
     let think = 0;

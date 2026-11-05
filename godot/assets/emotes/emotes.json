@@ -2,9 +2,9 @@
  "emotes": [
   {
    "id": "happy",
-   "name": "Victory",
+   "name": "Happy",
    "set": "starter",
-   "set_name": "Starter Set",
+   "set_name": "Pawn Set",
    "frames": 11,
    "fps": 15.714,
    "loop_s": 0.7,
@@ -17,7 +17,7 @@
    "id": "laugh",
    "name": "Laugh",
    "set": "starter",
-   "set_name": "Starter Set",
+   "set_name": "Pawn Set",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -27,10 +27,10 @@
    ]
   },
   {
-   "id": "cool",
-   "name": "Cool",
+   "id": "sob",
+   "name": "Cry",
    "set": "starter",
-   "set_name": "Starter Set",
+   "set_name": "Pawn Set",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -43,7 +43,20 @@
    "id": "angry",
    "name": "Angry",
    "set": "starter",
-   "set_name": "Starter Set",
+   "set_name": "Pawn Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "gasp",
+   "name": "Shocked",
+   "set": "starter",
+   "set_name": "Pawn Set",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -56,7 +69,7 @@
    "id": "love",
    "name": "Love",
    "set": "starter",
-   "set_name": "Starter Set",
+   "set_name": "Pawn Set",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -66,10 +79,10 @@
    ]
   },
   {
-   "id": "party",
-   "name": "Celebrate",
-   "set": "starter",
-   "set_name": "Starter Set",
+   "id": "cheer",
+   "name": "Happy",
+   "set": "friends",
+   "set_name": "Girl Set",
    "frames": 31,
    "fps": 14.762,
    "loop_s": 2.1,
@@ -79,10 +92,24 @@
    ]
   },
   {
-   "id": "champ",
-   "name": "Champ",
-   "set": "pawns",
-   "set_name": "Pawn Pals",
+   "id": "gLaugh",
+   "name": "Laugh",
+   "set": "friends",
+   "set_name": "Girl Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "laugh"
+  },
+  {
+   "id": "cry",
+   "name": "Cry",
+   "set": "friends",
+   "set_name": "Girl Set",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -92,10 +119,108 @@
    ]
   },
   {
-   "id": "sleepy",
-   "name": "Sleepy",
-   "set": "pawns",
-   "set_name": "Pawn Pals",
+   "id": "gAngry",
+   "name": "Angry",
+   "set": "friends",
+   "set_name": "Girl Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "angry"
+  },
+  {
+   "id": "gShock",
+   "name": "Shocked",
+   "set": "friends",
+   "set_name": "Girl Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "gasp"
+  },
+  {
+   "id": "gLove",
+   "name": "Love",
+   "set": "friends",
+   "set_name": "Girl Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "love"
+  },
+  {
+   "id": "bHappy",
+   "name": "Happy",
+   "set": "boys",
+   "set_name": "Boy Set",
+   "frames": 11,
+   "fps": 15.714,
+   "loop_s": 0.7,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "happy"
+  },
+  {
+   "id": "bLaugh",
+   "name": "Laugh",
+   "set": "boys",
+   "set_name": "Boy Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "laugh"
+  },
+  {
+   "id": "bCry",
+   "name": "Cry",
+   "set": "boys",
+   "set_name": "Boy Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "cry"
+  },
+  {
+   "id": "grr",
+   "name": "Angry",
+   "set": "boys",
+   "set_name": "Boy Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "angry"
+  },
+  {
+   "id": "wow",
+   "name": "Shocked",
+   "set": "boys",
+   "set_name": "Boy Set",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -105,10 +230,37 @@
    ]
   },
   {
-   "id": "sob",
-   "name": "Sob",
+   "id": "bLove",
+   "name": "Love",
+   "set": "boys",
+   "set_name": "Boy Set",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "love"
+  },
+  {
+   "id": "party",
+   "name": "Celebrate",
    "set": "pawns",
-   "set_name": "Pawn Pals",
+   "set_name": "Party Pack",
+   "frames": 31,
+   "fps": 14.762,
+   "loop_s": 2.1,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "cool",
+   "name": "Cool",
+   "set": "pawns",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -118,23 +270,10 @@
    ]
   },
   {
-   "id": "gasp",
-   "name": "Gasp",
+   "id": "tease",
+   "name": "Tease",
    "set": "pawns",
-   "set_name": "Pawn Pals",
-   "frames": 36,
-   "fps": 15,
-   "loop_s": 2.4,
-   "size": [
-    344,
-    218
-   ]
-  },
-  {
-   "id": "confused",
-   "name": "Confused",
-   "set": "pawns",
-   "set_name": "Pawn Pals",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -147,7 +286,7 @@
    "id": "hi",
    "name": "Hi!",
    "set": "pawns",
-   "set_name": "Pawn Pals",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -157,10 +296,10 @@
    ]
   },
   {
-   "id": "cry",
-   "name": "Cry",
-   "set": "friends",
-   "set_name": "Friends Set",
+   "id": "highfive",
+   "name": "High five",
+   "set": "pawns",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -170,10 +309,10 @@
    ]
   },
   {
-   "id": "wow",
-   "name": "Shocked",
-   "set": "friends",
-   "set_name": "Friends Set",
+   "id": "confused",
+   "name": "Confused",
+   "set": "pawns",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -185,8 +324,8 @@
   {
    "id": "facepalm",
    "name": "Facepalm",
-   "set": "friends",
-   "set_name": "Friends Set",
+   "set": "pawns",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -196,49 +335,10 @@
    ]
   },
   {
-   "id": "cheer",
-   "name": "Yay!",
-   "set": "friends",
-   "set_name": "Friends Set",
-   "frames": 31,
-   "fps": 14.762,
-   "loop_s": 2.1,
-   "size": [
-    344,
-    218
-   ]
-  },
-  {
-   "id": "think",
-   "name": "Thinking",
-   "set": "friends",
-   "set_name": "Friends Set",
-   "frames": 36,
-   "fps": 15,
-   "loop_s": 2.4,
-   "size": [
-    344,
-    218
-   ]
-  },
-  {
-   "id": "tease",
-   "name": "Tease",
-   "set": "friends",
-   "set_name": "Friends Set",
-   "frames": 36,
-   "fps": 15,
-   "loop_s": 2.4,
-   "size": [
-    344,
-    218
-   ]
-  },
-  {
-   "id": "dice",
-   "name": "Roll it!",
-   "set": "game",
-   "set_name": "Game Set",
+   "id": "sad",
+   "name": "Heartbroken",
+   "set": "pawns",
+   "set_name": "Party Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -251,7 +351,7 @@
    "id": "crown",
    "name": "Winner",
    "set": "game",
-   "set_name": "Game Set",
+   "set_name": "Champion Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -261,10 +361,10 @@
    ]
   },
   {
-   "id": "highfive",
-   "name": "High five",
+   "id": "champ",
+   "name": "Champ",
    "set": "game",
-   "set_name": "Game Set",
+   "set_name": "Champion Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -274,23 +374,10 @@
    ]
   },
   {
-   "id": "flag",
-   "name": "Give up",
+   "id": "dice",
+   "name": "Roll it!",
    "set": "game",
-   "set_name": "Game Set",
-   "frames": 36,
-   "fps": 15,
-   "loop_s": 2.4,
-   "size": [
-    344,
-    218
-   ]
-  },
-  {
-   "id": "sad",
-   "name": "Disappointed",
-   "set": "game",
-   "set_name": "Game Set",
+   "set_name": "Champion Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -303,7 +390,7 @@
    "id": "peek",
    "name": "Peek-a-boo",
    "set": "game",
-   "set_name": "Game Set",
+   "set_name": "Champion Pack",
    "frames": 36,
    "fps": 15,
    "loop_s": 2.4,
@@ -311,60 +398,740 @@
     344,
     218
    ]
+  },
+  {
+   "id": "think",
+   "name": "Thinking",
+   "set": "game",
+   "set_name": "Champion Pack",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "hmph",
+   "name": "Hmph!",
+   "set": "game",
+   "set_name": "Champion Pack",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "angry"
+  },
+  {
+   "id": "flag",
+   "name": "Give up",
+   "set": "game",
+   "set_name": "Champion Pack",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "sleepy",
+   "name": "Sleepy",
+   "set": "game",
+   "set_name": "Champion Pack",
+   "frames": 36,
+   "fps": 15,
+   "loop_s": 2.4,
+   "size": [
+    344,
+    218
+   ]
+  },
+  {
+   "id": "t-hi",
+   "name": "Hi!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-luck",
+   "name": "Good luck!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-fun",
+   "name": "Have fun!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-gg",
+   "name": "GG",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-wp",
+   "name": "Well played!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-thx",
+   "name": "Thanks!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-sorry",
+   "name": "Sorry!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bye",
+   "name": "Bye!",
+   "set": "basic",
+   "set_name": "Good Manners",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-six",
+   "name": "Roll a 6!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-nice",
+   "name": "Nice roll!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-lucky",
+   "name": "Lucky!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-again",
+   "name": "Not again!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-revenge",
+   "name": "Revenge!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-safe",
+   "name": "Safe!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-pair",
+   "name": "Pair up!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-home",
+   "name": "Almost home!",
+   "set": "ludo",
+   "set_name": "Ludo Talk",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-wow",
+   "name": "Wow!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-oops",
+   "name": "Oops!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-close",
+   "name": "So close!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-hurry",
+   "name": "Hurry up!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-wait",
+   "name": "Wait…",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-turn",
+   "name": "My turn!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-easy",
+   "name": "Easy!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-nooo",
+   "name": "Noooo!",
+   "set": "react",
+   "set_name": "Reactions",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bgg",
+   "name": "ভালো খেলা!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bluck",
+   "name": "শুভকামনা!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bsix",
+   "name": "ছক্কা চাই!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bcome",
+   "name": "আয় দেখি!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bagain",
+   "name": "আবার!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bwon",
+   "name": "জিতে গেলাম!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bthx",
+   "name": "ধন্যবাদ!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-bugh",
+   "name": "উফ!",
+   "set": "bangla",
+   "set_name": "Bangla",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-help",
+   "name": "Help me!",
+   "set": "team",
+   "set_name": "Team",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-go",
+   "name": "Go go go!",
+   "set": "team",
+   "set_name": "Team",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-got",
+   "name": "I got you!",
+   "set": "team",
+   "set_name": "Team",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
+  },
+  {
+   "id": "t-partner",
+   "name": "Nice one, partner!",
+   "set": "team",
+   "set_name": "Team",
+   "text": true,
+   "frames": 11,
+   "fps": 7.857,
+   "loop_s": 1.4,
+   "size": [
+    344,
+    218
+   ],
+   "sound": "hi"
   }
  ],
  "sets": [
   {
    "id": "starter",
-   "name": "Starter Set",
+   "name": "Pawn Set",
    "price": 0,
    "emotes": [
     "happy",
     "laugh",
-    "cool",
-    "angry",
-    "love",
-    "party"
-   ]
-  },
-  {
-   "id": "pawns",
-   "name": "Pawn Pals",
-   "price": 2500,
-   "emotes": [
-    "champ",
-    "sleepy",
     "sob",
+    "angry",
     "gasp",
-    "confused",
-    "hi"
+    "love"
    ]
   },
   {
    "id": "friends",
-   "name": "Friends Set",
-   "price": 4000,
+   "name": "Girl Set",
+   "price": 2500,
    "emotes": [
-    "cry",
-    "wow",
-    "facepalm",
     "cheer",
-    "think",
-    "tease"
+    "gLaugh",
+    "cry",
+    "gAngry",
+    "gShock",
+    "gLove"
    ]
   },
   {
-   "id": "game",
-   "name": "Game Set",
-   "price": 3500,
+   "id": "boys",
+   "name": "Boy Set",
+   "price": 2500,
    "emotes": [
-    "dice",
-    "crown",
+    "bHappy",
+    "bLaugh",
+    "bCry",
+    "grr",
+    "wow",
+    "bLove"
+   ]
+  },
+  {
+   "id": "pawns",
+   "name": "Party Pack",
+   "price": 5000,
+   "emotes": [
+    "party",
+    "cool",
+    "tease",
+    "hi",
     "highfive",
+    "confused",
+    "facepalm",
+    "sad"
+   ],
+   "premium": true
+  },
+  {
+   "id": "game",
+   "name": "Champion Pack",
+   "price": 5000,
+   "emotes": [
+    "crown",
+    "champ",
+    "dice",
+    "peek",
+    "think",
+    "hmph",
     "flag",
-    "sad",
-    "peek"
+    "sleepy"
+   ],
+   "premium": true
+  }
+ ],
+ "text_packs": [
+  {
+   "id": "basic",
+   "name": "Good Manners",
+   "price": 0,
+   "emotes": [
+    "t-hi",
+    "t-luck",
+    "t-fun",
+    "t-gg",
+    "t-wp",
+    "t-thx",
+    "t-sorry",
+    "t-bye"
+   ]
+  },
+  {
+   "id": "ludo",
+   "name": "Ludo Talk",
+   "price": 3000,
+   "emotes": [
+    "t-six",
+    "t-nice",
+    "t-lucky",
+    "t-again",
+    "t-revenge",
+    "t-safe",
+    "t-pair",
+    "t-home"
+   ]
+  },
+  {
+   "id": "react",
+   "name": "Reactions",
+   "price": 3000,
+   "emotes": [
+    "t-wow",
+    "t-oops",
+    "t-close",
+    "t-hurry",
+    "t-wait",
+    "t-turn",
+    "t-easy",
+    "t-nooo"
+   ]
+  },
+  {
+   "id": "bangla",
+   "name": "Bangla",
+   "price": 3000,
+   "emotes": [
+    "t-bgg",
+    "t-bluck",
+    "t-bsix",
+    "t-bcome",
+    "t-bagain",
+    "t-bwon",
+    "t-bthx",
+    "t-bugh"
    ]
   }
+ ],
+ "team": [
+  "t-help",
+  "t-go",
+  "t-got",
+  "t-partner"
  ]
 }

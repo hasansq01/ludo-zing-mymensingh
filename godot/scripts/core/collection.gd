@@ -4,6 +4,7 @@ extends RefCounted
 ## unlockText, levelInfo, avatarHTML, badgeSVG, buyAvatar, the Collection equip handler and the Achievements claim).
 ##   Characters: 20 drawn portraits (10 male, 10 female). Arif and Nadia are free, the rest cost 10,000-12,000 coins
 ##     and, once bought, are listed in profile.av_owned.
+##   More characters: 12 free portraits with a wide range of looks (WORLD; they are characters too, kind "char").
 ##   Avatars: the four pawns and Latte are free; Lucky Dice / Robot unlock with an achievement, Crown at level 5.
 ##   Frames (the ring around the avatar), Nameplates (behind the name) and Badges (an earned achievement's medal
 ##     beside the name) unlock by level or achievement.
@@ -47,6 +48,24 @@ const CHARS := [
 	{id = "ch-fariha", name = "Fariha", g = "f", price = 11250, a1 = "#fff6c8", a2 = "#e6cf52", skin = "#d9a07a", hair = "#1f1a1c", hs = "braids", top = "#e5484d", od = "dupatta", ac = "#f4c430"},
 	{id = "ch-nusrat", name = "Nusrat", g = "f", price = 10750, a1 = "#d9ecff", a2 = "#8fb3ef", skin = "#f6d2b8", hair = "#5b3a22", hs = "wavy", top = "#ff9ec7", od = "collar", ac = "#2fb39c"},
 	{id = "ch-ayesha", name = "Ayesha", g = "f", price = 11500, a1 = "#ffdcd6", a2 = "#ee8a7c", skin = "#8d5a3b", hair = "#1b1416", hs = "bangs", top = "#2fb39c", od = "scarf", ac = "#ffd45e"},
+]
+## More characters: free for everyone, with a wide range of looks; shown together, never labelled by origin. On top of
+## the fields above: eye ("round" | "almond" | "narrow" | "big"), eyeCol, lash, brow ("none" | "thin" | "soft" | "thick"),
+## nose ("small" | "wide"), mouth ("lips" | "smile" | "grin" | "neutral"), fh (facial hair: "stubble" | "moustache" |
+## "goatee" | "beard"). None of them set: the original face for that gender.
+const WORLD := [
+	{id = "w-hana", name = "Hana", g = "f", price = 0, a1 = "#ffe0ec", a2 = "#f28bb0", skin = "#f6d9c2", hair = "#1b1416", hs = "straight", eye = "narrow", nose = "small", top = "#ff9ec7", od = "collar"},
+	{id = "w-kenji", name = "Kenji", g = "m", price = 0, a1 = "#dfe7ff", a2 = "#7d97e8", skin = "#f3d3b5", hair = "#1b1416", hs = "side", eye = "narrow", nose = "small", top = "#2b2f45", od = "v"},
+	{id = "w-mei", name = "Mei", g = "f", price = 0, a1 = "#d6f4ea", a2 = "#5fc4a3", skin = "#f6d9c2", hair = "#2a1d18", hs = "buns", eye = "almond", nose = "small", top = "#e5484d", od = "necklace", ac = "#f4c430"},
+	{id = "w-linh", name = "Linh", g = "f", price = 0, a1 = "#fff0c9", a2 = "#f0b84a", skin = "#e3b18a", hair = "#1b1416", hs = "long", eye = "almond", nose = "small", top = "#2fa86b", od = "v"},
+	{id = "w-emma", name = "Emma", g = "f", price = 0, a1 = "#d8f1ff", a2 = "#68b8ea", skin = "#ffe3cf", hair = "#e8c26a", hs = "wavy", eyeCol = "#3b7be0", nose = "small", top = "#9b6be0", od = "collar", ac = "#ff7fae"},
+	{id = "w-lukas", name = "Lukas", g = "m", price = 0, a1 = "#e3f4c8", a2 = "#9ccc5a", skin = "#f6d2b8", hair = "#8a5a32", hs = "crop", eyeCol = "#3f8a4a", nose = "small", fh = "stubble", top = "#3b7be0", od = "hoodie"},
+	{id = "w-sofia", name = "Sofia", g = "f", price = 0, a1 = "#ffe1d1", a2 = "#f39a6b", skin = "#f3c6a5", hair = "#c4572a", hs = "bob", eyeCol = "#8a6a2a", nose = "small", top = "#2fb39c", od = "necklace", acc = "earrings", ac = "#f4c430"},
+	{id = "w-oliver", name = "Oliver", g = "m", price = 0, a1 = "#fff1c2", a2 = "#e9c14c", skin = "#ffe3cf", hair = "#d9783a", hs = "curls", eyeCol = "#3b7be0", nose = "small", top = "#e5484d", od = "stripe"},
+	{id = "w-jayden", name = "Jayden", g = "m", price = 0, a1 = "#cdeff5", a2 = "#4fb6c9", skin = "#6b4128", hair = "#1b1416", hs = "fade", nose = "wide", mouth = "grin", top = "#f4a340", od = "hoodie"},
+	{id = "w-maya", name = "Maya", g = "f", price = 0, a1 = "#fce4ff", a2 = "#d58be8", skin = "#8d5a3b", hair = "#1b1416", hs = "locs", nose = "wide", top = "#f4c430", od = "necklace", acc = "earrings", ac = "#f4c430"},
+	{id = "w-carlos", name = "Carlos", g = "m", price = 0, a1 = "#ffd6cf", a2 = "#ef7e6f", skin = "#c68a5e", hair = "#2a1d18", hs = "quiff", nose = "small", fh = "moustache", top = "#2fa86b", od = "collar"},
+	{id = "w-ava", name = "Ava", g = "f", price = 0, a1 = "#e7dcff", a2 = "#a98cf0", skin = "#f3c6a5", hair = "#5b3a22", hs = "pony", eyeCol = "#6b3f22", nose = "small", top = "#3b7be0", od = "v", ac = "#e5484d"},
 ]
 ## The original avatars (the Avatars tab). Red Pawn is the fallback. Characters are avatars too (avatar(id) finds both).
 const AVATARS := [
@@ -111,7 +130,7 @@ static func character(id: String) -> Dictionary:
 	for c: Dictionary in CHARS:
 		if c.id == id:
 			return c
-	return {}
+	return _find(WORLD, id)
 
 static func frame(id: String) -> Dictionary:
 	return _find(FRAMES, id)
@@ -359,6 +378,8 @@ const ART := {
 	robot = '<line x1="20" y1="4" x2="20" y2="10" stroke="#fff8ec" stroke-width="2.5"/><circle cx="20" cy="4.5" r="2.5" fill="#ff5a5a"/><rect x="7" y="10" width="26" height="22" rx="9" fill="#fff8ec"/><rect x="11" y="15" width="18" height="11" rx="5.5" fill="#1d2240"/><circle cx="16" cy="20.5" r="2.4" fill="#4df0ff"/><circle cx="24" cy="20.5" r="2.4" fill="#4df0ff"/>',
 }
 
+const JAW := "M12.6 18.4C12.8 25.2 16 27.2 20 27.2C24 27.2 27.2 25.2 27.4 18.4C26.4 22 24 23.4 20 23.4C16 23.4 13.6 22 12.6 18.4Z"
+
 ## A character's bust on the 40 x 40 grid (personSVG): back hair, outfit, neck, head, face, front hair, accessory.
 static func person_svg(p: Dictionary) -> String:
 	var S: String = p.skin
@@ -384,7 +405,8 @@ static func person_svg(p: Dictionary) -> String:
 			front = _path("M12 17C11 9 15 6.5 20 6.5C26 6.5 29 9 28.5 17L27.2 13C23 13 18 12.2 15 9.8C14 12 13 14 12 17Z", H)
 		"buzz":
 			front = _path("M12.3 15C12.5 9.5 16 7.8 20 7.8C24 7.8 27.5 9.5 27.7 15C25 12.6 15 12.6 12.3 15Z", H)
-			face = _path("M12.6 18.4C12.8 25.2 16 27.2 20 27.2C24 27.2 27.2 25.2 27.4 18.4C26.4 22 24 23.4 20 23.4C16 23.4 13.6 22 12.6 18.4Z", H)
+			if not p.has("fh"):                  # the buzz cut's own beard (Sabbir)
+				face = _path(JAW, H)
 		"manbun":
 			front = _circle(20, 5.4, 3.1, H) + _path(crop, H)
 		"spiky":
@@ -440,6 +462,20 @@ static func person_svg(p: Dictionary) -> String:
 			back = _path(long_back, H)
 			front = (_path("M12 16.2C11.8 9.2 15.4 7 20 7C24.6 7 28.2 9.2 28 16.2C27.6 14.6 27.2 14 26.4 14H13.6C12.8 14 12.4 14.6 12 16.2Z", H)
 				+ _path("M25.4 8.2L29.4 6.2L29 10ZM25.4 8.2L28.8 11.6L25.2 11Z", AC) + _circle(25.6, 9.2, 1.3, AC))
+		"bald":
+			front = '<ellipse cx="16.6" cy="11.6" rx="2.6" ry="1.3" transform="rotate(-20 16.6 11.6)" fill="#fff" opacity=".28"/>'
+		"fade":
+			front = (_path("M12.3 15C12.2 8.4 14.8 5.4 20 5.4C25.2 5.4 27.8 8.4 27.7 15C26 13 14 13 12.3 15Z", H)
+				+ '<path d="M12.3 15C12.4 13 13 12.4 14 12.2V15.6Z M27.7 15C27.6 13 27 12.4 26 12.2V15.6Z" fill="%s" opacity=".55"/>' % H)
+		"straight":
+			back = _path("M10.8 17C10.4 8.5 14.6 5.6 20 5.6C25.4 5.6 29.6 8.5 29.2 17L29.8 34.2H10.2Z", H)
+			front = _path("M12 17.6C11.6 9.4 15 7 20 7.2C18.6 9.2 16.6 12.6 12 17.6ZM28 17.6C28.4 9.4 25 7 20 7.2C21.4 9.2 23.4 12.6 28 17.6Z", H)
+		"locs":
+			for r: Array in [["9.7", "21"], ["12.3", "19"], ["25.1", "19"], ["27.7", "21"]]:
+				back += '<rect x="%s" y="12" width="2.6" height="%s" rx="1.3" fill="%s"/>' % [r[0], r[1], H]
+			front = _path("M12 16.2C11.6 9 15.2 6.8 20 6.8C24.8 6.8 28.4 9 28 16.2C25 12.8 15 12.8 12 16.2Z", H)
+			for x: String in ["15.4", "18.4", "21.6", "24.6"]:
+				front += '<path d="M%s 8.6V13.4" stroke="#000" stroke-opacity=".18" stroke-width=".7" stroke-linecap="round"/>' % x
 	# outfit and its detail
 	var T: String = p.top
 	var od := ""
@@ -470,23 +506,78 @@ static func person_svg(p: Dictionary) -> String:
 	var hijab: bool = p.hs == "hijab"
 	var head := ears + '<ellipse cx="20" cy="17.4" rx="%s" ry="%s" fill="%s"/>' % [7.2 if hijab else 8, 8.2 if hijab else 9, S]
 	var f: bool = p.g == "f"
-	var eyes := ('<ellipse cx="16.8" cy="18.2" rx="1.15" ry="1.35" fill="%s"/><ellipse cx="23.2" cy="18.2" rx="1.15" ry="1.35" fill="%s"/>' % [ink, ink]
-		+ _circle(17.2, 17.7, 0.4, "#fff") + _circle(23.6, 17.7, 0.4, "#fff"))
-	if f:
+	var eyes := _eyes(str(p.get("eye", "round")), str(p.get("eyeCol", "")), ink)
+	if bool(p.get("lash", f)):
 		eyes += '<path d="M15.2 17.3L14.6 16.6M24.8 17.3L25.4 16.6" stroke="%s" stroke-width=".7" stroke-linecap="round"/>' % ink
-	else:
-		eyes += '<path d="M15.2 15.6Q16.8 14.8 18.4 15.5M21.6 15.5Q23.2 14.8 24.8 15.6" fill="none" stroke="%s" stroke-width="1" stroke-linecap="round"/>' % (ink if hijab else H)
-	var mouth := (_path("M18 21.8Q20 23.8 22 21.8Q20 22.6 18 21.8Z", "#d9536a") if f
-		else '<path d="M17.8 21.6Q20 23.6 22.2 21.6" fill="none" stroke="%s" stroke-width=".9" stroke-linecap="round"/>' % ink)
+	var brow: String = {thin = ".7", soft = "1", thick = "1.7"}.get(str(p.get("brow", "none" if f else "soft")), "")
+	if brow != "":
+		eyes += '<path d="M15.2 15.6Q16.8 14.8 18.4 15.5M21.6 15.5Q23.2 14.8 24.8 15.6" fill="none" stroke="%s" stroke-width="%s" stroke-linecap="round"/>' % [ink if hijab or p.hs == "bald" else H, brow]
+	var lips := _path("M18 21.8Q20 23.8 22 21.8Q20 22.6 18 21.8Z", "#d9536a")
+	var smile := '<path d="M17.8 21.6Q20 23.6 22.2 21.6" fill="none" stroke="%s" stroke-width=".9" stroke-linecap="round"/>' % ink
+	var mouth: String = {
+		"lips": lips,
+		"smile": smile,
+		"grin": '<path d="M17.5 21.4Q20 25 22.5 21.4Z" fill="#fff" stroke="%s" stroke-width=".75" stroke-linejoin="round"/>' % ink,
+		"neutral": '<path d="M18.4 22.3Q20 22.8 21.6 22.3" fill="none" stroke="%s" stroke-width=".85" stroke-linecap="round"/>' % ink,
+	}.get(str(p.get("mouth", "")), lips if f else smile)
+	match str(p.get("nose", "")):
+		"small":
+			mouth = '<path d="M19.4 20.3Q20 21.1 20.6 20.3" fill="none" stroke="SH" stroke-width=".8" stroke-linecap="round"/>' + mouth
+		"wide":
+			mouth = '<path d="M18.6 20Q18.9 21.3 20 21.1Q21.1 21.3 21.4 20" fill="none" stroke="SH" stroke-width=".85" stroke-linecap="round"/>' + mouth
+	var stache := _path("M17 21Q18.6 19.6 20 20.6Q21.4 19.6 23 21Q21.6 21.4 20 21.1Q18.4 21.4 17 21Z", H)
+	match str(p.get("fh", "")):
+		"stubble":
+			face += '<path d="%s" fill="%s" opacity=".3"/>' % [JAW, H]
+		"moustache":
+			face += stache
+		"goatee":
+			face += stache + '<ellipse cx="20" cy="25.2" rx="1.9" ry="1.5" fill="%s"/>' % H
+		"beard":
+			face += _path(JAW, H) + stache
 	var cheeks := '<circle cx="15.2" cy="21" r="1.5" fill="#ff8f9b" opacity=".35"/><circle cx="24.8" cy="21" r="1.5" fill="#ff8f9b" opacity=".35"/>'
 	match str(p.get("acc", "")):
 		"glasses":
 			acc = '<g fill="none" stroke="%s" stroke-width=".9"><circle cx="16.8" cy="18.2" r="2.5"/><circle cx="23.2" cy="18.2" r="2.5"/><path d="M19.3 18H20.7"/></g>' % AC
 		"earrings":
 			acc = _circle(12.1, 21.2, 1, AC) + _circle(27.9, 21.2, 1, AC)
+		"shades":
+			acc = ('<g fill="#1d1922" stroke="%s" stroke-width=".7"><path d="M14 16.8H19.4Q19.6 20.4 16.7 20.4Q14 20.4 14 16.8Z"/><path d="M20.6 16.8H26Q26 20.4 23.3 20.4Q20.4 20.4 20.6 16.8Z"/></g>' % AC
+				+ '<path d="M19.4 17.2H20.6" stroke="%s" stroke-width=".7"/><path d="M15 17.6L16.2 19" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-linecap="round"/>' % AC)
 	var out := back + outfit + neck + head + face + eyes + mouth + cheeks + front + acc
 	# the soft shade rgba(70,30,40,.16) as colour + opacity (plain hex keeps every SVG reader happy)
 	return out.replace('fill="SH"', 'fill="#461e28" fill-opacity="0.16"').replace('stroke="SH"', 'stroke="#461e28" stroke-opacity="0.16"')
+
+## Both eyes (index.html personSVG): the shape, an iris colour if any, the highlights.
+static func _eyes(shape: String, col: String, ink: String) -> String:
+	if shape == "round" and col == "":        # the original eyes
+		return ('<ellipse cx="16.8" cy="18.2" rx="1.15" ry="1.35" fill="%s"/><ellipse cx="23.2" cy="18.2" rx="1.15" ry="1.35" fill="%s"/>' % [ink, ink]
+			+ _circle(17.2, 17.7, 0.4, "#fff") + _circle(23.6, 17.7, 0.4, "#fff"))
+	var out := '<g fill="%s">' % (col if col != "" else ink)
+	for x: float in [16.8, 23.2]:
+		match shape:
+			"big":
+				out += '<ellipse cx="%s" cy="18.1" rx="1.45" ry="1.75"/>' % x
+			"almond":
+				out += '<path d="M%s 18.3Q%s 16.8 %s 18.1Q%s 19.5 %s 18.3Z"/>' % [x - 1.7, x, x + 1.7, x + 0.1, x - 1.7]
+			"narrow":
+				out += '<ellipse cx="%s" cy="18.4" rx="1.35" ry=".72"/>' % x
+			_:
+				out += '<ellipse cx="%s" cy="18.2" rx="1.15" ry="1.35"/>' % x
+	out += "</g>"
+	if col != "":                             # the pupil
+		for x: float in [16.8, 23.2]:
+			out += _circle(x, 18.3, 0.45 if shape == "narrow" else 0.65, ink)
+	match shape:
+		"round":
+			out += _circle(17.2, 17.7, 0.4, "#fff") + _circle(23.6, 17.7, 0.4, "#fff")
+		"big":
+			out += _circle(17.3, 17.4, 0.55, "#fff") + _circle(23.7, 17.4, 0.55, "#fff")
+		_:
+			out += _circle(17.2, 18.0, 0.3, "#fff") + _circle(23.6, 18.0, 0.3, "#fff")
+	if shape == "narrow":
+		out += '<path d="M15.2 17.7Q16.8 17.1 18.4 17.7M21.6 17.7Q23.2 17.1 24.8 17.7" fill="none" stroke="%s" stroke-width=".55" stroke-linecap="round"/>' % ink
+	return out
 
 static func _path(d: String, fill: String) -> String:
 	return '<path d="%s" fill="%s"/>' % [d, fill]

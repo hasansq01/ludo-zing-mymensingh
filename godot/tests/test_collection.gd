@@ -25,6 +25,12 @@ func run() -> void:
 	Collection.profile_source = keep_src
 	Collection.writer = keep_writer
 
+func _distinct(list: Array, key: String, none: String) -> int:
+	var seen := {}
+	for c: Dictionary in list:
+		seen[str(c.get(key, none))] = true
+	return seen.size()
+
 func _ids(list: Array) -> Array:
 	return list.map(func(x): return x.id)
 
@@ -37,7 +43,20 @@ func _run() -> void:
 	check("10 male and 10 female", Collection.CHARS.filter(func(c): return c.g == "m").size() == 10 and Collection.CHARS.filter(func(c): return c.g == "f").size() == 10)
 	check("Arif and Nadia are the free characters", _ids(Collection.CHARS.filter(func(c): return c.price == 0)) == ["ch-arif", "ch-nadia"])
 	check("paid characters cost 10,000-12,000", Collection.CHARS.all(func(c): return c.price == 0 or (c.price >= 10000 and c.price <= 12000)))
-	check("character ids are unique", _unique(_ids(Collection.CHARS) + _ids(Collection.AVATARS)))
+	check("character ids are unique", _unique(_ids(Collection.CHARS) + _ids(Collection.WORLD) + _ids(Collection.AVATARS)))
+	check("12 more characters, all free", Collection.WORLD.size() == 12 and Collection.WORLD.all(func(c): return c.price == 0))
+	check("no labels by origin", Collection.WORLD.all(func(c): return not c.has("region")))
+	check("they cover light to deep skin tones and several eye shapes", _distinct(Collection.WORLD, "skin", "") >= 7 and _distinct(Collection.WORLD, "eye", "round") >= 3)
+	var drawn_bad: Array = []
+	for c: Dictionary in Collection.WORLD:
+		var svg := Collection.tile_svg(c.id)
+		var img := Image.new()
+		if img.load_svg_from_string(svg, 1.0) != OK or svg.contains("null") or svg.contains(' fill="SH"') or img.get_width() != 40:
+			drawn_bad.append(c.id)
+	check("every new avatar draws cleanly", drawn_bad.is_empty(), drawn_bad)
+	check("the original characters keep their look (Sabbir's beard, Nadia's lashes and lips)", Collection.tile_svg("ch-sabbir").contains(Collection.JAW) and Collection.tile_svg("ch-nadia").contains("M15.2 17.3L14.6 16.6") and Collection.tile_svg("ch-nadia").contains("#d9536a"))
+	check("their new faces: Lukas has green eyes and stubble, Carlos a moustache, Jayden a grin", Collection.tile_svg("w-lukas").contains("#3f8a4a") and Collection.tile_svg("w-lukas").contains('opacity=".3"') and Collection.tile_svg("w-carlos").contains("M17 21Q18.6") and Collection.tile_svg("w-jayden").contains("M17.5 21.4Q20 25"))
+	check("a new avatar is found, free, unlocked and can't be sold", Collection.avatar("w-maya").name == "Maya" and Collection.is_character("w-maya") and Collection.is_unlocked("char", "w-maya", {coins = 0}) and Collection.buy_char("w-maya").contains("free"))
 	check("avatars match the web", _ids(Collection.AVATARS) == ["pawn-red", "pawn-green", "pawn-yellow", "pawn-blue", "latte", "dice", "robot", "crown"])
 	check("frames match the web", _ids(Collection.FRAMES) == ["classic", "gold", "mint", "royal"] and Collection.FRAMES.map(func(f): return f.name) == ["Wood", "Gold", "Mint", "Royal"])
 	check("plates match the web", _ids(Collection.PLATES) == ["plain", "espresso", "ruby"])
@@ -127,6 +146,8 @@ func _run() -> void:
 	check("equip a free avatar", Collection.equip("avatar", "latte") and p.avatar == "latte" and writes == 1)
 	check("equip the one in use again: no save", Collection.equip("avatar", "latte") and writes == 1)
 	check("equip a free character", Collection.equip("char", "ch-nadia") and p.avatar == "ch-nadia")
+	check("equip one of the new free characters", Collection.equip("char", "w-kenji") and p.avatar == "w-kenji" and Collection.equipped("avatar", p) == "w-kenji")
+	Collection.equip("char", "ch-nadia")
 	check("never equip a paid character not bought", not Collection.equip("char", "ch-rafi") and p.avatar == "ch-nadia")
 	check("never equip a locked avatar", not Collection.equip("avatar", "crown") and p.avatar == "ch-nadia")
 	check("never equip a locked frame", not Collection.equip("frame", "royal") and p.frame == "classic")
@@ -202,11 +223,13 @@ func _run() -> void:
 	p = use(fresh(0))
 	p.avatar = "ch-nadia"
 	var secs: Array = ShopSheet._sections("avatars")
-	check("avatars tab: Characters then Classic", secs.map(func(x): return x[0]) == ["Characters", "Classic"], secs.map(func(x): return x[0]))
+	check("avatars tab: Characters, More characters, Classic", secs.map(func(x): return x[0]) == ["Characters", "More characters", "Classic"], secs.map(func(x): return x[0]))
+	check("avatars tab: More characters lists all 12, as characters", secs[1][1].size() == 12 and secs[1][1].all(func(it): return it.kind == "char"))
+	check("avatars tab: they are all ready to use, no coins", secs[1][1].all(func(it): return ShopSheet._owned(it.kind, it.id) and ShopSheet._price(it.kind, it.id) == 0))
 	check("avatars tab: the character in use leads, then the owned ones", secs[0][1][0].id == "ch-nadia" and secs[0][1][1].id == "ch-arif", secs[0][1].slice(0, 3))
 	p.avatar = "pawn-blue"
 	secs = ShopSheet._sections("avatars")
-	check("avatars tab: a classic avatar in use leads its section", secs[1][1][0].id == "pawn-blue" and secs[1][1].size() == Collection.AVATARS.size())
+	check("avatars tab: a classic avatar in use leads its section", secs[2][1][0].id == "pawn-blue" and secs[2][1].size() == Collection.AVATARS.size())
 	p.avatar = "ch-nadia"
 	check("welcome: only the free characters, the one in use first", Welcome.free_avatars() == ["ch-nadia", "ch-arif"], Welcome.free_avatars())
 	check("copy: typographic apostrophes", not Collection.SAVE_FAILED.contains("'") and not Catalog.SAVE_FAILED.contains("'"))

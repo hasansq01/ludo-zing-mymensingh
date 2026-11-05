@@ -97,7 +97,7 @@ func _account_calls() -> void:
 	f.profile.gems = 100
 	await a.refresh_me()
 	var r: Dictionary = await a.buy("room", "neon", "gems")
-	check("buy: with gems the body says currency gems, 30 gems are paid", r.ok and f.last("/v1/shop/buy").body == {kind = "room", id = "neon", currency = "gems"} and a.profile_own.gems == 70 and a.profile_own.coins == 50000, [r, f.last("/v1/shop/buy")])
+	check("buy: with gems the body says currency gems, 30 gems are paid", r.ok and f.last("/v1/shop/buy").body == {kind = "room", id = "neon", currency = "gems", catalog = 2} and a.profile_own.gems == 70 and a.profile_own.coins == 50000, [r, f.last("/v1/shop/buy")])
 	f.prices["dice_gold"] = 900
 	r = await a.buy("dice", "gold")
 	check("buy: the default currency is coins", r.ok and f.last("/v1/shop/buy").body.currency == "coins" and a.profile_own.coins == 49100)

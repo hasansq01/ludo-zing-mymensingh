@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EMOTE_PACKS,
+  emotePacksAllowing,
   GHOST_DELAY_MAX,
   GHOST_EMOTE,
   PERSONAS,
@@ -27,8 +28,8 @@ const R = (k: number): Mulberry32 => {
   r.next();
   return r;
 };
-const PACKS = ["pawns", "friends", "game"];
-const ownedOf = (pack: string) => new Set([...EMOTE_PACKS.starter, ...(EMOTE_PACKS[pack] ?? [])]);
+const PACKS = ["pawns", "friends", "boys", "game"];
+const ownedOf = (pack: string) => new Set([...EMOTE_PACKS.starter, ...EMOTE_PACKS.basic, ...(EMOTE_PACKS[pack] ?? [])]);
 const human = (id: string, from = 1): GhostTrigger => ({ kind: "emote", id, from, human: true });
 const SEC = 1000;
 
@@ -102,7 +103,7 @@ describe("spam: loses interest", () => {
       const mem = newGhostMemory();
       let said: string | null = null;
       for (let k = 0; k < 6; k++) {
-        const r = ghostEmoteReply({ now: k * 3 * SEC }, "sore", mem, human("angry"), rng, "friends");
+        const r = ghostEmoteReply({ now: k * 3 * SEC }, "sore", mem, human("angry"), rng, "pawns");
         if (k === 3 && r) said = r.id;
       }
       if (said) {
@@ -112,7 +113,7 @@ describe("spam: loses interest", () => {
       // sulking: quietUntil is 45-90 s after the 4th emote (t = 9 s); the others kept it going afterwards
       expect(mem.quietUntil - 9 * SEC).toBeGreaterThanOrEqual(45 * SEC);
       expect(mem.quietUntil - 9 * SEC).toBeLessThanOrEqual(90 * SEC);
-      const during = ghostEmoteReply({ now: 40 * SEC }, "sore", mem, human("angry"), rng, "friends");
+      const during = ghostEmoteReply({ now: 40 * SEC }, "sore", mem, human("angry"), rng, "pawns");
       expect(during).toBeNull();
       // 61 s after the last emote the window has reset: a first emote again, and it can be answered
       let ans = 0;
@@ -192,7 +193,7 @@ describe("personalities", () => {
       }
       return n / tot;
     };
-    expect(share("cheeky", human("laugh"), "tease", "friends")).toBeGreaterThan(share("friendly", human("laugh"), "tease", "friends") * 3);
+    expect(share("cheeky", human("laugh"), "tease", "pawns")).toBeGreaterThan(share("friendly", human("laugh"), "tease", "pawns") * 3);
     expect(share("friendly", human("hi"), "love", "pawns")).toBeGreaterThan(share("cheeky", human("hi"), "love", "pawns") * 2);
     expect(share("sore", { kind: "captured" }, "angry", "pawns")).toBeGreaterThan(share("friendly", { kind: "captured" }, "angry", "pawns") * 3);
   });
@@ -216,7 +217,7 @@ describe("personalities", () => {
       const rng = R(seed);
       const r = ghostEmoteReply({ now: 0 }, "chatty", mem, { kind: "open" }, rng, "pawns");
       if (r) {
-        r.id === "hi" ? hi++ : other++;
+        ["hi", "t-hi", "t-luck", "t-fun"].includes(r.id) ? hi++ : other++;
         expect(r.delayMs).toBeGreaterThanOrEqual(GHOST_EMOTE.open[0]);
         expect(r.delayMs).toBeLessThanOrEqual(GHOST_EMOTE.open[1]);
       }
@@ -238,12 +239,12 @@ describe("situation shifts the weights", () => {
     const cheeky = ["cool", "tease", "crown", "laugh", "champ"];
     const sad = ["cry", "sad", "facepalm", "sob"];
     for (const trig of [human("laugh"), human("party"), { kind: "capture" } as GhostTrigger]) {
-      expect(weight(pool(trig, { lead: 0.3 }, newGhostMemory(), "chatty", "friends"), cheeky)).toBeGreaterThan(weight(pool(trig, { lead: -0.3 }, newGhostMemory(), "chatty", "friends"), cheeky));
+      expect(weight(pool(trig, { lead: 0.3 }, newGhostMemory(), "chatty", "pawns"), cheeky)).toBeGreaterThan(weight(pool(trig, { lead: -0.3 }, newGhostMemory(), "chatty", "pawns"), cheeky));
     }
     for (const trig of [human("party"), human("crown"), { kind: "captured" } as GhostTrigger]) {
-      expect(weight(pool(trig, { lead: -0.3 }), ["sad", "flag", "facepalm"])).toBeGreaterThan(weight(pool(trig, { lead: 0.3 }), ["sad", "flag", "facepalm"]));
+      expect(weight(pool(trig, { lead: -0.3 }, newGhostMemory(), "chatty", "pawns"), ["sad", "flag", "facepalm"])).toBeGreaterThan(weight(pool(trig, { lead: 0.3 }, newGhostMemory(), "chatty", "pawns"), ["sad", "flag", "facepalm"]));
     }
-    expect(weight(pool({ kind: "captured" }, { lead: -0.3 }, newGhostMemory(), "chatty", "friends"), sad)).toBeGreaterThan(weight(pool({ kind: "captured" }, { lead: 0.3 }, newGhostMemory(), "chatty", "friends"), sad));
+    expect(weight(pool({ kind: "captured" }, { lead: -0.3 }, newGhostMemory(), "chatty", "pawns"), sad)).toBeGreaterThan(weight(pool({ kind: "captured" }, { lead: 0.3 }, newGhostMemory(), "chatty", "pawns"), sad));
   });
 
   it("right after its own capture it gloats; right after being captured it sulks (and stops being sweet)", () => {
@@ -253,9 +254,9 @@ describe("situation shifts the weights", () => {
     const hurt = newGhostMemory();
     hurt.hitAt = 95 * SEC;
     const GL = ["tease", "laugh", "cool", "champ", "crown"];
-    expect(weight(pool(human("happy"), {}, gloating, "friendly", "friends"), GL)).toBeGreaterThan(weight(pool(human("happy"), {}, fresh, "friendly", "friends"), GL));
+    expect(weight(pool(human("happy"), {}, gloating, "friendly", "pawns"), GL)).toBeGreaterThan(weight(pool(human("happy"), {}, fresh, "friendly", "pawns"), GL));
     const SK = ["angry", "cry", "facepalm", "sob"];
-    expect(weight(pool(human("angry"), {}, hurt, "cheeky", "friends"), SK)).toBeGreaterThan(weight(pool(human("angry"), {}, fresh, "cheeky", "friends"), SK));
+    expect(weight(pool(human("angry"), {}, hurt, "cheeky", "pawns"), SK)).toBeGreaterThan(weight(pool(human("angry"), {}, fresh, "cheeky", "pawns"), SK));
     expect(weight(pool(human("hi"), {}, hurt, "friendly", "pawns"), ["love", "happy"])).toBeLessThan(weight(pool(human("hi"), {}, fresh, "friendly", "pawns"), ["love", "happy"]));
   });
 
@@ -265,7 +266,7 @@ describe("situation shifts the weights", () => {
     const ch = (p: Persona) => {
       let cheeky = 0;
       for (let seed = 1; seed <= 600; seed++) {
-        const r = ghostEmoteReply({ now: 100 * SEC, chance: 1 }, p, JSON.parse(JSON.stringify(m)), human("sob"), R(seed), "friends");
+        const r = ghostEmoteReply({ now: 100 * SEC, chance: 1 }, p, JSON.parse(JSON.stringify(m)), human("sob"), R(seed), "pawns");
         if (r && ["cool", "tease", "laugh"].includes(r.id)) cheeky++;
       }
       return cheeky;
@@ -275,7 +276,7 @@ describe("situation shifts the weights", () => {
       let n = 0;
       for (let seed = 1; seed <= 600; seed++) {
         const r = ghostEmoteReply({ now: 100 * SEC, chance: 1 }, "friendly", JSON.parse(JSON.stringify(m)), human("cry"), R(seed), "pawns");
-        if (r && ["love", "hi"].includes(r.id)) n++;
+        if (r && ["love", "hi", "t-sorry"].includes(r.id)) n++;
       }
       return n;
     })();
@@ -300,10 +301,42 @@ describe("owned packs, repeats, delays, limits, memory", () => {
     ...Object.values(EMOTE_PACKS).flat().map((id) => human(id)),
   ];
 
+  it("a ghost with a character set reacts as that character", () => {
+    let girl = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const r = ghostEmoteReply({ now: 5 * SEC, chance: 1 }, "chatty", newGhostMemory(), { kind: "captured" }, R(seed), "friends");
+      if (r) {
+        expect(["happy", "laugh", "sob", "angry", "gasp", "love"]).not.toContain(r.id);
+        if (EMOTE_PACKS.friends.includes(r.id)) girl++;
+      }
+    }
+    expect(girl).toBeGreaterThan(50);
+  });
+
+  it("answers a phrase and the new characters (not the generic pool every time)", () => {
+    let gg = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const r = ghostEmoteReply({ now: 5 * SEC, chance: 1 }, "friendly", newGhostMemory(), human("t-gg"), R(seed), "");
+      if (r && ["t-gg", "t-wp", "t-thx"].includes(r.id)) gg++;
+    }
+    expect(gg).toBeGreaterThan(100);
+    expect(packOfEmote("gLaugh")).toBe("friends");
+    expect(packOfEmote("t-bgg")).toBe("bangla");
+  });
+
+  it("a game from before the 2026-11 packs keeps what it lists: the old pack still allows its emotes", () => {
+    expect(emotePacksAllowing("cool")).toEqual(["pawns", "starter"]);
+    expect(emotePacksAllowing("sob")).toEqual(["starter", "pawns"]);
+    expect(emotePacksAllowing("wow")).toEqual(["boys", "friends"]);
+    expect(emotePacksAllowing("gLaugh")).toEqual(["friends"]);
+    expect(emotePacksAllowing("t-six")).toEqual(["ludo"]);
+    expect(emotePacksAllowing("nope")).toEqual([]);
+  });
+
   it("only emotes from starter plus the one owned pack, whatever the trigger (graceful fallback, e.g. hi without pawns)", () => {
     let sent = 0;
     for (let seed = 1; seed <= 200; seed++) {
-      const pack = ["", ...PACKS][seed % 4];
+      const pack = ["", ...PACKS][seed % 5];
       const owned = ownedOf(pack);
       const mem = newGhostMemory();
       const rng = R(seed);
@@ -319,7 +352,7 @@ describe("owned packs, repeats, delays, limits, memory", () => {
     expect(sent).toBeGreaterThan(3000);
     // a ghost without pawns answers "hi" with something from the starter set
     const r = ghostEmoteReply({ now: 0, chance: 1 }, "friendly", newGhostMemory(), human("hi"), R(1), "game");
-    expect(r && EMOTE_PACKS.starter.concat(EMOTE_PACKS.game).includes(r.id)).toBe(true);
+    expect(r && EMOTE_PACKS.starter.concat(EMOTE_PACKS.basic, EMOTE_PACKS.game).includes(r.id)).toBe(true);
   });
 
   it("never the same emote twice in a row and avoids its last 3, over a long chat", () => {

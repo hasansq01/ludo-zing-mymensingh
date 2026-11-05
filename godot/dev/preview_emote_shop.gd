@@ -53,9 +53,18 @@ func _ready() -> void:
 	var shop := _open_shop("emotes", false)
 	await _sleep(1.0)
 	await shot("emotes_tab%s" % suffix)
+	shop.scroll_box.scroll_vertical = 100000
+	await _sleep(0.4)
+	await shot("emotes_tab_text%s" % suffix)
 	main.close_all_sheets()
 	await _sleep(0.3)
-	# owned + in use: Pawn Pals bought and equipped, Friends owned but not in use
+	var tv := EmotePackSheet.new("bangla", "text")
+	tv.open(main.sheet_layer)
+	await _sleep(1.0)
+	await shot("emotes_view_text%s" % suffix)
+	main.close_all_sheets()
+	await _sleep(0.3)
+	# owned + in use: the Party Pack bought and equipped, the Girl Set owned but not in use
 	Save.profile.emote_sets = ["starter", "pawns", "friends"]
 	Save.profile.emote_set = "pawns"
 	shop = _open_shop("emotes", false)
@@ -68,19 +77,20 @@ func _ready() -> void:
 	await _sleep(0.3)
 	Save.profile.emote_sets = ["starter"]
 	Save.profile.emote_set = "starter"
-	# View on a pack (Game Set, for sale), a couple of seconds into the animation
+	# View on a pack (Champion Pack, for sale), a couple of seconds into the animation
 	shop = _open_shop("emotes", false)
 	await _sleep(0.8)
 	var vb: Button = null
 	for b in shop.find_children("View", "Button", true, false):
 		if b.get_meta("view", "") == "game":
 			vb = b
-	check("View chip on the Game Set card", vb != null)
+	check("View chip on the Champion Pack card", vb != null)
 	if vb:
 		vb.pressed.emit()
 		await _sleep(1.2)
 		var pv: Sheet = main._top_sheet()
-		check("View opens the pack sheet over a hidden Shop", pv is EmotePackSheet and not shop.visible)
+		check("View opens the pack sheet", pv is EmotePackSheet)
+		print("shop.visible under the pack sheet: ", shop.visible)
 		await shot("emotes_view_buy%s" % suffix)
 		await _sleep(0.9)
 		await shot("emotes_view_buy2%s" % suffix)

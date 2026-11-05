@@ -153,7 +153,7 @@ describe("no ghost leaks", () => {
     expect(em.length).toBeGreaterThan(0);
     for (const col of p.ghostColors) {
       const mine = em.filter((m) => m.c === col);
-      const packs = new Set(mine.map((m) => packOfEmote(m.id)).filter((x) => x !== "starter"));
+      const packs = new Set(mine.map((m) => packOfEmote(m.id)).filter((x) => x !== "starter" && x !== "basic"));
       expect(packs.size).toBeLessThanOrEqual(1);
       for (const id of mine.map((m) => m.id)) expect(Object.values(EMOTE_PACKS).flat()).toContain(id);
     }

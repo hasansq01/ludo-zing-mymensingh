@@ -133,7 +133,8 @@ func dice_ids() -> Array: return ids(Catalog.DICE)
 func pawn_ids() -> Array: return ids(Catalog.PAWNS)
 func scene_ids() -> Array: return ids(SLScenes.LIST)
 func emote_ids() -> Array: return ids(Catalog.EMOTE_PACKS)
-func char_ids() -> Array: return ids(Collection.CHARS)
+func text_ids() -> Array: return ids(Catalog.TEXT_PACKS)
+func char_ids() -> Array: return ids(Collection.CHARS + Collection.WORLD)
 func avatar_ids() -> Array: return ids(Collection.AVATARS)
 func frame_ids() -> Array: return ids(Collection.FRAMES)
 func plate_ids() -> Array: return ids(Collection.PLATES)
@@ -185,6 +186,10 @@ func rand_raw() -> Dictionary:
 		raw.emote_sets = subset(emote_ids(), 0.35)
 	if chance(0.6):
 		raw.emote_set = pick(emote_ids() + ["bogus"])
+	if chance(0.6):
+		raw.text_packs = subset(text_ids(), 0.35)
+	if chance(0.6):
+		raw.text_pack = pick(text_ids() + ["bogus"])
 	raw.av_owned = subset(char_ids(), 0.2)
 	raw.avatar = pick(avatar_ids() + char_ids())
 	raw.frame = pick(frame_ids())
@@ -288,7 +293,7 @@ func buy_code(err: String) -> String:
 
 func buy_cases() -> Array:
 	var out := []
-	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], dice = dice_ids() + ["nope"], scene = scene_ids() + ["nope"],
+	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], text = text_ids() + ["nope"], dice = dice_ids() + ["nope"], scene = scene_ids() + ["nope"],
 		char = char_ids() + ["pawn-red", "nope"], pawn = pawn_ids() + ["nope"]}
 	for k in 480:
 		var p := rand_profile()
@@ -305,6 +310,7 @@ func buy_cases() -> Array:
 			"dice": err = Catalog.buy_dice(id)
 			"pawn": err = Catalog.buy_pawn(id)
 			"emotes": err = Catalog.buy_emotes(id)
+			"text": err = Catalog.buy_text(id)
 			"scene": err = SLScenes.buy_scene(id)
 			"char": err = Collection.buy_char(id, true)
 		var code := buy_code(err)
@@ -314,7 +320,7 @@ func buy_cases() -> Array:
 
 func equip_cases() -> Array:
 	var out := []
-	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], dice = dice_ids(), scene = scene_ids(), avatar = avatar_ids() + char_ids(),
+	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], text = text_ids() + ["nope"], dice = dice_ids(), scene = scene_ids(), avatar = avatar_ids() + char_ids(),
 		char = char_ids(), frame = frame_ids(), plate = plate_ids(), badge = Collection.BADGES, pawn = pawn_ids() + ["nope"]}
 	for k in 380:
 		var p := rand_profile()
@@ -329,6 +335,7 @@ func equip_cases() -> Array:
 			"dice": ok = Catalog.equip_dice(id)
 			"pawn": ok = Catalog.equip_pawn(id)
 			"emotes": ok = Catalog.equip_emotes(id)
+			"text": ok = Catalog.equip_text(id)
 			"scene": ok = SLScenes.equip_scene(id)
 			_: ok = Collection.equip(kind, id)
 		out.append({p = before, kind = kind, id = id, ok = ok, out = copy(p)})

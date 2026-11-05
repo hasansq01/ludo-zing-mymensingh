@@ -63,7 +63,7 @@ export async function shopBuy(req: Request, env: AccEnv, a: Authed, now: number)
   const currency = body.currency ?? "coins";
   if (currency !== "coins" && currency !== "gems") throw new BadRequest('currency: "coins" | "gems"');
   const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {
-    const b = buy(p, kind, id, currency);
+    const b = buy(p, kind, id, currency, body.catalog !== 2);
     if (!b.ok) {
       const body: Record<string, unknown> = { error: b.error };
       if (b.short !== undefined) body.short = b.short;

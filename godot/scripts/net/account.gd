@@ -531,7 +531,7 @@ func _write(method: int, path: String, body: Variant, notify := true) -> Diction
 ## POST /v1/shop/buy {kind, id, currency}. {ok, price, item} | {ok = false, error: coins | gems | owned | locked |
 ## unknown | offline, short?}. `currency` is "coins" (default) or "gems".
 func buy(kind: String, id: String, currency := "coins", notify := true) -> Dictionary:
-	return await _write(HTTPClient.METHOD_POST, "/v1/shop/buy", {kind = kind, id = id, currency = currency}, notify)
+	return await _write(HTTPClient.METHOD_POST, "/v1/shop/buy", {kind = kind, id = id, currency = currency, catalog = 2}, notify)
 
 ## GET /v1/tables -> {ok, tables: [{id, entry, level, unlocked, affordable}], fee_pct, broke, broke_bonus: {available,
 ## next_at, amount}} | {ok = false, error}.

@@ -1,7 +1,7 @@
 // The one-time import of the local (pre-v2) profile into a new account (POST /v1/auth/guest {pid, import}).
 // Only known fields are taken; numbers are capped, owned items must exist, equipped items must be owned or
 // unlocked, reward timers may only make the player wait (never claim twice). Every change is listed in `notes`.
-import { DEFAULT_SCENE, FREE_DICE, FREE_EMOTES, FREE_PAWN, FREE_ROOMS, STAT_KEYS, achievement, item } from "./catalog";
+import { DEFAULT_SCENE, FREE_DICE, FREE_EMOTES, FREE_PAWN, FREE_TEXT, FREE_ROOMS, STAT_KEYS, achievement, item } from "./catalog";
 import { IMPORT_CAPS } from "./rules";
 import { type Dict, clamp, clone, isArray, isDict, isGdInt, stripEdges } from "./gd";
 import { type Delta, type Profile, achDone, equipped, isPlayerId } from "./profile";
@@ -33,7 +33,7 @@ export function cleanName(v: unknown): string {
   return stripEdges(v).split(" ").filter((s) => s !== "").join(" ").slice(0, IMPORT_CAPS.name_max);
 }
 
-function ownedIds(v: unknown, kind: "room" | "dice" | "pawn" | "emotes" | "scene" | "char", field: string, notes: string[]): string[] {
+function ownedIds(v: unknown, kind: "room" | "dice" | "pawn" | "emotes" | "text" | "scene" | "char", field: string, notes: string[]): string[] {
   const out: string[] = [];
   if (v === undefined) return out;
   if (!isArray(v)) {
@@ -92,6 +92,8 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   p.pawns_owned = [FREE_PAWN, ...pawns.filter((d) => d !== FREE_PAWN)];
   const emo = ownedIds(raw.emote_sets, "emotes", "emote_sets", notes);
   p.emote_sets = [FREE_EMOTES, ...emo.filter((e) => e !== FREE_EMOTES)];
+  const txt = ownedIds(raw.text_packs, "text", "text_packs", notes);
+  p.text_packs = [FREE_TEXT, ...txt.filter((e) => e !== FREE_TEXT)];
   const scenes = ownedIds(raw.scenes, "scene", "scenes", notes);
   p.scenes = [DEFAULT_SCENE, ...scenes.filter((s) => s !== DEFAULT_SCENE)];
   p.av_owned = ownedIds(raw.av_owned, "char", "av_owned", notes);
@@ -108,7 +110,7 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   p.claimed = claimed;
 
   // equipped: owned / unlocked, else the default
-  const fields: [string, string][] = [["room", "room"], ["dice", "dice"], ["pawn", "pawn"], ["emotes", "emote_set"], ["scene", "scene"], ["avatar", "avatar"], ["frame", "frame"], ["plate", "plate"], ["badge", "badge"]];
+  const fields: [string, string][] = [["room", "room"], ["dice", "dice"], ["pawn", "pawn"], ["emotes", "emote_set"], ["text", "text_pack"], ["scene", "scene"], ["avatar", "avatar"], ["frame", "frame"], ["plate", "plate"], ["badge", "badge"]];
   for (const [kind, field] of fields) {
     const v = raw[field];
     if (v === undefined) continue;

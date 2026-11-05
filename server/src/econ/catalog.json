@@ -68,6 +68,39 @@
     },
     {
       "kind": "pawn",
+      "id": "candy",
+      "name": "Candy Pop",
+      "price": 2500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 25
+    },
+    {
+      "kind": "pawn",
+      "id": "fruity",
+      "name": "Fruity",
+      "price": 2500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 25
+    },
+    {
+      "kind": "pawn",
+      "id": "blossom",
+      "name": "Blossom",
+      "price": 2500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 25
+    },
+    {
+      "kind": "pawn",
       "id": "marble",
       "name": "Marble",
       "price": 3500,
@@ -76,6 +109,50 @@
       "default": false,
       "unlock": null,
       "gems": 35
+    },
+    {
+      "kind": "pawn",
+      "id": "ice",
+      "name": "Ice Crystal",
+      "price": 3500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 35
+    },
+    {
+      "kind": "pawn",
+      "id": "pirate",
+      "name": "Pirate",
+      "price": 3500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 35
+    },
+    {
+      "kind": "pawn",
+      "id": "robo",
+      "name": "Robo Bot",
+      "price": 4000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 40
+    },
+    {
+      "kind": "pawn",
+      "id": "wizard",
+      "name": "Little Wizard",
+      "price": 4000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 40
     },
     {
       "kind": "pawn",
@@ -90,8 +167,30 @@
     },
     {
       "kind": "pawn",
+      "id": "space",
+      "name": "Space Explorer",
+      "price": 5000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 50
+    },
+    {
+      "kind": "pawn",
       "id": "teacup",
       "name": "Teacup",
+      "price": 6000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 60
+    },
+    {
+      "kind": "pawn",
+      "id": "dragon",
+      "name": "Dragon",
       "price": 6000,
       "buy": true,
       "free": false,
@@ -135,7 +234,7 @@
     {
       "kind": "emotes",
       "id": "starter",
-      "name": "Starter Set",
+      "name": "Pawn Set",
       "price": 0,
       "buy": false,
       "free": true,
@@ -144,8 +243,8 @@
     },
     {
       "kind": "emotes",
-      "id": "pawns",
-      "name": "Pawn Pals",
+      "id": "friends",
+      "name": "Girl Set",
       "price": 2500,
       "buy": true,
       "free": false,
@@ -155,25 +254,79 @@
     },
     {
       "kind": "emotes",
-      "id": "friends",
-      "name": "Friends Set",
-      "price": 4000,
+      "id": "boys",
+      "name": "Boy Set",
+      "price": 2500,
       "buy": true,
       "free": false,
       "default": false,
       "unlock": null,
-      "gems": 40
+      "gems": 25
+    },
+    {
+      "kind": "emotes",
+      "id": "pawns",
+      "name": "Party Pack",
+      "price": 5000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 50
     },
     {
       "kind": "emotes",
       "id": "game",
-      "name": "Game Set",
-      "price": 3500,
+      "name": "Champion Pack",
+      "price": 5000,
       "buy": true,
       "free": false,
       "default": false,
       "unlock": null,
-      "gems": 35
+      "gems": 50
+    },
+    {
+      "kind": "text",
+      "id": "basic",
+      "name": "Good Manners",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": true,
+      "unlock": null
+    },
+    {
+      "kind": "text",
+      "id": "ludo",
+      "name": "Ludo Talk",
+      "price": 3000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 30
+    },
+    {
+      "kind": "text",
+      "id": "react",
+      "name": "Reactions",
+      "price": 3000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 30
+    },
+    {
+      "kind": "text",
+      "id": "bangla",
+      "name": "Bangla",
+      "price": 3000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 30
     },
     {
       "kind": "room",
@@ -511,6 +664,126 @@
       "gems": 115
     },
     {
+      "kind": "char",
+      "id": "w-hana",
+      "name": "Hana",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-kenji",
+      "name": "Kenji",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-mei",
+      "name": "Mei",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-linh",
+      "name": "Linh",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-emma",
+      "name": "Emma",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-lukas",
+      "name": "Lukas",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-sofia",
+      "name": "Sofia",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-oliver",
+      "name": "Oliver",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-jayden",
+      "name": "Jayden",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-maya",
+      "name": "Maya",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-carlos",
+      "name": "Carlos",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "char",
+      "id": "w-ava",
+      "name": "Ava",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
       "kind": "avatar",
       "id": "pawn-red",
       "name": "Red Pawn",
@@ -828,6 +1101,10 @@
       "starter"
     ],
     "emote_set": "starter",
+    "text_packs": [
+      "basic"
+    ],
+    "text_pack": "basic",
     "dice_owned": [
       "classic"
     ],

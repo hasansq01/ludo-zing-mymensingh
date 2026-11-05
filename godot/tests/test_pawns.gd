@@ -43,7 +43,10 @@ func run() -> void:
 
 func _catalogue() -> void:
 	var ids: Array = Catalog.PAWNS.map(func(d): return d.id)
-	check("Classic plus seven skins, Classic first", ids == ["classic", "trim", "marble", "kitty", "teacup", "glitter", "crown", "knight"], ids)
+	check("Classic first, then the coin skins by price, then the gem-only ones", ids == ["classic", "trim", "candy", "fruity", "blossom", "marble", "ice", "pirate", "robo", "wizard", "kitty", "space", "teacup", "dragon", "glitter", "crown", "knight"], ids)
+	check("the skins people may already own are all still sold, at their old prices", Catalog.pawn("trim").price == 2000 and Catalog.pawn("marble").price == 3500 and Catalog.pawn("kitty").price == 5000
+		and Catalog.pawn("teacup").price == 6000 and Catalog.pawn("glitter").gems == 80 and Catalog.pawn("crown").gems == 120 and Catalog.pawn("knight").gems == 150)
+	check("every themed skin is on sale", PawnSkins.THEMED.all(func(id): return not Catalog.pawn(id).is_empty()))
 	check("Classic is free", Catalog.pawn("classic").price == 0 and not Catalog.pawn_gems_only("classic") and Catalog.pawn_gems("classic") == 0)
 	var coin: Array = Catalog.PAWNS.filter(func(d): return int(d.price) > 0)
 	var gem: Array = Catalog.PAWNS.filter(func(d): return Catalog.pawn_gems_only(d.id))
@@ -150,18 +153,96 @@ func _who_wears_what() -> void:
 static func _verts(m: Mesh) -> int:
 	return 0 if m == null else (m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
 
+## The triangles of one mesh (surface 0).
+static func _tris(m: Mesh) -> int:
+	if m == null:
+		return 0
+	var a := m.surface_get_arrays(0)
+	return (a[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3 if a[Mesh.ARRAY_INDEX] != null else (a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
+
+## The colour of a colour-table cell.
+static func _table_px(t: ImageTexture, key: String) -> Color:
+	var uv := PawnSkins._cell(key)
+	return t.get_image().get_pixel(int(uv.x * t.get_width()), int(uv.y * t.get_height()))
+
+static func _all_uv(m: Mesh, uv: Vector2) -> bool:
+	for u: Vector2 in m.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]:
+		if not u.is_equal_approx(uv):
+			return false
+	return true
+
 func _skins_3d() -> void:
 	var worst := 0
 	var bad := []
+	var heavy := []
+	var wide := []
+	var calls := []
 	for d: Dictionary in Catalog.PAWNS:
-		var sk := PawnSkins.meshes(d.id)
-		var n := _verts(sk.body) + _verts(sk.head)
-		for a: Dictionary in sk.accents:
-			n += _verts(a.mesh)
-		worst = maxi(worst, n)
-		if sk.body == null or float(sk.top) < 0.6 or float(sk.top) > 1.15:
-			bad.append(d.id)
+		for seat: Color in Palette.PLAYER:                 # (only the fruity skin differs by seat)
+			var sk := PawnSkins.meshes(d.id, seat)
+			var n := _verts(sk.body) + _verts(sk.head)
+			var tris := _tris(sk.body) + _tris(sk.head)
+			var parts: Array = [sk.body, sk.head]
+			for a: Dictionary in sk.accents:
+				n += _verts(a.mesh)
+				tris += _tris(a.mesh)
+				parts.append(a.mesh)
+			worst = maxi(worst, n)
+			if tris > 3600:
+				heavy.append([d.id, tris])
+			if parts.filter(func(m): return m != null).size() > 4:
+				calls.append(d.id)
+			if sk.body == null or float(sk.top) < 0.6 or float(sk.top) > 1.16:
+				bad.append(d.id)
+			if d.id in PawnSkins.THEMED:
+				for m: Mesh in parts.filter(func(x): return x != null):
+					for v: Vector3 in m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+						if Vector2(v.x, v.z).length() > 0.4:
+							wide.append(d.id)
+							break
 	check("every skin builds a body and a height that fits a square", bad.is_empty(), bad)
+	check("no pawn is over 3,600 triangles", heavy.is_empty(), heavy)
+	check("a pawn is at most four draw calls", calls.is_empty(), calls)
+	check("the themed skins keep inside the classic pawn's square", wide.is_empty(), wide)
+	var themed_mats := []
+	for id: String in PawnSkins.THEMED:
+		var host := Node3D.new()
+		var look := PawnSkins.dress(host, id, Palette.PLAYER[0])
+		themed_mats.append(look.mat)
+		for a: Dictionary in look.accents:
+			themed_mats.append(a.mat)
+		host.free()
+	check("themed skins add no shader variant: the pawn material, with a texture or without", themed_mats.all(func(m: StandardMaterial3D):
+		return (m.clearcoat_enabled and m.emission_enabled and not m.vertex_color_use_as_albedo
+			and m.shading_mode == BaseMaterial3D.SHADING_MODE_PER_PIXEL and m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED
+			and m.texture_filter == BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS)))
+	var table := PawnSkins.palette(Palette.PLAYER[1])
+	check("the colour table is one small texture per seat colour", table == PawnSkins.palette(Palette.PLAYER[1]) and table != PawnSkins.palette(Palette.PLAYER[2]) and table.get_width() == 32)
+	check("... and has room for every colour", PawnSkins._cell_keys().size() <= PawnSkins.PALETTE_CELLS * PawnSkins.PALETTE_CELLS, PawnSkins._cell_keys().size())
+	check("... each cell in its colour", _table_px(table, "gold").is_equal_approx(Color(str(PawnSkins.INKS.gold)))
+		and _table_px(PawnSkins.palette(Palette.PLAYER[0]), "petal") != _table_px(PawnSkins.palette(Palette.PLAYER[3]), "petal"), _table_px(table, "gold"))
+	check("the fruit differs by seat, one set of meshes per fruit", PawnSkins.meshes("fruity", Palette.PLAYER[0]) != PawnSkins.meshes("fruity", Palette.PLAYER[1])
+		and is_same(PawnSkins.meshes("fruity", Palette.PLAYER[3]), PawnSkins.meshes("fruity", Palette.PLAYER[3])))
+	for kind: String in ["stripes", "scales", "vine"]:
+		var tex := PawnSkins.texture(kind, Palette.PLAYER[3])
+		var im: Image = tex.get_image()
+		var solid: Color = im.get_pixel(40, int(im.get_height() * (PawnSkins.SOLID_UV.y)))
+		check("%s: small, the head's spot is the plain seat colour" % kind, im.get_width() <= 96 and im.get_height() <= 96 and solid.is_equal_approx(Palette.PLAYER[3]), solid)
+		check("%s: made once" % kind, tex == PawnSkins.texture(kind, Palette.PLAYER[3]))
+	check("the head of a scaly or striped pawn points at the plain part of its texture", _all_uv(PawnSkins.meshes("dragon").head, PawnSkins.SOLID_UV) and _all_uv(PawnSkins.meshes("candy").head, PawnSkins.SOLID_UV))
+	# Top View: the head tips back about its own height, in 3D View it stays upright
+	var host := Node3D.new()
+	var robo := PawnSkins.dress(host, "robo", Palette.PLAYER[0])
+	PawnSkins.pose(robo, 0.0, 1.29)
+	check("pose, 3D View: upright on the stretched body", is_zero_approx((robo.head as Node3D).rotation.x) and is_equal_approx((robo.head as Node3D).position.y, PawnSkins.HEAD_Y * 1.29))
+	PawnSkins.pose(robo, 1.0)
+	check("pose, Top View: the head tips back", is_equal_approx((robo.head as Node3D).rotation.x, -float(robo.look)))
+	var turning := (robo.head as Node3D).transform * Vector3(0, float(robo.pivot) - PawnSkins.HEAD_Y, 0)
+	check("... about its turning height", turning.is_equal_approx(Vector3(0, float(robo.pivot), 0)), turning)
+	var plain := PawnSkins.dress(host, "classic", Palette.PLAYER[0])
+	PawnSkins.pose(plain, 1.0, 1.0)
+	check("... Classic has no face to show: never tips", is_zero_approx((plain.head as Node3D).rotation.x) and is_equal_approx((plain.head as Node3D).position.y, PawnSkins.HEAD_Y))
+	host.free()
 	var classic := _verts(PawnSkins.meshes("classic").body) + _verts(PawnSkins.meshes("classic").head)
 	check("no skin is much heavier than the classic pawn (< 1.6x its vertices)", worst < classic * 1.6, [worst, classic])
 	check("meshes are built once per skin and shared", is_same(PawnSkins.meshes("crown"), PawnSkins.meshes("crown"))
@@ -238,7 +319,12 @@ static func _close_hue(a: Color, b: Color) -> bool:
 func _flat_art() -> void:
 	check("flat heights: taller shapes, the short teacup", PawnArt.height("knight") > PawnArt.height("classic") and PawnArt.height("teacup") < PawnArt.height("classic")
 		and PawnArt.height("crown") > PawnArt.TOP)
-	check("flat outlines close on the axis for every shape", ["classic", "knight", "teacup"].all(func(s): return PawnArt._outline(s).size() >= 8))
+	check("flat outlines close on the axis for every shape", Catalog.PAWNS.all(func(d): return PawnArt._outline(d.id).size() >= 8))
+	var low := []
+	for d: Dictionary in Catalog.PAWNS:
+		if absf(PawnArt.height(d.id) - float(PawnSkins.meshes(d.id, Palette.PLAYER[0]).top)) > 0.12:
+			low.append(d.id)
+	check("flat heights match the 3D skins", low.is_empty(), low)
 
 
 # ---------- the gem path (server wallet) ----------
@@ -278,7 +364,7 @@ func _wallet() -> void:
 	var err: String = await ShopSheet._purchase("pawn", "crown")
 	check("a gem-only skin bought with coins: the server refuses, nothing changes", err != "" and not Save.profile.pawns_owned.has("crown") and int(Save.profile.gems) == 200, err)
 	err = await ShopSheet._purchase("pawn", "crown", "gems")
-	check("bought with gems: the server sells it, the profile owns and wears it", err == "" and f.last("/v1/shop/buy").body == {kind = "pawn", id = "crown", currency = "gems"}
+	check("bought with gems: the server sells it, the profile owns and wears it", err == "" and f.last("/v1/shop/buy").body == {kind = "pawn", id = "crown", currency = "gems", catalog = 2}
 		and Save.profile.pawns_owned.has("crown") and Save.profile.pawn == "crown" and int(Save.profile.gems) == 200 - Catalog.pawn_gems("crown"), [err, Save.profile.get("pawns_owned"), Save.profile.get("gems")])
 	err = await ShopSheet._purchase("pawn", "trim")
 	check("a coin skin through the server: coins paid, worn", err == "" and Save.profile.pawn == "trim" and int(Save.profile.coins) == 3000, [err, Save.profile.coins])

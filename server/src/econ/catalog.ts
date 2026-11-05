@@ -3,8 +3,8 @@
 // Server-only rules that have no GDScript counterpart (online rewards, claim limits, import caps) live in rules.ts.
 import data from "./catalog.json";
 
-export type ItemKind = "dice" | "pawn" | "emotes" | "room" | "scene" | "char" | "avatar" | "frame" | "plate" | "badge";
-export const ITEM_KINDS: readonly ItemKind[] = ["dice", "pawn", "emotes", "room", "scene", "char", "avatar", "frame", "plate", "badge"];
+export type ItemKind = "dice" | "pawn" | "emotes" | "text" | "room" | "scene" | "char" | "avatar" | "frame" | "plate" | "badge";
+export const ITEM_KINDS: readonly ItemKind[] = ["dice", "pawn", "emotes", "text", "room", "scene", "char", "avatar", "frame", "plate", "badge"];
 
 export interface Unlock {
   level?: number;
@@ -62,6 +62,8 @@ export interface CatalogData {
     pawn: string;
     emote_sets: string[];
     emote_set: string;
+    text_packs: string[];
+    text_pack: string;
     scenes: string[];
     scene: string;
     avatar: string;
@@ -130,6 +132,7 @@ export const FREE_DICE = CATALOG.defaults.dice;
 /** Classic, the pawn skin everyone owns (Catalog.FREE_PAWN). */
 export const FREE_PAWN = CATALOG.defaults.pawn;
 export const FREE_EMOTES = CATALOG.defaults.emote_set;
+export const FREE_TEXT = CATALOG.defaults.text_pack;
 export const DEFAULT_ROOM = CATALOG.defaults.room;
 export const DEFAULT_SCENE = CATALOG.defaults.scene;
 export const DEFAULT_AVATAR = CATALOG.defaults.avatar;

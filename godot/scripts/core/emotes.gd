@@ -16,10 +16,32 @@ static func packs() -> Array:
 				name = str(s.get("name", base.get("name", s.id))),
 				price = int(base.get("price", s.get("price", 0))),
 				emotes = _strs(s.get("emotes", base.get("emotes", []))),
+				premium = bool(s.get("premium", false)),
 			})
 	if out.is_empty():
 		for e: Dictionary in Catalog.EMOTE_PACKS:
-			out.append({id = e.id, name = e.name, price = int(e.price), emotes = _strs(e.emotes)})
+			out.append({id = e.id, name = e.name, price = int(e.price), emotes = _strs(e.emotes), premium = bool(e.get("premium", false))})
+	return out
+
+## The text packs in order: [{id, name, price, emotes: Array[String]}].
+static func text_packs() -> Array:
+	var out := []
+	for e: Dictionary in Catalog.TEXT_PACKS:
+		out.append({id = e.id, name = e.name, price = int(e.price), emotes = _strs(e.emotes)})
+	return out
+
+static func text_pack(id: String) -> Dictionary:
+	for p: Dictionary in text_packs():
+		if p.id == id:
+			return p
+	return {}
+
+## The Text tab's phrases: the equipped text pack, plus the team phrases in Pair Mode.
+static func equipped_text_ids(teams := false) -> Array[String]:
+	var out: Array[String] = []
+	out.assign(text_pack(Catalog.text_in_use()).get("emotes", []))
+	if teams:
+		out.append_array(_strs(Catalog.TEAM_PHRASES))
 	return out
 
 ## One pack ({} when unknown).
@@ -31,10 +53,10 @@ static func pack(id: String) -> Dictionary:
 
 ## The pack an emote belongs to ("" when unknown).
 static func pack_of(emote_id: String) -> String:
-	for p: Dictionary in packs():
+	for p: Dictionary in packs() + text_packs():
 		if p.emotes.has(emote_id):
 			return p.id
-	return ""
+	return "team" if Catalog.TEAM_PHRASES.has(emote_id) else ""
 
 ## Owned pack ids in pack order (Starter always).
 static func owned_packs() -> Array:
@@ -57,7 +79,7 @@ static func equipped_ids() -> Array[String]:
 ## True when the player's account owns the pack of that emote (Starter always).
 static func owns_emote(emote_id: String) -> bool:
 	var pid := pack_of(emote_id)
-	return pid != "" and Catalog.owns_emotes(pid)
+	return pid == "team" or Catalog.owns_emotes(pid) or Catalog.owns_text(pid)
 
 static func _strs(a: Variant) -> Array[String]:
 	var out: Array[String] = []

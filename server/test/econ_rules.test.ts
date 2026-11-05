@@ -432,7 +432,37 @@ describe("import of the local profile", () => {
 });
 
 
+describe("text emote packs", () => {
+  it("a new profile owns and uses Good Manners; an old one gains it", () => {
+    expect(newProfile()).toMatchObject({ text_packs: ["basic"], text_pack: "basic" });
+    expect(normalizeProfile({ text_packs: "x", text_pack: 4 })).toMatchObject({ text_packs: ["basic"], text_pack: "basic" });
+  });
+
+  it("buy pays once, owns and equips; equip needs ownership; Good Manners and the team phrases aren't sold", () => {
+    const p = newProfile();
+    p.coins = 5000;
+    expect(equip(p, "text", "bangla")).toMatchObject({ ok: false, error: "locked" });
+    const r = buy(p, "text", "bangla");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.profile).toMatchObject({ coins: 2000, text_packs: ["basic", "bangla"], text_pack: "bangla" });
+    expect(r.profile.emote_sets).toEqual(["starter"]);
+    expect(buy(r.profile, "text", "bangla")).toMatchObject({ ok: false, error: "owned" });
+    expect(buy(p, "text", "basic")).toMatchObject({ ok: false, error: "owned" });
+    expect(buy(p, "text", "team")).toMatchObject({ ok: false, error: "unknown" });
+    expect(equip(r.profile, "text", "basic")).toMatchObject({ ok: true, changed: true });
+  });
+});
+
 describe("emote packs", () => {
+  it("a game from before the 2026-11 packs pays the prices it shows; today's game pays today's", () => {
+    const p = newProfile();
+    p.coins = 10_000;
+    expect(buy(p, "emotes", "pawns", "coins", true)).toMatchObject({ ok: true, price: 2500 });
+    expect(buy(p, "emotes", "pawns")).toMatchObject({ ok: true, price: 5000 });
+    expect(buy(p, "emotes", "boys", "coins", true)).toMatchObject({ ok: true, price: 2500 });
+  });
+
   it("a new profile owns and uses the Starter Set", () => {
     const p = newProfile();
     expect(p.emote_sets).toEqual(["starter"]);
@@ -445,14 +475,14 @@ describe("emote packs", () => {
     const r = buy(p, "emotes", "friends");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.profile).toMatchObject({ coins: 6000, emote_sets: ["starter", "friends"], emote_set: "friends" });
+    expect(r.profile).toMatchObject({ coins: 7500, emote_sets: ["starter", "friends"], emote_set: "friends" });
     expect(buy(r.profile, "emotes", "friends")).toMatchObject({ ok: false, error: "owned" });
     expect(buy(p, "emotes", "starter")).toMatchObject({ ok: false, error: "owned" });
     expect(buy(p, "emotes", "nope")).toMatchObject({ ok: false, error: "unknown" });
-    expect(buy(newProfile(), "emotes", "pawns")).toMatchObject({ ok: true });
+    expect(buy(newProfile(), "emotes", "boys")).toMatchObject({ ok: true });
     const poor = newProfile();
     poor.coins = 100;
-    expect(buy(poor, "emotes", "pawns")).toMatchObject({ ok: false, error: "coins", short: 2400 });
+    expect(buy(poor, "emotes", "pawns")).toMatchObject({ ok: false, error: "coins", short: 4900 });
     expect(equip(p, "emotes", "game")).toMatchObject({ ok: false, error: "locked" });
     expect(equip(p, "emotes", "nope")).toMatchObject({ ok: false, error: "unknown" });
     const e = equip(r.profile, "emotes", "starter");

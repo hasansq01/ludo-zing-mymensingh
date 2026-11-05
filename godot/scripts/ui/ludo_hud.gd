@@ -478,6 +478,7 @@ func setup(s: Dictionary) -> void:
 	finish_card.visible = false
 	emotes.clear()                           # no reactions or computer cooldowns carried over
 	emote_picker.close()
+	emote_picker.teams = bool(s.get("teams", false))
 	emote_picker.refresh()                   # the equipped pack (it may have changed since the last game)
 	for c in 4:
 		var t: Tile = tiles[c]

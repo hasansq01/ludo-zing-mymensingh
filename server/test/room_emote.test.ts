@@ -86,8 +86,17 @@ describe("pack ownership", () => {
     a.send({ t: "emote", id: "wow" }); // friends: still locked
     expect((await a.waitFor((m) => m.t === "error" && m.code === "emote_locked")).code).toBe("emote_locked");
     await sleep(GAP);
-    a.send({ t: "emote", id: "party" }); // starter
+    a.send({ t: "emote", id: "party" }); // Party Pack now, in Starter on an older game: still allowed
     expect((await b.waitFor((m) => m.t === "emote" && m.id === "party")).id).toBe("party");
+    await sleep(GAP);
+    a.send({ t: "emote", id: "t-gg" }); // Good Manners: free
+    expect((await b.waitFor((m) => m.t === "emote" && m.id === "t-gg")).id).toBe("t-gg");
+    await sleep(GAP);
+    a.send({ t: "emote", id: "t-go" }); // the team phrases: free
+    expect((await b.waitFor((m) => m.t === "emote" && m.id === "t-go")).id).toBe("t-go");
+    await sleep(GAP);
+    a.send({ t: "emote", id: "t-bgg" }); // Bangla: paid
+    expect((await a.waitFor((m) => m.t === "error" && m.code === "emote_locked")).code).toBe("emote_locked");
   });
 
   it("a member without an account owns only the starter pack", async () => {

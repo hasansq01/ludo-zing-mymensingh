@@ -405,6 +405,8 @@ func start(cfg: Dictionary) -> void:
 			if not p.cpu and str(nm[p.c]) != "":
 				p.name = str(nm[p.c])
 	await _open()
+	if emotes and not G.is_empty():
+		emotes.react_start(G.players.map(func(p): return int(p.c)))
 
 ## Continue a saved game: MatchStore.load() as save_match() stored it ({game, cfg, G}) or a bare rules state.
 func resume(state: Dictionary) -> void:

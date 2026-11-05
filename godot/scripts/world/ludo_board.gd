@@ -433,7 +433,7 @@ func _process(delta: float) -> void:
 			var gs := s * txz
 			g.scale = Vector3(gs * (1.0 + sq * 0.7), gs * (1.0 - sq), gs * (1.0 + sq * 0.7))
 			(t.body as Node3D).scale = Vector3(1, ty, 1)
-			(t.head as Node3D).position.y = 0.74 * ty
+			PawnSkins.pose(t.look, top_k, ty)                       # the head on the stretched body; a face looks up in Top View
 			(t.sym as Node3D).position.y = 1.16 * ty + float(t.over)
 			PawnSkins.face(g, self, cam)                            # the skin's front towards the camera
 			var head_top := g.position.y + (0.93 * ty + float(t.over)) * gs   # world height of the top of the head

@@ -48,14 +48,15 @@ export const FREE_AVATARS: readonly string[] = (data.items as CatalogItemLite[])
 export const DEFAULT_AVATAR: string = data.defaults.avatar;
 
 /** Characters that read as one gender (a ghost's avatar should not contradict its name). */
-const FEMALE_CHARS = new Set(["ch-nadia", "ch-riya", "ch-tania", "ch-mim", "ch-sumaiya", "ch-priya", "ch-lamia", "ch-fariha", "ch-nusrat", "ch-ayesha"]);
+const FEMALE_CHARS = new Set(["ch-nadia", "ch-riya", "ch-tania", "ch-mim", "ch-sumaiya", "ch-priya", "ch-lamia", "ch-fariha", "ch-nusrat", "ch-ayesha", "w-hana", "w-mei", "w-linh", "w-emma", "w-sofia", "w-maya", "w-ava"]);
 
 /**
  * The pawn skins ghosts wear (Catalog.PAWNS), weighted: about half keep Classic, the coin skins are common, the
  * gem-only ones rare, so a table looks lived-in without every seat dressed up. "" = Classic. Only skins that exist.
  */
 export const GHOST_PAWNS: readonly (readonly [string, number])[] = (
-  [["", 50], ["trim", 12], ["marble", 10], ["kitty", 9], ["teacup", 8], ["glitter", 5], ["crown", 4], ["knight", 2]] as const
+  [["", 50], ["trim", 7], ["candy", 5], ["fruity", 5], ["blossom", 5], ["marble", 6], ["ice", 4], ["pirate", 4], ["robo", 3], ["wizard", 3],
+    ["kitty", 5], ["space", 2], ["teacup", 4], ["dragon", 2], ["glitter", 3], ["crown", 2], ["knight", 1]] as const
 ).filter(([id]) => id === "" || (data.items as CatalogItemLite[]).some((it) => it.kind === "pawn" && it.id === id));
 
 export interface GhostIdentity {
@@ -108,7 +109,7 @@ export function makeGhosts(n: number, humans: readonly HumanLite[], rng: Rng): G
     const pool = (female ? FEMALE_NAMES : MALE_NAMES).filter((x) => !taken.has(norm(x)));
     const name = pool.length ? pick(pool, rng) : `Player${intIn(10, 99, rng)}`;
     taken.add(norm(name));
-    const fits = FREE_AVATARS.filter((a) => !a.startsWith("ch-") || FEMALE_CHARS.has(a) === female);
+    const fits = FREE_AVATARS.filter((a) => !(a.startsWith("ch-") || a.startsWith("w-")) || FEMALE_CHARS.has(a) === female);
     // most people keep the default avatar
     const avatar = rng.randf() < 0.35 ? DEFAULT_AVATAR : pick(fits.length ? fits : FREE_AVATARS, rng);
     const base = pick(levels, rng);
@@ -189,21 +190,66 @@ export function ghostPairYes(s: LudoState, rng: Rng): boolean {
 
 // ---------- emotes (EMOTES.md) ----------
 
-/** The emote packs in manifest order (ids of the 24 emotes; `starter` is free and always owned). */
+/**
+ * The emote packs in manifest order (godot Catalog.EMOTE_PACKS, TEXT_PACKS, TEAM_PHRASES): the character sets, the Premium
+ * packs, the text packs. `starter`, `basic` and `team` are free and always owned.
+ */
 export const EMOTE_PACKS: Readonly<Record<string, readonly string[]>> = {
+  starter: ["happy", "laugh", "sob", "angry", "gasp", "love"],
+  friends: ["cheer", "gLaugh", "cry", "gAngry", "gShock", "gLove"],
+  boys: ["bHappy", "bLaugh", "bCry", "grr", "wow", "bLove"],
+  pawns: ["party", "cool", "tease", "hi", "highfive", "confused", "facepalm", "sad"],
+  game: ["crown", "champ", "dice", "peek", "think", "hmph", "flag", "sleepy"],
+  basic: ["t-hi", "t-luck", "t-fun", "t-gg", "t-wp", "t-thx", "t-sorry", "t-bye"],
+  ludo: ["t-six", "t-nice", "t-lucky", "t-again", "t-revenge", "t-safe", "t-pair", "t-home"],
+  react: ["t-wow", "t-oops", "t-close", "t-hurry", "t-wait", "t-turn", "t-easy", "t-nooo"],
+  bangla: ["t-bgg", "t-bluck", "t-bsix", "t-bcome", "t-bagain", "t-bwon", "t-bthx", "t-bugh"],
+  team: ["t-help", "t-go", "t-got", "t-partner"],
+};
+export const PAID_PACKS: readonly string[] = ["friends", "boys", "pawns", "game"];
+export const FREE_EMOTE_PACKS: readonly string[] = ["starter", "basic", "team"];
+
+/**
+ * The packs as games from before the 2026-11 packs (v14, v15) still show them: a player there sends what their game lists,
+ * so these keep being accepted. Drop once min_online passes those versions.
+ */
+const LEGACY_EMOTE_PACKS: Readonly<Record<string, readonly string[]>> = {
   starter: ["happy", "laugh", "cool", "angry", "love", "party"],
   pawns: ["champ", "sleepy", "sob", "gasp", "confused", "hi"],
   friends: ["cry", "wow", "facepalm", "cheer", "think", "tease"],
   game: ["dice", "crown", "highfive", "flag", "sad", "peek"],
 };
-export const PAID_PACKS: readonly string[] = ["pawns", "friends", "game"];
 
-/** The pack that contains emote `id`, or "" when it is not one of the 24. */
+/** The pack that contains emote `id`, or "" when it is not one of ours. */
 export function packOfEmote(id: unknown): string {
   if (typeof id !== "string") return "";
   for (const [p, ids] of Object.entries(EMOTE_PACKS)) if (ids.includes(id)) return p;
   return "";
 }
+
+/** Every pack whose owner may send emote `id` (today's pack first, then the pack it was in); [] when unknown. */
+export function emotePacksAllowing(id: unknown): string[] {
+  const now = packOfEmote(id);
+  if (!now) return [];
+  const out = [now];
+  for (const [p, ids] of Object.entries(LEGACY_EMOTE_PACKS)) if (ids.includes(id as string) && !out.includes(p)) out.push(p);
+  return out;
+}
+
+/** A character set's own drawing of a core emotion: a ghost with that set reacts as that character. */
+const AS_CHARACTER: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  friends: { happy: "cheer", laugh: "gLaugh", sob: "cry", angry: "gAngry", gasp: "gShock", love: "gLove" },
+  boys: { happy: "bHappy", laugh: "bLaugh", sob: "bCry", angry: "grr", gasp: "wow", love: "bLove" },
+};
+/** The emote as this ghost draws it: its character set's own version of a core emotion. */
+function dressed(id: string, owned: ReadonlySet<string>): string {
+  const set = owned.has("gLaugh") ? AS_CHARACTER.friends : owned.has("bLaugh") ? AS_CHARACTER.boys : undefined;
+  return set?.[id] ?? id;
+}
+/** The other characters' core emotions, read as the first one's when a ghost answers them. */
+const CORE_OF: Readonly<Record<string, string>> = {
+  gLaugh: "laugh", gAngry: "angry", gShock: "wow", gLove: "love", bHappy: "happy", bLaugh: "laugh", bCry: "cry", grr: "angry", bLove: "love", hmph: "angry",
+};
 
 /** One random paid pack, the second pack a ghost "owns" (besides starter). */
 export function ghostPack(rng: Rng): string {
@@ -321,7 +367,7 @@ export const GHOST_DELAY_MAX = GHOST_EMOTE.delay[1] + GHOST_EMOTE.afterMove[1];
 type Pool = ReadonlyArray<readonly [string, number]>;
 /** Weight of "no reply" is the entry named "-". */
 const POOLS: Record<string, Pool> = {
-  hi: [["hi", 5], ["love", 1], ["laugh", 1], ["cool", 1], ["happy", 1.5], ["-", 1.2]],
+  hi: [["hi", 5], ["t-hi", 3], ["love", 1], ["laugh", 1], ["cool", 1], ["happy", 1.5], ["-", 1.2]],
   love: [["love", 4], ["laugh", 1.5], ["happy", 2], ["tease", 0.4], ["cool", 0.5], ["-", 0.8]],
   happy: [["happy", 3], ["laugh", 1.5], ["love", 1], ["cool", 1], ["hi", 1], ["cheer", 1], ["-", 1.5]],
   laugh: [["laugh", 3], ["tease", 1.5], ["cool", 1], ["angry", 0.7], ["facepalm", 1], ["happy", 1], ["-", 1.2]],
@@ -342,16 +388,25 @@ const POOLS: Record<string, Pool> = {
   // the generic fallback, also when an answer is not in an owned pack
   other: [["laugh", 2], ["happy", 2], ["cool", 1.5], ["love", 1], ["hi", 1], ["-", 1.5]],
   // game events
-  capture: [["laugh", 3], ["cool", 3], ["tease", 3], ["champ", 2], ["crown", 2], ["party", 1], ["highfive", 1], ["happy", 1], ["-", 2]],
+  capture: [["t-sorry", 0.8], ["laugh", 3], ["cool", 3], ["tease", 3], ["champ", 2], ["crown", 2], ["party", 1], ["highfive", 1], ["happy", 1], ["-", 2]],
   captured: [["angry", 3], ["sob", 2], ["cry", 2], ["sad", 2], ["gasp", 2], ["wow", 1], ["confused", 1], ["facepalm", 2], ["laugh", 1], ["-", 2]],
   six: [["party", 2], ["cool", 2], ["happy", 2], ["cheer", 2], ["dice", 2], ["wow", 1], ["-", 3]],
-  finish: [["party", 2], ["happy", 2], ["love", 1], ["cheer", 2], ["crown", 2], ["champ", 2], ["highfive", 1], ["-", 1]],
+  finish: [["t-gg", 1.5], ["party", 2], ["happy", 2], ["love", 1], ["cheer", 2], ["crown", 2], ["champ", 2], ["highfive", 1], ["-", 1]],
   // a sad person: beaten by this ghost (cheeky or friendly answer) or just sad
   sadCheeky: [["cool", 2], ["tease", 2], ["laugh", 2], ["crown", 0.7], ["champ", 0.7], ["-", 1]],
-  sadFriendly: [["love", 2], ["hi", 1.5], ["happy", 0.8], ["highfive", 0.5], ["confused", 0.4], ["-", 1.2]],
+  sadFriendly: [["t-sorry", 0.8], ["love", 2], ["hi", 1.5], ["happy", 0.8], ["highfive", 0.5], ["confused", 0.4], ["-", 1.2]],
   // "ok, enough" at the end of spam
   enough: [["facepalm", 3], ["sleepy", 2]],
+  // phrases: answered in kind (a ghost's own text pack is Good Manners)
+  "t-gg": [["t-gg", 3], ["t-wp", 2], ["t-thx", 1], ["laugh", 1], ["-", 1]],
+  "t-luck": [["t-luck", 2], ["t-fun", 2], ["t-thx", 2], ["happy", 1], ["-", 1.5]],
+  "t-thx": [["love", 2], ["happy", 2], ["t-hi", 1], ["-", 1.5]],
+  "t-sorry": [["love", 1.5], ["laugh", 1.5], ["t-thx", 1], ["-", 1.5]],
+  "t-bye": [["t-bye", 4], ["t-gg", 2], ["love", 1], ["-", 1]],
 };
+POOLS["t-hi"] = POOLS.hi;
+POOLS["t-fun"] = POOLS["t-luck"];
+POOLS["t-wp"] = POOLS["t-gg"];
 for (const k of ["cry", "sad", "sob"]) POOLS[k] = POOLS.sadFriendly;
 POOLS.cheer = POOLS.highfive;
 POOLS.champ = POOLS.crown;
@@ -362,7 +417,7 @@ const LOSING = new Set(["cry", "sad", "facepalm", "sob", "flag"]);
 const GLOAT = new Set(["tease", "laugh", "cool", "champ", "crown"]);
 const SULK = new Set(["angry", "cry", "facepalm", "sob"]);
 const SOFT = new Set(["love", "happy", "hi"]);
-const SAD_IN = new Set(["cry", "sad", "sob"]);
+const SAD_IN = new Set(["cry", "sad", "sob", "bCry"]);
 
 const span = (r: readonly [number, number] | readonly number[], rng: Rng): number => r[0] + rng.randf() * (r[1] - r[0]);
 
@@ -416,13 +471,13 @@ export function ghostPool(trigger: GhostTrigger, persona: Persona, mem: GhostMem
   let base: Pool;
   if (trigger.kind === "emote") {
     if (SAD_IN.has(trigger.id)) base = gloat ? (rng.randf() < def.cheeky ? POOLS.sadCheeky : POOLS.sadFriendly) : rng.randf() < 0.6 ? POOLS.sadFriendly : POOLS.sadCheeky;
-    else base = POOLS[trigger.id] ?? POOLS.other;
-  } else if (trigger.kind === "open") base = [["hi", 5], ["happy", 1.5], ["cool", 0.5]];
+    else base = POOLS[CORE_OF[trigger.id] ?? trigger.id] ?? POOLS.other;
+  } else if (trigger.kind === "open") base = [["hi", 5], ["t-hi", 3], ["t-luck", 2], ["t-fun", 1], ["happy", 1.5], ["cool", 0.5]];
   else base = POOLS[trigger.kind];
   const weigh = (pool: Pool): Array<[string, number]> => {
     const out: Array<[string, number]> = [];
     for (const [id, w0] of pool) {
-      if (id === "-" || !owned.has(id) || mem.last.includes(id)) continue;
+      if (id === "-" || !owned.has(id) || mem.last.includes(dressed(id, owned))) continue;
       let w = w0 * (def.bias[id] ?? 1);
       if (winning && WINNING.has(id)) w *= 2.2;
       if (winning && LOSING.has(id)) w *= 0.4;
@@ -469,7 +524,7 @@ export function ghostEmoteReply(sit: GhostSituation, persona: Persona, mem: Ghos
   const def = PERSONA_DEFS[persona];
   const always = (sit.chance ?? -1) >= 1;
   const gate = (p: number): boolean => always || (sit.chance === undefined ? rng.randf() < p : rng.randf() < p * sit.chance);
-  const owned = new Set([...EMOTE_PACKS.starter, ...(EMOTE_PACKS[pack] ?? [])]);
+  const owned = new Set([...EMOTE_PACKS.starter, ...EMOTE_PACKS.basic, ...(EMOTE_PACKS[pack] ?? [])]);
   const reply = (cands: Array<[string, number]>, delayMs: number): { id: string; delayMs: number } | null => {
     const real = cands.filter(([id]) => id !== "-");
     if (!real.length) return null;
@@ -481,8 +536,9 @@ export function ghostEmoteReply(sit: GhostSituation, persona: Persona, mem: Ghos
     if (mem.sent.length >= E.maxPerWindow) return null;
     if (mem.sent.some((t) => Math.abs(at - t) < Math.max(E.minGap, def.gap) * k)) return null;
     mem.sent.push(at);
-    mem.last = [...mem.last, id].slice(-3);
-    return { id, delayMs };
+    const shown = dressed(id, owned);
+    mem.last = [...mem.last, shown].slice(-3);
+    return { id: shown, delayMs };
   };
   const delay = (own: boolean): number => {
     let d = span(E.delay, rng);
@@ -564,6 +620,6 @@ export function ghostEmoteReply(sit: GhostSituation, persona: Persona, mem: Ghos
   }
 
   function weighEnough(): Array<[string, number]> {
-    return POOLS.enough.filter(([id]) => owned.has(id) && !mem.last.includes(id)).map(([id, w]) => [id, w * (def.bias[id] ?? 1)] as [string, number]);
+    return POOLS.enough.filter(([id]) => owned.has(id) && !mem.last.includes(dressed(id, owned))).map(([id, w]) => [id, w * (def.bias[id] ?? 1)] as [string, number]);
   }
 }

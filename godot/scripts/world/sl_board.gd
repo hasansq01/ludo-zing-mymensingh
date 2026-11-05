@@ -572,7 +572,7 @@ func setup_players(colors: Array, skins: Array = []) -> void:
 		rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		var ring := MeshKit.put(g, ring_mesh, rm, Vector3(0, 0.03, 0), Vector3.ZERO, Vector3.ONE, false)
 		ring.visible = false
-		var t := {node = g, mat = m, ring = ring, target = wait_spot(pi), scale = PAWN_SCALE * WAIT_SCALE, anim = false, pos = 0,
+		var t := {node = g, mat = m, look = look, ring = ring, target = wait_spot(pi), scale = PAWN_SCALE * WAIT_SCALE, anim = false, pos = 0,
 			skin = Catalog.pawn(skin).get("id", Catalog.FREE_PAWN), over = float(look.top) - PawnSkins.CLASSIC_TOP}
 		g.position = t.target
 		g.scale = Vector3.ONE * float(t.scale)
@@ -699,6 +699,7 @@ func _process(delta: float) -> void:
 			var s: float = g.scale.x + (float(t.scale) - g.scale.x) * ks
 			g.scale = Vector3(s, s, s)
 			PawnSkins.face(g, self, cam)                # the skin's front towards the camera
+			PawnSkins.pose(t.look, PawnSkins.top_k(cam))    # a face looks up in Top View
 		PawnSkins.animate(t.mat, now, still)
 		var on := pi == current
 		t.ring.visible = on

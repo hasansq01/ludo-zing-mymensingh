@@ -196,6 +196,8 @@ func start(players_: Array, teams_ := false, opts_ := {}) -> void:
 			if players[c] == "human" and str(nm[c]) != "":
 				s.names[c] = str(nm[c])
 	await _open(s, true)
+	if hud and hud.get("emotes") != null:
+		hud.emotes.react_start([0, 1, 2, 3].filter(func(k): return LudoRules.active(S, k)))
 
 ## The guided first match (Tutorial): you vs one Easy computer on a staged board with scripted dice and coach
 ## marks. `then`: where "Play a real game" leads afterwards ("cpu": a game vs the computer; "local": the Pass &

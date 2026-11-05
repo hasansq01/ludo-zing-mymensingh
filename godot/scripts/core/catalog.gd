@@ -11,8 +11,9 @@ extends RefCounted
 
 ## Names that are plain words, shown through L10n.t (the rest, Crema / Espresso / Pawn Pals ..., stay English). A new
 ## item table only needs its plain names added here (or `## l10n-keys: name` when all its names are translated).
-const _NAMES := ["Classic", "Royal Gold", "Starter Set", "Friends Set", "Game Set", "Gold Trim", "Marble", "Kitty Ears",  # l10n
-	"Teacup", "Glitter", "Royal Crown", "Chess Knight"]  # l10n
+const _NAMES := ["Classic", "Royal Gold", "Pawn Set", "Girl Set", "Boy Set", "Party Pack", "Champion Pack", "Good Manners", "Ludo Talk", "Reactions", "Bangla", "Gold Trim", "Marble", "Kitty Ears",  # l10n
+	"Teacup", "Glitter", "Royal Crown", "Chess Knight", "Candy Pop", "Fruity", "Blossom", "Ice Crystal", "Pirate", "Robo Bot",  # l10n
+	"Little Wizard", "Space Explorer", "Dragon"]  # l10n
 ## l10n-keys: desc
 
 ## Dice skins (SKINS): body, edge shade, pips, the single pip of the 1. Classic is free and always owned.
@@ -22,14 +23,27 @@ const DICE := [
 	{id = "espresso", name = "Espresso", price = 2500, bg = Color("#4a2c1a"), edge = Color("#2a170c"), pip = Color("#f3e3cc"), one = Color("#f2b632")},
 	{id = "gold", name = "Royal Gold", price = 6000, bg = Color("#f6c945"), edge = Color("#c99a1c"), pip = Color("#3a2400"), one = Color("#b3261e")},
 ]
-## Emote packs (server/EMOTES.md): six animated stickers each. Starter is free and always owned. The art and the
-## emotes' display names come from assets/emotes/emotes.json (EmoteArt); these rows are the economy's source.
+## Emote packs (server/EMOTES.md): the Pawn, Girl and Boy sets hold the same six emotions (happy, laugh, cry, angry,
+## shocked, love) drawn as that character; the two Premium packs hold eight extras each. The Pawn Set is free and always
+## owned. The ids go back to the first packs, so purchases carry over (friends was the Friends Set, pawns Pawn Pals, game
+## the Game Set). The art and the emotes' display names come from assets/emotes/emotes.json (EmoteArt); these rows are the
+## economy's source.
 const EMOTE_PACKS := [
-	{id = "starter", name = "Starter Set", price = 0, emotes = ["happy", "laugh", "cool", "angry", "love", "party"]},
-	{id = "pawns", name = "Pawn Pals", price = 2500, emotes = ["champ", "sleepy", "sob", "gasp", "confused", "hi"]},
-	{id = "friends", name = "Friends Set", price = 4000, emotes = ["cry", "wow", "facepalm", "cheer", "think", "tease"]},
-	{id = "game", name = "Game Set", price = 3500, emotes = ["dice", "crown", "highfive", "flag", "sad", "peek"]},
+	{id = "starter", name = "Pawn Set", price = 0, emotes = ["happy", "laugh", "sob", "angry", "gasp", "love"]},
+	{id = "friends", name = "Girl Set", price = 2500, emotes = ["cheer", "gLaugh", "cry", "gAngry", "gShock", "gLove"]},
+	{id = "boys", name = "Boy Set", price = 2500, emotes = ["bHappy", "bLaugh", "bCry", "grr", "wow", "bLove"]},
+	{id = "pawns", name = "Party Pack", price = 5000, premium = true, emotes = ["party", "cool", "tease", "hi", "highfive", "confused", "facepalm", "sad"]},
+	{id = "game", name = "Champion Pack", price = 5000, premium = true, emotes = ["crown", "champ", "dice", "peek", "think", "hmph", "flag", "sleepy"]},
 ]
+## Text emotes: short fixed phrases, nothing is typed, so nothing rude can be sent. Packs of 8, one equipped; Good Manners
+## is free and always owned. TEAM_PHRASES join the picker's Text tab in Pair Mode (free, not sold).
+const TEXT_PACKS := [
+	{id = "basic", name = "Good Manners", price = 0, emotes = ["t-hi", "t-luck", "t-fun", "t-gg", "t-wp", "t-thx", "t-sorry", "t-bye"]},
+	{id = "ludo", name = "Ludo Talk", price = 3000, emotes = ["t-six", "t-nice", "t-lucky", "t-again", "t-revenge", "t-safe", "t-pair", "t-home"]},
+	{id = "react", name = "Reactions", price = 3000, emotes = ["t-wow", "t-oops", "t-close", "t-hurry", "t-wait", "t-turn", "t-easy", "t-nooo"]},
+	{id = "bangla", name = "Bangla", price = 3000, emotes = ["t-bgg", "t-bluck", "t-bsix", "t-bcome", "t-bagain", "t-bwon", "t-bthx", "t-bugh"]},
+]
+const TEAM_PHRASES := ["t-help", "t-go", "t-got", "t-partner"]
 ## Pawn skins (owner 2026-10-31, "shapes + finishes"): a new shape (a crown, cat ears, a chess knight, a teacup) or a
 ## new finish (gold trim, marble, glitter) for every one of a player's pawns, in Ludo and Snakes & Ladders alike, and
 ## seen by everyone at an online table. The seat colour (Palette.PLAYER) stays each pawn's main colour, so players
@@ -40,14 +54,24 @@ const EMOTE_PACKS := [
 const PAWNS := [
 	{id = "classic", name = "Classic", price = 0, desc = "The glossy pawn every game starts with."},
 	{id = "trim", name = "Gold Trim", price = 2000, desc = "Gold bands at the foot, the waist and the collar."},
+	{id = "candy", name = "Candy Pop", price = 2500, desc = "Candy stripes and a sprinkled cupcake top."},
+	{id = "fruity", name = "Fruity", price = 2500, desc = "Strawberry, watermelon, orange, blueberry."},
+	{id = "blossom", name = "Blossom", price = 2500, desc = "A flower for a head and a leafy vine."},
 	{id = "marble", name = "Marble", price = 3500, desc = "Polished stone with soft white veins."},
+	{id = "ice", name = "Ice Crystal", price = 3500, desc = "A crystal pawn crowned with shards."},
+	{id = "pirate", name = "Pirate", price = 3500, desc = "A tricorn, an eye patch, a bandana and a belt."},
+	{id = "robo", name = "Robo Bot", price = 4000, desc = "A little robot with a white head and glowing eyes."},
+	{id = "wizard", name = "Little Wizard", price = 4000, desc = "A robe, a scarf and a big starry hat."},
 	{id = "kitty", name = "Kitty Ears", price = 5000, desc = "Two pointy cat ears, pink inside."},
+	{id = "space", name = "Space Explorer", price = 5000, desc = "A space suit and a big visor helmet."},
 	{id = "teacup", name = "Teacup", price = 6000, desc = "A cup on its saucer, frothy on top."},
+	{id = "dragon", name = "Dragon", price = 6000, desc = "Gold horns, scales and little wings."},
 	{id = "glitter", name = "Glitter", price = 0, gems = 80, desc = "Sparkles all over that catch the light."},
 	{id = "crown", name = "Royal Crown", price = 0, gems = 120, desc = "A small gold crown with a jewel in your colour."},
 	{id = "knight", name = "Chess Knight", price = 0, gems = 150, desc = "A horse's head on a turned base, like the chess piece."},
 ]
 const FREE_EMOTES := "starter"
+const FREE_TEXT := "basic"
 const FREE_DICE := "classic"
 const FREE_PAWN := "classic"
 const FREE_ROOMS := ["night", "cafe"]
@@ -106,6 +130,12 @@ static func emote_pack(id: String) -> Dictionary:
 			return e
 	return {}
 
+static func text_pack(id: String) -> Dictionary:
+	for e: Dictionary in TEXT_PACKS:
+		if e.id == id:
+			return e
+	return {}
+
 
 # ---------- the player's things ----------
 
@@ -159,6 +189,15 @@ static func emotes_in_use() -> String:
 ## Owned emote packs in catalogue order (Starter first).
 static func owned_emote_packs() -> Array:
 	return EMOTE_PACKS.filter(func(e: Dictionary) -> bool: return owns_emotes(e.id))
+
+static func owns_text(id: String) -> bool:
+	if text_pack(id).is_empty():
+		return false
+	return id == FREE_TEXT or _list(profile(), "text_packs").has(id)
+
+static func text_in_use() -> String:
+	var e := str(profile().get("text_pack", ""))
+	return e if owns_text(e) else FREE_TEXT
 
 static func room_in_use() -> String:
 	var r := str(profile().get("room", ""))
@@ -284,6 +323,35 @@ static func equip_emotes(id: String) -> bool:
 	if str(profile().get("emote_set", "")) == id:
 		return true
 	return _commit(func(p: Dictionary) -> void: p.emote_set = id)
+
+## Buys a text pack and equips it. "" when bought, else the reason (nothing changed then).
+static func buy_text(id: String, equip := true) -> String:
+	var e := text_pack(id)
+	if e.is_empty():
+		return L10n.t("That emote pack isn’t in the shop.")
+	if owns_text(id):
+		return L10n.t("You already own %s.") % L10n.t(e.name)
+	var price := int(e.price)
+	if coins() < price:
+		return need_text(price - coins())
+	var ok := _commit(func(p: Dictionary) -> void:
+		p.coins = int(p.get("coins", 0)) - price
+		var owned := _list(p, "text_packs")
+		if not owned.has(FREE_TEXT):
+			owned.insert(0, FREE_TEXT)
+		owned.append(id)
+		p.text_packs = owned
+		if equip:
+			p.text_pack = id)
+	return "" if ok else L10n.t(SAVE_FAILED)
+
+## Equips an owned text pack. False when it isn't owned (or the save failed); true when it is in use now.
+static func equip_text(id: String) -> bool:
+	if not owns_text(id):
+		return false
+	if str(profile().get("text_pack", "")) == id:
+		return true
+	return _commit(func(p: Dictionary) -> void: p.text_pack = id)
 
 ## Puts an owned room in use. False when it isn't owned (or the save failed); true when it is in use now.
 static func equip_room(id: String) -> bool:

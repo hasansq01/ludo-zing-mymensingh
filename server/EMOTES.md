@@ -1,27 +1,47 @@
 # Emotes: shared contract (2026-10-25)
 
-Ported from the web version on `origin/feature/emotes` (index.html `EMOTES`, `EMOTE_SETS`, `Emotes`). 24 animated
-stickers in 4 packs of 6. Commits go to main; the branch is ported, not merged.
+Ported from the web version on `origin/feature/emotes` (index.html `EMOTES`, `EMOTE_SETS`, `TEXT_PACKS`, `Emotes`), redone
+2026-11-04 after that branch's character sets and text emotes. 34 animated stickers in 5 packs, 36 phrases in 4 text packs
+and a team list. Commits go to main; the branch is ported, not merged.
 
 ## Ids
 | pack id | name | price | emotes (in order) |
 |---|---|---|---|
-| `starter` | Starter Set | 0 (free, owned + equipped by default) | happy, laugh, cool, angry, love, party |
-| `pawns` | Pawn Pals | 2,500 | champ, sleepy, sob, gasp, confused, hi |
-| `friends` | Friends Set | 4,000 | cry, wow, facepalm, cheer, think, tease |
-| `game` | Game Set | 3,500 | dice, crown, highfive, flag, sad, peek |
+| `starter` | Pawn Set | 0 (free, owned + equipped by default) | happy, laugh, sob, angry, gasp, love |
+| `friends` | Girl Set | 2,500 | cheer, gLaugh, cry, gAngry, gShock, gLove |
+| `boys` | Boy Set | 2,500 | bHappy, bLaugh, bCry, grr, wow, bLove |
+| `pawns` | Party Pack (Premium) | 5,000 | party, cool, tease, hi, highfive, confused, facepalm, sad |
+| `game` | Champion Pack (Premium) | 5,000 | crown, champ, dice, peek, think, hmph, flag, sleepy |
 
-Display names come from the branch's `EMOTES` table (Victory = happy, Celebrate = party, Shocked = wow, Yay! = cheer,
-Thinking = think, Roll it! = dice, Winner = crown, Give up = flag, Disappointed = sad, Peek-a-boo = peek, …); the
-manifest `godot/assets/emotes/emotes.json` is the source of truth for names, frames and fps.
+The three character sets hold the same six emotions in the same order. Ids go back to the first packs, so purchases carry over.
+
+| text pack id | name | price | phrases |
+|---|---|---|---|
+| `basic` | Good Manners | 0 (free, owned + equipped by default) | t-hi, t-luck, t-fun, t-gg, t-wp, t-thx, t-sorry, t-bye |
+| `ludo` | Ludo Talk | 3,000 | t-six, t-nice, t-lucky, t-again, t-revenge, t-safe, t-pair, t-home |
+| `react` | Reactions | 3,000 | t-wow, t-oops, t-close, t-hurry, t-wait, t-turn, t-easy, t-nooo |
+| `bangla` | Bangla | 3,000 | t-bgg, t-bluck, t-bsix, t-bcome, t-bagain, t-bwon, t-bthx, t-bugh |
+| `team` | (Pair Mode only, free, not sold) | - | t-help, t-go, t-got, t-partner |
+
+Fixed phrases only: nothing is typed, so nothing rude can be sent. A phrase is a sticker too (group "text"; the picker writes
+its words, the bubble shows the sticker) and is English or Bangla in every language. The manifest
+`godot/assets/emotes/emotes.json` is the source of truth for names, frames, fps and shared sounds (`sound`).
+
+## Games from before these packs (v14, v15)
+They carry the first four packs in their own manifest and catalogue. Until `min_online` passes them, the server: accepts an
+emote from its old pack too (`LEGACY_EMOTE_PACKS`, `emotePacksAllowing`), and charges the prices they show when a buy has no
+`catalog: 2` (`LEGACY_EMOTE_PRICES`). An emote they don't know is skipped quietly on their side. **Deploy the server before
+any game with these packs ships**: an older server refuses the new ids.
 
 ## Art (EMO-ART)
-`godot/assets/emotes/<id>/NNN.webp` frames + `icon.webp`, manifest `emotes.json`; `EmoteArt` (scripts/ui/emote_art.gd):
+Captured from the web page by `tools/capture-emotes.mjs`. `godot/assets/emotes/<id>/NNN.webp` frames + `icon.webp`, manifest `emotes.json`; `EmoteArt` (scripts/ui/emote_art.gd):
 `frames(id) -> SpriteFrames`, `icon(id) -> Texture2D`, `manifest() -> Dictionary`.
 
 ## Profile (game Save.profile and the server profile, same keys)
 - `emote_sets: Array[String]` owned packs, always includes `"starter"`.
-- `emote_set: String` equipped pack (default `"starter"`). Only the equipped pack's 6 emotes appear in the picker.
+- `emote_set: String` equipped pack (default `"starter"`). Only the equipped pack's emotes appear in the picker.
+- `text_packs: Array[String]` owned text packs, always includes `"basic"`; `text_pack: String` equipped (default `"basic"`):
+  the picker's Text tab, plus the team phrases in Pair Mode. Buy / equip with `kind: "text"`.
 - Buy / equip through the server wallet: `POST /v1/shop/buy {kind: "emotes", id: <pack>}`,
   `POST /v1/shop/equip {kind: "emotes", id: <pack>}` (buy also equips, like other items).
 - GDScript helper (E-SHOP): `scripts/core/emotes.gd` class `Emotes`: `packs() -> Array` (manifest order),
@@ -32,7 +52,7 @@ manifest `godot/assets/emotes/emotes.json` is the source of truth for names, fra
 - Client → server: `{t: "emote", id}` (any time during a match; also in the lobby is fine).
 - Server → others (not the sender): `{t: "emote", c, id}` where `c` = the sender's colour (lobby: `c` = -1 and
   `member` = id). The sender shows its own reaction locally at once.
-- Server checks: the member's account owns the pack containing `id` (starter always), and a rate limit of 1 emote per
+- Server checks: the member's account owns the pack containing `id` (starter, basic and team always), and a rate limit of 1 emote per
   2 s and 6 per 30 s per member; violations → `{t: "error", code: "emote_locked" | "emote_rate"}` (clients ignore
   quietly). Emotes never touch game state, `n` or the hash.
 - Quick-match ghosts react like people: see "Ghost behaviour" below. Indistinguishable from a person's emote.
@@ -46,7 +66,7 @@ is `{t:"emote", c, id}` exactly like a person's; persona and memory are never se
   emote (about 5%, at most once per match per other ghost); an opening "hi" early in the match (once, chatty and
   friendly only).
 - Replies come from a weighted pool per incoming emote or event (including a "no reply" weight), restricted to the
-  packs the ghost owns (starter + one paid; falls back to a generic pool inside the owned packs), never one of its last
+  packs the ghost owns (starter + Good Manners + one paid, a character set's owner reacting as that character; falls back to a generic pool inside the owned packs), never one of its last
   3 emotes. Sad emotes (cry, sad, sob) get a cheeky or a friendly answer, by personality, cheeky after the ghost just
   captured someone.
 - Situation: ahead in the race (progress lead > 8%) boosts cool/tease/crown/laugh/champ/party, behind boosts
@@ -75,7 +95,7 @@ is `{t:"emote", c, id}` exactly like a person's; persona and memory are never se
 `godot/assets/audio/emotes/<id>.ogg|wav`. Callers guard with `has_method`.
 
 ## In-game (E-HUD)
-Picker button above your avatar, picker panel at the left of the board (equipped pack, 6 cells, 2 s cooldown after a
-send), reactions pop beside the sender's dice/avatar (≈2.4 s, queue of 2 per player), in Ludo and S&L, 3D and Top
-view, all seat positions. Offline: computer players react (capture / being captured / win), throttled (9 s per CPU,
+Picker button above your avatar, picker panel at the left of the board (two tabs: Stickers, the equipped pack; Text, the
+equipped text pack; 2 s cooldown after a send), reactions pop beside the sender's dice/avatar (≈2.4 s, queue of 2 per player), in Ludo and S&L, 3D and Top
+view, all seat positions. Offline: computer players react (the start of a game / capture / being captured / win, stickers and phrases), throttled (9 s per CPU,
 4 s overall, never the same twice running). Pass & Play: the sender is the player to move.
