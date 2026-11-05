@@ -11,6 +11,15 @@ Update both files when a significant decision, feature or bug fix lands. Last re
 ## What it is
 A mobile-first 3D Ludo game for the browser, played on a round table inside a cozy room (four room themes). Built entirely with Claude.
 Targets: YouTube Playables (main) and static hosting. Live: https://ludo-king-mymensingh.pages.dev
+**Website deploys are automatic (2026-11-04, after the user repeatedly found new features missing from the live site,
+which only changed when someone uploaded the zip by hand):** `.github/workflows/deploy-web.yml` builds with
+`tools/build.ps1` on every push that touches the web game and publishes `dist/` with `wrangler pages deploy`:
+`main` → https://ludo-king-mymensingh.pages.dev, other branches → `https://<branch>.ludo-king-mymensingh.pages.dev`.
+Needs the repository secrets `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` (setup in README).
+A feature is live only once its branch is merged into `main` (or on its branch link). The build stamps
+`<meta name="ludo-build">` (branch · commit · date; `LUDO_BUILD` or git), shown in Settings › Account › Version
+(`#setBuild`, hidden on the source page). The Android app is a separate Godot build (`godot/`) with its own catalogue
+(e.g. its own pawn skins): web features don't reach it by themselves.
 (Cloudflare Pages, free plan, project `ludo-king-mymensingh`, deployed by uploading the build zip).
 
 ## Android / Godot port (started 2026-10-23)
@@ -54,7 +63,7 @@ release (12-tester closed test for 14 days).
   no tone mapping (keeps pastels clean); moderate light levels instead. No post-processing: "bloom" is additive soft sprites.
 - Fonts: Lilita One (display), Nunito (body), Orbitron 700 (no longer used since the splash logo became the supplied SVG; still in the font list).
 - Board, walls, rugs, skies, posters and latte art are drawn on canvas textures. Rounded furniture uses `rbox()` (bevelled
-  extrusion with smoothed normals). Dice is a CSS 3D cube, not WebGL. No image assets are needed.
+  extrusion with smoothed normals). Dice is a CSS 3D cube, not WebGL. Dice motion (flicker fix 2026-11-04, user report of a fast flick on rolls and "without reason"): the waiting pulse animates the `scale` property (`diceNudge`), the roll hop `translate` and eases `scale` down from the pulse size captured on the tap (`curScale` → `--s0`, `diceHop`), so a tap mid-pulse no longer snaps 112% → 100% in one frame (measured before: 1.087 → 1.000); when the dice moves to the next player's card (every turn, CPUs too) it pops in (`.arrive`, `diceArrive` .24 s opacity + scale), hiding the frame a re-attached 3D element can show; the TAP label is no longer re-attached on every HUD update (that restarted it); `.cube` has `will-change:transform`. The S&L dice uses the same keyframes. The local server (`.claude/launch.json`) sends `Cache-Control: no-store`, so switching branches never shows a cached old game. No image assets are needed.
 - Sound (2026-10-20): `Sound` module, Web Audio, everything synthesised (no audio files). Graph: voices -> effects bus /
   music bus -> master -> x1.6 makeup -> limiter (DynamicsCompressor, -6 dB, 12:1) -> speakers. Started by the first
   pointerdown / keydown (browser autoplay rules). It goes quiet (master gain 0, music stopped; never a context
@@ -83,6 +92,10 @@ release (12-tester closed test for 14 days).
 | `tests/snakes-ladders.js` | 46 Snakes & Ladders tests (board data, landing rule, real turns with forced dice, rewards); source page with `?vt=1`. |
 | `tests/team-rules.js` | 28 Pair Mode (teams) + Free Hand tests, partly with real forced rolls; run on the source page with `?vt=1` (no saving). |
 | `tests/daily-rewards.js` | 32 Daily Reward tests; source page with `?vt=1`. |
+| `tests/emotes.js` | 89 emote tests (incl. text emotes: 4 packs of 8 + team phrases, phrase stickers, picker Text tab, Pair Mode team phrases, CPU start line, pack buy / refuse / save / equip / repair; incl. the 16 required reactions, 5 sets: Pawn / Girl / Boy with the same 6 core emotions (one character each, real Angry in each) and 2 Premium packs of 8 extras, the 8-emote picker on screen, sticker art on the 172x109 grid, unique clip ids, tap sizes, left-side picker placement + animation, set buy / refuse / equip / save / Inventory / View) (button placement vs cards / HUD, panel open / close, bubbles on avatars, queue, no overlaps, Top View, CPU reactions + throttle, Pass & Play sender, game state untouched); source page with `?vt=1`, after the splash. |
+| `tests/demo.js` | 15 demo-mode tests (everything owned and priced 0, Shop has no enabled Buy / prices / Locked tags, Dice tab still lists the dice, Collection fully unlocked, profile repair keeps everything owned); source page with `?vt=1&demo=1`, after the splash. |
+| `tests/pawn-skins.js` | 48 pawn skin tests (themed skins have their own bodies) (12 skins x 4 colours build; base at y 0, inside the Classic footprint (also with Top View heads tipped back), Top View tilt / upright faces / taps, 3D View untouched, height 0.9–1.3, body in the player colour, < 3,600 triangles; swapping never changes state / layout / rings; shared geometry + materials; pickables; facing; real moves for all colours, canvas taps pick the right pawn, stacks + pairs lay out exactly like Classic, captures, Pair Mode; buy / refuse / no double charge / save / Shop + Inventory tabs / Compare all / profile repair); source page with `?vt=1`, visible pane, after the splash. |
+| `tests/avatars.js` | More-characters avatar tests (12 avatars, free, unique, no origin labels, draw cleanly; original characters unchanged; Edit Profile grid + save, one Collection group + equip, home chip and game card, no avatar maker); source page with `?vt=1`. |
 | `tests/shop-preview.js` | 42 Shop preview tests (cards, camera, buy / insufficient / no double charge / use, restore on close, fallback + retry); source page with `?vt=1`, after the splash. |
 | `tests/info-icons.js` | 40 feature-info (ⓘ) tests: placements, explanations vs rule code, pulse / read state, tap area, keyboard, dismissal; source page with `?vt=1`. |
 | `vendor/` | Downloaded three.js + font files, reused by the build. |
@@ -90,7 +103,7 @@ release (12-tester closed test for 14 days).
 | `firebase/firestore.rules`, `firebase/SETUP.md` | Firestore security rules for player progress; the manual Firebase / Google / Facebook setup steps. |
 | `submission/` | YouTube Playables submission kit (`SUBMISSION.md`, two screenshots). |
 | `README.md` | Build, test and deploy commands. |
-| `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). |
+| `.gitignore`, `.gitattributes` | Git (since 2026-10-22, branch `main`): ignores regenerated output (`dist/`, `*.zip`, `tests/visual/output/`) and any secrets / keys / `.env`; keeps every text file LF on checkout (the build and deploy checks compare exact bytes). Git used: the one bundled with GitHub Desktop (`%LOCALAPPDATA%\GitHubDesktop\app-*\resources\app\git\cmd\git.exe`); no `gh` CLI. Commits are made only after the user approves; pushing is done in GitHub Desktop (Push origin). Team workflow (since 2026-10-24): all updates are committed on the shared working branch `feature/emotes`, never directly on `main`; they reach `main` through pull requests on GitHub (PR #1). |
 | `godot/`, `tools/godot-test.sh` | The Godot 4.7 Android version (rules + tests so far) and its headless test runner. See `godot/README.md`. |
 | `build/`, `ludo-royale-web.zip` | Obsolete early build; not used. |
 
@@ -136,6 +149,11 @@ release (12-tester closed test for 14 days).
   `Store.replace()` / `reloadSaved()` swap the whole profile.
 - **Pause:** pause menu (Resume, Restart, Settings, Exit to home with a second-tap confirm). Outside YouTube, hiding the
   tab opens it (`visibilitychange`); inside YouTube only the SDK pauses. Timers (`wait`) count only unpaused time.
+- **Snakes & Ladders scene moods (2026-11-06, ported from the Android app's final "bright and joyful" pass):** each scene
+  in `SCENES` has the Godot values for sky, fog, light, ground and clearing, plus `sunDir` (the sun light's position),
+  `halo` [colour, x, y, size, strength] (a soft additive glow far behind the scene, z -42) and `stars` (enchanted only,
+  60, seeded). Built by `skyMood(T)` in `buildWorld`. Snake Trail keeps its own look (the Android app dropped it). The
+  Android app's warm corner vignette is not ported.
 - **Snakes & Ladders 3D gameplay (2026-10-21):** matches are played on the jungle scene's table (`Jungle.play(true)`):
   the table stops turning, the sign, the coiled-snake tree and the two decor pawns hide, 3D glossy pawns (with contact
   shadows and a pulsing ring under the current player) follow SL's own per-player xy / lift mapped onto the 3D board,
@@ -165,6 +183,121 @@ release (12-tester closed test for 14 days).
   `dailyState()` decides; `claimDaily()` writes via `commitProfile` after re-reading the stored profile. Limitation:
   local only (browser storage or the signed-in account's sync / YouTube cloud save); the device clock decides the day.
   Tests: `tests/daily-rewards.js` (32).
+- **Emotes (Ludo games, 2026-10-24; sticker style approved the same day):** 24 2D stickers matched to the user's
+  reference sheet. Each sticker carries its own cream speech bubble (dark outline, tail left) on a 172x109 viewBox
+  (`stSticker`); the character pops out over its top edge and is cut at its bottom. Kit: `stSil` (merged silhouette:
+  outline pass + fill), `stShade` (clipped cel shading), `stTube` / `stArm`, hands (`stFist`, `stPalm`, `stThumb`,
+  `stPoint`), a face kit (`STE` eyes / `STB` brows / `STM` mouths, `stFace` over `{l,r,y,m,cx}`), accents (`stShards`,
+  `stHeart`, `stStar`, `stDrop`, `stZ`, `stQ`, `stAnger`, `stBang`, `stConfetti`), and three bases: `stPawn` (four
+  colours, `ST_PAL`), `stHijab` (any scarf colour) and `stBoy` (jacket colour). `EMOTE_STICKERS[id]` holds the art;
+  `EMOTES` maps id/name/motion onto it. `emArt(e)` makes the clip-path ids unique per copy on the page (use it wherever
+  a sticker is inserted). Reactions: Victory, Laugh, Cool, Angry, Love, Confused, Hi!, Celebrate, Sob, Gasp,
+  Champ (pawns); Cry, Shocked, Facepalm, Yay! (`cheer`, the approved yellow-hijab sticker; replaced Clap), Tease,
+  Grr! (hoodie boy fuming), Hmph! (purple-hijab girl, arms crossed) (friends; Grr! / Hmph! added 2026-11-03); Roll it!,
+  Winner, Disappointed, High five, Give up, Peek-a-boo (game). Sleepy and Thinking were retired from the sets on
+  2026-11-03 (art kept in `EMOTE_STICKERS`). In-game bubble: the sticker
+  (100x63.5) on the sender's avatar with a thin glow in their colour. Picker cells 72x50 (`CW` / `CH` in `placePanel`).
+  **Animation (Clash-style):** parts are `<g class="sa-…">` groups (`stPart`): `sa-char` + a mood class wraps the
+  character (built in by `stPawn` / `stHijab` / `stBoy`, `mood` option), `stArm` wraps arms in `sa-arm` (pivot = the
+  path's start, swing by hand kind), `stFace` wraps eyes / mouths (`ST_EYEMOVE`, `ST_TALK`), accents wrap themselves
+  (`sa-beat`, `sa-twinkle`, `sa-drip`, `sa-rise`, `sa-wobble`, `sa-throb`, `sa-pop`, `sa-burst`); game objects use
+  `sa-roll`, `sa-hop`, `sa-crack`, `sa-clap`, `sa-bob`, `sa-wave`, `sa-peek`. All keyframes live in the "sticker
+  animation" CSS block (reduced motion stops them). Stickers with parts get `em-alive` instead of a whole-sticker
+  motion. Reactions pop in (`emPop`, small bounce) at `spot(c)`: beside the sender's dice on the inner side, just
+  above the card row (below it for the top players), each on its own half of the screen and clear of the emote button,
+  sized by `bubbleW()` (84-116px, smaller only if it cannot fit); life `LIFE` 2.4s, fading with `emOut`; the picker
+  cools down 2s after a send (`cool()`, `.cooling`). The emote button (`place()`) sits just above your avatar (HUD
+  row if no room): a cream chat bubble, thin warm-brown outline, three dots, no background.
+  **Sets (by character, 2026-11-04; user's request, replaces the mood-balanced sets of 2026-11-03):** every
+  character set holds the same six core emotions in the same order and with the same names (`EMOTE_FEELS`: Happy, Laugh,
+  Cry, Angry, Shocked, Love; an emote's `feel`, names from `FEEL_NAMES`), drawn as one character: Pawn Set `starter`
+  (free, default; pawn art), Girl Set `friends` 2,500 (hijab girl: Yay art as Happy, new `gLaugh`, Cry, new `gAngry`,
+  `gShock`, `gLove`), Boy Set `boys` 2,500 (hoodie boy: new `bHappy`, `bLaugh`, `bCry`, Grr art as Angry, Shocked art,
+  new `bLove`). Every other emote is an extra in a Premium pack of 8 (`premium: true`, gold "Premium" tag on the card):
+  Party Pack `pawns` 5,000 (Celebrate, Cool, Tease, Hi!, High five, Confused, Facepalm, Heartbroken) and Champion Pack
+  `game` 5,000 (Winner, Champ, Roll it!, Peek-a-boo, Thinking, Hmph!, Give up, Sleepy; Thinking and Sleepy are back).
+  Ids kept, so saved purchases still work (old Cheeky Set owners now own the Girl Set, Party Set owners the Party Pack,
+  Champion Set owners the Champion Pack). 34 emotes, each in exactly one set. Pack cards preview 2x4 (`.emset-prev.eight`).
+  The in-game picker holds the equipped set's 6 or 8 emotes. Profile:
+  `P.emoteSets` (always incl. starter), `P.emoteSet` (equipped; `ensureProfile` repairs). Only the equipped set is in the
+  game picker (`Emotes.refresh()` on each `reset()` / set change). Shop > Emotes and Inventory > Emotes (`renderEmoteSets`):
+  card = 2x3 preview of the set, Equipped / Owned / Locked tag, View + Buy / Use; `buyEmoteSet` (commitProfile; owns +
+  equips; refuses without coins / when owned) / `useEmoteSet`; View = `#emSetSheet` (`openEmoteSet`): the six emotes big,
+  each playing its motion, with Buy / Use. Picker: a slim panel along the left edge of the board, vertically centred in
+  the band between the top and bottom player cards (1 column; 2 or 3 when the band is short, e.g. 320x568 and the
+  landscape frame), popping out from the left (slide + scale + fade, buttons staggered by `--i`), closing with a quick
+  fade (`.closing`, then hidden after 170ms).
+  `EMOTES` entries: id, group, name, emoji fallback (ch), motion class, art; all
+  free, `owned()` is the hook for a future shop; `Emotes` is defined before the HUD code. `#emoteBtn` is placed by
+  `Emotes.place()` (from `buildCards` and on resize): level with your dice between the bottom cards, else just below
+  between them, else in `.hud-top` before the gear, judged against each bottom card's columns at rest and enlarged
+  (x1.05) plus the "Tap" hint (falls back to the HUD at 320px and in landscape). `#emotePanel` (4x2) closes on a pick,
+  an outside tap, Escape or `openSheet`. Bubbles (`.emote-bubble` in `#pcards`, pointer-events none) are centred on the
+  sender's avatar with their colour ring, live 1.8s (`emLife` + a per-emote motion; reduced motion = fade), one per
+  player with a queue of 2; `sfx('emote')` follows the sound settings. Sender = the only human, or the player to move
+  in Pass & Play. CPU reactions: `Emotes.react('capture'|'win')` from `move` / `gameOver` (random chance, 9s per CPU,
+  4s overall, never the same twice running; cleared by `reset()` on each new game / exit). No game state is touched.
+  **Text emotes (2026-11-04, user's request):** fixed short phrases, never typed (nothing rude can be sent). Each is a
+  sticker (`stText`: the phrase in Lilita One / a Bangla font in the cream bubble, white-rimmed, gently bobbing
+  `sa-say`, sized to fill the bubble on one or two lines, Bangla measured by grapheme; plus a small animated accent
+  from `stIcon`), stored in `EMOTES` with `group: 'text'` so bubbles, queue, cooldown and CPU reactions treat them like
+  any emote (`TEXT_EMOTES`). Packs of 8 (`TEXT_PACKS`): Good Manners `basic` (free, default: Hi!, Good luck!, Have fun!,
+  GG, Well played!, Thanks!, Sorry!, Bye!), Ludo Talk `ludo` 3,000 (Roll a 6!, Nice roll!, Lucky!, Not again!,
+  Revenge!, Safe!, Pair up!, Almost home!), Reactions `react` 3,000 (Wow!, Oops!, So close!, Hurry up!, Wait…, My
+  turn!, Easy!, Noooo!), Bangla `bangla` 3,000 (ভালো খেলা!, শুভকামনা!, ছক্কা চাই!, আয় দেখি!, আবার!, জিতে গেলাম!,
+  ধন্যবাদ!, উফ!); team phrases `team` (Help me!, Go go go!, I got you!, Nice one, partner!) are free and appear only in
+  Pair Mode. Profile: `P.textPacks` (owned, always incl. basic), `P.textPack` (equipped; `ensureProfile` repairs);
+  `buyTextPack` / `useTextPack` (commitProfile, like emote sets). Shop › Emotes and Inventory › Emotes list the packs
+  under "Text emotes" after the sticker sets (card = the 8 phrases as chips). Picker: a tab row (`.em-tabs`: ☺
+  stickers / Aa text) above the cells; `Emotes.mode` 'em' | 'text', back to stickers each game; text cells show the
+  phrase (`.em-pick-txt`); `placePanel` counts the tab row. CPU lines: hurt CPU adds Not again! / Revenge! / Noooo!,
+  a capturing CPU adds Sorry! / Lucky! / Easy!, winners and losers add GG / Well played!, and at the start of a game
+  (`react('start')`, not in `?vt=1`) a computer may say Good luck! / Have fun! / Hi!.
+  Tests: `tests/emotes.js` (89).
+- **Demo version (2026-11-03, user's request):** open the game with `?demo=1` (e.g. `index.html?demo=1`, or set
+  `window.LUDO_DEMO = true` before the game script) and everything that is normally bought is free and already owned:
+  rooms, S&L scenes, dice, pawn skins, emote sets, characters, avatars, frames and nameplates (`DEMO`; `demoFree()` sets
+  every catalogue price to 0 in `loadProfile`, `ensureProfile` owns everything, `isUnlocked` returns true). Badges stay
+  achievement rewards. The Shop shows a green "Demo version" note (`.demo-note`, only under `html.demo`); the Dice tab now
+  skips Classic by id instead of by price. Demo progress lives in its own browser storage (`LSK` prefix `ludoDemo*`
+  instead of `ludoRoyale*`), never in the YouTube cloud save (`CLOUD = IN_YT && !DEMO`) and never syncs to an account
+  (`Account.available` is false). Without the flag nothing changes. The build (`tools/build.ps1`) has no separate demo
+  output: the demo is the same `index.html` opened with `?demo=1`. Tests: `tests/demo.js` (15).
+- **Pawn skins (Ludo, 2026-11-03):** `PawnSkins` module (right after the token code). 12 cosmetic themes x the 4 player
+  colours: Classic (free, default, the original pawn untouched), Royal Crown 3,000, Ice Crystal 3,500, Candy Pop 2,500,
+  Marble 2,000, Robo Bot 4,000, Little Wizard 4,000, Fruity 2,500 (strawberry / apple / lemon / blueberry head by colour),
+  Blossom 2,500, Pirate 3,500, Space Explorer 5,000, Dragon 6,000 (`PawnSkins.LIST`). Shapes follow the user's reference sheet
+  (2026-11-04: "each pawn set are unique designs"): Classic, Royal Crown and Marble keep the classic body; the others
+  have their own: a bell (`BELL`, no collar, head at y .79) for Candy Pop (frosted cupcake head, sprinkles), Fruity
+  (juice drips; strawberry / watermelon slice / orange / blueberry head for red / green / yellow / blue), Blossom (vine
+  texture, flower head facing front), Pirate (belt, bandana, eye patch, tricorn with skull and gold trim), Dragon
+  (scales on the lower body, gold horns, crest, bat wings, chest gem); a robe (`ROBE`) for Little Wizard (scarf, floppy
+  hat, no face); a white suit on a coloured foot (`SUIT` + `FOOT`) for Robo Bot and Space Explorer (white is the main
+  colour there, as in the reference, with the player colour on the foot, chest, ears and visor); a faceted crystal
+  column (`COLUMN`) with crystal fans on top and round the foot for Ice Crystal. Built in code (no assets): each
+  skin's `build(css, c)` returns its player-colour material (= `t.mat`, so the movable glow works) and parts; accessories
+  are merged into one mesh per material (`merge()`, which also bakes positions and flips mirrored parts), geometry is
+  cached per skin and shared by all 16 tokens, materials per skin + colour; candy stripes / marble / dragon scales are
+  small canvas textures (own PRNG, so `?vt=1`'s seeded `Math.random` is untouched). Rules: base at y 0 and everything
+  inside the Classic footprint (radius .38), same pivot (the token group), height 0.9–1.3, body in the player colour,
+  under 3,600 triangles per pawn. `PawnSkins.apply(id)` only swaps the meshes inside each token group (and their entries
+  in `pickables`); rings, positions, scales and game state are never touched. The equipped skin dresses all 16 pawns
+  (every colour). Themed skins turn to face the camera (`g.rotation.y = camAz + camRoll` in `frameLoop`, so faces are
+  also upright on the rolled Top View screen; Classic stays at 0). Top View (2026-11-03, user's report that skins were
+  unreadable from above): straight down, a pawn showed only the top of its head, so each themed skin's head parts
+  (parts flagged `H` in its build) tip back by its `look` angle about the head centre `pivot` (`PawnSkins.pose(t, k)`;
+  k eases 0 → 1 with the camera elevation from 62° to 89.5°, so 3D View and the home screen are unchanged) and the
+  face, visor, patch, flower or fruit looks up at the camera. Angles: Robo Bot / Space Explorer 1.3, Pirate / Blossom
+  1.0, Fruity .9, Little Wizard / Dragon .8, Royal Crown .5; Ice, Candy, Marble and Classic need none (their look is
+  on top already). The tipped heads stay inside the footprint (tested). Note: close-ups rendered into a default
+  WebGLRenderTarget (16-bit depth) show ring artefacts on the visors; the game screen (24-bit) does not.
+  Profile: `P.pawnSkins` (owned, always incl. classic; joined by `mergeProgress`), `P.pawnSkin` (equipped;
+  `ensureProfile` repairs; `loadProfile` applies). Shop > Pawns and Inventory > Pawns (`renderPawnSkins`; tab colour
+  lilac #C9A6E0, icon `#tiPawn`): card = rendered picture of the four colours (`PawnSkins.pic(id)`, 320x240 PNG,
+  rendered once with the game renderer into a render target, cached), Equipped / Owned / Locked, Buy / Use;
+  `buyPawnSkin` (commitProfile: coins + own + equip; refuses without coins / when owned) / `usePawnSkin`.
+  "Compare all" (`#pawnAllSheet`, `openPawnAll`) shows the 12 skins side by side. Godot port: not done in this checkout.
+  Tests: `tests/pawn-skins.js` (48).
 - **Shop preview (2026-10-21):** `viewWith()` adds View (`data-pv="room:id"` / `"scene:id"`) to Shop Rooms / Scenes
   cards only. `Preview` opens `#pvSheet` (2026-10-21 layout fix): one `.pv` card (28px radius, 4px border + ring,
   overflow hidden) = `.pv-view` (square, max min(58cqh, 440px), shrinks on short frames) + `.pv-panel` joined below;
@@ -261,7 +394,7 @@ release (12-tester closed test for 14 days).
   each card shows "w/ <partner colour>", a "Done · need 6" / "Free Hand" chip, and the partner whose pawns the roll
   moves gets a dashed outline; status messages name it ("rolled 4 for Yellow").
 - **Profile `P`:** name, id (`LKM-XXXX-XXXX`), guestSince (first "Continue as Guest" time), avatar, frame, plate, badge, xp, coins, lastSpin, lastFree, owned dice, dice,
-  `stats{played,wins,losses,streak,bestStreak,coinsEarned,pairsFormed,ppGames}`, `claimed[]`, `rooms[]` (owned themes, always includes the free `night` and `cafe`), `room` (selected theme). `ensureProfile()` fills missing fields;
+  `stats{played,wins,losses,streak,bestStreak,coinsEarned,pairsFormed,ppGames}`, `claimed[]`, `rooms[]` (owned themes, always includes the free `night` and `cafe`), `room` (selected theme), `pawnSkins[]` / `pawnSkin` (pawn skins, see Pawn skins). `ensureProfile()` fills missing fields;
   `commitProfile()` rolls back on a failed save.
 
 ## Gameplay rules (as implemented)
@@ -335,8 +468,10 @@ release (12-tester closed test for 14 days).
   while the landing is visible (setup/game/home draw nothing of it); built lazily on first open (`Jungle.start`).
   Contents (polished 2026-10-20): sky gradient + fog, grass and a soft-edged sandy clearing, round wooden table turning
   ~1 rev / 30 s with a framed 3D board (`buildBoard`: rounded cream frame like the Ludo board, honey lip, painted face
-  with rounded pastel tiles and numbers (`boardFace`), 3D ladders and glossy tapered snakes built from SL.LADDERS /
-  SL.SNAKES / SL.SNAKE_COL) and two glossy Ludo-style pawns (no dice); background of smooth rounded trees, two far
+  with rounded pastel tiles and numbers (`boardFace`); since 2026-10-26 the ladders and snakes are flat 2D cartoon art
+  painted into that same 2048 px face texture (`paintLadders` / `paintSnakes`, from SL.LADDERS / SL.SNAKES /
+  SL.SNAKE_COL and the scene's `rail` / `rung` / `stripe` / `snakes` colours), no 3D geometry; the snake bodies use
+  the same wave as SL's `snakePts`, so pawns slide along the drawn snake) and two glossy Ludo-style pawns (no dice); background of smooth rounded trees, two far
   palms (leaf geometry `leafGeo`), tidy bushes and ferns; a hanging wooden sign "SNAKES & LADDERS" (canvas text,
   Lilita One) with ropes, vines and a little snake; two framing snakes (left tree coil, purple hanging right). Snakes
   share one model (`snake`: tapered body `taperGeo` with painted back pattern and pale belly, `snakeHead` with big
@@ -369,6 +504,15 @@ release (12-tester closed test for 14 days).
   and ownership if saving fails; button disabled on the first tap). A purchase does not equip; Equip uses the common
   collection equip path (`P.avatar`). Cards: Free / Owned / Equipped tag, lock icon + coin price when for sale (shown
   in full colour). Edit Profile's avatar grid lists them too; a locked one says where to buy it.
+- **More characters (2026-11-04):** `WORLD` = 12 free person avatars with a wide range of looks (Hana, Kenji, Mei,
+  Linh, Emma, Lukas, Sofia, Oliver, Jayden, Maya, Carlos, Ava), appended to `AVATARS` after `CHARS`; Collection ›
+  Characters shows them together under "More characters" after Male / Female, and they are in Edit Profile's grid. The
+  user asked that they are never labelled or grouped by origin. `personSVG` gained optional face fields (none set = the
+  original faces, so CHARS look the same): `eye` (round / almond / narrow / big), `eyeCol` (iris colour, '' = dark),
+  `lash`, `brow` (none / thin / soft / thick), `nose` (none / small / wide), `mouth` (smile / lips / grin / neutral),
+  `fh` (none / stubble / moustache / goatee / beard), `acc` 'shades'; and hairstyles bald, fade, straight, locs. The
+  buzz cut draws its beard only when `fh` is unset (Sabbir). An avatar customizer was built the same day and removed
+  at the user's request. Tests: `tests/avatars.js`.
   Presentation (style ref: user's casual-game profile screenshots, in our palette): `#profilePage` (`.ppage`) is a
   dimmed full-screen overlay (size container) holding a fixed-size modal `.pm` (max 440x720): cream panel, white rim,
   warm-brown outline, coral title ribbon `.pm-title` over the top edge, red `.x-btn` (`#ppBack`). Folder tabs `.ftabs`
