@@ -129,7 +129,7 @@ static func _wall_painter(o: Dictionary) -> Callable:
 static func _paint_sky(c: Control) -> void:
 	var w := c.size.x
 	var h := c.size.y
-	_vgrad(c, [[0.0, Color("#7cc4ff")], [0.55, Color("#cbe8ff")], [1.0, Color("#fff1d6")]])
+	_vgrad(c, [[0.0, Color("#e8926a")], [0.55, Color("#ffc286")], [1.0, Color("#ffe4b4")]])
 	var g := Gradient.new()                       # the sun: a radial glow of radius 160
 	g.offsets = PackedFloat32Array([0.0, 0.25, 1.0])
 	g.colors = PackedColorArray([Color8(255, 250, 220, 255), Color8(255, 240, 190, 230), Color8(255, 240, 190, 0)])
@@ -153,7 +153,7 @@ static func _paint_sky(c: Control) -> void:
 		hills.append(Vector2(x, h * 0.86 - sin(x / 70.0) * 22 - sin(x / 23.0) * 6))
 		x += 8
 	hills.append(Vector2(w, h))
-	c.draw_colored_polygon(hills, Color("#9fd99a"))
+	c.draw_colored_polygon(hills, Color("#a8905c"))
 
 static func _art_painter(pal: Array, kind: String, seed_: int) -> Callable:
 	return func(c: Control):
@@ -439,6 +439,6 @@ static func build(rooms: Rooms, baker: TexBaker) -> void:
 				_p(hs, MeshKit.sphere(1), leaf_a if j % 2 else leaf_b, Vector3(x - 1.6 + v * 1.6, 56 - j * 2.6 - v, 5.8 + sin(j) * 0.5), Vector3.ZERO, Vector3(1.1, 0.6, 0.9))
 
 	# sunlight through the windows, warm lamplight by the shelf, a soft fill by the sofa
-	rooms._omni(Color("#fff0c8"), 0.55, 160, Vector3(-48, Y0 + 52, 0))
+	rooms._omni(Color("#ffb46e"), 0.75, 160, Vector3(-48, Y0 + 52, 0))
 	rooms._omni(Color("#ffe2b8"), 0.33, 110, Vector3(34, Y0 + 44, -50))
-	rooms._omni(Color("#fff4e6"), 0.25, 140, Vector3(30, Y0 + 70, 40))
+	rooms._omni(Color("#ffd8ae"), 0.14, 140, Vector3(30, Y0 + 70, 40))

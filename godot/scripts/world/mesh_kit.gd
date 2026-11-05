@@ -83,6 +83,35 @@ static func _tri_oriented(st: SurfaceTool, pts: Array, nrms: Array, uvs: Array, 
 		st.set_uv(uvs[q])
 		st.add_vertex(pts[q])
 
+## The corners falling softly into shade, for a landing view: a quad for the camera to carry just past its near plane
+## (the caller sizes it to the view). The eye goes to the lit table. Fade it with its albedo's alpha; low tier: don't show.
+static func vignette() -> MeshInstance3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.set_flag(BaseMaterial3D.FLAG_DISABLE_DEPTH_TEST, true)
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	m.disable_fog = true
+	m.render_priority = 100
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.5, 0.78, 1.0])
+	g.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 0.3), Color(0, 0, 0, 0.62)])
+	var t := GradientTexture2D.new()
+	t.width = 128
+	t.height = 128
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	t.gradient = g
+	m.albedo_texture = t
+	var v := MeshInstance3D.new()
+	v.mesh = QuadMesh.new()
+	v.material_override = m
+	v.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	v.extra_cull_margin = 16384
+	return v
+
+
 ## Lathe (surface of revolution) from a profile of (radius, height) points, like THREE.LatheGeometry.
 ## Normals come from the profile's tangent, pointing away from the axis on the outside.
 static func lathe(profile: PackedVector2Array, segments := 36) -> ArrayMesh:

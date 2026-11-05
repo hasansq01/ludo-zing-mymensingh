@@ -26,6 +26,7 @@ var rng := RandomNumberGenerator.new()
 var cam_az := -PI / 2
 var cam_target_az := -PI / 2
 var cam_el := HOME_EL
+var _vignette: MeshInstance3D
 var cam_target_el := HOME_EL
 var cam_zoom := 1.0
 var cam_target_zoom := 1.0
@@ -43,6 +44,9 @@ func _ready() -> void:
 	camera.keep_aspect = Camera3D.KEEP_WIDTH
 	camera.fov = 48.0                   # horizontal: the web version's portrait lens (2·atan(tan 24°))
 	camera.near = 0.5
+	_vignette = MeshKit.vignette()          # the home view's soft corners (MeshKit.vignette)
+	_vignette.visible = Quality.extras()
+	camera.add_child(_vignette)
 	camera.far = 500.0
 	add_child(camera)
 	_build_environment()
@@ -57,6 +61,7 @@ func build_room(baker: TexBaker, progress: Callable, room_id := Rooms.DEFAULT) -
 	board.set_texture(await baker.bake(Vector2i(2048, 2048), LudoBoard.paint))
 	progress.call(0.35)
 	var rings := await baker.bake(Vector2i(1024, 1024), _paint_rings)
+	_rings = rings
 	_table_top.material_override = MeshKit.tex_mat(rings, 0.32)
 	_table_top.material_override.albedo_color = Color("#fff0dc")   # MOOD.night table tint
 	_latte_mat.albedo_texture = await baker.bake(Vector2i(256, 256), _paint_latte)
@@ -135,19 +140,42 @@ static var SHADOW_NBIAS := 0.6
 # ---------- table + cups ----------
 
 var _table_top: MeshInstance3D
+var _rings: Texture2D                   # the wood grain of the top
+var _edge_m: StandardMaterial3D
+var _leg_m: StandardMaterial3D
+var _inlay_m: StandardMaterial3D
 var _latte_mat: StandardMaterial3D
 
 func _build_table() -> void:
-	var edge := MeshKit.mat(Color("#e6a462"), 0.32)
-	var enamel := MeshKit.mat(Color("#fff8f0"), 0.28)
-	var top := CylinderMesh.new()
-	top.top_radius = 14.5; top.bottom_radius = 14.5; top.height = 1.2; top.radial_segments = 72; top.rings = 1
-	MeshKit.put(self, top, edge, Vector3(0, TT - 0.6, 0))
+	# its materials are its own: every room dresses the table (set_table_look)
+	_edge_m = StandardMaterial3D.new()
+	_edge_m.albedo_color = Color("#e6a462")
+	_edge_m.roughness = 0.3
+	_leg_m = StandardMaterial3D.new()
+	_leg_m.albedo_color = Color("#fff8f0")
+	_leg_m.roughness = 0.28
+	_inlay_m = StandardMaterial3D.new()
+	_inlay_m.albedo_color = Color("#f4c542")
+	_inlay_m.roughness = 0.22
+	_inlay_m.metallic_specular = 0.8
+	# a moulded edge, turned rather than a plain slab
+	var y := TT + 0.02
+	var rim := PackedVector2Array([Vector2(13.4, y - 1.9), Vector2(14.2, y - 1.8), Vector2(14.65, y - 1.3), Vector2(14.9, y - 0.8), Vector2(14.9, y - 0.42),
+		Vector2(14.72, y - 0.14), Vector2(14.5, y + 0.0)])
+	MeshKit.put(self, MeshKit.lathe(rim, 72), _edge_m, Vector3.ZERO)
+	var under := CylinderMesh.new()
+	under.top_radius = 14.4; under.bottom_radius = 13.4; under.height = 1.7; under.radial_segments = 48; under.rings = 1
+	MeshKit.put(self, under, _edge_m, Vector3(0, y - 1.05, 0))     # (its top well under the disc: they mustn't fight)
 	# the ring-grain top is its own disc so the texture maps straight down
-	_table_top = MeshKit.put(self, _disc(14.5, 72), MeshKit.mat(Color("#f2c693"), 0.32), Vector3(0, TT + 0.02, 0), Vector3.ZERO, Vector3.ONE, false)
-	MeshKit.put(self, MeshKit.torus(14.5, 0.4, 72, 12), edge, Vector3(0, TT - 0.6, 0))
-	MeshKit.put(self, MeshKit.cylinder(1.4, 1.9, 28, 24), enamel, Vector3(0, Y0 + 14.6, 0))
-	MeshKit.put(self, MeshKit.cylinder(6.4, 7.4, 1.4, 40), enamel, Vector3(0, Y0 + 0.7, 0))
+	_table_top = MeshKit.put(self, _disc(14.5, 72), MeshKit.mat(Color("#f2c693"), 0.32), Vector3(0, y, 0), Vector3.ZERO, Vector3.ONE, false)
+	# an inlaid line round the top, outside the board's corners
+	MeshKit.put(self, MeshKit.torus(13.75, 0.13, 72, 6), _inlay_m, Vector3(0, y + 0.02, 0), Vector3.ZERO, Vector3(1, 0.3, 1), false)
+	# a turned pedestal on a stepped foot
+	var f := Y0
+	var leg := PackedVector2Array([Vector2(7.5, f), Vector2(7.6, f + 0.5), Vector2(7.1, f + 1.0), Vector2(5.8, f + 1.5), Vector2(4.6, f + 2.1), Vector2(3.4, f + 3.2), Vector2(2.4, f + 4.6),
+		Vector2(1.75, f + 6.4), Vector2(1.5, f + 9.0), Vector2(1.42, f + 16.0), Vector2(1.5, f + 21.0), Vector2(2.0, f + 23.4), Vector2(2.7, f + 24.3), Vector2(2.0, f + 25.2),
+		Vector2(1.7, f + 26.6), Vector2(3.4, f + 28.0), Vector2(5.2, TT - 1.9)])
+	MeshKit.put(self, MeshKit.lathe(leg, 28), _leg_m, Vector3.ZERO)
 	# the key spot's shadow of the table top on the floor (light at (4, 60, 10): centred a little towards -x / -z)
 	# and a darker contact shadow round the foot
 	MeshKit.contact_shadow(self, 50, 50, Vector3(-2, Y0 + 0.16, -5), Color(0.2, 0.1, 0.05, 0.52), false, 0.72)
@@ -169,6 +197,25 @@ func _build_table() -> void:
 func set_table_tint(c: Color) -> void:
 	if _table_top and _table_top.material_override:
 		_table_top.material_override.albedo_color = c
+
+## A room's table (Rooms.TABLES): top tint, its surface ("rings" the wood grain, "stone" marble, "" lacquer), how glossy,
+## the moulded edge, the pedestal and the inlaid line.
+func set_table_look(t: Dictionary) -> void:
+	set_table_tint(t.top)
+	var m := _table_top.material_override as StandardMaterial3D
+	if m:
+		match str(t.get("surface", "rings")):
+			"stone":
+				m.albedo_texture = DiceLooks.pattern("stone")
+			"":
+				m.albedo_texture = null
+			_:
+				m.albedo_texture = _rings
+		m.roughness = float(t.get("rough", 0.28))
+	_edge_m.albedo_color = t.edge
+	_leg_m.albedo_color = t.leg
+	_leg_m.roughness = float(t.get("leg_rough", 0.3))
+	_inlay_m.albedo_color = t.inlay
 
 static func _disc(r: float, segs: int) -> ArrayMesh:
 	var st := SurfaceTool.new()
@@ -357,6 +404,10 @@ func _process(delta: float) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	if orbit and not reduced_motion:
 		cam_target_az += 0.0016 * 60.0 * delta
+	# the soft corners are the home view's: in a match they would darken the board's edges
+	var vm := _vignette.material_override as StandardMaterial3D
+	vm.albedo_color.a = move_toward(vm.albedo_color.a, 1.0 if orbit else 0.0, delta * 2.5)
+	_vignette.visible = Quality.extras() and vm.albedo_color.a > 0.0
 	var k := 1.0 - pow(0.96, delta * 60.0)        # the web version's 0.04 easing per frame
 	cam_az += (cam_target_az - cam_az) * k
 	cam_el += (cam_target_el - cam_el) * k
@@ -398,3 +449,7 @@ func _update_camera(_snap: bool) -> void:
 		up = Vector3.UP
 	camera.look_at_from_position(camera.position, Vector3.ZERO, up)
 	camera.v_offset = view_y
+	var vd := camera.near * 1.5
+	var vw := 2.0 * vd * tan(hf)
+	_vignette.position = Vector3(camera.h_offset, camera.v_offset, -vd)   # (the offsets move the view, not this node)
+	_vignette.scale = Vector3(vw * 1.04, vw / aspect * 1.04, 1)

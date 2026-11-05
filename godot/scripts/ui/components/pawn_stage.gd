@@ -11,17 +11,20 @@ extends SubViewportContainer
 
 const CARD := "card"
 const FOUR := "four"
+const SOLO := "solo"                     ## one pawn, filling the picture, in `solo_color` (the bake tool's rows)
 const SPIN := 0.55                       ## FOUR: radians a second each pawn turns
 ## Where the pawns stand per layout: [colour index, position, scale]; the camera's eye and target.
 const LAYOUTS := {
 	card = {pawns = [[3, Vector3(0.5, 0, -0.5), 0.9], [0, Vector3(-0.2, 0, 0.12), 1.0]],
 		eye = Vector3(0.0, 1.12, 3.85), look = Vector3(0.08, 0.36, -0.1), fov = 27.0},
+	solo = {pawns = [[0, Vector3(0, 0, 0), 1.0]], eye = Vector3(0.0, 0.95, 3.5), look = Vector3(0.0, 0.57, 0.0), fov = 23.0},
 	four = {pawns = [[0, Vector3(-1.38, 0, 0), 1.0], [1, Vector3(-0.46, 0, 0), 1.0], [2, Vector3(0.46, 0, 0), 1.0], [3, Vector3(1.38, 0, 0), 1.0]],
 		eye = Vector3(0.0, 1.3, 5.5), look = Vector3(0.0, 0.48, 0.0), fov = 26.0},
 }
 
 var skin := "classic"
 var layout := CARD
+var solo_color := 0                      ## the SOLO layout's colour index
 var keep_drawing := false                ## a still CARD keeps drawing (the bake tool reads it back)
 var viewport: SubViewport
 var camera: Camera3D
@@ -30,8 +33,9 @@ var _looks: Array = []                   # [{node, look}] per pawn
 var _still_frames := 0
 
 
-func _init(skin_ := "classic", layout_ := CARD) -> void:
+func _init(skin_ := "classic", layout_ := CARD, solo_color_ := 0) -> void:
 	skin = skin_
+	solo_color = solo_color_
 	layout = layout_ if LAYOUTS.has(layout_) else CARD
 	stretch = true
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -84,7 +88,7 @@ func set_skin(id: String) -> void:
 		g.position = p[1]
 		g.scale = Vector3.ONE * float(p[2])
 		_root.add_child(g)
-		var look := PawnSkins.dress(g, id, Palette.PLAYER[int(p[0])])
+		var look := PawnSkins.dress(g, id, Palette.PLAYER[solo_color if layout == SOLO else int(p[0])])
 		MeshKit.contact_shadow(g, 1.1, 1.1, Vector3(0, 0.004, 0), Color(0.24, 0.13, 0.07, 0.38))
 		var to_cam := camera.position - g.position              # the skin's front towards the camera (PawnSkins.face)
 		g.rotation.y = atan2(to_cam.x, to_cam.z)

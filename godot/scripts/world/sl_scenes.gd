@@ -190,19 +190,7 @@ func _ready() -> void:
 	_sky.extra_cull_margin = 16384
 	camera.add_child(_sky)
 	# the corners fall softly into shade: the eye goes to the lit table (off on the low tier: one blended quad less)
-	var vm := StandardMaterial3D.new()
-	vm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	vm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	vm.set_flag(BaseMaterial3D.FLAG_DISABLE_DEPTH_TEST, true)
-	vm.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-	vm.disable_fog = true
-	vm.render_priority = 100
-	vm.albedo_texture = _radial([0.0, 0.5, 0.78, 1.0], [Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 0.3), Color(0, 0, 0, 0.62)], 128)
-	_vignette = MeshInstance3D.new()
-	_vignette.mesh = QuadMesh.new()
-	_vignette.material_override = vm
-	_vignette.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_vignette.extra_cull_margin = 16384
+	_vignette = MeshKit.vignette()
 	_vignette.visible = Quality.extras()
 	camera.add_child(_vignette)
 	_table = Node3D.new()

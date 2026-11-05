@@ -18,7 +18,7 @@ signal start(config: Dictionary)
 
 const PAIR_NOTE := "Teams: Red + Yellow vs Green + Blue."     # l10n   (old name kept for callers; shown through L10n.t)
 const TEAMS_NOTE := PAIR_NOTE
-const SWATCH_H := 76.0
+const SWATCH_H := 96.0
 const MAX_NAME := 12                    ## Pass & Play names (they must fit the game's player tiles)
 
 var game := "ludo"
@@ -365,7 +365,7 @@ class Swatch extends Button:
 		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		row.offset_bottom = -UIKit.LIP.md
 		var pawn := SeatDot.new(symbols)
-		pawn.custom_minimum_size = Vector2(32, 38)
+		pawn.custom_minimum_size = Vector2(44, 56)
 		pawn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pawn.skin = Catalog.pawn_in_use()     # whichever colour you pick, your pawns wear your skin
 		pawn.set_color(c)
@@ -402,7 +402,7 @@ class Swatch extends Button:
 			draw_texture_rect(_check, Rect2(p + Vector2(5, 5), Vector2(d - 10, d - 10)), false, Palette.ON_HONEY)
 
 
-## A seat's colour as the board's pawn in that colour (PawnArt; with the colour-blind symbol on its body when that
+## A seat's colour as the board's pawn in that colour (its baked picture, Thumbnailer.pawn_cell; with the colour-blind symbol on its body when that
 ## setting is on). Same size on every row; used by the Pass & Play rows, the colour choices and the lobby.
 class SeatDot extends Control:
 	var c := 0
@@ -435,4 +435,11 @@ class SeatDot extends Control:
 			_sym.position = Vector2(size.x / 2.0 - d / 2.0, size.y * 0.66 - d / 2.0)
 
 	func _draw() -> void:
-		PawnArt.draw(self, Rect2(Vector2.ZERO, size).grow(-1.0), c, rim, skin)
+		var pic := Thumbnailer.pawn_cell(skin if skin != "" else Catalog.FREE_PAWN, c)   # the real pawn, as the Shop shows it
+		if pic.is_empty():
+			PawnArt.draw(self, Rect2(Vector2.ZERO, size).grow(-1.0), c, rim, skin)
+			return
+		var cell: Vector2 = (pic[1] as Rect2).size
+		var k := minf(size.x / cell.x, size.y / cell.y)
+		var d := cell * k
+		draw_texture_rect_region(pic[0], Rect2(Vector2((size.x - d.x) / 2.0, size.y - d.y), d), pic[1])

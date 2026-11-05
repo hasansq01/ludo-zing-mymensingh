@@ -64,6 +64,7 @@ func _catalogue() -> void:
 	check("titles read as plurals", ShopSheet._title("pawn", "Marble") == "Marble pawns" and ShopSheet._yours("pawn", "Marble pawns") == "Marble pawns are yours!")
 	check("a push link's shop:pawn opens the Pawns tab", Notifications.shop_tab("pawn") == "pawns")
 	check("every skin has a baked Shop picture", Thumbnailer.ids("pawn") == ids and ids.all(func(id): return Thumbnailer.has_baked("pawn", id)))
+	check("every skin has its row of four colours for the setup sheet", ids.all(func(id): return Thumbnailer.has_baked("pawnrow", id) and (Thumbnailer.pawn_cell(id, 2)[1] as Rect2).position.x == 2.0 * Thumbnailer.PAWN_CELL.x))
 
 
 # ---------- buying and equipping ----------

@@ -49,6 +49,7 @@ const BAKED_DIR := "res://assets/thumbs/"
 ## (4:3, PawnStage's card pair) at 2x.
 const BAKE_SIZE := Vector2i(720, 540)
 const PAWN_SIZE := Vector2i(360, 270)
+const PAWN_CELL := Vector2i(128, 160)    ## one pawn in a skin's row picture (pawnrow_<id>.webp: the four colours side by side)
 const DICE_SIZE := 84.0
 const DICE_SCALE := 3.0
 ## The room camera (web Rooms.thumb: a corner camera at angle .72, 50 out, 24 up, looking at the far corner), in
@@ -104,6 +105,13 @@ static func baked(kind: String, id: String) -> Texture2D:
 
 static func baked_path(kind: String, id: String) -> String:
 	return BAKED_DIR + "%s_%s.webp" % [kind, id.validate_filename()]
+
+## The real pawn of a skin in colour c (0..3) from its baked row: [texture, region], or [] when there is none.
+static func pawn_cell(id: String, c: int) -> Array:
+	var t := baked("pawnrow", id)
+	if t == null:
+		return []
+	return [t, Rect2(Vector2(c * PAWN_CELL.x, 0), Vector2(PAWN_CELL))]
 
 static func has_baked(kind: String, id: String) -> bool:
 	return use_baked and ResourceLoader.exists(baked_path(kind, id))
