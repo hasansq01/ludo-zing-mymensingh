@@ -152,7 +152,7 @@ func _pure() -> void:
 		FriendsSheet.sub_text({added_at = now - 3 * 86400, played_at = null, game = null}, "friends", now) == "Added 3 days ago")
 	check("banner sub: game and spaced room", InviteBanner.sub_text({game = "ludo", code = "K7QX2M"}) == "Ludo · Room K7Q X2M")
 	check("invite errors: person rate names them, total rate doesn't",
-		Social.invite_error_text("rate", "person") % "Rafi" == "You invited Rafi a moment ago." and not "%s" in Social.invite_error_text("rate", "total"))
+		Social.invite_error_text("rate", "person") % "Rafi" == "You’ve invited Rafi a lot. Try again later." and not "%s" in Social.invite_error_text("rate", "total"))
 	check("invite errors: every code has words", Social.invite_error_text("offline") != Social.invite_error_text("room_full")
 		and Social.invite_error_text("started") != "" and Social.invite_error_text("not_found") != "")
 	check("save: Invites from players is on by default", Save.prefs.get("invites") == true)
@@ -371,10 +371,26 @@ func _invite_flow() -> void:
 		and is_instance_valid(o.lobby_sheet) and fake.sent.size() == 1 and fake.sent[0].code == o.net.code, [out, o.state])
 	check("invite: the new room has the sheet's game", hub.rooms[o.net.code].settings.game == "sl")
 	check("invite: the row says Invited, and Rafi is told nothing more here", s.was_invited(str(rafi.uid)) and s.last_toast == "Invite sent to Rafi", s.last_toast)
-	# again within 10 minutes: the server's per-person limit, said kindly
+	# again at once: nothing more goes out, and it stays "Invited"; after a minute it may Remind
 	var again := await s.invite(rafi)
-	check("invite again: per person, once per 10 minutes", not again.ok and again.error == "rate" and again.scope == "person"
-		and s.last_toast == "You invited Rafi a moment ago.", [again, s.last_toast])
+	check("invite again at once: fine, the same invite, no second one", again.ok and fake.sent.size() == 1 and s.invite_state(str(rafi.uid)) == "invited", [again, fake.sent.size()])
+	var keep_sent: Array = fake.sent.duplicate(true)
+	fake.sent[0].at = int(fake.sent[0].at) - 70
+	await s.refresh_sent()
+	check("invite: a minute without an answer, the row offers Remind", s.invite_state(str(rafi.uid)) == "remind" and not s.was_invited(str(rafi.uid)), s.invite_state(str(rafi.uid)))
+	fake.sent = keep_sent
+	await s.refresh_sent()
+	# their Not now: said once, and the row holds, in any room
+	fake.declined_by[str(rafi.uid)] = s.now()
+	await s.refresh_sent()
+	check("their Not now: the row changes and you are told", s.invite_state(str(rafi.uid)) == "declined" and s.was_invited(str(rafi.uid)) and s.last_toast == "Rafi can’t play right now.", [s.invite_state(str(rafi.uid)), s.last_toast])
+	var refused := await s.invite(rafi)
+	check("their Not now: invite refused, kindly", not refused.ok and refused.declined == true and s.last_toast == "Rafi said not now. You can invite them again later.", [refused, s.last_toast])
+	fake.declined_by.erase(str(rafi.uid))
+	s.sent.erase(str(rafi.uid))
+	# the exact case: invited to one room, then a new room: the old invite doesn't count there
+	s.sent[str(rafi.uid)] = {status = "invited", code = "OLD111", until = s.now() + 500, again = s.now() + 50}
+	check("an invite to another room: this room's row says Invite", s.invite_state(str(rafi.uid)) == "" and not s.was_invited(str(rafi.uid)))
 	# a ghost and someone with invites off: the very same answers
 	var ghost: Dictionary = s.recent[4]
 	var off: Dictionary = s.recent[3]
@@ -384,7 +400,7 @@ func _invite_flow() -> void:
 	var ro := await s.invite(off)
 	var rm := await s.invite(s.recent[1])
 	check("invite: a ghost, invites off and a person: the same answer", rg == ro and ro == rm and rm.ok, [rg, ro, rm])
-	check("invite: (only the fake knows who it reached)", fake.reached.size() == 2 and fake.sent.size() == 4)
+	check("invite: (only the fake knows who it reached)", fake.reached.size() == 2 and fake.sent.size() == 4, [fake.reached.size(), fake.sent.size()])
 	# in a match: not now
 	o._set_state("match")
 	var busy := await s.invite(s.recent[2])

@@ -6,7 +6,9 @@ extends Node
 ##   - Friends are one-way (a favourites list: nobody is asked or told). Long-press a player (a list row, a lobby
 ##     member, a match tile, a leaderboard row) and ask_friend() asks "Add to friends?" / "Remove?".
 ##   - Invite (a list row's button) brings that person into the friend room you are in; in none, Online makes one
-##     first and its lobby opens. The server pushes the invite to their phones.
+##     first and its lobby opens. The server pushes the invite to their phones. Open by default: a new room's invite
+##     replaces the last one at once, an unanswered one can be repeated after a minute (Remind). Only their Not now
+##     stops you, for a while (invite_state, refresh_sent).
 ##   - The invites to you: GET /v1/social/invites at launch and resume, every POLL_SEC while Home is idle, and at once
 ##     when an invite push arrives with the app open (Notifications hands it over instead of a toast). The newest one
 ##     not seen yet becomes the InviteBanner (Join: accept, then the usual join of that room; Not now: decline).
@@ -30,6 +32,7 @@ signal invited(uid: String)
 
 const CACHE_SEC := 30.0
 const POLL_SEC := 30.0
+const LOBBY_SEC := 8.0                   ## how often a lobby with an invite out reads the answers
 const PATH := "/v1/social"
 
 static var _inst: Social = null
@@ -41,7 +44,9 @@ var poll_sec := POLL_SEC                 ## 0: no timer (tests)
 var recent: Array = []                   ## [{uid, name, avatar, frame, level, game, played_at, friend}]
 var friends: Array = []                  ## [{uid, name, avatar, frame, level, added_at, game, played_at}]
 var state := ""                          ## "" (never read) | "loading" | "ok" | "offline" | "error"
-var invited_until := {}                  ## uid -> unix s until which its row says "Invited"
+var sent := {}                           ## uid -> where your invite stands: {status: "invited", code, until, again} | {status: "declined", until}
+var _names := {}                         # uid -> the name you invited (for "Rafi can't play right now")
+var _shown := {}                         # uid -> invite_state() the lists last showed
 var pending: Array = []                  ## invites waiting for the banner (newest first)
 var banner: InviteBanner
 var last_toast := ""                     ## tests: the last thing said
@@ -78,6 +83,11 @@ func _ready() -> void:
 		_timer.timeout.connect(_on_tick)
 		add_child(_timer)
 		_timer.start()
+		var lobby_timer := Timer.new()
+		lobby_timer.wait_time = LOBBY_SEC
+		lobby_timer.timeout.connect(_on_lobby_tick)
+		add_child(lobby_timer)
+		lobby_timer.start()
 	var acc := _account()
 	if acc != null:
 		acc.signed_in_changed.connect(_on_signed_in)
@@ -155,9 +165,21 @@ func is_friend(uid: String) -> bool:
 			return true
 	return false
 
-## Whether a row's Invite should say "Invited" now.
+## A row's Invite button: "" (Invite), "invited" (waiting for their answer), "remind" (still waiting, may ask again),
+## "declined" (they said Not now: not for a while, in any room). An invite to another room doesn't count here.
+func invite_state(uid: String) -> String:
+	var st: Variant = sent.get(uid)
+	if not st is Dictionary or now() >= int(st.until):
+		return ""
+	if st.status == "declined":
+		return "declined"
+	if str(st.code) != _room_code():
+		return ""
+	return "invited" if now() < int(st.again) else "remind"
+
+## Whether a row's Invite is off for now.
 func was_invited(uid: String) -> bool:
-	return int(invited_until.get(uid, 0)) > now()
+	return invite_state(uid) in ["invited", "declined"]
 
 func _set_recent_friend(uid: String, on: bool) -> void:
 	for p: Dictionary in recent:
@@ -267,7 +289,7 @@ static func _error_text(code: String) -> String:
 
 ## Invite a person from the lists into your friend room. In no room: Online makes one first (its lobby opens), with
 ## `game` (default: Home's). {ok, error}: offline, busy (a match or a search is on), room (no room could be made),
-## not_found, rate, not_in_room, room_full, started.
+## not_found, rate (with scope, and declined when they said Not now), not_in_room, room_full, started.
 func invite(p: Dictionary, game := "") -> Dictionary:
 	var uid := str(p.get("uid", ""))
 	var name := L10n.seat_name(str(p.get("name", "Player")))
@@ -281,13 +303,64 @@ func invite(p: Dictionary, game := "") -> Dictionary:
 		return _invite_done({ok = false, error = "busy"}, name, uid)
 	var r: Dictionary = await request(HTTPClient.METHOD_POST, PATH + "/invites", {uid = uid, code = o.net.code})
 	var out := {ok = r.ok, error = r.error}
+	_names[uid] = name
 	if r.ok:
-		invited_until[uid] = _int(r.data.get("expires_at"), now() + 600)
+		sent[uid] = {status = "invited", code = o.net.code, until = _int(r.data.get("expires_at"), now() + 600), again = _int(r.data.get("again_at"), now() + 60)}
+		_note_state(uid)
 	elif r.error == "rate":
 		out.scope = str(r.data.get("scope", "total"))
 		if out.scope == "person":
-			invited_until[uid] = _int(r.data.get("retry_at"), now() + 600)
+			out.declined = bool(r.data.get("declined", false))
+			var until := _int(r.data.get("retry_at"), now() + 600)
+			sent[uid] = {status = "declined", until = until} if out.declined else {status = "invited", code = o.net.code, until = until, again = until}
+			_note_state(uid)
 	return _invite_done(out, name, uid)
+
+func _note_state(uid: String) -> void:
+	_shown[uid] = invite_state(uid)
+
+## GET /v1/social/invites/sent: where your invites stand. Someone's Not now: a toast and their row changes. The
+## lists show it (signal invited) whenever a row's state changed, also by the clock ("Invited" -> "Remind").
+func refresh_sent() -> void:
+	if not available() or (not http_fn.is_valid() and Account.session() == ""):
+		return
+	var r: Dictionary = await request(HTTPClient.METHOD_GET, PATH + "/invites/sent")
+	if not r.ok or not r.data.get("sent") is Array:
+		return
+	var fresh := {}
+	for it: Variant in r.data.sent:
+		if not it is Dictionary:
+			continue
+		var d: Dictionary = it
+		var uid := str(d.get("uid", ""))
+		if str(d.get("status", "")) == "declined":
+			fresh[uid] = {status = "declined", until = _int(d.get("retry_at"), now())}
+		else:
+			fresh[uid] = {status = "invited", code = str(d.get("code", "")), until = _int(d.get("expires_at"), now()), again = _int(d.get("again_at"), now())}
+	for uid: String in fresh:
+		var was: Variant = sent.get(uid)
+		if fresh[uid].status == "declined" and was is Dictionary and was.status == "invited" and str(was.get("code", "")) == _room_code():
+			toast(_toast_host(), tr("%s can’t play right now.") % str(_names.get(uid, tr("Your friend"))), "info")
+	sent = fresh
+	_states_step()
+
+## Tells the lists about any row whose state changed (the answer came, or the clock moved on).
+func _states_step() -> void:
+	for uid: String in sent.keys() + _shown.keys():
+		var st := invite_state(uid)
+		if str(_shown.get(uid, "")) != st:
+			_shown[uid] = st
+			invited.emit(uid)
+
+## Every LOBBY_SEC in a friend room's lobby with an invite still out, or with an Invite list open: their answers.
+func _on_lobby_tick() -> void:
+	if not _app_focused():
+		return
+	var o := _online()
+	if o != null and str(o.state) == "lobby" and sent.keys().any(func(u: String) -> bool: return invite_state(u) in ["invited", "remind"]):
+		refresh_sent()
+	else:
+		_states_step()
 
 func _invite_done(r: Dictionary, name: String, uid: String) -> Dictionary:
 	var host := _toast_host()
@@ -298,7 +371,7 @@ func _invite_done(r: Dictionary, name: String, uid: String) -> Dictionary:
 	var scope := str(r.get("scope", ""))
 	var text := invite_error_text(str(r.error), scope)
 	if r.error == "rate" and scope == "person":
-		text = text % name                       # "You invited Rafi a moment ago."
+		text = (tr("%s said not now. You can invite them again later.") if bool(r.get("declined", false)) else text) % name
 		invited.emit(uid)
 	toast(host, text, "info" if r.error in ["rate", "busy"] else "bad")
 	return r
@@ -310,7 +383,7 @@ static func invite_error_text(code: String, scope := "") -> String:
 		"busy":
 			return L10n.t("Finish this game first.")
 		"rate":
-			return L10n.t("You invited %s a moment ago.") if scope == "person" else L10n.t("That’s a lot of invites. Try again later.")
+			return L10n.t("You’ve invited %s a lot. Try again later.") if scope == "person" else L10n.t("That’s a lot of invites. Try again later.")
 		"not_found":
 			return L10n.t("You can invite players you’ve played with or added.")
 		"room_full":
@@ -487,6 +560,7 @@ func open_invite_sheet() -> FriendsSheet:
 		g = o.game
 	var s := FriendsSheet.new(g, true)
 	s.open(_sheet_layer())
+	refresh_sent()                           # (a Not now from before still holds)
 	return s
 
 ## The match tiles' long-press (Ludo HUD, S&L tiles): the seat's member, in the room you are in.

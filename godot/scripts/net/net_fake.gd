@@ -1281,8 +1281,8 @@ class Hub extends RefCounted:
 ## The /v1/social endpoints for one account (server/PROTOCOL.md "Recent players, friends and invites"), in process,
 ## as Social.http_fn: (method, path, body) -> {ok, status, data, error} like Account.request. Seed it with people
 ## (person(), add_recent(), add_friend(), add_invite()); `hub` (optional) answers which rooms you are in, so
-## {code, member} adds and invites check the room like the server (an open friend room). As the server: one invite
-## per person per 10 minutes, and an invite to a ghost or to someone with invites off answers exactly like any other
+## {code, member} adds and invites check the room like the server (an open friend room). As the server: Not now stops you for 30 minutes,
+## a repeat within a minute sends nothing, and an invite to a ghost or to someone with invites off answers exactly like any other
 ## (`quiet` people only change what `reached` records). offline = true: every call answers {ok = false, "offline"}.
 class SocialServer extends RefCounted:
 	var recent: Array = []                ## [{uid, name, avatar, frame, level, game, played_at, friend}]
@@ -1292,6 +1292,7 @@ class SocialServer extends RefCounted:
 	var sent: Array = []                  ## invites you sent: [{uid, code, at}]
 	var reached: Array = []               ## of those, the ones a person would get (not quiet)
 	var quiet := {}                       ## uid -> true: a ghost, or invites off (the answers stay the same)
+	var declined_by := {}                 ## uid -> when they said Not now to you
 	var accepted: Array = []              ## ids (or codes) accepted
 	var declined: Array = []
 	var calls: Array = []                 ## [method, path, body] of every call
@@ -1404,14 +1405,25 @@ class SocialServer extends RefCounted:
 				var why := _room_open(str(b.get("code", "")))
 				if why != "":
 					return _err(409, why)
+				if declined_by.has(uid) and _now() < int(declined_by[uid]) + 1800:
+					return _err(429, "rate", {scope = "person", declined = true, retry_at = int(declined_by[uid]) + 1800})
 				for s: Dictionary in sent:
-					if s.uid == uid and _now() - int(s.at) < 600:
-						return _err(429, "rate", {scope = "person", retry_at = int(s.at) + 600})
+					if s.uid == uid and s.code == str(b.code) and _now() - int(s.at) < 60:
+						return _ok({ok = true, expires_at = int(s.at) + 600, again_at = int(s.at) + 60})
 				var rec := {uid = uid, code = str(b.code), at = _now()}
 				sent.append(rec)
 				if not quiet.has(uid):
 					reached.append(rec)
-				return _ok({ok = true, expires_at = _now() + 600})
+				return _ok({ok = true, expires_at = _now() + 600, again_at = _now() + 60})
+			"/v1/social/invites/sent":
+				var out := []
+				for uid: String in declined_by:
+					if _now() < int(declined_by[uid]) + 1800:
+						out.append({uid = uid, status = "declined", retry_at = int(declined_by[uid]) + 1800})
+				for s: Dictionary in sent:
+					if not declined_by.has(s.uid) and _now() < int(s.at) + 600:
+						out.append({uid = s.uid, status = "invited", code = s.code, expires_at = int(s.at) + 600, again_at = int(s.at) + 60})
+				return _ok({sent = out})
 			"/v1/social/invites/accept", "/v1/social/invites/decline":
 				var key := str(b.get("id", b.get("code", "")))
 				var found := {}

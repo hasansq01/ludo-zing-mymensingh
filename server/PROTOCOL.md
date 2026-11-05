@@ -407,8 +407,8 @@ HTTP only (`src/social.ts`, D1 migration `0007_social.sql`); no room message cha
 - **Invites**: only to someone on your recent or friends list, only into the friend room you are in (lobby or
   between matches, with a free seat). The person gets a push (`kind: "invite"`, channel `game`, link `room:<CODE>`,
   tag `invite:<CODE>`, TTL 10 min; at most 6 invite pushes per person per hour) and the invite in
-  `GET /v1/social/invites`. An invite **expires** after 10 minutes, or as soon as the room's match starts.
-  **Limits**: one invite from the same person to the same person per 10 minutes (`scope: "person"`), 20 per hour and
+  `GET /v1/social/invites`. An invite **expires** after 10 minutes, as soon as the room's match starts, when the inviter leaves the room or the room closes, or when they invite the same person to another room.
+  **Limits**: invites are open by default. Their explicit "Not now" stops that inviter for 30 minutes (`scope: "person", declined: true`; ignoring never blocks); a repeat to the same room within 60 s is answered without a second push; 6 per hour from the same person to the same person (`scope: "person"`), 20 per hour and
   60 per day per inviter (`scope: "total"`). **Privacy**: an invite to someone whose "Invites from players" is off,
   or to a ghost, is answered, stored and rate-limited exactly like one a person ignores (the push is sent after the
   answer); decline ("Not now") is never reported to the inviter.
@@ -418,7 +418,8 @@ HTTP only (`src/social.ts`, D1 migration `0007_social.sql`); no room message cha
 | GET | `/v1/social` | → `{recent: [{uid, name, avatar, frame, level, game, played_at, friend}], friends: [{uid, name, avatar, frame, level, added_at, game, played_at}], prefs: {invites}, max: {recent: 30, friends: 100}}` (times unix s; a friend never played with has `game` / `played_at` null; newest first) |
 | POST | `/v1/social/friends` | `{uid}` (from a list or the leaderboard) or `{code, member}` (a member id of the room you are in: the lobby, a match) → `{ok, friend: person}` (idempotent); `404 not_found`, `400` yourself, `409 {error: "friends_full", max}` |
 | DELETE | `/v1/social/friends` | `{uid}` → `{ok}` |
-| POST | `/v1/social/invites` | `{uid, code}` → `{ok, expires_at}`; `404 not_found` (not on your lists), `409 not_in_room \| room_full \| started` (your room can't take them), `429 {error: "rate", scope: "person" \| "total", retry_at}` |
+| GET | `/v1/social/invites/sent` | `{sent: [{uid, status: "invited", code, expires_at, again_at} \| {uid, status: "declined", retry_at}]}` |
+| POST | `/v1/social/invites` | `{uid, code}` → `{ok, expires_at, again_at}`; `404 not_found` (not on your lists), `409 not_in_room \| room_full \| started` (your room can't take them), `429 {error: "rate", scope: "person" \| "total", retry_at}` |
 | GET | `/v1/social/invites` | → `{invites: [{id, from: person, code, game, sent_at, expires_at}]}` (pending, newest first, at most 10) |
 | POST | `/v1/social/invites/accept` | `{id}` or `{code}` (a tapped push knows only the room) → `{ok, code, game}`, then join the room as with a code; `410 {error: "gone"}` when it expired, the inviter left or the room can't take you |
 | POST | `/v1/social/invites/decline` | `{id}` or `{code}` → `{ok}` |

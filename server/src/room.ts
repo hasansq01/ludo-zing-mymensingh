@@ -1269,6 +1269,10 @@ export class Room extends DurableObject<Env> {
   private removeMember(mem: Member): void {
     const r = this.room!;
     r.members = r.members.filter((m) => m !== mem);
+    if (!r.quick && mem.account) {
+      // what they invited people to is over: no one taps into a room they already left
+      this.db("invites ended", [this.env.DB.prepare("UPDATE invites SET status = 'expired' WHERE code = ? AND from_account = ? AND status = 'pending'").bind(r.code, mem.account)]);
+    }
     if (r.host === mem.id) r.host = r.quick ? -1 : r.members.length ? r.members[0].id : -1;
     r.touched = Date.now();
   }
@@ -1441,7 +1445,10 @@ export class Room extends DurableObject<Env> {
     if (msg.game !== undefined && !isGame(msg.game)) return this.error(ws, "bad_message", 'game: "ludo" | "sl"');
     if (typeof msg.teams === "boolean") r.settings.teams = msg.teams;
     // (pair_ask from clients before per-person "Ask before pairing" is ignored: each person's own hello says it)
-    if (isGame(msg.game)) r.settings.game = msg.game;
+    if (isGame(msg.game) && msg.game !== r.settings.game) {
+      r.settings.game = msg.game;
+      this.db("invites' game", [this.env.DB.prepare("UPDATE invites SET game = ? WHERE code = ? AND status = 'pending'").bind(msg.game, r.code)]);   // they read the right game
+    }
     r.touched = Date.now();
     this.broadcast(this.lobbyMsg());
   }
@@ -2563,6 +2570,7 @@ export class Room extends DurableObject<Env> {
       const stmts: D1PreparedStatement[] = [];
       const m = r.match;
       if (r.status === "playing" && m) stmts.push(this.endMatchStmt(m, result, now));
+      if (!r.quick) stmts.push(this.env.DB.prepare("UPDATE invites SET status = 'expired' WHERE code = ? AND status = 'pending'").bind(r.code));
       stmts.push(D.upsertRoom(this.env.DB, { ...this.roomState(), status: "closed", online: 0, closed_reason: reason }, now));
       this.roomDirty = false;
       this.db("room closed", stmts);

@@ -21,7 +21,9 @@ export const SOCIAL = {
   recent: 30, // people kept per account (newest first)
   friends: 100, // friends per account
   inviteTtlMs: 10 * 60_000, // an invite expires after this (or when the room's match starts)
-  pairEveryMs: 10 * 60_000, // one invite from the same person to the same person per this long
+  againMs: 60_000, // the same room, still unanswered: another tap reminds them only after this long
+  pairPerHour: 6, // invites from the same person to the same person per hour, in any rooms
+  declineBlockMs: 30 * 60_000, // after their "Not now": no invites from that person to them for this long
   perHour: 20, // invites one account may send per hour ...
   perDay: 60, // ... and per day
   pushesPerHour: 6, // invite pushes one person gets per hour (more are still listed in the game)
@@ -238,6 +240,7 @@ const GAME_NAMES: Record<string, string> = { ludo: "Ludo", sl: "Snakes & Ladders
  *   DELETE social/friends          {uid} -> {ok}
  *   GET    social/invites          -> {invites: [{id, from, code, game, sent_at, expires_at}]}
  *   POST   social/invites          {uid, code} -> {ok, expires_at}
+ *   GET    social/invites/sent     -> {sent: [{uid, status, ...}]}: where the caller's own invites stand
  *   POST   social/invites/accept   {id} | {code} -> {ok, code, game} | 410 gone
  *   POST   social/invites/decline  {id} | {code} -> {ok}
  *   POST   social/prefs            {invites} -> {ok, prefs}
@@ -256,8 +259,10 @@ export async function handleSocial(req: Request, env: A.AccEnv, ctx: ExecutionCo
       return m === "GET" ? await pendingInvites(env, a, now) : method();
     case "social/invites/accept":
       return m === "POST" ? await acceptInvite(req, env, a, now) : method();
+    case "social/invites/sent":
+      return m === "GET" ? await sentInvites(env, a, now) : method();
     case "social/invites/decline":
-      return m === "POST" ? await declineInvite(req, env, a) : method();
+      return m === "POST" ? await declineInvite(req, env, a, now) : method();
     case "social/prefs":
       return m === "POST" ? await setPrefs(req, env, a, now) : method();
   }
@@ -323,10 +328,13 @@ async function removeFriend(req: Request, env: A.AccEnv, a: A.Authed): Promise<R
 /**
  * POST social/invites {uid, code}: invite someone from the recent or friends list into the caller's friend room
  * `code`. 404 not_found: not someone on the caller's lists; 409 not_in_room / room_full / started: the caller's
- * room can't take them (Room.inviteCheck); 429 {error: "rate", scope: "person" | "total", retry_at}: one invite per
- * person per 10 minutes, SOCIAL.perHour / perDay in all. Otherwise 200 {ok, expires_at} whatever happens next: the
- * invite is stored for the rate limits in every case, reaches the person (listed, pushed) only when their invites
- * are on, and nobody is told whether it did.
+ * room can't take them (Room.inviteCheck). Invites are open by default: a new room's invite replaces the old one at
+ * once, and an unanswered one can be repeated after SOCIAL.againMs (sooner: answered {ok} with no second push). What
+ * stops them: 429 {error: "rate", scope: "person", declined: true, retry_at}: they said "Not now" (an explicit answer;
+ * ignoring an invite never blocks); 429 {error: "rate", scope: "person", retry_at}: SOCIAL.pairPerHour; 429 {error:
+ * "rate", scope: "total", retry_at}: SOCIAL.perHour / perDay in all. Otherwise 200 {ok, expires_at, again_at} whatever
+ * happens next: the invite reaches the person (listed, pushed) only when their invites are on, and nobody is told
+ * whether it did.
  */
 async function sendInvite(req: Request, env: A.AccEnv, ctx: ExecutionContext, a: A.Authed, now: number): Promise<Response> {
   const o = await A.readBody(req);
@@ -343,25 +351,55 @@ async function sendInvite(req: Request, env: A.AccEnv, ctx: ExecutionContext, a:
   if (!check.ok) return A.authedJson(a, { error: check.error }, 409);
   const r = await db
     .prepare(
-      `SELECT MAX(CASE WHEN to_uid = ?2 AND at > ?3 THEN at END) AS pair_at,
+      `SELECT COALESCE(SUM(to_uid = ?2 AND at > ?4), 0) AS pair, MIN(CASE WHEN to_uid = ?2 AND at > ?4 THEN at END) AS pair_first,
+         MAX(CASE WHEN to_uid = ?2 AND status = 'declined' THEN expires_at END) AS declined_at,
+         MAX(CASE WHEN to_uid = ?2 AND code = ?3 AND status = 'pending' AND expires_at > ?6 THEN at END) AS open_at,
+         MAX(CASE WHEN to_uid = ?2 AND code = ?3 AND status = 'pending' AND expires_at > ?6 THEN expires_at END) AS open_until,
          COALESCE(SUM(at > ?4), 0) AS hour, MIN(CASE WHEN at > ?4 THEN at END) AS hour_first,
          COUNT(*) AS day, MIN(at) AS day_first
        FROM invites WHERE from_account = ?1 AND at > ?5`,
     )
-    .bind(me, uid, now - SOCIAL.pairEveryMs, now - 3_600_000, now - 86_400_000)
-    .first<{ pair_at: number | null; hour: number; hour_first: number | null; day: number; day_first: number | null }>();
-  if (r?.pair_at) return A.authedJson(a, { error: "rate", scope: "person", retry_at: sec(r.pair_at + SOCIAL.pairEveryMs) }, 429);
+    .bind(me, uid, code, now - 3_600_000, now - 86_400_000, now)
+    .first<{ pair: number; pair_first: number | null; declined_at: number | null; open_at: number | null; open_until: number | null; hour: number; hour_first: number | null; day: number; day_first: number | null }>();
+  if (r?.declined_at && now < r.declined_at + SOCIAL.declineBlockMs) {
+    return A.authedJson(a, { error: "rate", scope: "person", declined: true, retry_at: sec(r.declined_at + SOCIAL.declineBlockMs) }, 429);
+  }
+  if (r?.open_at && now < r.open_at + SOCIAL.againMs) {
+    return A.authedJson(a, { ok: true, expires_at: sec(r.open_until ?? now), again_at: sec(r.open_at + SOCIAL.againMs) });
+  }
+  if (r && r.pair >= SOCIAL.pairPerHour) return A.authedJson(a, { error: "rate", scope: "person", retry_at: sec((r.pair_first ?? now) + 3_600_000) }, 429);
   if (r && r.hour >= SOCIAL.perHour) return A.authedJson(a, { error: "rate", scope: "total", retry_at: sec((r.hour_first ?? now) + 3_600_000) }, 429);
   if (r && r.day >= SOCIAL.perDay) return A.authedJson(a, { error: "rate", scope: "total", retry_at: sec((r.day_first ?? now) + 86_400_000) }, 429);
   const id = newInviteId();
   const to = p.account_id !== null && p.invites_on === 1 ? p.account_id : null;
   const expires = now + SOCIAL.inviteTtlMs;
-  await db
-    .prepare("INSERT INTO invites (id, from_account, to_uid, to_account, code, game, at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')")
-    .bind(id, me, uid, to, code, check.game, now, expires)
-    .run();
+  await db.batch([
+    db.prepare("UPDATE invites SET status = 'expired' WHERE from_account = ? AND to_uid = ? AND status = 'pending'").bind(me, uid), // (the room they were asked to before)
+    db
+      .prepare("INSERT INTO invites (id, from_account, to_uid, to_account, code, game, at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')")
+      .bind(id, me, uid, to, code, check.game, now, expires),
+  ]);
   if (to) ctx.waitUntil(invitePush(env, id, to, shownName(check.name), check.game, code, now).catch((e) => console.error("invite push failed:", e)));
-  return A.authedJson(a, { ok: true, expires_at: sec(expires) });
+  return A.authedJson(a, { ok: true, expires_at: sec(expires), again_at: sec(now + SOCIAL.againMs) });
+}
+
+/**
+ * GET social/invites/sent: where the caller's invites stand, for the lists' buttons: {sent: [{uid, status: "invited",
+ * code, expires_at, again_at} | {uid, status: "declined", retry_at}]}. Accepted, expired and replaced ones aren't listed.
+ */
+async function sentInvites(env: A.AccEnv, a: A.Authed, now: number): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    "SELECT to_uid AS uid, code, status, at, expires_at AS exp FROM invites WHERE from_account = ? AND at > ? ORDER BY at ASC",
+  )
+    .bind(a.row.id, now - SOCIAL.inviteTtlMs - SOCIAL.declineBlockMs)
+    .all<{ uid: string; code: string; status: string; at: number; exp: number }>();
+  const last = new Map(results.map((r) => [r.uid, r]));
+  const sent: Record<string, unknown>[] = [];
+  for (const r of last.values()) {
+    if (r.status === "pending" && r.exp > now) sent.push({ uid: r.uid, status: "invited", code: r.code, expires_at: sec(r.exp), again_at: sec(r.at + SOCIAL.againMs) });
+    else if (r.status === "declined" && now < r.exp + SOCIAL.declineBlockMs) sent.push({ uid: r.uid, status: "declined", retry_at: sec(r.exp + SOCIAL.declineBlockMs) });
+  }
+  return A.authedJson(a, { sent });
 }
 
 /** The invite's push (kind "invite", channel game, link room:<CODE>), unless the person had SOCIAL.pushesPerHour. */
@@ -432,14 +470,17 @@ async function acceptInvite(req: Request, env: A.AccEnv, a: A.Authed, now: numbe
     .bind(open ? "accepted" : "expired", a.row.id, inv.code)
     .run();
   if (!open) return A.authedJson(a, { error: "gone" }, 410);
-  return A.authedJson(a, { ok: true, code: inv.code, game: inv.game });
+  return A.authedJson(a, { ok: true, code: inv.code, game: check.game });
 }
 
-/** POST social/invites/decline {id} | {code}: "Not now" (the sender is never told). Idempotent. */
-async function declineInvite(req: Request, env: A.AccEnv, a: A.Authed): Promise<Response> {
+/**
+ * POST social/invites/decline {id} | {code}: "Not now". Idempotent. The inviter's row then says so, and they can't
+ * invite this person again for SOCIAL.declineBlockMs (counted from expires_at, which a decline sets to now).
+ */
+async function declineInvite(req: Request, env: A.AccEnv, a: A.Authed, now: number): Promise<Response> {
   const k = inviteKey(await A.readBody(req));
-  await env.DB.prepare("UPDATE invites SET status = 'declined' WHERE to_account = ? AND status = 'pending' AND (id = ? OR code = ?)")
-    .bind(a.row.id, k.id, k.code)
+  await env.DB.prepare("UPDATE invites SET status = 'declined', expires_at = ? WHERE to_account = ? AND status = 'pending' AND (id = ? OR code = ?)")
+    .bind(now, a.row.id, k.id, k.code)
     .run();
   return A.authedJson(a, { ok: true });
 }

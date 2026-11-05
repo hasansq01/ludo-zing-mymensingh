@@ -67,7 +67,7 @@ async function recentOf(g: Guest, n: number): Promise<Json[]> {
 /** An answer with its times made relative to `now` (what two invites at the same moment must share). */
 function shape(r: { status: number; body: Json }, now = NOW): Json {
   const b = { ...r.body };
-  for (const k of ["expires_at", "retry_at"]) if (typeof b[k] === "number") b[k] -= now;
+  for (const k of ["expires_at", "retry_at", "again_at"]) if (typeof b[k] === "number") b[k] -= now;
   return { status: r.status, body: b };
 }
 
@@ -267,7 +267,7 @@ describe("invites", () => {
     const r = await invite(a, uid.b, code);
     const took = Date.now() - t0;
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ ok: true, expires_at: NOW + 600 });
+    expect(r.body).toEqual({ ok: true, expires_at: NOW + 600, again_at: NOW + 60 });
     expect(took).toBeLessThan(800);
     const pending = await invites(b);
     expect(pending).toHaveLength(1);
@@ -293,22 +293,22 @@ describe("invites", () => {
     const { code, cs } = await lobby([a]);
     const t = NOW + 1000;
     const first = [await invite(a, uid.ghost, code, t), await invite(a, uid.b, code, t), await invite(a, uid.c, code, t)].map((r) => shape(r, t));
-    expect(first[0]).toEqual({ status: 200, body: { ok: true, expires_at: 600 } });
+    expect(first[0]).toEqual({ status: 200, body: { ok: true, expires_at: 600, again_at: 60 } });
     expect(first[1]).toEqual(first[0]);
     expect(first[2]).toEqual(first[0]);
-    // again a minute later: the per-person limit, alike for all three
-    const again = [await invite(a, uid.ghost, code, t + MIN), await invite(a, uid.b, code, t + MIN), await invite(a, uid.c, code, t + MIN)].map((r) => shape(r, t));
-    expect(again[0]).toEqual({ status: 429, body: { error: "rate", scope: "person", retry_at: 600 } });
+    // tapped again a moment later: still fine, the same invite, alike for all three
+    const again = [await invite(a, uid.ghost, code, t + 10), await invite(a, uid.b, code, t + 10), await invite(a, uid.c, code, t + 10)].map((r) => shape(r, t));
+    expect(again[0]).toEqual({ status: 200, body: { ok: true, expires_at: 600, again_at: 60 } });
     expect(again[1]).toEqual(again[0]);
     expect(again[2]).toEqual(again[0]);
-    // and after 10 minutes, all three can be invited again
-    const later = [await invite(a, uid.ghost, code, t + 600), await invite(a, uid.b, code, t + 600), await invite(a, uid.c, code, t + 600)].map((r) => shape(r, t + 600));
+    // after a minute, a reminder is a new invite, for all three
+    const later = [await invite(a, uid.ghost, code, t + 61), await invite(a, uid.b, code, t + 61), await invite(a, uid.c, code, t + 61)].map((r) => shape(r, t));
     expect(later[1]).toEqual(later[0]);
     expect(later[2]).toEqual(later[0]);
-    expect(later[0].status).toBe(200);
+    expect(later[0]).toEqual({ status: 200, body: { ok: true, expires_at: 661, again_at: 121 } });
     // the person with invites off sees nothing and gets no push; the one who ignores it has it listed
-    expect(await invites(c, t + 601)).toEqual([]);
-    expect((await invites(b, t + 601)).length).toBeGreaterThan(0);
+    expect(await invites(c, t + 62)).toEqual([]);
+    expect((await invites(b, t + 62)).length).toBeGreaterThan(0);
     await eventually(async () => fcm.delivered.some((m) => m.token === tok.b), 5000, "b's push");
     await sleep(200);
     expect(fcm.delivered.filter((m) => m.token === tok.c)).toEqual([]);
@@ -338,7 +338,7 @@ describe("invites", () => {
     for (const x of [...cs, ...other.cs, ...full.cs, ...started.cs]) x.close();
   });
 
-  it("expires after 10 minutes and when the room's match starts; decline is silent", async () => {
+  it("expires after 10 minutes and when the room's match starts; decline ends it", async () => {
     const t = NOW + 5000;
     const r1 = await lobby([a]);
     await invite(a, uid.b, r1.code, t);
@@ -437,6 +437,54 @@ describe("invites", () => {
     expect(await invites(y, t + 1401)).toHaveLength(1);
     expect((await v1("social/prefs", { session: y.session, body: { invites: "no" } })).status).toBe(400);
     for (const z of cs) z.close();
+  });
+
+  it("your exact case: the wrong game, leave, a new room: the new invite goes at once and replaces the old", async () => {
+    const t = NOW + 200_000;
+    const wrong = await lobby([a]);
+    await invite(a, uid.b, wrong.code, t);
+    const right = await lobby([a]);
+    const r = shape(await invite(a, uid.b, right.code, t + 5), t + 5);
+    expect(r).toEqual({ status: 200, body: { ok: true, expires_at: 600, again_at: 60 } });
+    const list = await invites(b, t + 6);
+    expect(list.map((i: Json) => i.code)).toEqual([right.code]);
+    for (const x of [...wrong.cs, ...right.cs]) x.close();
+  });
+
+  it("their Not now stops that inviter for 30 minutes, in any room; ignoring never does", async () => {
+    const t = NOW + 210_000;
+    const r1 = await lobby([a]);
+    await invite(a, uid.b, r1.code, t);
+    const p = await invites(b, t + 1);
+    await ok("social/invites/decline", { session: b.session, body: { id: p[0].id }, now: t + 100 });
+    const r2 = await lobby([a]);
+    expect(shape(await invite(a, uid.b, r2.code, t + 101), t + 100)).toEqual({ status: 429, body: { error: "rate", scope: "person", declined: true, retry_at: 1800 } });
+    expect((await invites(b, t + 102))).toEqual([]);
+    const sent = await ok("social/invites/sent", { session: a.session, now: t + 102 });
+    expect(sent.sent.find((x: Json) => x.uid === uid.b)).toMatchObject({ status: "declined", retry_at: t + 1900 });
+    expect((await invite(a, uid.b, r2.code, t + 1901)).status).toBe(200);
+    for (const x of [...r1.cs, ...r2.cs]) x.close();
+  });
+
+  it("leaving ends your invites; switching game updates them; the list says where they stand", async () => {
+    const t = NOW + 220_000;
+    const r1 = await lobby([a]);
+    await invite(a, uid.b, r1.code, t);
+    expect((await ok("social/invites/sent", { session: a.session, now: t + 1 })).sent.find((x: Json) => x.uid === uid.b)).toMatchObject({ status: "invited", code: r1.code, again_at: t + 60 });
+    r1.cs[0].send({ t: "settings", game: "sl" });
+    await eventually(async () => (await invites(b, t + 2))[0]?.game === "sl", 5000, "the game follows");
+    r1.cs[0].send({ t: "leave" });
+    await eventually(async () => (await invites(b, t + 3)).length === 0, 5000, "ended on leave");
+    expect((await ok("social/invites/sent", { session: a.session, now: t + 4 })).sent.find((x: Json) => x.uid === uid.b)).toBeUndefined();
+    for (const x of r1.cs) x.close();
+  });
+
+  it("still no spam: 6 an hour to the same person", async () => {
+    const t = NOW + 230_000;
+    const r1 = await lobby([a]);
+    for (let k = 0; k < 6; k++) expect((await invite(a, uid.ghost, r1.code, t + k * 61)).status).toBe(200);
+    expect(shape(await invite(a, uid.ghost, r1.code, t + 400), t)).toEqual({ status: 429, body: { error: "rate", scope: "person", retry_at: 3600 } });
+    for (const x of r1.cs) x.close();
   });
 });
 

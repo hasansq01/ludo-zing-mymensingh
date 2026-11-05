@@ -277,7 +277,7 @@ msgstr "এই রুম শপে নেই।"
 #. catalog.gd buy_text()
 #. collection.gd buy_char()
 #. sl_scenes.gd buy_scene()
-#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:293
+#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:318
 msgid "You already own %s."
 msgstr "%s তোমার আগে থেকেই আছে।"
 
@@ -1966,7 +1966,7 @@ msgstr "বের হও"
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/main.gd:1352 scripts/net/online.gd:244 scripts/net/social.gd:429
+#: scripts/main.gd:1352 scripts/net/online.gd:244 scripts/net/social.gd:502
 msgid "Stay"
 msgstr "থাকো"
 
@@ -2097,7 +2097,7 @@ msgstr "সাইন ইন হচ্ছে… একটু পরে আবা�
 #. social.gd _error_text()
 #. social.gd invite_error_text()
 #. rewards_sheet.gd _on_watched()
-#: scripts/net/account.gd:505 scripts/net/net_client.gd:215 scripts/net/social.gd:263 scripts/net/social.gd:322 scripts/ui/sheets/rewards_sheet.gd:181
+#: scripts/net/account.gd:505 scripts/net/net_client.gd:215 scripts/net/social.gd:285 scripts/net/social.gd:395 scripts/ui/sheets/rewards_sheet.gd:181
 msgid "Something went wrong. Please try again."
 msgstr "কিছু একটা গোলমাল হয়েছে। আবার চেষ্টা করো।"
 
@@ -2295,14 +2295,15 @@ msgstr "হ্যাঁ"
 
 #. notifications.gd _ask()
 #. invite_banner.gd _init()
+#. friends_sheet.gd _invite_text()
 #. shop_sheet.gd buy_with_gems()
-#: scripts/net/notifications.gd:352 scripts/ui/components/invite_banner.gd:77 scripts/ui/sheets/shop_sheet.gd:835
+#: scripts/net/notifications.gd:352 scripts/ui/components/invite_banner.gd:77 scripts/ui/sheets/friends_sheet.gd:388 scripts/ui/sheets/shop_sheet.gd:835
 msgid "Not now"
 msgstr "এখন না"
 
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/net/online.gd:244 scripts/net/social.gd:428
+#: scripts/net/online.gd:244 scripts/net/social.gd:501
 msgid "Leave this room?"
 msgstr "রুম ছেড়ে যাবে?"
 
@@ -2415,39 +2416,39 @@ msgid "Get the game:"
 msgstr "গেমটা নামাও:"
 
 #. social.gd ask_friend()
-#: scripts/net/social.gd:214
+#: scripts/net/social.gd:236
 msgid "Remove from friends?"
 msgstr "বন্ধু তালিকা থেকে সরাবে?"
 
 #. social.gd ask_friend()
-#: scripts/net/social.gd:214
+#: scripts/net/social.gd:236
 msgid "%s leaves your friends list. They aren’t told."
 msgstr "%s তোমার বন্ধু তালিকা থেকে সরে যাবে। ওকে জানানো হবে না।"
 
 #. social.gd ask_friend()
-#: scripts/net/social.gd:215
+#: scripts/net/social.gd:237
 msgid "Remove"
 msgstr "সরাও"
 
 #. social.gd ask_friend()
-#: scripts/net/social.gd:215
+#: scripts/net/social.gd:237
 msgid "Keep"
 msgstr "রেখে দাও"
 
 #. social.gd ask_friend()
-#: scripts/net/social.gd:218
+#: scripts/net/social.gd:240
 msgid "%s removed from friends"
 msgstr "%s বন্ধু তালিকা থেকে সরানো হলো"
 
 #. social.gd ask_friend()
 #. social.gd ask_seat()
-#: scripts/net/social.gd:220 scripts/net/social.gd:241
+#: scripts/net/social.gd:242 scripts/net/social.gd:263
 msgid "Add to friends?"
 msgstr "বন্ধু তালিকায় যোগ করবে?"
 
 #. social.gd ask_friend()
 #. social.gd ask_seat()
-#: scripts/net/social.gd:220 scripts/net/social.gd:241
+#: scripts/net/social.gd:242 scripts/net/social.gd:263
 msgid "Add friend"
 msgstr "যোগ করো"
 
@@ -2457,93 +2458,108 @@ msgstr "যোগ করো"
 #. Sheets (shared dialogs) · sheet.gd make_confirm()
 #. quick_sheet.gd _build_search()
 #. settings_sheet.gd _confirm_reset()
-#: scripts/net/social.gd:220 scripts/net/social.gd:241 scripts/ui/sheet.gd:811 scripts/ui/sheet.gd:822 scripts/ui/sheets/quick_sheet.gd:124 scripts/ui/sheets/settings_sheet.gd:539
+#: scripts/net/social.gd:242 scripts/net/social.gd:263 scripts/ui/sheet.gd:811 scripts/ui/sheet.gd:822 scripts/ui/sheets/quick_sheet.gd:124 scripts/ui/sheets/settings_sheet.gd:539
 msgid "Cancel"
 msgstr "বাতিল"
 
 #. social.gd _add_text()
-#: scripts/net/social.gd:247
+#: scripts/net/social.gd:269
 msgid "Invite %s to your games from your friends list. They aren’t told you added them."
 msgstr "বন্ধু তালিকা থেকে %s-কে তোমার খেলায় ডাকতে পারবে। তুমি যোগ করেছ, সেটা ওকে জানানো হবে না।"
 
 #. social.gd _added_toast()
-#: scripts/net/social.gd:251
+#: scripts/net/social.gd:273
 msgid "%s added to friends"
 msgstr "%s এখন তোমার বন্ধু তালিকায়"
 
 #. social.gd _error_text()
-#: scripts/net/social.gd:258
+#: scripts/net/social.gd:280
 msgid "Connect to the internet to add friends."
 msgstr "বন্ধু যোগ করতে ইন্টারনেটে কানেক্ট করো।"
 
 #. social.gd _error_text()
-#: scripts/net/social.gd:260
+#: scripts/net/social.gd:282
 msgid "Your friends list is full. Remove someone first."
 msgstr "বন্ধু তালিকা ভরে গেছে। আগে কাউকে সরাও।"
 
 #. social.gd _error_text()
-#: scripts/net/social.gd:262
+#: scripts/net/social.gd:284
 msgid "That player can’t be added right now."
 msgstr "এই প্লেয়ারকে এখন যোগ করা যাচ্ছে না।"
 
+#. social.gd refresh_sent()
+#: scripts/net/social.gd:343
+msgid "%s can’t play right now."
+msgstr "%s এখন খেলতে পারছেন না।"
+
+#. social.gd refresh_sent()
+#: scripts/net/social.gd:343
+msgid "Your friend"
+msgstr "আপনার বন্ধু"
+
 #. social.gd _invite_done()
-#: scripts/net/social.gd:295
+#: scripts/net/social.gd:368
 msgid "Invite sent to %s"
 msgstr "%s-কে ডাক পাঠানো হয়েছে"
 
+#. social.gd _invite_done()
+#: scripts/net/social.gd:374
+msgid "%s said not now. You can invite them again later."
+msgstr "%s এখন না বলেছেন। পরে আবার আমন্ত্রণ করতে পারবেন।"
+
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:309
+#: scripts/net/social.gd:382
 msgid "Connect to the internet to invite friends."
 msgstr "বন্ধুদের ডাকতে ইন্টারনেটে কানেক্ট করো।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:311
+#: scripts/net/social.gd:384
 msgid "Finish this game first."
 msgstr "আগে এই খেলাটা শেষ করো।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:313
-msgid "You invited %s a moment ago."
-msgstr "%s-কে একটু আগেই ডেকেছ।"
+#: scripts/net/social.gd:386
+msgid "You’ve invited %s a lot. Try again later."
+msgstr "%s-কে অনেকবার আমন্ত্রণ করেছেন। পরে আবার চেষ্টা করুন।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:313
+#: scripts/net/social.gd:386
 msgid "That’s a lot of invites. Try again later."
 msgstr "অনেক ডাক পাঠানো হয়ে গেছে। পরে আবার চেষ্টা করো।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:315
+#: scripts/net/social.gd:388
 msgid "You can invite players you’ve played with or added."
 msgstr "যাদের সাথে খেলেছ বা যোগ করেছ, শুধু তাদেরই ডাকতে পারবে।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:317
+#: scripts/net/social.gd:390
 msgid "Your room is full."
 msgstr "তোমার রুম ভরে গেছে।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:319
+#: scripts/net/social.gd:392
 msgid "Your game has started."
 msgstr "তোমার খেলা শুরু হয়ে গেছে।"
 
 #. social.gd invite_error_text()
-#: scripts/net/social.gd:321
+#: scripts/net/social.gd:394
 msgid "Make a room first."
 msgstr "আগে একটা রুম বানাও।"
 
 #. social.gd _on_join()
-#: scripts/net/social.gd:420
+#: scripts/net/social.gd:493
 msgid "That invite has ended."
 msgstr "এই ডাকের সময় শেষ।"
 
 #. social.gd _on_join()
-#: scripts/net/social.gd:428
+#: scripts/net/social.gd:501
 msgid "You’ll join %s’s room instead."
 msgstr "এর বদলে %s-এর রুমে ঢুকবে।"
 
 #. social.gd _on_join()
 #. invite_banner.gd _init()
-#: scripts/net/social.gd:429 scripts/ui/components/invite_banner.gd:79
+#: scripts/net/social.gd:502 scripts/ui/components/invite_banner.gd:79
 msgid "Join"
 msgstr "ঢোকো"
 
@@ -3634,7 +3650,7 @@ msgstr "3 জন পর্যন্ত বন্ধুর সাথে যার
 
 #. friends_sheet.gd _room_pane()
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:120 scripts/ui/sheets/friends_sheet.gd:451
+#: scripts/ui/sheets/friends_sheet.gd:120 scripts/ui/sheets/friends_sheet.gd:462
 msgid "Create room"
 msgstr "রুম বানাও"
 
@@ -3661,7 +3677,7 @@ msgstr "পেস্ট"
 
 #. friends_sheet.gd _room_pane()
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:153 scripts/ui/sheets/friends_sheet.gd:452
+#: scripts/ui/sheets/friends_sheet.gd:153 scripts/ui/sheets/friends_sheet.gd:463
 msgid "Join room"
 msgstr "রুমে ঢোকো"
 
@@ -3723,41 +3739,44 @@ msgstr "বন্ধু তালিকা থেকে সরাও"
 msgid "Add to friends"
 msgstr "বন্ধু তালিকায় যোগ করো"
 
-#. friends_sheet.gd _person_row()
-#. friends_sheet.gd _invite()
-#: scripts/ui/sheets/friends_sheet.gd:339 scripts/ui/sheets/friends_sheet.gd:390
-msgid "Invited"
-msgstr "ডাকা হয়েছে"
-
-#. friends_sheet.gd _person_row()
-#. friends_sheet.gd _invite()
-#. lobby_sheet.gd _member_row()
-#: scripts/ui/sheets/friends_sheet.gd:339 scripts/ui/sheets/friends_sheet.gd:390 scripts/ui/sheets/lobby_sheet.gd:280
-msgid "Invite"
-msgstr "ডাকো"
-
 #. friends_sheet.gd sub_text()
 #: scripts/ui/sheets/friends_sheet.gd:367
 msgid "Added %s"
 msgstr "যোগ করেছ %s"
 
+#. friends_sheet.gd _invite_text()
+#: scripts/ui/sheets/friends_sheet.gd:384
+msgid "Invited"
+msgstr "ডাকা হয়েছে"
+
+#. friends_sheet.gd _invite_text()
+#: scripts/ui/sheets/friends_sheet.gd:386
+msgid "Remind"
+msgstr "মনে করান"
+
+#. friends_sheet.gd _invite_text()
+#. lobby_sheet.gd _member_row()
+#: scripts/ui/sheets/friends_sheet.gd:389 scripts/ui/sheets/lobby_sheet.gd:280
+msgid "Invite"
+msgstr "ডাকো"
+
 #. friends_sheet.gd _invite()
-#: scripts/ui/sheets/friends_sheet.gd:385
+#: scripts/ui/sheets/friends_sheet.gd:396
 msgid "Inviting…"
 msgstr "ডাকা হচ্ছে…"
 
 #. friends_sheet.gd paste()
-#: scripts/ui/sheets/friends_sheet.gd:411
+#: scripts/ui/sheets/friends_sheet.gd:422
 msgid "No room code to paste"
 msgstr "পেস্ট করার মতো রুম কোড নেই"
 
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:451
+#: scripts/ui/sheets/friends_sheet.gd:462
 msgid "Creating…"
 msgstr "বানানো হচ্ছে…"
 
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:452
+#: scripts/ui/sheets/friends_sheet.gd:463
 msgid "Joining…"
 msgstr "যুক্ত হচ্ছে…"
 
@@ -5248,8 +5267,8 @@ msgstr "আজকের মেনু"
 
 #. sl_scenes.gd
 #: scripts/world/sl_scenes.gd:21
-msgid "The classic sunny jungle."
-msgstr "ক্লাসিক রোদেলা জঙ্গল।"
+msgid "The classic jungle at golden hour."
+msgstr "সোনালি বিকেলের চিরচেনা জঙ্গল।"
 
 #. sl_scenes.gd
 #: scripts/world/sl_scenes.gd:22
@@ -5277,23 +5296,29 @@ msgid "Glowing mushrooms, fireflies, golden snakes."
 msgstr "জ্বলজ্বলে মাশরুম, জোনাকি আর সোনালি সাপ।"
 
 #. sl_scenes.gd buy_scene()
-#: scripts/world/sl_scenes.gd:291
+#: scripts/world/sl_scenes.gd:316
 msgid "That scene isn’t in the shop."
 msgstr "এই সিন শপে নেই।"
 
 # REVIEW: painted on the 3D sign in big letters (first line)
 #. sl_scenes.gd _make_sign()
 #. TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
-#: scripts/world/sl_scenes.gd:1168
+#: scripts/world/sl_scenes.gd:1254
 msgid "SNAKES"
 msgstr "সাপ"
 
 # REVIEW: painted on the 3D sign in big letters (second line); first line is সাপ. Needs a font with Bangla glyphs.
 #. sl_scenes.gd _make_sign()
 #. TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
-#: scripts/world/sl_scenes.gd:1168
+#: scripts/world/sl_scenes.gd:1254
 msgid "& LADDERS"
 msgstr "সিঁড়ি"
+
+#~ msgid "The classic sunny jungle."
+#~ msgstr "ক্লাসিক রোদেলা জঙ্গল।"
+
+#~ msgid "You invited %s a moment ago."
+#~ msgstr "%s-কে একটু আগেই ডেকেছ।"
 
 #~ msgid "Gold bands at the foot, the waist and the collar."
 #~ msgstr "পায়ে, কোমরে আর গলায় সোনালি পাড়।"

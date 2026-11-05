@@ -14,7 +14,7 @@ extends Sheet
 ## with Try again, an empty note saying how people get there, or the rows (UIKit.list_row: avatar in its frame with the
 ## level star, name, the line under it, Invite). Long-press a row to add the person to friends or remove them
 ## (Social.ask_friend) too. Invite asks Social, which brings them into the room you are in (in none, a new room is made
-## first and its lobby opens, closing this sheet); the button then says "Invited" for as long as the invite lasts.
+## first and its lobby opens, closing this sheet); the button then says "Invited", "Remind" after a minute without an answer, or "Not now" if they said so.
 ## invite mode (the lobby's "Invite friends"): only Friends and Recent, under the title "Invite friends".
 ##
 ##   var s := FriendsSheet.new("sl")           # the game a new room starts with (the host can change it in the lobby)
@@ -336,7 +336,7 @@ func _person_row(p: Dictionary, key: String) -> Control:
 	star.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	star.pressed.connect(_star.bind(p, star))
 	h.add_child(star)
-	var inv := UIKit.btn(tr("Invited") if s != null and s.was_invited(uid) else tr("Invite"), "honey", "xs")   # dense (a 48 px target): the name and its line keep the room
+	var inv := UIKit.btn(_invite_text(s.invite_state(uid) if s != null else ""), "honey", "xs")   # dense (a 48 px target): the name and its line get the room
 	inv.name = "Invite"
 	inv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	inv.custom_minimum_size.x = 76
@@ -377,6 +377,17 @@ func _star(p: Dictionary, b: Button) -> void:
 	if is_instance_valid(b):
 		b.disabled = false                   # (kept when Remove was cancelled; else the redraw replaced the row)
 
+## A row's Invite button, by Social.invite_state.
+static func _invite_text(state: String) -> String:
+	match state:
+		"invited":
+			return L10n.t("Invited")
+		"remind":
+			return L10n.t("Remind")
+		"declined":
+			return L10n.t("Not now")
+	return L10n.t("Invite")
+
 func _invite(p: Dictionary, b: Button) -> void:
 	var s := _social()
 	if s == null or b.disabled:
@@ -387,7 +398,7 @@ func _invite(p: Dictionary, b: Button) -> void:
 	if not is_instance_valid(b):
 		return                               # (a new room's lobby closed this sheet)
 	var done := s.was_invited(str(p.get("uid", "")))
-	b.text = tr("Invited") if done else tr("Invite")
+	b.text = _invite_text(s.invite_state(str(p.get("uid", ""))))
 	b.disabled = done
 	UIKit.set_kind(b, "off" if done else "honey")
 
