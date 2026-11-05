@@ -372,31 +372,44 @@ export function usageSnapshot(env: UsageEnv, now: number): Promise<UsageBody> {
 export const ERRORS_QUERY = `query Errors($accountTag: string!, $start: Time!, $end: Time!, $script: string!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
-      workers: workersInvocationsAdaptive(limit: 10, filter: { datetime_geq: $start, datetime_lt: $end, scriptName: $script }) {
+      workers: workersInvocationsAdaptive(limit: 20, filter: { datetime_geq: $start, datetime_lt: $end, scriptName: $script }) {
+        dimensions { status }
         sum { requests errors }
       }
-      durableObjects: durableObjectsInvocationsAdaptiveGroups(limit: 10, filter: { datetime_geq: $start, datetime_lt: $end, scriptName: $script }) {
+      durableObjects: durableObjectsInvocationsAdaptiveGroups(limit: 20, filter: { datetime_geq: $start, datetime_lt: $end, scriptName: $script }) {
+        dimensions { status }
         sum { requests errors }
       }
     }
   }
 }`;
 
-export async function cloudflareErrors(env: UsageEnv, now: number): Promise<{ requests: number; errors: number }> {
+/**
+ * What Cloudflare counts as an error but isn't one: a phone dropping its connection, and a room's alarm cancelled
+ * because the bot chain moved it (Room.chain). Any other status counts, also one we have never seen.
+ */
+export const NOT_FAILURES: readonly string[] = ["success", "clientDisconnected", "responseStreamDisconnected", "canceled", "cancelled"];
+
+export async function cloudflareErrors(env: UsageEnv, now: number): Promise<{ requests: number; errors: number; by_status: Record<string, number> }> {
   const res = await post(env.CF_API_TOKEN!, ERRORS_QUERY, {
     accountTag: env.CF_ACCOUNT_ID || ACCOUNT_ID,
     start: new Date(now - HOUR).toISOString(),
     end: new Date(now).toISOString(),
     script: WORKER_NAME,
   });
-  const acc = res as { workers?: Array<Row<{ requests: number; errors: number }, unknown>>; durableObjects?: Array<Row<{ requests: number; errors: number }, unknown>> };
+  type ErrorRow = { dimensions?: { status?: string }; sum?: { requests: number; errors: number } };
+  const acc = res as { workers?: ErrorRow[]; durableObjects?: ErrorRow[] };
   let requests = 0;
   let errors = 0;
+  const by_status: Record<string, number> = {};
   for (const r of [...(acc.workers ?? []), ...(acc.durableObjects ?? [])]) {
+    const status = r.dimensions?.status ?? "unknown";
+    const n = r.sum?.errors ?? 0;
     requests += r.sum?.requests ?? 0;
-    errors += r.sum?.errors ?? 0;
+    if (n > 0) by_status[status] = (by_status[status] ?? 0) + n;
+    if (!NOT_FAILURES.includes(status)) errors += n;
   }
-  return { requests, errors };
+  return { requests, errors, by_status };
 }
 
 // ---------- cache (per isolate; 5 minutes) ----------

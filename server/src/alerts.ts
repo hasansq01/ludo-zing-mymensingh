@@ -9,7 +9,7 @@
 //  - the pace: at the rate of the last 3 hours, an allowance runs out before the 00:00 UTC reset;
 //  - Cloudflare's usage can't be read (twice in a row): the warnings above are blind;
 //  - server errors in the last hour (Cloudflare's count for the Worker and its Durable Objects, plus the Worker errors
-//    the fetch handler logged in D1 `events`);
+//    the fetch handler logged in D1 `events`). Phones disconnecting and cancelled alarms don't count (usage.ts NOT_FAILURES);
 //  - push sending failing today (D1 push_events);
 //  - from 03:00 UTC (09:00 Bangladesh), once: yesterday's summary.
 import * as D from "./db";
@@ -69,6 +69,8 @@ export interface CheckResult {
   usage: string;
   /** "ok", "skipped" (no token), or why the error count could not be read. */
   errors_check: string;
+  /** Cloudflare's error count in the last hour by status, the ones that don't count (usage.ts NOT_FAILURES) included. */
+  errors_by_status: Record<string, number>;
   /** The highest daily allowance now: {id, percent}. */
   top: { id: string; percent: number } | null;
   /** Keys of the alerts raised by this check (already raised ones are not). */
@@ -368,11 +370,13 @@ export async function checkAlerts(env: AEnv, now = Date.now()): Promise<CheckRes
     .first<{ n: number }>();
   let requests = 0;
   let errors = logged?.n ?? 0;
+  let errorsByStatus: Record<string, number> = {};
   if (env.CF_API_TOKEN) {
     try {
       const cf = await cloudflareErrors(env, now);
       requests = cf.requests;
       errors += cf.errors;
+      errorsByStatus = cf.by_status;
       errorsMsg = "ok";
     } catch (e) {
       if (!(e instanceof CloudflareError)) throw e;
@@ -406,7 +410,7 @@ export async function checkAlerts(env: AEnv, now = Date.now()): Promise<CheckRes
   await raise(db, silent, now, true);
   const fresh = await raise(db, list, now);
   const pushed = await deliver(env, fresh).catch((e) => (console.error("alert push failed:", e), { sent: 0, failed: 0 }));
-  const result: CheckResult = { at: now, usage: usageMsg, errors_check: errorsMsg, top, raised: fresh.map((a) => a.key), pushed };
+  const result: CheckResult = { at: now, usage: usageMsg, errors_check: errorsMsg, errors_by_status: errorsByStatus, top, raised: fresh.map((a) => a.key), pushed };
   await db.batch([setState(db, "usage_fails", String(fails), now), setState(db, "last_check", JSON.stringify(result), now)]);
   if (fresh.length) console.log(`alerts: raised ${result.raised.join(", ")}; pushed ${pushed.sent} (${pushed.failed} failed)`);
   return result;

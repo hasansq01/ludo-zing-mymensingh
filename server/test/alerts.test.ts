@@ -31,7 +31,7 @@ const flat = (n: number, v: number): number[] => Array(n).fill(v);
 const morning = (total: number): number[] => [...flat(4, total / 4), ...flat(9, 0)];
 
 /** A fake Cloudflare: Workers requests `series[k]` in hour k of today, nothing else; `errors` in the last hour. */
-function fakeCloudflare(o: { series?: number[]; errors?: number; requests?: number; down?: boolean }) {
+function fakeCloudflare(o: { series?: number[]; errors?: number; requests?: number; down?: boolean; doRows?: Json[] }) {
   const calls: string[] = [];
   setCloudflareFetcher(async (_url, init) => {
     const b = JSON.parse(String(init?.body));
@@ -40,7 +40,7 @@ function fakeCloudflare(o: { series?: number[]; errors?: number; requests?: numb
     if (b.query === ERRORS_QUERY) {
       return Response.json({ data: { viewer: { accounts: [{
         workers: [{ sum: { requests: o.requests ?? 1000, errors: o.errors ?? 0 } }],
-        durableObjects: [{ sum: { requests: 0, errors: 0 } }],
+        durableObjects: o.doRows ?? [{ sum: { requests: 0, errors: 0 } }],
       }] } } });
     }
     const workers: Json[] = [];
@@ -210,6 +210,17 @@ describe("checkAlerts", () => {
     fakeCloudflare({ series: flat(13, 10) });
     await DB.prepare("INSERT INTO push_events (day, kind, sent, failed) VALUES ('2026-11-03', 'turn', 5, 25)").run();
     expect((await checkAlerts(E, NOON)).raised).toEqual(["server:push:2026-11-03"]);
+  });
+
+  it("a phone disconnecting and a cancelled alarm are not server errors; a crash and an unknown status are", async () => {
+    const dropped = (status: string, errors: number): Json => ({ dimensions: { status }, sum: { requests: errors, errors } });
+    fakeCloudflare({ series: flat(13, 10), requests: 300, errors: 0, doRows: [dropped("clientDisconnected", 40), dropped("canceled", 60)] });
+    let r = await checkAlerts(E, NOON);
+    expect(r.raised.filter((k) => k.startsWith("server:errors"))).toEqual([]);
+    expect(r.errors_by_status).toEqual({ clientDisconnected: 40, canceled: 60 });
+    fakeCloudflare({ series: flat(13, 10), requests: 300, errors: 0, doRows: [dropped("canceled", 60), dropped("scriptThrewException", 15), dropped("somethingNew", 15)] });
+    r = await checkAlerts(E, NOON);
+    expect(r.raised.filter((k) => k.startsWith("server:errors")).length).toBe(1);
   });
 
   it("many new alerts at once: one push that lists them, every row gets its result", async () => {
