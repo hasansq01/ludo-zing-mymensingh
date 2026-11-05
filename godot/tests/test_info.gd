@@ -61,7 +61,7 @@ func _run() -> void:
 				bad.append(k + ": " + x)
 	check("each has a title and 3+ bullets, bold as balanced [b] bbcode", bad.is_empty(), bad)
 	check("titles (Teams (2 v 2) renamed from Pair Mode)", Info.INFO.team.t == "Teams (2 v 2)" and Info.INFO.free.t == "Help your teammate" and Info.INFO.sl.t == "Snakes & Ladders rules" and Info.INFO.slEntry.t == "Entering the board" and Info.INFO.daily.t == "Daily reward")
-	check("bubbles stay short (3 to 5 bullets)", KEYS.map(func(k): return (Info.INFO[k].b as Array).size()) == [3, 4, 4, 4, 4, 3, 4, 3, 3, 5, 4], KEYS.map(func(k): return (Info.INFO[k].b as Array).size()))
+	check("bubbles stay short (3 to 5 bullets)", KEYS.map(func(k): return (Info.INFO[k].b as Array).size()) == [3, 4, 4, 4, 4, 3, 4, 3, 3, 5, 5], KEYS.map(func(k): return (Info.INFO[k].b as Array).size()))
 	var old_names := []
 	for k: String in KEYS:
 		var tx := text(k)
@@ -229,7 +229,7 @@ func _run_rules() -> void:
 	var dice_r := {"dice": "crema", "or": 400}
 	check("…an owned dice is swapped for coins", Rewards.grant_of({dice_owned = ["classic", "crema"]}, dice_r).coins == 400 and Rewards.grant_of({dice_owned = ["classic"]}, dice_r).dice == "crema")
 	t = text("scenes")
-	check("scenes text: the free scenes are named, the others cost coins", t.contains("Jungle Clearing and Enchanted Jungle are free") and SLScenes.LIST[0].name == "Jungle Clearing"
+	check("scenes text: the free scenes are named, the others cost coins", t.contains("Jungle Clearing, Snake Trail and Enchanted Jungle are free") and t.contains("Online matches always use the standard board") and SLScenes.LIST[0].name == "Jungle Clearing"
 		and SLScenes.LIST.all(func(x): return (x.price == 0) == SLScenes.FREE.has(x.id)))
 	check("camera texts name both views (Settings: 3D / Top)", text("cam").contains("3D:") and text("cam").contains("Top:") and text("slcam").contains("Top:"))
 

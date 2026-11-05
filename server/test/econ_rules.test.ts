@@ -307,6 +307,33 @@ describe("offline match claims", () => {
     expect(claimLimit(ludoWin, { coins: 200, xp: 100 }, { coins_today: 0, xp_today: 0, last_hour: 20 }, T0)).toEqual({ reason: "hourly", granted: false, coins: 0, xp: 0 });
   });
 
+  it("replay a Snake Trail win on the trail's squares, never on the classic board", () => {
+    const sl: ClaimInput = { game: "sl", mode: "cpu", result: "win", duration_s: 120 };
+    const rolls: number[] = [];
+    let pos = 0;
+    while (pos !== 100 && rolls.length < 300) {
+      // the roll reaching furthest; 5 at most, so no run of 6s to think about
+      const v = [5, 4, 3, 2, 1].reduce((a, b) => (land(pos, b, false, "trail").to > land(pos, a, false, "trail").to ? b : a));
+      pos = land(pos, v, false, "trail").to;
+      rolls.push(v);
+    }
+    expect(pos).toBe(100);
+    expect(claimMatch(fresh(), { ...sl, rolls, board: "trail" }, none, T0)).toMatchObject({ limited: false, coins: 100 });
+    for (const board of [undefined, "", "nope", 7]) {
+      expect(claimMatch(fresh(), { ...sl, rolls, board }, none, T0)).toMatchObject({ limited: true, reason: "replay" });
+    }
+    // ... and the other way round: a fixed classic win is no win on the trail
+    const classic: number[] = [];
+    pos = 0;
+    while (pos !== 100 && classic.length < 300) {
+      const v = [5, 4, 3, 2, 1].reduce((a, b) => (land(pos, b).to > land(pos, a).to ? b : a));
+      pos = land(pos, v).to;
+      classic.push(v);
+    }
+    expect(claimMatch(fresh(), { ...sl, rolls: classic }, none, T0)).toMatchObject({ limited: false, coins: 100 });
+    expect(claimMatch(fresh(), { ...sl, rolls: classic, board: "trail" }, none, T0)).toMatchObject({ limited: true, reason: "replay" });
+  });
+
   it("pay an S&L win vs Computer only when its rolls replay to square 100", () => {
     const sl: ClaimInput = { game: "sl", mode: "cpu", result: "win", duration_s: 120 };
     const bad = [undefined, "1,2,3", [6, 6, 6, 6], [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7], Array(CLAIM_LIMITS.max_rolls + 1).fill(1)];

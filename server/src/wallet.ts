@@ -195,7 +195,7 @@ export interface ClaimOutcome {
 }
 
 /**
- * POST /v1/claims {id, game, mode, result, players, duration_s, placing?, moves?, pairs?, xp?, rolls?, need_one?}
+ * POST /v1/claims {id, game, mode, result, players, duration_s, placing?, moves?, pairs?, xp?, rolls?, need_one?, board?}
  * (placing, when sent, decides the reward: 1 = the win reward, any other place the play reward; else result)
  * -> {ok, id, limited, granted, reason?, coins, xp, would?, profile}. Idempotent by `id` (a retry returns the first
  * answer with `duplicate: true` and the current profile). Rules: econ claimMatch / claimLimit (what the offline

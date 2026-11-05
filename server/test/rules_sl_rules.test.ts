@@ -316,3 +316,57 @@ describe("protocol actions (applySlAction)", () => {
     expect(SL.turnColor(g)).toBe(3);
   });
 });
+
+describe("Snake Trail board", () => {
+  const T = SL.TRAIL;
+  // Rolls that win on the trail, walked: the roll reaching furthest (no third 6 in a row). As test_snakes_ladders.gd.
+  const walk = (): number[] => {
+    let pos = 0;
+    let sixes = 0;
+    const out: number[] = [];
+    while (pos !== 100 && out.length < 300) {
+      let best = 1;
+      let to = -1;
+      for (let v = 1; v <= 6; v++) {
+        if (v === 6 && sixes === 2) continue;
+        const r = SL.land(pos, v, false, T);
+        if (r.to > to) {
+          to = r.to;
+          best = v;
+        }
+      }
+      sixes = best === 6 ? sixes + 1 : 0;
+      pos = to;
+      out.push(best);
+    }
+    return out;
+  };
+
+  it("has the game's tables", () => {
+    expect(SL.TRAIL_LADDERS).toEqual({ 3: 21, 8: 16, 19: 30, 33: 42, 47: 54, 59: 68, 72: 80, 85: 92 });
+    expect(SL.TRAIL_SNAKES).toEqual({ 17: 6, 28: 22, 36: 14, 45: 31, 56: 44, 62: 40, 70: 57, 83: 69, 95: 82, 98: 79 });
+  });
+
+  it("land() takes the board", () => {
+    expect(SL.land(2, 1, false, T)).toEqual({ to: 21, steps: 1, via: 3, ladder: true });
+    expect(SL.land(16, 1, false, T)).toEqual({ to: 6, steps: 1, via: 17, snake: true });
+    expect(SL.land(2, 1)).toEqual({ to: 3, steps: 1 });
+    expect(SL.land(3, 1, false, T)).toEqual({ to: 4, steps: 1 });
+  });
+
+  it("the state carries the board only when it is the trail", () => {
+    expect("board" in SL.newGame("local", 2)).toBe(false);
+    expect(SL.newGame("local", 2, 0, { board: T }).board).toBe(T);
+    expect(SL.boardOf({ board: "nope" })).toBe("");
+    const g = SL.newGame("local", 2, 0, { board: T });
+    SL.applyRoll(g, 3);
+    expect(g.players[0].pos).toBe(21);
+  });
+
+  it("a win replays on its own board only", () => {
+    const win = walk();
+    expect(SL.replayReaches100(win, false, T)).toBe(true);
+    expect(SL.replayReaches100(win)).toBe(false);
+  });
+});
+

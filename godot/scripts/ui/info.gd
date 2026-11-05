@@ -72,8 +72,9 @@ const INFO := {
 		"A dice or character you already own is swapped for the coins shown.",
 		"A new day starts at midnight on this device."]},
 	scenes = {t = "Scenes", b = [
-		"A scene is the 3D world around the Snakes & Ladders board. The board, snakes, ladders and rules are the same in every scene.",
-		"Jungle Clearing and Enchanted Jungle are free. The others cost the coins shown, paid once, and are yours to keep.",
+		"A scene is the 3D world around the Snakes & Ladders board. The board, snakes, ladders and rules are the same in every scene, except Snake Trail.",
+		"Snake Trail has its own winding board with its own snakes and ladders. Online matches always use the standard board.",
+		"Jungle Clearing, Snake Trail and Enchanted Jungle are free. The others cost the coins shown, paid once, and are yours to keep.",
 		"A scene you buy is put to use straight away. Switch between your scenes with [b]Use[/b].",
 		"Not enough coins? Nothing is spent; the shop tells you how many more you need."]},
 }

@@ -7,7 +7,7 @@ import { CLAIM_LIMITS, ONLINE_REWARDS } from "./rules";
 import { type Dict, clone, getInt, isDict } from "./gd";
 import { type Delta, type Profile, type Stats, addCoins } from "./profile";
 import { dayKey } from "./rewards";
-import { replayReaches100 } from "../rules/sl";
+import { replayReaches100, TRAIL } from "../rules/sl";
 
 export type Seat = "human" | "cpu" | "off";
 export type Game = "ludo" | "sl";
@@ -115,6 +115,8 @@ export interface ClaimInput {
   rolls?: unknown;
   /** S&L: the "need a 1 to start" rule was on (replayed with it). */
   need_one?: unknown;
+  /** S&L: the Snake Trail board ("trail", replayed with its own snakes and ladders); anything else is the classic set. */
+  board?: unknown;
   xp?: number;
 }
 
@@ -199,7 +201,7 @@ function placingOk(c: ClaimInput): boolean {
 export function rollsVerified(c: ClaimInput): boolean {
   if (c.game !== "sl" || !claimWon(c) || c.mode !== "cpu") return true;
   if (!Array.isArray(c.rolls) || c.rolls.length > CLAIM_LIMITS.max_rolls) return false;
-  return replayReaches100(c.rolls, c.need_one === true);
+  return replayReaches100(c.rolls, c.need_one === true, c.board === TRAIL ? TRAIL : "");
 }
 
 /** What a claim worth `worth` is paid now: the reason it is cut (null: in full) and the coins / XP granted. */

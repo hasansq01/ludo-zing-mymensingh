@@ -393,6 +393,16 @@
     },
     {
       "kind": "scene",
+      "id": "trail",
+      "name": "Snake Trail",
+      "price": 0,
+      "buy": false,
+      "free": true,
+      "default": false,
+      "unlock": null
+    },
+    {
+      "kind": "scene",
       "id": "frost",
       "name": "Frosty Wonderland",
       "price": 20000,

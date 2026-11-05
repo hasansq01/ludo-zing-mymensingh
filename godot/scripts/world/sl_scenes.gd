@@ -15,10 +15,11 @@ extends Node3D
 
 signal scene_built(id: String)
 
-## The shop list (SL_SCENES): Jungle and Enchanted Jungle are free and always owned (FREE).
+## The shop list (SL_SCENES): Jungle, Snake Trail and Enchanted Jungle are free and always owned (FREE).
 ## l10n-keys: desc
 const LIST := [
 	{id = "jungle", name = "Jungle Clearing", price = 0, desc = "The classic sunny jungle.", g = [Color("#c8ee9c"), Color("#6aa84a")]},
+	{id = "trail", name = "Snake Trail", price = 0, desc = "A winding snake-shaped trail in a sunny meadow.", g = [Color("#bfe6ff"), Color("#7cc84a")]},
 	{id = "frost", name = "Frosty Wonderland", price = 20000, desc = "Snowy pines, a frozen pond, lanterns, falling snow.", g = [Color("#eef8ff"), Color("#9fc4e6")]},
 	{id = "candy", name = "Candy Kingdom", price = 22000, desc = "Lollipops, gumdrops and candy-cane ladders.", g = [Color("#ffe3f1"), Color("#f59ccb")]},
 	{id = "desert", name = "Desert Temple", price = 25000, desc = "Sandstone ruins, palms, an oasis, golden trim.", g = [Color("#ffe4ad"), Color("#e9a35a")]},
@@ -26,7 +27,7 @@ const LIST := [
 	{id = "enchanted", name = "Enchanted Jungle", price = 0, desc = "Glowing mushrooms, fireflies, golden snakes.", g = [Color("#8f6bb8"), Color("#2b4a5c")]},
 ]
 const DEFAULT := "jungle"
-const FREE := [DEFAULT, "enchanted"]     # owned by everyone (owner 2026-10-30: Enchanted Jungle is free)
+const FREE := [DEFAULT, "trail", "enchanted"]     # owned by everyone (owner 2026-10-30: Enchanted Jungle is free)
 
 const K := 15.0 / 4.8                    # web units -> Godot units (the board face is 4.8 there, 15 here)
 const TT := -0.31                        # table top in Godot units (TableWorld.TT)
@@ -54,6 +55,17 @@ const SCENES := {
 		board = {bands = ["#ffd2b0", "#ffc8c4", "#cfe9c2", "#ffe39a", "#cfe4f2"], cream = "#fff4e2", grout = "#e9c7a0", goal = "#ffd45c", star = "#f4a92a", num = "#7d4f61", num100 = "#b06d00", frame = "#fff4e6", frameR = 0.38, lip = "#f2b25c", rail = "#c47a3c", rung = "#f2b366"},
 		sign = {plank = "#a9693a", grain = Color(90 / 255.0, 45 / 255.0, 20 / 255.0), edge = "#7a4422", stroke = "#3a1a12", rope = "#c9a46a", c1 = "#e5484d", c2 = "#f4c430", top = "vine", snake = ["#5cc84f", "#2f8f3a", "#fff0b8"]},
 		table_snake = ["#ffb02e", "#e07a16", "#fff3c4"], motes = ["fly", "#fff3a0", 40, 0.45], fall = ["#7cc95a"], beams = Color(1.0, 250 / 255.0, 210 / 255.0, 0.55),
+	},
+	# Snake Trail: a sunny meadow with a wooden fence, flowers and clouds; the board is one winding trail (SLTrail)
+	trail = {
+		sky = ["#4fb3f0", "#9fdcff", "#d6f1ff", "#bfe8a0"], fog = ["#d6f1ff", 30, 95], light = ["#fff8e6", "#5a9a3a", 0.7, "#fff3d0", 0.85, 0.14],
+		ground = "#86cf5a", clearing = [206, 238, 160], table = ["#c98a4a", "#8a552c", 0.55, 0.0],
+		board = {layout = "trail", bands = ["#ffd2b0", "#ffc8c4", "#cfe9c2", "#ffe39a", "#cfe4f2"], cream = "#fff4e2", grout = "#bfe6ff", goal = "#ffd45c", star = "#f4a92a", num = "#1f3312", num100 = "#7a4a00", frame = "#fff6e8", frameR = 0.38, lip = "#7cc84a", rail = "#2f6fd6", rung = "#6aa8ff",
+			snakes = ["#ff8a3d", "#c04fe0", "#ffd23f", "#ff9fc0", "#e5484d", "#3fb6e0", "#ff7a5a", "#a46be8", "#f4b400", "#ff6f91"],
+			trail = {cloud = "#ffffff", outline = "#2c5a17", tiles = ["#7cc84a", "#c5ea6a"], red = "#ff5a4f", yellow = "#ffd84d", trophy = "#f4b82a"},
+			grid = {grout = "#e9c7a0", num = "#7d4f61", num100 = "#b06d00"}},     # this scene's board as a grid (online): the Jungle's tile contrast
+		sign = {plank = "#a9693a", grain = Color(90 / 255.0, 45 / 255.0, 20 / 255.0), edge = "#7a4422", stroke = "#3a1a12", rope = "#c9a46a", c1 = "#2fa86b", c2 = "#f4c430", top = "vine", snake = ["#7cc84a", "#3f8f2a", "#fff0b8"]},
+		table_snake = ["#ffd23f", "#d99a00", "#fff7d0"], motes = ["fly", "#ffffff", 18, 0.3], fall = null, beams = null,
 	},
 	candy = {
 		sky = ["#ff9fcf", "#ffe4f3", "#ffd0ea", "#f08cc0"], fog = ["#ffd9ee", 30, 95], light = ["#fff4fb", "#d86aa6", 0.72, "#fff2e6", 0.78, 0.14],
@@ -202,6 +214,10 @@ static func info(id: String) -> Dictionary:
 			return s
 	return {}
 
+## The squares scene id's board has of its own: "trail" for Snake Trail, "" (the grid) for the others.
+static func layout_of(id: String) -> String:
+	return str((SCENES[id].board as Dictionary).get("layout", "")) if SCENES.has(id) else ""
+
 ## Put the S&L board on this world's table (the board keeps its own pawns and animations).
 func attach_board(b: SLBoard) -> void:
 	board = b
@@ -224,6 +240,8 @@ func set_scene(baker: TexBaker, id: String) -> void:
 	while _building:
 		await get_tree().process_frame
 	if id == current and _w:
+		if board:                                # (a match may have put this board on other squares: use_layout)
+			await board.use_layout(layout_of(id))
 		return
 	_building = true
 	await _build_world(id)
@@ -401,6 +419,7 @@ func _build_world(id: String) -> void:
 
 	match id:
 		"jungle": await _jungle_world()
+		"trail": await _trail_world()
 		"candy": await _candy_world()
 		"desert": await _desert_world()
 		"frost": await _frost_world()
@@ -1287,6 +1306,65 @@ func _hanging_snake(c0, c1, c2, bark, leaves: Array) -> void:
 	await _snake([Vector3(2.2, 2.6, 0), Vector3(1.1, 2.55, 0), Vector3(0.1, 2.2, 0.05), Vector3(-0.25, 1.35, 0.2), Vector3(0.1, 0.55, 0.3), Vector3(-0.25, -0.05, 0.5)], 0.26, c0, c1, c2, Vector3(-0.5, -0.3, 1), hang)
 	_add(_cyl(), _lam(bark), 1.3, 2.85, 0, hang, {s = [0.18, 4, 0.18], rz = PI / 2})
 	_canopy(hang, 3.4, 3.4, -0.4, 1.5, leaves)
+
+func _trail_world() -> void:
+	var greens := [["#4caf50", "#5cbf4a", "#8fd16a"], ["#3f9a3a", "#4caf50", "#7cc95a"], ["#57b847", "#66c255", "#9be37a"]]
+	_sway_on = false
+	var i := 0
+	for tr in [[-16, -18, 4.5, 1], [-6, -27, 5.5, 1.1], [7, -26, 5, 1], [17, -17, 4.5, 0.95], [0, -38, 6.5, 1.3]]:
+		_tree(tr[0], tr[1], tr[2], tr[3], greens[i % 3]); i += 1
+	for q in [[-14, 9, -34, 2.6], [6, 11, -38, 3], [18, 8, -30, 2.2], [-4, 13, -44, 3.4], [-24, 10, -26, 2]]:
+		_puff(_w, q[0], GROUND + q[1], q[2], q[3])
+	for k in 9:
+		var q := _ring_pos(k, 8.0, 1.06, 0.88, 11.5)
+		_fence(_w, q.x, q.y, 3.6, atan2(-q.x, -q.y))
+	for k in 8:
+		var q := _ring_pos(k, 7.0, 1.1, 0.8, 9.4)
+		_bush(_w, q.x, q.y, 1.2 + (k % 3) * 0.25, greens[k % 3], ["#ff8fb3", "#ffd34d", "#ffffff"] if k % 2 else null)
+		_daisies(_w, q.x * (9.4 - 1.6) / 9.4, q.y * (9.4 - 1.6) / 9.4, 5)
+	_sway_on = true
+	var left := _tree(0, 0, 16, 1.1, greens[0], "#7a4a2a")
+	_anchor(left, -1.04, 0, 1.02, true, 0.9)
+	_coil_tree = left
+	await _coil_on(left, 1.42, ["#7cc84a", "#3f8f2a", "#fff0b8"])
+	var right := _tree(0, 0, 17, 1.2, greens[1], "#7a4a2a")
+	right.rotation.y = PI
+	_anchor(right, 1.07, 0, 1.12, true, 0.9)
+	var fl := _group(_w, 0, 0, 0)
+	_anchor(fl, -0.92, -0.66, 0.72, true, 0.8)
+	_fence(fl, 0.4, 0, 2.4, 0.3)
+	_daisies(fl, 1.2, 0.9, 6, 1.4)
+	var fr := _group(_w, 0, 0, 0)
+	_anchor(fr, 0.96, -0.42, 0.9, true, 0.9)
+	_bush(fr, 0, 0, 1.3, greens[2], ["#ff8fb3", "#ffd34d"])
+	_daisies(fr, -1, 0.8, 5, 1.3)
+
+## A wooden picket fence piece: rounded posts and two rails.
+func _fence(parent: Node3D, x: float, z: float, len: float, ry: float) -> Node3D:
+	var g := _group(parent, x, GROUND, z)
+	g.rotation.y = ry
+	var wd := _lam("#a8692e")
+	var lt := _lam("#c98a4a")
+	var post := MeshKit.rbox(0.34, 1.7, 0.16, 0.08)
+	var px := -len / 2.0
+	while px <= len / 2.0 + 0.01:
+		_add(post, lt, px, 0.85, 0, g)
+		_add(_sph(), lt, px, 1.7, 0, g, {s = [0.17, 0.12, 0.08]})
+		px += 0.8
+	var rail := MeshKit.rbox(len + 0.4, 0.16, 0.1, 0.04)
+	for y in [0.55, 1.2]:
+		_add(rail, wd, 0, y, -0.1, g)
+	return g
+
+## A little patch of white daisies with yellow hearts.
+func _daisies(parent: Node3D, x: float, z: float, n: int, s := 1.0) -> void:
+	for k in n:
+		var a := k * 2.4
+		var r := 0.25 + k * 0.12
+		var fx := x + cos(a) * r * s
+		var fz := z + sin(a) * r * s
+		_add(_sph(), _lam("#ffffff"), fx, GROUND + 0.22 * s, fz, parent, {s = [0.16 * s, 0.05 * s, 0.16 * s]})
+		_add(_sph(), _lam("#ffcf3a"), fx, GROUND + 0.25 * s, fz, parent, {s = 0.06 * s})
 
 func _candy_world() -> void:
 	var pinks := [["#ffb3d9", "#ff9cc9", "#ffe0f0"], ["#b9e4ff", "#9fd6ff", "#e6f6ff"], ["#e5d4ff", "#d3bcff", "#f6efff"]]

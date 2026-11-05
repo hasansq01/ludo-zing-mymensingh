@@ -14,34 +14,48 @@ extends RefCounted
 ## pos 0 is off the board; squares run 1-100. Entering the board: by default any roll v from square 0 moves to
 ## square v (ladders and snakes apply). The house rule need_one (Settings "Need a 1 to start", pref sl_need_one)
 ## brings back the web version's rule: off the board only a 1 enters, on square 1.
+## s.board: the board's own snakes and ladders ("trail": the Snake Trail scene, offline only; missing: the classic set,
+## which every online match plays, as the server's rules do).
 
 const LADDERS := {4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91}   # 1 -> 38 and 80 -> 100 removed (2026-10-21)
 const SNAKES := {16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78}
+## Snake Trail's own set: short, each joining tiles that lie just above / below each other on neighbouring loops.
+const TRAIL_LADDERS := {3: 21, 8: 16, 19: 30, 33: 42, 47: 54, 59: 68, 72: 80, 85: 92}
+const TRAIL_SNAKES := {17: 6, 28: 22, 36: 14, 45: 31, 56: 44, 62: 40, 70: 57, 83: 69, 95: 82, 98: 79}
+const TRAIL := "trail"
 const REWARD := 100                   # coins for beating the computer
 const PLAY_REWARD := 10               # coins for finishing a game you lost against the computer (participation)
 const COLOR_NAMES := ["Red", "Green", "Yellow", "Blue"]
 const CPU_NAMES := ["Mocha", "Biscotti", "Espresso"]
 
 
+static func ladders_on(board := "") -> Dictionary:
+	return TRAIL_LADDERS if board == TRAIL else LADDERS
+
+static func snakes_on(board := "") -> Dictionary:
+	return TRAIL_SNAKES if board == TRAIL else SNAKES
+
 ## The rule in one place: where a roll of v from square `from` ends, and what happened on the way.
-## need_one: the "Need a 1 to start" house rule (off the board, only a 1 enters).
-static func land(from: int, v: int, need_one := false) -> Dictionary:
+## need_one: the "Need a 1 to start" house rule (off the board, only a 1 enters). board: whose snakes and ladders.
+static func land(from: int, v: int, need_one := false, board := "") -> Dictionary:
 	if from == 0 and need_one and v != 1:
 		return {to = 0, steps = 0, wait = true}    # off the board: only a 1 brings the pawn on
 	var to := from + v
 	if to > 100:
 		return {to = from, steps = 0, over = true}
-	if LADDERS.has(to):
-		return {to = LADDERS[to], steps = v, via = to, ladder = true}
-	if SNAKES.has(to):
-		return {to = SNAKES[to], steps = v, via = to, snake = true}
+	var lad := ladders_on(board)
+	var sn := snakes_on(board)
+	if lad.has(to):
+		return {to = lad[to], steps = v, via = to, ladder = true}
+	if sn.has(to):
+		return {to = sn[to], steps = v, via = to, snake = true}
 	return {to = to, steps = v}
 
 ## Reward check: replay the human's rolls through the rules from square 0, the way apply_roll played them: the
 ## third 6 in a row is recorded but ends the turn without moving (a player's rolls only run on past a 6, so a run
 ## of 6s in the list is one turn's run). Rolls that came through JSON are floats, so whole-number floats count;
-## anything outside 1-6 or fractional fails the check. need_one must be the house rule the game was played with.
-static func replay_reaches_100(rolls: Array, need_one := false) -> bool:
+## anything outside 1-6 or fractional fails the check. need_one and board must be what the game was played with.
+static func replay_reaches_100(rolls: Array, need_one := false, board := "") -> bool:
 	var pos := 0
 	var sixes := 0
 	for v in rolls:
@@ -53,13 +67,13 @@ static func replay_reaches_100(rolls: Array, need_one := false) -> bool:
 		if sixes == 3:                        # three 6s: the turn is over, the pawn stays
 			sixes = 0
 			continue
-		pos = land(pos, int(v), need_one).to
+		pos = land(pos, int(v), need_one, board).to
 		if pos == 100:
 			return true
 	return false
 
 ## vs Computer: you play `color`, the computers take the next colours round. Pass & Play: Red, Green, ...
-## opts: {need_one: bool} (default false: any roll enters the board).
+## opts: {need_one: bool (default false: any roll enters the board), board: "trail" (default: the classic set)}.
 static func new_game(mode: String, n: int, color := 0, opts := {}) -> Dictionary:
 	var players := []
 	for k in n:
@@ -69,12 +83,19 @@ static func new_game(mode: String, n: int, color := 0, opts := {}) -> Dictionary
 			you = mode == "cpu" and k == 0, cpu = mode == "cpu" and k > 0,
 			pos = 0, rolls = [], ladders = 0, snakes = 0,
 		})
-	return {mode = mode, turn = 0, phase = "roll", sixes = 0, winner = -1, paid = false, players = players,
+	var g := {mode = mode, turn = 0, phase = "roll", sixes = 0, winner = -1, paid = false, players = players,
 		need_one = bool(opts.get("need_one", false)), finished = []}
+	if str(opts.get("board", "")) == TRAIL:
+		g.board = TRAIL
+	return g
 
 ## The house rule in force for game g (a state saved before the option existed has no field: any roll enters).
 static func needs_one(g: Dictionary) -> bool:
 	return bool(g.get("need_one", false))
+
+## The board game g is played on: "trail", or "" for the classic set (anything else in a saved state counts as classic).
+static func board_of(g: Dictionary) -> String:
+	return TRAIL if str(g.get("board", "")) == TRAIL else ""
 
 static func current(g: Dictionary) -> Dictionary:
 	return g.players[g.turn]
@@ -92,7 +113,7 @@ static func apply_roll(g: Dictionary, v: int) -> Array:
 		ev.append({type = "three_sixes", turn = g.turn})
 		_next(g, ev)
 		return ev
-	var r := land(p.pos, v, needs_one(g))
+	var r := land(p.pos, v, needs_one(g), board_of(g))
 	if r.has("wait") or r.has("over"):
 		ev.append({type = "wait" if r.has("wait") else "over", turn = g.turn, v = v, need = 100 - p.pos})
 		if v == 6:
@@ -134,7 +155,7 @@ static func claim_win_reward(g: Dictionary) -> int:
 	if g.phase != "over" or g.paid or g.mode != "cpu":
 		return 0
 	var p: Dictionary = g.players[g.winner]
-	if not p.you or not replay_reaches_100(p.rolls, needs_one(g)):
+	if not p.you or not replay_reaches_100(p.rolls, needs_one(g), board_of(g)):
 		return 0
 	g.paid = true
 	return REWARD

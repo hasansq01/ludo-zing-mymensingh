@@ -646,7 +646,7 @@ func pending() -> Array:
 
 ## A claim body from a finished offline match:
 ##   {game "ludo" | "sl", mode "cpu" | "pp" | "local", result "win" | "loss", players (Ludo: 4 seats), duration_s,
-##    pairs (Ludo), rolls + need_one (S&L vs computer), placing (your final place, 1-based: the server pays by it)}.
+##    pairs (Ludo), rolls + need_one + board (S&L vs computer), placing (your final place, 1-based: the server pays by it)}.
 ## Gets an id (idempotent: a retry never pays twice), joins the queue and is sent when a connection exists.
 ## Returns the claim id.
 func report_match(info: Dictionary) -> String:

@@ -28,6 +28,12 @@ export const LADDERS: Readonly<Record<number, number>> = { 4: 14, 9: 31, 21: 42,
 export const SNAKES: Readonly<Record<number, number>> = {
   16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78,
 };
+/** Snake Trail's own set (offline only: online matches always play the classic set). */
+export const TRAIL_LADDERS: Readonly<Record<number, number>> = { 3: 21, 8: 16, 19: 30, 33: 42, 47: 54, 59: 68, 72: 80, 85: 92 };
+export const TRAIL_SNAKES: Readonly<Record<number, number>> = {
+  17: 6, 28: 22, 36: 14, 45: 31, 56: 44, 62: 40, 70: 57, 83: 69, 95: 82, 98: 79,
+};
+export const TRAIL = "trail";
 export const REWARD = 100; // coins for beating the computer
 export const PLAY_REWARD = 10; // coins for finishing a game you lost against the computer (participation)
 export const COLOR_NAMES = ["Red", "Green", "Yellow", "Blue"] as const;
@@ -55,6 +61,7 @@ export interface SlState {
   paid: boolean;
   players: SlPlayer[];
   need_one?: boolean;
+  board?: string;
   /** Player indices in finish order (missing in states saved before play on). */
   finished?: number[];
 }
@@ -91,17 +98,20 @@ export interface SlStanding {
 
 export interface SlNewGameOpts {
   need_one?: boolean;
+  board?: string;
 }
 
 const has = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 
 /** The rule in one place: where a roll of v from square `from` ends, and what happened on the way. */
-export function land(from: number, v: number, needOne = false): Landing {
+export function land(from: number, v: number, needOne = false, board = ""): Landing {
   if (from === 0 && needOne && v !== 1) return { to: 0, steps: 0, wait: true }; // off the board: only a 1 enters
   const to = from + v;
   if (to > 100) return { to: from, steps: 0, over: true };
-  if (has(LADDERS, String(to))) return { to: LADDERS[to], steps: v, via: to, ladder: true };
-  if (has(SNAKES, String(to))) return { to: SNAKES[to], steps: v, via: to, snake: true };
+  const lad = board === TRAIL ? TRAIL_LADDERS : LADDERS;
+  const sn = board === TRAIL ? TRAIL_SNAKES : SNAKES;
+  if (has(lad, String(to))) return { to: lad[to], steps: v, via: to, ladder: true };
+  if (has(sn, String(to))) return { to: sn[to], steps: v, via: to, snake: true };
   return { to, steps: v };
 }
 
@@ -109,7 +119,7 @@ export function land(from: number, v: number, needOne = false): Landing {
  * Reward check: replays the human's rolls through the rules from square 0, the way applyRoll played them (the third
  * 6 in a row is recorded but ends the turn without moving). Anything that is not a whole number in 1-6 fails.
  */
-export function replayReaches100(rolls: readonly unknown[], needOne = false): boolean {
+export function replayReaches100(rolls: readonly unknown[], needOne = false, board = ""): boolean {
   let pos = 0;
   let sixes = 0;
   for (const v of rolls) {
@@ -121,7 +131,7 @@ export function replayReaches100(rolls: readonly unknown[], needOne = false): bo
       sixes = 0;
       continue;
     }
-    pos = land(pos, Math.trunc(v), needOne).to;
+    pos = land(pos, Math.trunc(v), needOne, board).to;
     if (pos === 100) return true;
   }
   return false;
@@ -153,7 +163,13 @@ export function newGame(mode: string, n: number, color = 0, opts: SlNewGameOpts 
     players,
     need_one: Boolean(opts.need_one ?? false),
     finished: [],
+    ...(opts.board === TRAIL ? { board: TRAIL } : {}),
   };
+}
+
+/** The board game g is played on: "trail", or "" for the classic set. */
+export function boardOf(g: { board?: unknown }): string {
+  return g.board === TRAIL ? TRAIL : "";
 }
 
 /** The house rule in force for game g (a state saved before the option existed has no field: any roll enters). */
@@ -178,7 +194,7 @@ export function applyRoll(g: SlState, v: number): SlEvent[] {
     next(g, ev);
     return ev;
   }
-  const r = land(p.pos, v, needsOne(g));
+  const r = land(p.pos, v, needsOne(g), boardOf(g));
   if (r.wait || r.over) {
     ev.push({ type: r.wait ? "wait" : "over", turn: g.turn, v, need: 100 - p.pos });
     if (v === 6) again(g, ev);
@@ -220,7 +236,7 @@ export function applyRoll(g: SlState, v: number): SlEvent[] {
 export function claimWinReward(g: SlState): number {
   if (g.phase !== "over" || g.paid || g.mode !== "cpu") return 0;
   const p = g.players.at(g.winner) as SlPlayer;
-  if (!p.you || !replayReaches100(p.rolls, needsOne(g))) return 0;
+  if (!p.you || !replayReaches100(p.rolls, needsOne(g), boardOf(g))) return 0;
   g.paid = true;
   return REWARD;
 }

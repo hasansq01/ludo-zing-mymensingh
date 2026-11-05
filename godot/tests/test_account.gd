@@ -170,10 +170,11 @@ func _claims() -> void:
 	var answers := []
 	a.claim_answered.connect(func(id: String, ans: Dictionary): answers.append([id, ans.coins]))
 	var id1 := a.report_match(match_info())
-	var id2 := a.report_match({game = "sl", mode = "cpu", result = "win", duration_s = 90, rolls = [1, 6, 3], need_one = true})
+	var id2 := a.report_match({game = "sl", mode = "cpu", result = "win", duration_s = 90, rolls = [1, 6, 3], need_one = true, board = "trail"})
 	check("claims: queued offline with ids", a.pending().size() == 2 and id1 != id2 and id1.length() >= 8 and a.prefs.pending_claims.size() == 2)
 	check("claims: the id is URL-safe and 8-64 long", id1.length() <= 64 and id1.to_lower() == id1 and not id1.contains(" "), id1)
 	check("claims: the S&L claim keeps rolls and need_one", a.pending()[1].rolls == [1, 6, 3] and a.pending()[1].need_one == true)
+	check("claims: ... and its board (the server replays on it)", a.pending()[1].board == "trail")
 	check("claims: nothing sent without a connection", f.count("/v1/claims") == 0)
 	f.online = true
 	await a.sign_in_guest()
