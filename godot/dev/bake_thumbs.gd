@@ -63,6 +63,9 @@ func _ready() -> void:
 			var img := await _render_pawn(id)
 			if img:
 				total += _save(img, "pawn", id)
+			var row := await _render_pawn_row(id)
+			if row:
+				total += _save(row, "pawnrow", id)
 	print("bake_thumbs: %d KB in %s (%.1f s)" % [total / 1024, Thumbnailer.BAKED_DIR, (Time.get_ticks_msec() - t0) / 1000.0])
 	_restore()
 	for i in 3:                              # let the freed worlds go before quitting
@@ -123,6 +126,26 @@ func _render_pawn(id: String) -> Image:
 	img.convert(Image.FORMAT_RGBA8)
 	img.resize(Thumbnailer.PAWN_SIZE.x, Thumbnailer.PAWN_SIZE.y, Image.INTERPOLATE_LANCZOS)
 	return img
+
+## The setup sheet's pawns: the skin once per colour, side by side (Thumbnailer.pawn_cell).
+func _render_pawn_row(id: String) -> Image:
+	var cell := Thumbnailer.PAWN_CELL
+	var row := Image.create(cell.x * 4, cell.y, false, Image.FORMAT_RGBA8)
+	for c in 4:
+		var st := PawnStage.new(id, PawnStage.SOLO, c)
+		st.keep_drawing = true
+		st.size = Vector2(cell * SUPERSAMPLE)
+		st.viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		add_child(st)
+		st.size = Vector2(cell * SUPERSAMPLE)
+		for i in Thumbnailer.SETTLE_FRAMES + 2:
+			await RenderingServer.frame_post_draw
+		var img := st.viewport.get_texture().get_image()
+		st.queue_free()
+		img.convert(Image.FORMAT_RGBA8)
+		img.resize(cell.x, cell.y, Image.INTERPOLATE_LANCZOS)
+		row.blit_rect(img, Rect2i(Vector2i.ZERO, cell), Vector2i(c * cell.x, 0))
+	return row
 
 ## Writes the WebP and its .import (lossy, no mipmaps, no VRAM compression). Returns the file size in bytes.
 func _save(img: Image, kind: String, id: String) -> int:
