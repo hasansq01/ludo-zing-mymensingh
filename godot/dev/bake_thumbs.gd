@@ -3,7 +3,7 @@ extends Node
 ## renders them live (Thumbnailer.baked):
 ##   rooms   res://assets/thumbs/room_<id>.webp    Thumbnailer's corner camera, 720 x 540
 ##   scenes  res://assets/thumbs/scene_<id>.webp   the scene's landing view (sign shrunk like the Shop's), 720 x 540
-##   dice    res://assets/thumbs/dice_<id>.webp    a Dice3D at rest on face 5, its padded rect, 3x an 84 px die
+##   dice    res://assets/thumbs/dice_<id>.webp    a Dice3D in its corner view, its padded rect, 3x an 84 px die
 ##   pawns   res://assets/thumbs/pawn_<id>.webp    PawnStage's CARD pair (a red and a blue pawn in the skin), 360 x 270
 ## Rooms, scenes and pawns render at 2x the picture size with 4x MSAA and are scaled down (Lanczos): clean edges. Lossy
 ## WebP (quality QUALITY) with a matching .import (lossy, no mipmaps, never VRAM-compressed: crisp UI, small download).
@@ -69,7 +69,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 	get_tree().quit()
 
-## A Dice3D on face DICE_FACE, laid out at DICE_SIZE UI px inside a host viewport stretched DICE_SCALE times (so the
+## A Dice3D in its corner view, laid out at DICE_SIZE UI px inside a host viewport stretched DICE_SCALE times (so the
 ## die renders at that pixel density, as on a phone), and its own render target read back (straight from the die's
 ## viewport, so its alpha is exactly what the live die shows).
 func _render_die(id: String) -> Image:
@@ -89,8 +89,8 @@ func _render_die(id: String) -> Image:
 	die.position = Vector2(pad.x * s, pad.y * s)
 	die.size = Vector2(s, s)
 	host.add_child(die)
-	die.set_skin(d.bg, d.edge, d.pip, d.one)
-	die.show_face(Thumbnailer.DICE_FACE)
+	die.wear(id)
+	die.show_showcase()
 	die.view.modulate = Color.WHITE
 	die.set_process(false)                  # no pulse / glow: the resting die
 	die._layout()

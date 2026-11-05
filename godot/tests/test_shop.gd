@@ -28,10 +28,13 @@ func _run() -> void:
 	var err: String
 
 	# ---- catalogue ----
-	check("every web dice skin is in the catalogue", Catalog.DICE.map(func(d): return d.id) == ["classic", "crema", "espresso", "gold"])
-	check("skin prices match the web", Catalog.DICE.map(func(d): return d.price) == [0, 1000, 2500, 6000])
+	check("every dice skin is in the catalogue, cheapest first", Catalog.DICE.map(func(d): return d.id) == ["classic", "crema", "espresso", "rosewood", "marble", "rickshaw", "emerald", "neon", "galaxy", "gold"])
+	check("the skins people already own keep their prices; the new ones sit between them", Catalog.DICE.map(func(d): return d.price) == [0, 1000, 2500, 2500, 3500, 4000, 4500, 5000, 5500, 6000])
 	check("dice(id) finds a skin", Catalog.dice("espresso").name == "Espresso" and Catalog.dice("espresso").bg == Color("#4a2c1a"))
 	check("dice(unknown) is empty", Catalog.dice("rainbow").is_empty())
+	check("every dice skin has a material, and its pattern paints", Catalog.DICE.all(func(d): return DiceLooks.LOOKS.has(d.id) and (not DiceLooks.look(d.id).has("pat") or DiceLooks.pattern(str(DiceLooks.look(d.id).pat)) != null)))
+	check("patterns stay small and are painted once", DiceLooks.pattern("wood").get_width() <= DiceLooks.PATTERN_PX and DiceLooks.pattern("wood") == DiceLooks.pattern("wood"))
+	check("the premium skins shine, the free one doesn't", float(DiceLooks.look("gold").shine) > 0.0 and not DiceLooks.look("classic").has("shine"))
 	check("every room has a card gradient", Rooms.LIST.all(func(r): return Catalog.ROOM_GRADIENT.has(r.id)))
 	check("short coin amounts like the web", [Catalog.short(950), Catalog.short(1000), Catalog.short(2500), Catalog.short(2550), Catalog.short(1200000)] == ["950", "1K", "2.5K", "2.5K", "1.2M"],
 		[Catalog.short(950), Catalog.short(1000), Catalog.short(2500), Catalog.short(2550), Catalog.short(1200000)])

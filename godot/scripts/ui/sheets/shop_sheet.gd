@@ -516,7 +516,7 @@ func _art(kind: String, id: String) -> Control:
 	well.add_child(c)
 	match kind:
 		"dice":
-			var die := Thumbnailer.dice_art(id, 84)        # the baked die (a live Dice3D only without a bake)
+			var die := Thumbnailer.dice_art(id, 112)        # the baked die (a live Dice3D only without a bake)
 			c.add_child(die)
 			well.set_meta("art", die)
 		"pawn":

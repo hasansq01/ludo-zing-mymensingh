@@ -151,98 +151,123 @@ msgid "Dragon"
 msgstr "ড্রাগন"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:55
+#: scripts/core/catalog.gd:16
+msgid "Rosewood"
+msgstr "রোজউড"
+
+#. catalog.gd
+#: scripts/core/catalog.gd:16
+msgid "Rickshaw"
+msgstr "রিকশা"
+
+#. catalog.gd
+#: scripts/core/catalog.gd:16
+msgid "Emerald"
+msgstr "পান্না"
+
+#. catalog.gd
+#: scripts/core/catalog.gd:16
+msgid "Neon"
+msgstr "নিয়ন"
+
+#. catalog.gd
+#: scripts/core/catalog.gd:16
+msgid "Galaxy"
+msgstr "গ্যালাক্সি"
+
+#. catalog.gd
+#: scripts/core/catalog.gd:61
 msgid "The glossy pawn every game starts with."
 msgstr "চকচকে গুটি, সব খেলা এটা দিয়েই শুরু।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:56
+#: scripts/core/catalog.gd:62
 msgid "Engraved gold bands, gems at the collar and a gold finial."
 msgstr "খোদাই করা সোনার ব্যান্ড, কলারে রত্ন আর মাথায় সোনার চূড়া।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:57
+#: scripts/core/catalog.gd:63
 msgid "Candy stripes, a swirl of frosting and a cherry on top."
 msgstr "ক্যান্ডির ডোরা, ঘূর্ণি ক্রিম আর ওপরে একটা চেরি।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:58
+#: scripts/core/catalog.gd:64
 msgid "A big juicy fruit for a head: strawberry, apple, orange or blueberry."
 msgstr "মাথায় বড় রসালো ফল: স্ট্রবেরি, আপেল, কমলা বা ব্লুবেরি।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:59
+#: scripts/core/catalog.gd:65
 msgid "A double flower for a head and a skirt of lotus petals."
 msgstr "মাথায় দুই স্তরের ফুল, গায়ে পদ্মের পাপড়ির ঘাগরা।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:60
+#: scripts/core/catalog.gd:66
 msgid "Polished stone with fine white veins, trimmed in gold."
 msgstr "সোনালি কারুকাজে মসৃণ পাথর, তাতে সাদা সূক্ষ্ম শিরা।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:61
+#: scripts/core/catalog.gd:67
 msgid "A faceted crystal crowned with glittering shards."
 msgstr "কাটা স্ফটিকের গুটি, মাথায় ঝলমলে বরফের মুকুট।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:62
+#: scripts/core/catalog.gd:68
 msgid "A captain with a tricorn, an eye patch, a black beard and gold buttons."
 msgstr "তিনকোনা টুপি, চোখে পট্টি, কালো দাড়ি আর সোনার বোতামের ক্যাপ্টেন।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:63
+#: scripts/core/catalog.gd:69
 msgid "A friendly robot with glowing eyes, a smile and a heart in its chest."
 msgstr "জ্বলজ্বলে চোখ, হাসি আর বুকে হৃদয় নিয়ে মিষ্টি এক রোবট।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:64
+#: scripts/core/catalog.gd:70
 msgid "A long white beard, a crooked starry hat and a gold-trimmed robe."
 msgstr "লম্বা সাদা দাড়ি, তারা-ভরা বাঁকা টুপি আর সোনালি পাড়ের আলখাল্লা।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:65
+#: scripts/core/catalog.gd:71
 msgid "A whole cat: big eyes, whiskers, paws, a tail and a bell on its collar."
 msgstr "আস্ত একটা বিড়াল: বড় চোখ, গোঁফ, থাবা, লেজ আর গলায় ঘণ্টা।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:66
+#: scripts/core/catalog.gd:72
 msgid "A space suit, a backpack and a gold mirror visor."
 msgstr "স্পেস স্যুট, পিঠে ব্যাগ আর সোনালি আয়নার ভাইজর।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:67
+#: scripts/core/catalog.gd:73
 msgid "Fine china with gold trim and a heart in the froth."
 msgstr "সোনালি পাড়ের দামি চিনামাটির কাপ, ফেনায় একটা হৃদয়।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:68
+#: scripts/core/catalog.gd:74
 msgid "Gold horns, slit eyes, wings, scales and a spiked tail."
 msgstr "সোনার শিং, সরু চোখ, ডানা, আঁশ আর কাঁটাওয়ালা লেজ।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:69
+#: scripts/core/catalog.gd:75
 msgid "Sparkles all over, silver trim and a diamond on top."
 msgstr "সারা গায়ে ঝিলিক, রুপালি পাড় আর মাথায় একটা হীরা।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:70
+#: scripts/core/catalog.gd:76
 msgid "A king in an ermine cape with an arched gold crown and gems."
 msgstr "আরমিনের চাদর আর রত্নখচিত সোনার মুকুট পরা রাজা।"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:71
+#: scripts/core/catalog.gd:77
 msgid "A horse's head with a mane and a gold bridle, on a gold-ringed base."
 msgstr "কেশর আর সোনার লাগামে ঘোড়ার মাথা, সোনার বালার ওপর।"
 
 #. catalog.gd
 #. collection.gd
-#: scripts/core/catalog.gd:86 scripts/core/collection.gd:24
+#: scripts/core/catalog.gd:92 scripts/core/collection.gd:24
 msgid "Couldn’t save on this device. No coins were spent."
 msgstr "এই ফোনে সেভ করা গেল না। কোনো কয়েন খরচ হয়নি।"
 
 #. catalog.gd buy_room()
-#: scripts/core/catalog.gd:230
+#: scripts/core/catalog.gd:236
 msgid "That room isn’t in the shop."
 msgstr "এই রুম শপে নেই।"
 
@@ -252,23 +277,23 @@ msgstr "এই রুম শপে নেই।"
 #. catalog.gd buy_text()
 #. collection.gd buy_char()
 #. sl_scenes.gd buy_scene()
-#: scripts/core/catalog.gd:232 scripts/core/catalog.gd:251 scripts/core/catalog.gd:304 scripts/core/catalog.gd:333 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:293
+#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:293
 msgid "You already own %s."
 msgstr "%s তোমার আগে থেকেই আছে।"
 
 #. catalog.gd buy_dice()
-#: scripts/core/catalog.gd:249
+#: scripts/core/catalog.gd:255
 msgid "Those dice aren’t in the shop."
 msgstr "এই ডাইস শপে নেই।"
 
 #. catalog.gd buy_emotes()
 #. catalog.gd buy_text()
-#: scripts/core/catalog.gd:302 scripts/core/catalog.gd:331
+#: scripts/core/catalog.gd:308 scripts/core/catalog.gd:337
 msgid "That emote pack isn’t in the shop."
 msgstr "এই ইমোট প্যাক শপে নেই।"
 
 #. catalog.gd need_text()
-#: scripts/core/catalog.gd:380
+#: scripts/core/catalog.gd:386
 msgid "Not enough coins — you need %s more."
 msgstr "কয়েন কম পড়েছে — আরও %s লাগবে।"
 
@@ -650,7 +675,7 @@ msgstr "“%s” অর্জন করো"
 #. daily_sheet.gd reward_text()
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
-#: scripts/core/collection.gd:228 scripts/core/rewards.gd:139 scripts/main.gd:889 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
+#: scripts/core/collection.gd:228 scripts/core/rewards.gd:139 scripts/main.gd:886 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
 msgid "%s coins"
 msgstr "%s কয়েন"
 
@@ -1787,90 +1812,90 @@ msgstr "এই ম্যাচ আর চালানো যাবে না।"
 
 # REVIEW: %s is a countdown like '2h 5m'; reads '<time> পরে ফ্রি কয়েন'
 #. App (pause menu, dialogs, toasts) · main.gd _claim_free()
-#: scripts/main.gd:853
+#: scripts/main.gd:850
 msgid "Free coins in %s"
 msgstr "%s পরে ফ্রি কয়েন"
 
 # testers only: the graphics leak test (seven taps on Settings' version line)
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:931
+#: scripts/main.gd:928
 msgid "Graphics test started: keep the game open for about 4 minutes."
 msgstr "গ্রাফিক্স টেস্ট শুরু হয়েছে: প্রায় 4 মিনিট গেমটি খোলা রাখো।"
 
 # testers only
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:934
+#: scripts/main.gd:931
 msgid "Graphics test: step %d of %d"
 msgstr "গ্রাফিক্স টেস্ট: ধাপ %d / %d"
 
 # testers only
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:936
+#: scripts/main.gd:933
 msgid "Graphics test done. Thank you!"
 msgstr "গ্রাফিক্স টেস্ট শেষ। ধন্যবাদ!"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1011
+#: scripts/main.gd:1008
 msgid "Menu"
 msgstr "মেনু"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1011
+#: scripts/main.gd:1008
 msgid "Paused"
 msgstr "বিরতি"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1016
+#: scripts/main.gd:1013
 msgid "The game keeps going while this is open."
 msgstr "এটা খোলা থাকলেই খেলা চলতে থাকে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1018
+#: scripts/main.gd:1015
 msgid "Back to game"
 msgstr "খেলায় ফেরো"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. settings_sheet.gd _init()
-#: scripts/main.gd:1019 scripts/main.gd:1024 scripts/ui/sheets/settings_sheet.gd:58
+#: scripts/main.gd:1016 scripts/main.gd:1021 scripts/ui/sheets/settings_sheet.gd:58
 msgid "Settings"
 msgstr "সেটিংস"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1020
+#: scripts/main.gd:1017
 msgid "Leave match"
 msgstr "ম্যাচ ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. Home screen · home_screen.gd _build_quick()
-#: scripts/main.gd:1022 scripts/ui/home_screen.gd:353
+#: scripts/main.gd:1019 scripts/ui/home_screen.gd:353
 msgid "Resume"
 msgstr "চালিয়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. update_banner.gd set_mode()
-#: scripts/main.gd:1023 scripts/main.gd:1063 scripts/ui/components/update_banner.gd:95
+#: scripts/main.gd:1020 scripts/main.gd:1060 scripts/ui/components/update_banner.gd:95
 msgid "Restart"
 msgstr "আবার শুরু"
 
 # Pause menu
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1025
+#: scripts/main.gd:1022
 msgid "Exit to home"
 msgstr "হোমে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1036
+#: scripts/main.gd:1033
 msgid "Your place is kept: your reward comes when the game ends."
 msgstr "তোমার জায়গা ঠিক আছে, খেলা শেষ হলে রিওয়ার্ড পাবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1036
+#: scripts/main.gd:1033
 msgid "A bot plays your colour for the rest of the game."
 msgstr "তোমার রঙে বাকি খেলা বট খেলবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1037
+#: scripts/main.gd:1034
 msgid "Leave this match?"
 msgstr "ম্যাচ ছেড়ে যাবে?"
 
@@ -1879,69 +1904,69 @@ msgstr "ম্যাচ ছেড়ে যাবে?"
 #. online.gd _ask_leave_lobby()
 #. Result screen · result_screen.gd _sync_buttons()
 #. lobby_sheet.gd _init()
-#: scripts/main.gd:1037 scripts/main.gd:1072 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
+#: scripts/main.gd:1034 scripts/main.gd:1069 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
 msgid "Leave"
 msgstr "ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1037 scripts/main.gd:1063 scripts/main.gd:1072
+#: scripts/main.gd:1034 scripts/main.gd:1060 scripts/main.gd:1069
 msgid "Keep playing"
 msgstr "খেলতে থাকো"
 
 # REVIEW: online, after you finished
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. finish_card.gd _init()
-#: scripts/main.gd:1037 scripts/ui/components/finish_card.gd:51
+#: scripts/main.gd:1034 scripts/ui/components/finish_card.gd:51
 msgid "Keep watching"
 msgstr "দেখতে থাকো"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1063
+#: scripts/main.gd:1060
 msgid "Restart this game?"
 msgstr "খেলা আবার শুরু করবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1063
+#: scripts/main.gd:1060
 msgid "Everyone goes back to the start."
 msgstr "সবাই আবার শুরু থেকে শুরু করবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1072
+#: scripts/main.gd:1069
 msgid "Leave this game?"
 msgstr "খেলা ছেড়ে যাবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1072
+#: scripts/main.gd:1069
 msgid "Your progress in this match is saved."
 msgstr "এই ম্যাচের প্রোগ্রেস সেভ হয়েছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _on_gems_granted()
 #. store_sheet.gd _on_granted()
-#: scripts/main.gd:1197 scripts/ui/sheets/store_sheet.gd:163
+#: scripts/main.gd:1194 scripts/ui/sheets/store_sheet.gd:163
 msgid "+%s gems"
 msgstr "+%s জেম"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1355
+#: scripts/main.gd:1352
 msgid "Quit Ludo Zing?"
 msgstr "Ludo Zing থেকে বের হবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1355
+#: scripts/main.gd:1352
 msgid "Your progress is saved."
 msgstr "তোমার প্রোগ্রেস সেভ আছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1355
+#: scripts/main.gd:1352
 msgid "Quit"
 msgstr "বের হও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/main.gd:1355 scripts/net/online.gd:244 scripts/net/social.gd:429
+#: scripts/main.gd:1352 scripts/net/online.gd:244 scripts/net/social.gd:429
 msgid "Stay"
 msgstr "থাকো"
 

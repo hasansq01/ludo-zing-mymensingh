@@ -837,12 +837,9 @@ func apply_room(id: String) -> void:
 
 ## The equipped dice skin on every die in the game.
 func apply_dice_skin() -> void:
-	var sk: Dictionary = Catalog.dice(str(Save.profile.dice))
-	if sk.is_empty():
-		return
 	for d: Dice3D in [hud.dice, sl.dice]:
 		if is_instance_valid(d):
-			d.set_skin(sk.bg, sk.edge, sk.pip, sk.one)
+			d.wear(str(Save.profile.dice))
 
 ## Free coins: claim them (coins fly from the Rewards sheet's row, else Home's gift, into the counter) or say when
 ## they are ready.

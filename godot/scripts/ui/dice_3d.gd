@@ -26,6 +26,8 @@ const IDLE_HINT := 4.0                 # s of an active, untouched die before th
 const READY_TURN := 0.785             # the neutral pose: turned 45° about the vertical, then tipped towards the camera
 const READY_TIP := 0.6                 # (a corner towards you: the top and two sides show)
 const READY_SCALE := 0.8               # the corner view is wider than a face: shrink it to the same footprint
+const SHINE_EVERY := 2.6               # s between the bands of light on a waiting premium die
+const SHINE_SEC := 0.55                # s a band of light takes to cross
 
 const SHADER := """
 shader_type spatial;
@@ -36,6 +38,24 @@ uniform vec4 edge : source_color = vec4(0.882, 0.843, 0.765, 1.0);
 uniform vec4 pip : source_color = vec4(0.133, 0.149, 0.247, 1.0);
 uniform vec4 one : source_color = vec4(0.847, 0.196, 0.227, 1.0);
 uniform float half_size = 0.5;
+uniform sampler2D pattern : source_color, filter_linear_mipmap, repeat_enable, hint_default_white;
+uniform float pat_k = 0.0;
+uniform float pat_shift = 0.0;
+uniform float pat_glow = 0.0;
+uniform float metal = 0.0;
+uniform vec3 metal_tint : source_color = vec3(0.97, 0.78, 0.25);
+uniform float pip_metal = 0.0;
+uniform vec4 pip_rim : source_color = vec4(0.0);
+uniform float pip_glow = 0.0;
+uniform vec4 band : source_color = vec4(0.0);
+uniform float band_metal = 0.0;
+uniform float band_glow = 0.0;
+uniform vec4 rim : source_color = vec4(0.0);
+uniform float rough = 0.3;
+uniform float spec = 0.45;
+uniform float edge_k = 0.35;
+uniform float sweep = -9.0;
+uniform vec3 sweep_col : source_color = vec3(1.0);
 
 varying vec3 p_obj;
 varying vec3 n_obj;
@@ -74,23 +94,55 @@ void fragment() {
 		if (p.y > 0.0) { v = 3; ty = vec3(0.0, 0.0, -1.0); } else { v = 4; ty = vec3(0.0, 0.0, 1.0); }
 	}
 	uv = vec2(dot(p, tx), dot(p, ty)) * 0.5;
+	vec3 nn = normalize(n_obj);
 	float r = v == 1 ? 0.155 : 0.1;
 	vec2 o = nearest_pip(v, uv, 0.25);
 	float d = length(o);
 	float w = clamp(fwidth(d), 0.002, 0.025);   // clamped: d jumps where the faces meet
 	float inside = 1.0 - smoothstep(r - w, r + w, d);
-	float rim = (1.0 - smoothstep(r, r * 1.35, d)) * (1.0 - inside);
-	float border = smoothstep(0.4, 0.5, max(abs(uv.x), abs(uv.y)));
-	vec3 col = mix(body.rgb, edge.rgb, border * 0.35 + rim * 0.5);
-	col = mix(col, v == 1 ? one.rgb : pip.rgb, inside);
-	// a shallow dish: the normal leans towards the pip's centre inside it and on its rim
-	float slope = d < r ? 0.85 * d / r : 0.85 * (1.0 - smoothstep(r, r * 1.3, d));
+	float lip = (1.0 - smoothstep(r + w, r * 1.3 + w, d)) * (1.0 - inside);
+	// the body: its colour or its pattern, polished corners in the edge colour
+	vec2 puv = uv + 0.5 + pat_shift * vec2(float(v) * 0.37, float(v) * 0.61);
+	vec4 tp = textureGrad(pattern, puv, dFdx(uv), dFdy(uv));
+	vec3 col = mix(body.rgb, tp.rgb, tp.a * pat_k);
+	float corner = smoothstep(0.015, 0.2, 1.0 - max(max(abs(nn.x), abs(nn.y)), abs(nn.z)));
+	col = mix(col, edge.rgb, corner * edge_k);
+	// a line framing the face
+	float line = (1.0 - smoothstep(0.009, 0.009 + w, abs(max(abs(uv.x), abs(uv.y)) - 0.425))) * band.a;
+	col = mix(col, band.rgb, line);
+	// the ring round a pip, then the pip: its bottom in shadow, like something carved in
+	float ring = (1.0 - smoothstep(r * 1.1, r * 1.1 + w, d)) * (1.0 - inside) * pip_rim.a;
+	col = mix(col, pip_rim.rgb, ring);
+	col *= 1.0 - lip * 0.22 * (1.0 - pip_rim.a);
+	vec3 ink = v == 1 ? one.rgb : pip.rgb;
+	float deep = mix(0.68, 1.0, smoothstep(0.0, r, d));
+	col = mix(col, ink * deep, inside);
+	// a carved dish: the normal leans towards the pip's centre inside it and over its lip
+	float slope = d < r ? 0.95 * d / r : 0.95 * (1.0 - smoothstep(r, r * 1.3, d));
 	vec3 lean = (tx * o.x + ty * o.y) / max(d, 0.0001);
-	vec3 n = normalize(normalize(n_obj) - lean * slope);
-	NORMAL = normalize(mat3(VIEW_MATRIX) * (MODEL_NORMAL_MATRIX * n));
-	ALBEDO = col;
-	ROUGHNESS = mix(0.32, 0.12, inside);
-	SPECULAR = mix(0.45, 0.7, inside);
+	vec3 n = normalize(nn - lean * slope);
+	vec3 N = normalize(mat3(VIEW_MATRIX) * (MODEL_NORMAL_MATRIX * n));
+	NORMAL = N;
+	// polished metal: a sky and a horizon read by the reflection (no probe, the same on every phone)
+	vec3 R = reflect(-VIEW, normalize(N + vec3(VERTEX.xy * 0.3, 0.0)));   // (a flat face still catches a gradient)
+	float h = R.y * 0.5 + 0.5;
+	float env = mix(mix(0.5, 0.98, smoothstep(0.0, 0.42, h)), mix(0.72, 1.4, smoothstep(0.5, 0.9, h)), smoothstep(0.36, 0.62, h));
+	env += pow(max(dot(R, normalize(vec3(-0.45, 0.65, 0.6))), 0.0), 40.0) * 1.1;
+	float m = clamp(mix(metal * (1.0 - ring) * (1.0 - tp.a * pat_k * 0.75), pip_metal, inside), 0.0, 1.0);
+	m = max(m, line * band_metal);
+	vec3 tint = inside > 0.5 ? ink : (line > 0.5 && band_metal > 0.0 ? band.rgb : metal_tint);
+	ALBEDO = col * (1.0 - m * 0.85);
+	ROUGHNESS = mix(rough, mix(0.34, 0.08, pip_metal), inside);
+	SPECULAR = mix(spec, mix(0.25, 0.8, pip_metal), inside);
+	vec3 glow = tint * env * m;
+	glow += tp.rgb * tp.a * pat_k * pat_glow * (1.0 - inside) * 0.7;
+	glow += ink * inside * pip_glow;
+	glow += band.rgb * line * band_glow;
+	glow += rim.rgb * rim.a * pow(1.0 - clamp(dot(N, VIEW), 0.0, 1.0), 2.4);
+	// the band of light that crosses the die
+	float along = dot(VERTEX.xy, vec2(0.7071)) - sweep;
+	glow += sweep_col * exp(-along * along * 26.0) * 0.55;
+	EMISSION = glow;
 }
 """
 
@@ -123,6 +175,10 @@ var _pop := 0.0                        # landing pop (1 -> 0)
 var ready_pose := false                ## the die shows the neutral pose (show_ready), not a result
 var _ready_tw: Tween
 var _ready_k := 0.0                    # 0 = face-on, 1 = the neutral pose (eases the size with the turn)
+var shine := 0.0                       ## a band of light crosses this skin while it waits and when it lands (wear)
+var flash := Color("#ffe9b0")          ## the landing's flash, in the skin's colour (wear)
+var _flash := 0.0                      # landing flash (1 -> 0)
+var _sweep_t := 99.0                   # s since the band of light started
 
 func _init() -> void:
 	custom_minimum_size = Vector2(84, 84)
@@ -275,11 +331,26 @@ func _process(delta: float) -> void:
 	shadow_core.scale = Vector3(1, 1, 1) * (1.0 - lift * 0.3 + sq * 0.15)
 	shadow.transparency = lift * 0.55
 	shadow_core.transparency = lift * 0.85
+	_flash = maxf(0.0, _flash - delta / 0.4)
 	if waiting:
 		glow.modulate = Color(tint, 0.3 + pulse * 0.32)
 	else:
 		glow.modulate = Color(tint, 0.0)
+	if _flash > 0.0:                               # the landing: a burst behind the die, more for a 6
+		var g := Color(flash, _flash * (0.95 if value == 6 else 0.6))
+		glow.modulate = g if g.a > glow.modulate.a else glow.modulate
+	_shine_step(delta, waiting)
 	_hand_hint(waiting and _idle >= IDLE_HINT)
+
+## The premium skins: a band of light crosses the die every SHINE_EVERY s while it waits, and once when it lands.
+func _shine_step(delta: float, waiting: bool) -> void:
+	if shine <= 0.0 or mat == null:
+		return
+	_sweep_t += delta
+	if waiting and _sweep_t > SHINE_EVERY:
+		_sweep_t = 0.0
+	var k := _sweep_t / SHINE_SEC
+	mat.set_shader_parameter("sweep", lerpf(-1.4, 1.4, k) if k < 1.0 else -9.0)
 
 ## The hand pointer: slides in over the die's lower right and taps it once every 1.2 s.
 func _hand_hint(on: bool) -> void:
@@ -323,6 +394,9 @@ func roll(v: int, speed := 1.0) -> void:
 	_height = 0.0
 	_squash = 0.0
 	_pop = 1.0
+	_flash = 1.0
+	if shine > 0.0:
+		_sweep_t = 0.0
 	rolling = false
 	set_active(active)
 
@@ -402,6 +476,39 @@ func set_skin(bg: Color, edge: Color, pip: Color, one: Color) -> void:
 	mat.set_shader_parameter("edge", edge)
 	mat.set_shader_parameter("pip", pip)
 	mat.set_shader_parameter("one", one)
+
+## Puts dice skin `id` on this die: Catalog's colours and DiceLooks' material. Unknown ids change nothing.
+func wear(id: String) -> void:
+	var d := Catalog.dice(id)
+	if d.is_empty() or mat == null:
+		return
+	set_skin(d.bg, d.edge, d.pip, d.one)
+	var l := DiceLooks.look(id)
+	var tex := DiceLooks.pattern(str(l.get("pat", "")))
+	mat.set_shader_parameter("pattern", tex)
+	mat.set_shader_parameter("pat_k", float(l.get("pat_k", 0.0)) if tex else 0.0)
+	for k: String in ["pat_shift", "pat_glow", "metal", "pip_metal", "pip_glow", "band_metal", "band_glow"]:
+		mat.set_shader_parameter(k, float(l.get(k, 0.0)))
+	mat.set_shader_parameter("rough", float(l.get("rough", 0.3)))
+	mat.set_shader_parameter("spec", float(l.get("spec", 0.45)))
+	mat.set_shader_parameter("edge_k", float(l.get("edge_k", 0.35)))
+	mat.set_shader_parameter("metal_tint", Color(str(l.get("metal_tint", "#f7c63e"))))
+	for k: String in ["pip_rim", "band", "rim"]:
+		mat.set_shader_parameter(k, Color(str(l.get(k, "#00000000"))))
+	shine = float(l.get("shine", 0.0))
+	flash = Color(str(l.get("flash", "#ffe9b0")))
+	mat.set_shader_parameter("sweep_col", flash.lerp(Color.WHITE, 0.5))
+
+## The Shop's picture: a corner towards you, the 1 on top and two more faces showing.
+func show_showcase() -> void:
+	ready_pose = true
+	_ready_k = 1.0
+	if _ready_tw:
+		_ready_tw.kill()
+	if die:
+		die.rotation = (Basis(Vector3.RIGHT, READY_TIP) * Basis(Vector3.UP, READY_TURN) * Basis.from_euler(FACE_EULER[4])).get_euler()
+	if hop:
+		hop.scale = Vector3.ONE * READY_SCALE
 
 
 # ---------- internals ----------

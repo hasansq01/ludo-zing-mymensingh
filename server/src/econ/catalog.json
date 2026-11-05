@@ -36,6 +36,72 @@
     },
     {
       "kind": "dice",
+      "id": "rosewood",
+      "name": "Rosewood",
+      "price": 2500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 25
+    },
+    {
+      "kind": "dice",
+      "id": "marble",
+      "name": "Marble",
+      "price": 3500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 35
+    },
+    {
+      "kind": "dice",
+      "id": "rickshaw",
+      "name": "Rickshaw",
+      "price": 4000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 40
+    },
+    {
+      "kind": "dice",
+      "id": "emerald",
+      "name": "Emerald",
+      "price": 4500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 45
+    },
+    {
+      "kind": "dice",
+      "id": "neon",
+      "name": "Neon",
+      "price": 5000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 50
+    },
+    {
+      "kind": "dice",
+      "id": "galaxy",
+      "name": "Galaxy",
+      "price": 5500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 55
+    },
+    {
+      "kind": "dice",
       "id": "gold",
       "name": "Royal Gold",
       "price": 6000,

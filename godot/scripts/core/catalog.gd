@@ -13,15 +13,21 @@ extends RefCounted
 ## item table only needs its plain names added here (or `## l10n-keys: name` when all its names are translated).
 const _NAMES := ["Classic", "Royal Gold", "Pawn Set", "Girl Set", "Boy Set", "Party Pack", "Champion Pack", "Good Manners", "Ludo Talk", "Reactions", "Bangla", "Gold Trim", "Marble", "Kitty",  # l10n
 	"Teacup", "Glitter", "Royal Crown", "Chess Knight", "Candy Pop", "Fruity", "Blossom", "Ice Crystal", "Pirate", "Robo Bot",  # l10n
-	"Little Wizard", "Space Explorer", "Dragon"]  # l10n
+	"Little Wizard", "Space Explorer", "Dragon", "Rosewood", "Rickshaw", "Emerald", "Neon", "Galaxy"]  # l10n
 ## l10n-keys: desc
 
 ## Dice skins (SKINS): body, edge shade, pips, the single pip of the 1. Classic is free and always owned.
 const DICE := [
-	{id = "classic", name = "Classic", price = 0, bg = Color("#fdfaf2"), edge = Color("#e1d7c3"), pip = Color("#22263f"), one = Color("#d8323a")},
-	{id = "crema", name = "Crema", price = 1000, bg = Color("#f1d9b5"), edge = Color("#d2b183"), pip = Color("#5a3418"), one = Color("#5a3418")},
-	{id = "espresso", name = "Espresso", price = 2500, bg = Color("#4a2c1a"), edge = Color("#2a170c"), pip = Color("#f3e3cc"), one = Color("#f2b632")},
-	{id = "gold", name = "Royal Gold", price = 6000, bg = Color("#f6c945"), edge = Color("#c99a1c"), pip = Color("#3a2400"), one = Color("#b3261e")},
+	{id = "classic", name = "Classic", price = 0, bg = Color("#fdfaf2"), edge = Color("#fff4dd"), pip = Color("#1b2040"), one = Color("#d8202c")},
+	{id = "crema", name = "Crema", price = 1000, bg = Color("#f1d9b5"), edge = Color("#fff0d4"), pip = Color("#4a2810"), one = Color("#8a3a12")},
+	{id = "espresso", name = "Espresso", price = 2500, bg = Color("#4a2c1a"), edge = Color("#8a5a33"), pip = Color("#f4bd3c"), one = Color("#f4bd3c")},
+	{id = "rosewood", name = "Rosewood", price = 2500, bg = Color("#5a2412"), edge = Color("#a5582f"), pip = Color("#f6e7c8"), one = Color("#ffd27a")},
+	{id = "marble", name = "Marble", price = 3500, bg = Color("#f4f2ec"), edge = Color("#ffffff"), pip = Color("#f4bd3c"), one = Color("#d39a26")},
+	{id = "rickshaw", name = "Rickshaw", price = 4000, bg = Color("#d81f3c"), edge = Color("#ffd23f"), pip = Color("#fff6d0"), one = Color("#ffd23f")},
+	{id = "emerald", name = "Emerald", price = 4500, bg = Color("#0f7a4f"), edge = Color("#8dffd2"), pip = Color("#fff0c0"), one = Color("#fff0c0")},
+	{id = "neon", name = "Neon", price = 5000, bg = Color("#0d0f24"), edge = Color("#39f5ff"), pip = Color("#ff3fd0"), one = Color("#39f5ff")},
+	{id = "galaxy", name = "Galaxy", price = 5500, bg = Color("#120a33"), edge = Color("#9a8cff"), pip = Color("#ffffff"), one = Color("#ffd46b")},
+	{id = "gold", name = "Royal Gold", price = 6000, bg = Color("#f6c945"), edge = Color("#ffe48a"), pip = Color("#4a2a00"), one = Color("#c4122a")},
 ]
 ## Emote packs (server/EMOTES.md): the Pawn, Girl and Boy sets hold the same six emotions (happy, laugh, cry, angry,
 ## shocked, love) drawn as that character; the two Premium packs hold eight extras each. The Pawn Set is free and always

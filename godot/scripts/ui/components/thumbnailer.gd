@@ -29,7 +29,7 @@ extends Node
 ##   Thumbnailer.view("room" | "scene", id, radius) -> Thumbnailer.View   a Control showing the baked picture at
 ##                                                   once, else a shimmer over the placeholder until the live render
 ##                                                   is ready, then fading it in
-##   Thumbnailer.dice_art(id, size := 84) -> Control a die at rest on face 5, exactly where a Dice3D of that size
+##   Thumbnailer.dice_art(id, size := 84) -> Control a die in its corner view, exactly where a Dice3D of that size
 ##                                                   draws it (the baked picture; a live Dice3D when there's no bake)
 ##   Thumbnailer.pawn_art(id) -> Control              a red and a blue pawn in that skin filling the control (the
 ##                                                   baked picture; a live PawnStage when there's no bake)
@@ -51,7 +51,6 @@ const BAKE_SIZE := Vector2i(720, 540)
 const PAWN_SIZE := Vector2i(360, 270)
 const DICE_SIZE := 84.0
 const DICE_SCALE := 3.0
-const DICE_FACE := 5
 ## The room camera (web Rooms.thumb: a corner camera at angle .72, 50 out, 24 up, looking at the far corner), in
 ## TableWorld units (the same as the web's), with a vertical lens wide enough for 4:3.
 const ROOM_CAM := {pos = Vector3(30.5, 21.0, 35.0), look = Vector3(-14, 5.0, -14), fov = 50.0}
@@ -246,7 +245,7 @@ static func _key(kind: String, id: String) -> String:
 static func view(kind: String, id: String, radius: int = UIKit.R.md) -> View:
 	return View.new(kind, id, radius)
 
-## A die skin at rest on face DICE_FACE, for a Shop card: a Control of size x size whose picture overflows it exactly
+## A die skin in its corner view (Dice3D.show_showcase), for a Shop card: a Control of size x size whose picture overflows it exactly
 ## like a Dice3D's (Dice3D.PAD: room for the hop and the soft shadow), so it drops in for `Dice3D.new()` + set_skin +
 ## show_face. The baked picture when there is one (no SubViewport, nothing per frame); else a live Dice3D.
 static func dice_art(id: String, size: float = DICE_SIZE) -> Control:
@@ -258,8 +257,8 @@ static func dice_art(id: String, size: float = DICE_SIZE) -> Control:
 		die.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if not d.is_empty():
 			die.ready.connect(func():
-				die.set_skin(d.bg, d.edge, d.pip, d.one)
-				die.show_face(DICE_FACE)
+				die.wear(id)
+				die.show_showcase()
 				die.view.modulate = Color.WHITE, CONNECT_ONE_SHOT)
 		return die
 	var c := Control.new()

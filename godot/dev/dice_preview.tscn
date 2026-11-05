@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://dev/dice_preview.gd" id="1"]
+
+[node name="DicePreview" type="Node"]
+script = ExtResource("1")
