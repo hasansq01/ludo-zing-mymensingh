@@ -149,6 +149,11 @@ release (12-tester closed test for 14 days).
   `Store.replace()` / `reloadSaved()` swap the whole profile.
 - **Pause:** pause menu (Resume, Restart, Settings, Exit to home with a second-tap confirm). Outside YouTube, hiding the
   tab opens it (`visibilitychange`); inside YouTube only the SDK pauses. Timers (`wait`) count only unpaused time.
+- **Snakes & Ladders scene moods (2026-11-06, ported from the Android app's final "bright and joyful" pass):** each scene
+  in `SCENES` has the Godot values for sky, fog, light, ground and clearing, plus `sunDir` (the sun light's position),
+  `halo` [colour, x, y, size, strength] (a soft additive glow far behind the scene, z -42) and `stars` (enchanted only,
+  60, seeded). Built by `skyMood(T)` in `buildWorld`. Snake Trail keeps its own look (the Android app dropped it). The
+  Android app's warm corner vignette is not ported.
 - **Snakes & Ladders 3D gameplay (2026-10-21):** matches are played on the jungle scene's table (`Jungle.play(true)`):
   the table stops turning, the sign, the coiled-snake tree and the two decor pawns hide, 3D glossy pawns (with contact
   shadows and a pulsing ring under the current player) follow SL's own per-player xy / lift mapped onto the 3D board,

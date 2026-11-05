@@ -7124,16 +7124,18 @@ const Jungle = (() => {
   const wood = { plank: '#a9693a', grain: 'rgba(90,45,20,A)', edge: '#7a4422', stroke: '#3a1a12', rope: '#c9a46a' };
   const SCENES = {
     jungle: {
-      sky: ['#9bd572', '#e8f6c0', '#b3e08a', '#6aa84a'], fog: ['#d6edb0', 20, 72], light: ['#fff6dc', '#4a8a36', .66, '#fff0c8', .8, .12],
-      ground: '#76c150', clearing: [230, 200, 140], table: ['#b87a45', '#8a552c', .55, 0],
+      sky: ['#86cfa8', '#ecdc92', '#f8e4a4', '#6aa84a'], fog: ['#c6d890', 22, 78], light: ['#fff8e0', '#4f8a3e', .72, '#ffe2a4', .88, .12],
+      sunDir: [-9, 11, 8], halo: ['#fff0b8', -8, 13, 30, .7],
+      ground: '#6aae48', clearing: [232, 204, 140], table: ['#b87a45', '#8a552c', .55, 0],
       board: { bands: ['#ffd2b0', '#ffc8c4', '#cfe9c2', '#ffe39a', '#cfe4f2'], cream: '#fff4e2', grout: '#e9c7a0', goal: '#ffd45c', star: '#f4a92a', num: '#7d4f61', num100: '#b06d00', frame: '#fff4e6', frameR: .38, lip: '#f2b25c', rail: '#c47a3c', rung: '#f2b366' },
       sign: { ...wood, c1: '#e5484d', c2: '#f4c430', top: 'vine', snake: ['#5cc84f', '#2f8f3a', '#fff0b8'] },
       tableSnake: ['#ffb02e', '#e07a16', '#fff3c4'], motes: ['fly', '#fff3a0', 40, .45], fall: '#7cc95a', beams: 'rgba(255,250,210,.55)',
       world: jungleWorld,
     },
     candy: {
-      sky: ['#ff9fcf', '#ffe4f3', '#ffd0ea', '#f08cc0'], fog: ['#ffd9ee', 30, 95], light: ['#fff4fb', '#d86aa6', .72, '#fff2e6', .78, .14],
-      ground: '#ffb6d8', clearing: [255, 240, 228], table: ['#ff9cc6', '#e0609e', .25, .05],
+      sky: ['#d28ae0', '#fbc4de', '#ffdcea', '#ec98c8'], fog: ['#fac8e4', 28, 94], light: ['#fff6fc', '#d080b4', .76, '#ffead6', .76, .13],
+      sunDir: [8, 10, 8], halo: ['#fff0d8', 9, 9, 26, .6],
+      ground: '#fbaad4', clearing: [255, 232, 236], table: ['#ff9cc6', '#e0609e', .25, .05],
       // the Candy Kingdom board: pink / peach / cream / mint tiles with faint sprinkles, a candy-cane lip with
       // peppermints and gumdrops on the rim, candy-striped snakes, candy-cane ladders with mint rungs
       board: { bands: ['#ffd1e8', '#d6efff', '#fff1a8', '#d8f5d0', '#e8dcff'], tiles: ['#ffc9df', '#ffd6ba', '#fff4e2', '#c2eed8'], marks: ['sprinkles', ['#ff6fae', '#5fd0b0', '#b58cff', '#3fc6c9', '#e5484d']], cream: '#fffaf6', grout: '#f7c3da', goal: '#ffe066', star: '#ff7ab6', num: '#8a3f68', num100: '#b0306f', frame: '#ffe6f2', frameR: .3, lip: '#ff8fc1',
@@ -7154,8 +7156,9 @@ const Jungle = (() => {
       world: trailWorld,
     },
     desert: {
-      sky: ['#ffb46b', '#ffe4ad', '#ffd38f', '#e9a35a'], fog: ['#f4d29c', 40, 130], light: ['#fff1d6', '#b8803e', .66, '#ffe0a8', .95, .12],
-      ground: '#ddb173', clearing: [240, 214, 160], table: ['#7a4a2a', '#e3b04b', .5, .65],
+      sky: ['#7ab0e6', '#f8d09a', '#ffdea8', '#de9f62'], fog: ['#f0cc98', 38, 128], light: ['#fff4dc', '#b48044', .7, '#ffd894', .94, .11],
+      sunDir: [10, 10, 8], halo: ['#fff0c0', 10, 9, 34, .7],
+      ground: '#dcae70', clearing: [242, 216, 160], table: ['#7a4a2a', '#e3b04b', .5, .65],
       // the Desert Temple board: ivory / sandstone / sandy-beige tiles with faint terracotta glyphs, a sandstone frame,
       // a deep-teal lip with gold diamonds, sun medallions on the corners and terracotta tiles mid-side, wooden ladders,
       // turquoise / emerald / terracotta / gold snakes with pale back diamonds
@@ -7167,15 +7170,17 @@ const Jungle = (() => {
       world: desertWorld,
     },
     frost: {
-      sky: ['#a9d6ff', '#eef8ff', '#d4ecfc', '#9fc4e6'], fog: ['#e6f3fb', 32, 115], light: ['#eaf6ff', '#8fb6d2', .72, '#ffe4b8', .7, .16],
-      ground: '#f4f9ff', clearing: [226, 240, 250], table: ['#dcebf5', '#9cc7e0', .3, .05],
+      sky: ['#7ab2ee', '#d6e9fb', '#e4f1fc', '#a2c2e4'], fog: ['#d8e8f6', 30, 108], light: ['#e8f2ff', '#7f9ec4', .66, '#ffd9ac', .55, .1],
+      sunDir: [-6, 12, 8], halo: ['#fff4d8', -9, 15, 22, .6],
+      ground: '#c8dcf2', clearing: [212, 230, 246], table: ['#dcebf5', '#9cc7e0', .3, .05],
       board: { bands: ['#d7ecff', '#dff5ee', '#e8e6ff', '#d9f2ff', '#eef3ff'], cream: '#ffffff', grout: '#bcd7ea', goal: '#ffd45c', star: '#59a8e0', num: '#2f4f73', num100: '#9a5a00', frame: '#f3fbff', frameR: .25, lip: '#8cc8ea', rail: '#7fb0d0', rung: '#e3f4ff' },
       sign: { plank: '#b5835a', grain: 'rgba(90,50,20,A)', edge: '#7a5232', stroke: '#173a6b', rope: '#e6f0f7', c1: '#3b7be0', c2: '#ffffff', top: 'snow', snake: ['#e5484d', '#ffffff', '#fff3f3'] },
       tableSnake: ['#3fa7d6', '#ffffff', '#eaf8ff'], motes: ['snow', '#ffffff', 110, .32], fall: null, beams: null,
       world: frostWorld,
     },
     cloud: {
-      sky: ['#78c4ff', '#cfeaff', '#ffe3f2', '#b6dcff'], fog: ['#e4f2ff', 40, 140], light: ['#ffffff', '#b8c9ff', .8, '#fff4e0', .7, .18],
+      sky: ['#74b4f4', '#c8e0fc', '#ffe6e6', '#b0d0fa'], fog: ['#e0ecfc', 38, 136], light: ['#f6f2ee', '#a8b4e6', .7, '#ffe6c8', .5, .12],
+      sunDir: [-8, 10, 8], halo: ['#fff0d8', -7, 8, 34, .6],
       ground: null, clearing: null, table: ['#f6f1ea', '#e2d7f3', .22, .12],
       board: { bands: ['#ffe3ef', '#e1efff', '#fff3c9', '#e3f8e6', '#efe4ff'], cream: '#ffffff', grout: '#e6dcf5', goal: '#ffe07a', star: '#b48cff', num: '#5b4b8a', num100: '#9a5a00', frame: '#ffffff', frameR: .22, frameM: .1, lip: '#c9b3ff', rail: '#f2a7cf', rung: '#ffffff' },
       sign: { plank: '#fbf7ff', grain: 'rgba(160,140,220,A)', edge: '#c9b3ff', stroke: '#4b3a8a', rope: '#ffffff', c1: '#8a5cf0', c2: '#ff8fc1', top: 'cloud', snake: ['#ff9ad0', '#ffffff', '#fff2fa'] },
@@ -7183,8 +7188,9 @@ const Jungle = (() => {
       world: cloudWorld,
     },
     enchanted: {
-      sky: ['#3d2f7a', '#6a4fa8', '#8f6bb8', '#2b4a5c'], fog: ['#4a4a82', 18, 62], light: ['#c9b8ff', '#1f4a3a', .72, '#ffd9a0', .7, .12],
-      ground: '#2f6b4f', clearing: [86, 150, 120], table: ['#5a3524', '#e3b04b', .35, .7],
+      sky: ['#3d2f7a', '#6a4fa8', '#8f6bb8', '#2b4a5c'], fog: ['#4a4a82', 18, 62], light: ['#d8ccff', '#1f4a3a', .74, '#ffdca8', .68, .12],
+      sunDir: [7, 12, 8], halo: ['#ffeec8', 8, 14, 14, .8], stars: 60,
+      ground: '#2f6b4f', clearing: [90, 156, 126], table: ['#5a3524', '#e3b04b', .35, .7],
       board: { bands: ['#cdeee4', '#e3d7fb', '#d6f0c8', '#fbe6b8', '#cfe3f7'], cream: '#fbf7ee', grout: '#b9a6d6', goal: '#ffd45c', star: '#7ef0c8', num: '#3d2f5c', num100: '#9a5a00', frame: '#f7ecd6', frameR: .3, lip: '#e3b04b', lipM: .7, rail: '#c99a3a', railM: .5, rung: '#f4d58a' },
       sign: { plank: '#7a4a2e', grain: 'rgba(40,20,10,A)', edge: '#4e2c18', stroke: '#1d1240', rope: '#e3c47a', c1: '#7ef0c8', c2: '#ffd56a', top: 'vine', vine: ['#2e7d5a', '#4fbf8a', '#2f9a6a'], snake: ['#f2c14e', '#b8862a', '#fff4d0'] },
       tableSnake: ['#3fd0c0', '#1f8a80', '#e8fff8'], motes: ['fly', '#c8ff9a', 80, .6], fall: '#7ef0c8', beams: 'rgba(200,180,255,.4)',
@@ -7448,6 +7454,18 @@ const Jungle = (() => {
     buildWorld(wantedScene());
     document.body.classList.add('jungle-ready');
   }
+  // the scene's mood (ported from the Android app, 2026-11-06): a soft additive glow where the sun or the moon is, and
+  // stars for the night scene. Far behind everything, unlit, no fog; only the landing camera looks up this far.
+  function skyMood(T) {
+    const soft = tex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); [[0, 1], [.2, .5], [.55, .12], [1, 0]].forEach(([p, a]) => gr.addColorStop(p, `rgba(255,255,255,${a})`)); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glow = (col, a) => new THREE.MeshBasicMaterial({ map: soft, color: lin(col), transparent: true, opacity: a, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    if (T.halo) { const [col, x, y, size, a] = T.halo; add(new THREE.PlaneGeometry(size, size), glow(col, a), x, y, -42); }
+    if (T.stars) {
+      let seed = T.stars * 17; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const m = glow('#fff5e0', .9), g = new THREE.PlaneGeometry(.34, .34);
+      for (let i = 0; i < T.stars; i++) { const sc = .5 + rnd() * rnd() * 1.3; add(g, m, (rnd() - .5) * 70, 7 + rnd() * 26, -44, null, { s: [sc, sc, 1] }); }
+    }
+  }
   function buildWorld(id) {
     const T = SCENES[id] || SCENES.jungle;
     if (J) disposeWorld(J);
@@ -7462,7 +7480,8 @@ const Jungle = (() => {
     if (!cam) cam = new THREE.PerspectiveCamera(46, 1, .5, 200);
     const L = T.light;
     J.add(new THREE.HemisphereLight(lin(L[0]), lin(L[1]), L[2]));
-    const sun = new THREE.DirectionalLight(lin(L[3]), L[4]); sun.position.set(7, 16, 10); J.add(sun);
+    const sun = new THREE.DirectionalLight(lin(L[3]), L[4]); sun.position.set(...(T.sunDir || [7, 16, 10])); J.add(sun);
+    skyMood(T);
     J.add(new THREE.AmbientLight(lin(0xffffff), L[5]));
 
     // ground, a soft-edged clearing and a soft shadow under the table
