@@ -82,8 +82,8 @@ msgstr "মার্বেল"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:14
-msgid "Kitty Ears"
-msgstr "বিড়ালের কান"
+msgid "Kitty"
+msgstr "কিটি"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:15
@@ -157,83 +157,83 @@ msgstr "চকচকে গুটি, সব খেলা এটা দিয়
 
 #. catalog.gd
 #: scripts/core/catalog.gd:56
-msgid "Gold bands at the foot, the waist and the collar."
-msgstr "পায়ে, কোমরে আর গলায় সোনালি পাড়।"
+msgid "Engraved gold bands, gems at the collar and a gold finial."
+msgstr "খোদাই করা সোনার ব্যান্ড, কলারে রত্ন আর মাথায় সোনার চূড়া।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:57
-msgid "Candy stripes and a sprinkled cupcake top."
-msgstr "ক্যান্ডির ডোরা আর মাথায় রঙিন ছিটানো কাপকেক।"
+msgid "Candy stripes, a swirl of frosting and a cherry on top."
+msgstr "ক্যান্ডির ডোরা, ঘূর্ণি ক্রিম আর ওপরে একটা চেরি।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:58
-msgid "Strawberry, watermelon, orange, blueberry."
-msgstr "স্ট্রবেরি, তরমুজ, কমলা, ব্লুবেরি।"
+msgid "A big juicy fruit for a head: strawberry, apple, orange or blueberry."
+msgstr "মাথায় বড় রসালো ফল: স্ট্রবেরি, আপেল, কমলা বা ব্লুবেরি।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:59
-msgid "A flower for a head and a leafy vine."
-msgstr "মাথায় একটা ফুল আর পাতাওয়ালা লতা।"
+msgid "A double flower for a head and a skirt of lotus petals."
+msgstr "মাথায় দুই স্তরের ফুল, গায়ে পদ্মের পাপড়ির ঘাগরা।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:60
-msgid "Polished stone with soft white veins."
-msgstr "মসৃণ পাথর, গায়ে হালকা সাদা রেখা।"
+msgid "Polished stone with fine white veins, trimmed in gold."
+msgstr "সোনালি কারুকাজে মসৃণ পাথর, তাতে সাদা সূক্ষ্ম শিরা।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:61
-msgid "A crystal pawn crowned with shards."
-msgstr "স্ফটিকের গুটি, মাথায় ধারালো টুকরোর মুকুট।"
+msgid "A faceted crystal crowned with glittering shards."
+msgstr "কাটা স্ফটিকের গুটি, মাথায় ঝলমলে বরফের মুকুট।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:62
-msgid "A tricorn, an eye patch, a bandana and a belt."
-msgstr "তিনকোনা টুপি, চোখে পট্টি, গলায় রুমাল আর কোমরে বেল্ট।"
+msgid "A captain with a tricorn, an eye patch, a black beard and gold buttons."
+msgstr "তিনকোনা টুপি, চোখে পট্টি, কালো দাড়ি আর সোনার বোতামের ক্যাপ্টেন।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:63
-msgid "A little robot with a white head and glowing eyes."
-msgstr "সাদা মাথা আর জ্বলজ্বলে চোখের ছোট্ট রোবট।"
+msgid "A friendly robot with glowing eyes, a smile and a heart in its chest."
+msgstr "জ্বলজ্বলে চোখ, হাসি আর বুকে হৃদয় নিয়ে মিষ্টি এক রোবট।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:64
-msgid "A robe, a scarf and a big starry hat."
-msgstr "লম্বা আলখাল্লা, স্কার্ফ আর তারা-আঁকা বড় টুপি।"
+msgid "A long white beard, a crooked starry hat and a gold-trimmed robe."
+msgstr "লম্বা সাদা দাড়ি, তারা-ভরা বাঁকা টুপি আর সোনালি পাড়ের আলখাল্লা।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:65
-msgid "Two pointy cat ears, pink inside."
-msgstr "দুটো খাড়া বিড়ালের কান, ভেতরটা গোলাপি।"
+msgid "A whole cat: big eyes, whiskers, paws, a tail and a bell on its collar."
+msgstr "আস্ত একটা বিড়াল: বড় চোখ, গোঁফ, থাবা, লেজ আর গলায় ঘণ্টা।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:66
-msgid "A space suit and a big visor helmet."
-msgstr "স্পেস স্যুট আর ভাইজর-সহ বড় হেলমেট।"
+msgid "A space suit, a backpack and a gold mirror visor."
+msgstr "স্পেস স্যুট, পিঠে ব্যাগ আর সোনালি আয়নার ভাইজর।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:67
-msgid "A cup on its saucer, frothy on top."
-msgstr "পিরিচের ওপর কাপ, ওপরে ফেনা।"
+msgid "Fine china with gold trim and a heart in the froth."
+msgstr "সোনালি পাড়ের দামি চিনামাটির কাপ, ফেনায় একটা হৃদয়।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:68
-msgid "Gold horns, scales and little wings."
-msgstr "সোনালি শিং, আঁশ আর ছোট্ট ডানা।"
+msgid "Gold horns, slit eyes, wings, scales and a spiked tail."
+msgstr "সোনার শিং, সরু চোখ, ডানা, আঁশ আর কাঁটাওয়ালা লেজ।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:69
-msgid "Sparkles all over that catch the light."
-msgstr "গা ভর্তি ঝিলিক, আলোয় ঝিকমিক করে।"
+msgid "Sparkles all over, silver trim and a diamond on top."
+msgstr "সারা গায়ে ঝিলিক, রুপালি পাড় আর মাথায় একটা হীরা।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:70
-msgid "A small gold crown with a jewel in your colour."
-msgstr "ছোট্ট সোনার মুকুট, তাতে তোমার রঙের পাথর।"
+msgid "A king in an ermine cape with an arched gold crown and gems."
+msgstr "আরমিনের চাদর আর রত্নখচিত সোনার মুকুট পরা রাজা।"
 
 #. catalog.gd
 #: scripts/core/catalog.gd:71
-msgid "A horse's head on a turned base, like the chess piece."
-msgstr "দাবার ঘোড়ার মতো, গোল বেসের ওপর ঘোড়ার মাথা।"
+msgid "A horse's head with a mane and a gold bridle, on a gold-ringed base."
+msgstr "কেশর আর সোনার লাগামে ঘোড়ার মাথা, সোনার বালার ওপর।"
 
 #. catalog.gd
 #. collection.gd
@@ -5269,6 +5269,54 @@ msgstr "সাপ"
 #: scripts/world/sl_scenes.gd:1168
 msgid "& LADDERS"
 msgstr "সিঁড়ি"
+
+#~ msgid "Gold bands at the foot, the waist and the collar."
+#~ msgstr "পায়ে, কোমরে আর গলায় সোনালি পাড়।"
+
+#~ msgid "Candy stripes and a sprinkled cupcake top."
+#~ msgstr "ক্যান্ডির ডোরা আর মাথায় রঙিন ছিটানো কাপকেক।"
+
+#~ msgid "Strawberry, watermelon, orange, blueberry."
+#~ msgstr "স্ট্রবেরি, তরমুজ, কমলা, ব্লুবেরি।"
+
+#~ msgid "A flower for a head and a leafy vine."
+#~ msgstr "মাথায় একটা ফুল আর পাতাওয়ালা লতা।"
+
+#~ msgid "Polished stone with soft white veins."
+#~ msgstr "মসৃণ পাথর, গায়ে হালকা সাদা রেখা।"
+
+#~ msgid "A crystal pawn crowned with shards."
+#~ msgstr "স্ফটিকের গুটি, মাথায় ধারালো টুকরোর মুকুট।"
+
+#~ msgid "A tricorn, an eye patch, a bandana and a belt."
+#~ msgstr "তিনকোনা টুপি, চোখে পট্টি, গলায় রুমাল আর কোমরে বেল্ট।"
+
+#~ msgid "A little robot with a white head and glowing eyes."
+#~ msgstr "সাদা মাথা আর জ্বলজ্বলে চোখের ছোট্ট রোবট।"
+
+#~ msgid "A robe, a scarf and a big starry hat."
+#~ msgstr "লম্বা আলখাল্লা, স্কার্ফ আর তারা-আঁকা বড় টুপি।"
+
+#~ msgid "Two pointy cat ears, pink inside."
+#~ msgstr "দুটো খাড়া বিড়ালের কান, ভেতরটা গোলাপি।"
+
+#~ msgid "A space suit and a big visor helmet."
+#~ msgstr "স্পেস স্যুট আর ভাইজর-সহ বড় হেলমেট।"
+
+#~ msgid "A cup on its saucer, frothy on top."
+#~ msgstr "পিরিচের ওপর কাপ, ওপরে ফেনা।"
+
+#~ msgid "Gold horns, scales and little wings."
+#~ msgstr "সোনালি শিং, আঁশ আর ছোট্ট ডানা।"
+
+#~ msgid "Sparkles all over that catch the light."
+#~ msgstr "গা ভর্তি ঝিলিক, আলোয় ঝিকমিক করে।"
+
+#~ msgid "A small gold crown with a jewel in your colour."
+#~ msgstr "ছোট্ট সোনার মুকুট, তাতে তোমার রঙের পাথর।"
+
+#~ msgid "A horse's head on a turned base, like the chess piece."
+#~ msgstr "দাবার ঘোড়ার মতো, গোল বেসের ওপর ঘোড়ার মাথা।"
 
 #~ msgid "Starter Set"
 #~ msgstr "স্টার্টার সেট"

@@ -40,7 +40,7 @@ server values of `rules.ts` never reach them. `test/econ_rules.test.ts` covers t
 | Gem prices | Every item the Shop sells (price > 0) costs `ceil(price / 100)` gems (`gems` in `catalog.json`; free and unlock-only items have none) | `Catalog.gem_price` |
 | Rooms | Dream 3,000 · Studio 4,000 · Cloudside 5,000 (Moonlit, Corner free) | `Rooms.LIST` |
 | Dice | Crema 1,000 · Espresso 2,500 · Royal Gold 6,000 (Classic free) | `Catalog.DICE` |
-| Pawn skins | Coins: Gold Trim 2,000 · Marble 3,500 · Kitty Ears 5,000 · Teacup 6,000 (or `ceil(price / 100)` gems). Gems only: Glitter 80 · Royal Crown 120 · Chess Knight 150 (`price` 0, `buy` false, their own `gems`). Classic free. Profile `pawns_owned` (Classic first) and `pawn` | `Catalog.PAWNS` |
+| Pawn skins | Coins: Gold Trim 2,000 · Marble 3,500 · Kitty 5,000 · Teacup 6,000 (or `ceil(price / 100)` gems). Gems only: Glitter 80 · Royal Crown 120 · Chess Knight 150 (`price` 0, `buy` false, their own `gems`). Classic free. Profile `pawns_owned` (Classic first) and `pawn` | `Catalog.PAWNS` |
 | S&L scenes | Frost 20,000 · Candy 22,000 · Desert / Cloud / Enchanted 25,000 (Jungle free) | `SLScenes.LIST` |
 | Characters | 18 at 10,000–12,000; Arif and Nadia free | `Collection.CHARS` |
 | Unlock-only | Lucky Dice avatar (First Victory), Robot (Winning Streak), Crown (level 5); frames Gold (level 5), Mint (Master of Pairs), Royal (Coin Collector); plates Espresso (Experienced Player), Ruby (Winning Streak); each badge needs its achievement | `Collection` |

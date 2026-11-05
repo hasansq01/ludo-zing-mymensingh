@@ -157,7 +157,7 @@
     {
       "kind": "pawn",
       "id": "kitty",
-      "name": "Kitty Ears",
+      "name": "Kitty",
       "price": 5000,
       "buy": true,
       "free": false,

@@ -14,8 +14,8 @@ const FOUR := "four"
 const SPIN := 0.55                       ## FOUR: radians a second each pawn turns
 ## Where the pawns stand per layout: [colour index, position, scale]; the camera's eye and target.
 const LAYOUTS := {
-	card = {pawns = [[3, Vector3(0.42, 0, -0.42), 0.92], [0, Vector3(-0.3, 0, 0.18), 1.0]],
-		eye = Vector3(0.0, 1.7, 4.7), look = Vector3(0.06, 0.3, -0.1), fov = 27.0},
+	card = {pawns = [[3, Vector3(0.5, 0, -0.5), 0.9], [0, Vector3(-0.2, 0, 0.12), 1.0]],
+		eye = Vector3(0.0, 1.12, 3.85), look = Vector3(0.08, 0.36, -0.1), fov = 27.0},
 	four = {pawns = [[0, Vector3(-1.38, 0, 0), 1.0], [1, Vector3(-0.46, 0, 0), 1.0], [2, Vector3(0.46, 0, 0), 1.0], [3, Vector3(1.38, 0, 0), 1.0]],
 		eye = Vector3(0.0, 1.3, 5.5), look = Vector3(0.0, 0.48, 0.0), fov = 26.0},
 }
@@ -65,6 +65,11 @@ func _init(skin_ := "classic", layout_ := CARD) -> void:
 	fill.light_color = Color("#ffe6cf")
 	fill.rotation = Vector3(deg_to_rad(-20.0), deg_to_rad(150.0), 0)
 	_root.add_child(fill)
+	var rim := DirectionalLight3D.new()        # from behind: a bright edge lifts the pawn off the card
+	rim.light_energy = 0.55
+	rim.light_color = Color("#fff4e0")
+	rim.rotation = Vector3(deg_to_rad(-28.0), deg_to_rad(205.0), 0)
+	_root.add_child(rim)
 	set_skin(skin)
 
 

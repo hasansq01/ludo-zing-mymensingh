@@ -67,11 +67,12 @@ static func _outline(skin: String) -> PackedVector2Array:
 static func height(skin: String) -> float:
 	match skin:
 		"knight": return 1.08
-		"crown": return HEAD_Y + 0.29
+		"crown": return 1.1
 		"kitty": return HEAD_Y + 0.29
 		"teacup": return 0.66
 		"trim": return TOP + 0.07
-		"candy": return 1.02
+		"candy": return 1.12
+		"glitter": return TOP + 0.1
 		"fruity": return 1.05
 		"blossom": return 1.08
 		"ice": return 1.15

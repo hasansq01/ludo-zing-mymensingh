@@ -11,7 +11,7 @@ extends RefCounted
 
 ## Names that are plain words, shown through L10n.t (the rest, Crema / Espresso / Pawn Pals ..., stay English). A new
 ## item table only needs its plain names added here (or `## l10n-keys: name` when all its names are translated).
-const _NAMES := ["Classic", "Royal Gold", "Pawn Set", "Girl Set", "Boy Set", "Party Pack", "Champion Pack", "Good Manners", "Ludo Talk", "Reactions", "Bangla", "Gold Trim", "Marble", "Kitty Ears",  # l10n
+const _NAMES := ["Classic", "Royal Gold", "Pawn Set", "Girl Set", "Boy Set", "Party Pack", "Champion Pack", "Good Manners", "Ludo Talk", "Reactions", "Bangla", "Gold Trim", "Marble", "Kitty",  # l10n
 	"Teacup", "Glitter", "Royal Crown", "Chess Knight", "Candy Pop", "Fruity", "Blossom", "Ice Crystal", "Pirate", "Robo Bot",  # l10n
 	"Little Wizard", "Space Explorer", "Dragon"]  # l10n
 ## l10n-keys: desc
@@ -53,22 +53,22 @@ const TEAM_PHRASES := ["t-help", "t-go", "t-got", "t-partner"]
 ## ones at one to two of the smallest gem packs (80 gems). `desc`: the PawnSheet's line under the turning pawns.
 const PAWNS := [
 	{id = "classic", name = "Classic", price = 0, desc = "The glossy pawn every game starts with."},
-	{id = "trim", name = "Gold Trim", price = 2000, desc = "Gold bands at the foot, the waist and the collar."},
-	{id = "candy", name = "Candy Pop", price = 2500, desc = "Candy stripes and a sprinkled cupcake top."},
-	{id = "fruity", name = "Fruity", price = 2500, desc = "Strawberry, watermelon, orange, blueberry."},
-	{id = "blossom", name = "Blossom", price = 2500, desc = "A flower for a head and a leafy vine."},
-	{id = "marble", name = "Marble", price = 3500, desc = "Polished stone with soft white veins."},
-	{id = "ice", name = "Ice Crystal", price = 3500, desc = "A crystal pawn crowned with shards."},
-	{id = "pirate", name = "Pirate", price = 3500, desc = "A tricorn, an eye patch, a bandana and a belt."},
-	{id = "robo", name = "Robo Bot", price = 4000, desc = "A little robot with a white head and glowing eyes."},
-	{id = "wizard", name = "Little Wizard", price = 4000, desc = "A robe, a scarf and a big starry hat."},
-	{id = "kitty", name = "Kitty Ears", price = 5000, desc = "Two pointy cat ears, pink inside."},
-	{id = "space", name = "Space Explorer", price = 5000, desc = "A space suit and a big visor helmet."},
-	{id = "teacup", name = "Teacup", price = 6000, desc = "A cup on its saucer, frothy on top."},
-	{id = "dragon", name = "Dragon", price = 6000, desc = "Gold horns, scales and little wings."},
-	{id = "glitter", name = "Glitter", price = 0, gems = 80, desc = "Sparkles all over that catch the light."},
-	{id = "crown", name = "Royal Crown", price = 0, gems = 120, desc = "A small gold crown with a jewel in your colour."},
-	{id = "knight", name = "Chess Knight", price = 0, gems = 150, desc = "A horse's head on a turned base, like the chess piece."},
+	{id = "trim", name = "Gold Trim", price = 2000, desc = "Engraved gold bands, gems at the collar and a gold finial."},
+	{id = "candy", name = "Candy Pop", price = 2500, desc = "Candy stripes, a swirl of frosting and a cherry on top."},
+	{id = "fruity", name = "Fruity", price = 2500, desc = "A big juicy fruit for a head: strawberry, apple, orange or blueberry."},
+	{id = "blossom", name = "Blossom", price = 2500, desc = "A double flower for a head and a skirt of lotus petals."},
+	{id = "marble", name = "Marble", price = 3500, desc = "Polished stone with fine white veins, trimmed in gold."},
+	{id = "ice", name = "Ice Crystal", price = 3500, desc = "A faceted crystal crowned with glittering shards."},
+	{id = "pirate", name = "Pirate", price = 3500, desc = "A captain with a tricorn, an eye patch, a black beard and gold buttons."},
+	{id = "robo", name = "Robo Bot", price = 4000, desc = "A friendly robot with glowing eyes, a smile and a heart in its chest."},
+	{id = "wizard", name = "Little Wizard", price = 4000, desc = "A long white beard, a crooked starry hat and a gold-trimmed robe."},
+	{id = "kitty", name = "Kitty", price = 5000, desc = "A whole cat: big eyes, whiskers, paws, a tail and a bell on its collar."},
+	{id = "space", name = "Space Explorer", price = 5000, desc = "A space suit, a backpack and a gold mirror visor."},
+	{id = "teacup", name = "Teacup", price = 6000, desc = "Fine china with gold trim and a heart in the froth."},
+	{id = "dragon", name = "Dragon", price = 6000, desc = "Gold horns, slit eyes, wings, scales and a spiked tail."},
+	{id = "glitter", name = "Glitter", price = 0, gems = 80, desc = "Sparkles all over, silver trim and a diamond on top."},
+	{id = "crown", name = "Royal Crown", price = 0, gems = 120, desc = "A king in an ermine cape with an arched gold crown and gems."},
+	{id = "knight", name = "Chess Knight", price = 0, gems = 150, desc = "A horse's head with a mane and a gold bridle, on a gold-ringed base."},
 ]
 const FREE_EMOTES := "starter"
 const FREE_TEXT := "basic"
