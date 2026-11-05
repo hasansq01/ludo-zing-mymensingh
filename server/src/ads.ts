@@ -5,15 +5,15 @@
 // game's word. Day caps per kind and in total (Bangladesh day), checked at start and again at the callback.
 // LevelPlay (the primary network) does the same through GET /v1/ads/levelplay: its MD5 signature with the private key
 // (secret LEVELPLAY_S2S_KEY), the nonce and account id as custom parameters, eventId once. Both grant via grantAd().
-import { type AccEnv, type Authed, type Step, BadRequest, authedJson, json, mutate, readBody } from "./accounts";
-import { ECON_V1, addCoins, type Profile } from "./econ";
+import { type AccEnv, type Authed, type Step, BadRequest, authedJson, json, mutate, readBody, rowToProfile } from "./accounts";
+import { ECON_V1, addCoins, extraSpins, type Profile } from "./econ";
 import { econDay, econDayStartMs } from "./wallet";
 import { nextDayAt } from "./econ";
 import { gcall } from "./gauth";
 
 export const KEYS_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json";
 const KEYS_TTL_MS = 24 * 3600_000;
-export type AdKind = "reroll" | "refill" | "double" | "gems";
+export type AdKind = "reroll" | "refill" | "double" | "gems" | "spin" | "gift";
 const KINDS = Object.keys(ECON_V1.ads) as AdKind[];
 const NONCE_RE = /^ad_[a-z2-7]{24}$/;
 
@@ -185,6 +185,9 @@ export async function adsStart(req: Request, env: AccEnv, a: Authed, now: number
     const amt = await doubleAmount(db, a.row.id, ref, now);
     if (amt <= 0) return authedJson(a, { error: "not_eligible", msg: amt < 0 ? "already doubled" : "only a coin-table win of the last 15 minutes can be doubled" }, 409);
   }
+  if (kind === "gift" && giftAmount(rowToProfile(p), econDay(now)) <= 0) {
+    return authedJson(a, { error: "not_eligible", msg: "claim today's daily reward first" }, 409);
+  }
   const nonce = newNonce();
   await db.prepare("INSERT INTO ad_rewards (nonce, account_id, kind, ref, created_at, status) VALUES (?, ?, ?, ?, ?, 'pending')").bind(nonce, a.row.id, kind, ref, now).run();
   return authedJson(a, { ok: true, nonce, user_id: a.row.id, custom_data: nonce, ...c });
@@ -205,6 +208,17 @@ export async function adsStatus(env: AccEnv, a: Authed, url: URL, now: number): 
   return authedJson(a, out);
 }
 
+/** The coins of today's daily reward, 0 before it is claimed: what the Welcome Back video doubles. */
+function giftAmount(p: Profile, today: string): number {
+  const hist = isHistory(p.daily) ? p.daily.history : [];
+  const h = hist[hist.length - 1];
+  return h && h.on === today ? Math.max(0, Math.trunc(Number(h.coins) || 0)) : 0;
+}
+
+function isHistory(d: unknown): d is { history: Array<{ on?: string; coins?: unknown }> } {
+  return typeof d === "object" && d !== null && Array.isArray((d as { history?: unknown }).history);
+}
+
 /** The reward of one kind applied to a profile: [new profile, ledger coins, ledger gems, amount]. */
 function applyReward(p: Profile, kind: AdKind, double: number): [Profile, number, number, number] {
   const q = structuredClone(p);
@@ -223,6 +237,12 @@ function applyReward(p: Profile, kind: AdKind, double: number): [Profile, number
     case "gems":
       q.gems += ECON_V1.ads.gems.amount;
       return [q, 0, ECON_V1.ads.gems.amount, ECON_V1.ads.gems.amount];
+    case "spin":
+      (q as unknown as { extra_spins: number }).extra_spins = extraSpins(q) + ECON_V1.ads.spin.amount;
+      return [q, 0, 0, ECON_V1.ads.spin.amount];
+    case "gift":
+      addCoins(q, double);
+      return [q, double, 0, double];
   }
 }
 
@@ -256,6 +276,10 @@ export async function grantAd(env: AccEnv, nonce: string, user: string, tx: stri
     if (ad.kind === "double") {
       const g = await db.prepare("SELECT coins FROM match_grants WHERE match_id = ? AND account_id = ?").bind(ad.ref ?? "", ad.account_id).first<{ coins: number }>();
       dbl = Math.max(0, g?.coins ?? 0);
+      if (!dbl) return reject("not_eligible");
+    }
+    if (ad.kind === "gift") {
+      dbl = giftAmount(p, econDay(now));
       if (!dbl) return reject("not_eligible");
     }
     const [q, coins, gems, amount] = applyReward(p, ad.kind, dbl);

@@ -291,7 +291,12 @@ export const PRIZES: readonly number[] = REWARDS.prizes;
 
 /** Rewards.can_spin. */
 export function canSpin(p: Profile, today: string): boolean {
-  return String(p.last_spin ?? "") !== today;
+  return String(p.last_spin ?? "") !== today || extraSpins(p) > 0;
+}
+
+/** Lucky Draw: draws won by watching a video (`extra_spins`), used once the day's free one is gone. */
+export function extraSpins(p: Profile): number {
+  return Math.max(0, getInt(p, "extra_spins", 0));
 }
 
 /**
@@ -313,6 +318,7 @@ export function spin(profile: Profile, today: string, roll: number): SpinResult 
   if (!Number.isInteger(roll) || roll < 0 || roll >= PRIZES.length) throw new RangeError(`spin roll ${roll}`);
   if (!canSpin(profile, today)) return { ok: false, error: "spun", next_at: nextDayAt(today) };
   const p = clone(profile);
+  if (String(p.last_spin ?? "") === today) (p as unknown as { extra_spins: number }).extra_spins = extraSpins(p) - 1;
   p.last_spin = today;
   addCoins(p, PRIZES[roll]);
   return { ok: true, profile: p, delta: { coins: PRIZES[roll], xp: 0 }, index: roll, prize: PRIZES[roll] };

@@ -122,6 +122,8 @@ export function rowToProfile(r: AccountRow): Profile {
     daily: rw.daily,
     last_spin: rw.last_spin,
     last_free: rw.last_free,
+    ...(rw.extra_spins ? { extra_spins: rw.extra_spins } : {}),
+    ...(rw.missions ? { missions: rw.missions } : {}),
     avatar: r.avatar,
     av_owned: owned.av_owned,
     frame: r.frame,
@@ -153,7 +155,7 @@ export function profileColumns(p: Profile): Record<string, string | number | nul
     stats: JSON.stringify(p.stats),
     owned: JSON.stringify(owned),
     equipped: JSON.stringify(eq),
-    rewards: JSON.stringify({ daily: p.daily, last_spin: p.last_spin, last_free: p.last_free }),
+    rewards: JSON.stringify({ daily: p.daily, last_spin: p.last_spin, last_free: p.last_free, extra_spins: (p as { extra_spins?: number }).extra_spins || undefined, missions: (p as { missions?: unknown }).missions }),
     achievements: JSON.stringify({ claimed: p.claimed }),
   };
 }

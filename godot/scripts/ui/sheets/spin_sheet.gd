@@ -1,9 +1,9 @@
 class_name SpinSheet
 extends Sheet
-## Daily spin (index.html #spinSheet, buildWheel and the #spinGo handler) in the .pm sheet look (Sheet "pm" with the
-## "Daily spin" RibbonTitle; the 48 px X is the only dismiss control): the 8-segment prize wheel in the player
+## Lucky Draw (index.html #spinSheet, buildWheel and the #spinGo handler) in the .pm sheet look (Sheet "pm" with the
+## "Lucky Draw" RibbonTitle; the 48 px X is the only dismiss control): the 8-segment prize wheel in the player
 ## colours with a purple jackpot wedge ("1K" and a star), rim pegs, the coral pointer and the gold hub; one free
-## spin per local day. Spin picks the prize first (Rewards.spin: saved at once, so closing mid-spin can't give a
+## spin per local day, more with a video (the server grants them: Rewards.extra_spins), the chances shown. Spin picks the prize first (Rewards.spin: saved at once, so closing mid-spin can't give a
 ## second spin), then the wheel turns and eases onto that segment (~4 s, cubic-bezier(.12,.75,.15,1); 1.4 s with
 ## Reduce motion) with a soft tick per segment, a light haptic every second tick and a pointer flick.
 ## On landing: the segment pulses, Haptics.success(), "You won 250 coins!" pops in, the coins fly to the home coin
@@ -20,6 +20,8 @@ const TURNS_REDUCED := 2
 const SPIN_SEC_REDUCED := 1.4
 ## The jackpot segment index (Rewards.PRIZES 1000).
 const JACKPOT := 5
+## What the jackpot pays on top of its coins (server ECON_V1.jackpot_gems).
+const JACKPOT_GEMS := 5
 
 var profile: Dictionary
 var rng := RandomNumberGenerator.new()
@@ -28,6 +30,9 @@ var _width := float(UIKit.W.form)
 var wheel: Wheel
 var _note: Label
 var _go: Button
+var _again: Button
+var flow: AdFlow
+var _no_more := false                     # today's videos for a draw are used
 var _spinning := false
 var _result := {}
 var _ticks := 0
@@ -35,7 +40,7 @@ var _ticks := 0
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
 func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
-	super(L10n.t("Daily spin"), width, true, LOOK_PM)
+	super(L10n.t("Lucky Draw"), width, true, LOOK_PM)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
 	_width = width
@@ -55,6 +60,22 @@ func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> voi
 	_go.pressed.connect(_spin)
 	_go.resized.connect(_fit_go_text)
 	body.add_child(_go)
+	_again = UIKit.button(tr("Draw again with a video"), "teal", "md")
+	_again.name = "Again"
+	_again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_again.visible = false
+	UIKit.fit_text(_again, 13)
+	_again.pressed.connect(_watch)
+	body.add_child(_again)
+	# fair and open: what you can win, and the chances
+	var odds := UIKit.label(tr("Every wedge has the same chance. The jackpot: %s coins and %d gems.") % [Fmt.coins_full(Rewards.PRIZES.max()), JACKPOT_GEMS], UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	odds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(odds)
+	if AdFlow.available() and is_same(profile, Save.profile):
+		flow = AdFlow.new()
+		flow.name = "AdFlow"
+		flow.done.connect(_on_watched)
+		add_child(flow)
 	_render()
 
 
@@ -118,6 +139,7 @@ func _render() -> void:
 			_go.add_theme_color_override("font_disabled_color", Palette.SUB)
 		_go.text = tr("Next spin in %s") % Fmt.until(Rewards.sec_to_midnight())
 		_go.disabled = true
+	_again.visible = flow != null and not ready_now and not _spinning and not _no_more
 	_fit_go_text()
 	_note.visible = ready_now or _spinning or not _result.is_empty()   # no empty gap once today's spin is used
 	if _spinning:
@@ -189,10 +211,32 @@ func _landed(r: Dictionary) -> void:
 		Toast.show(self, tr("%s coins") % Fmt.gain(prize), card, 1.8, "coin")
 	if int(r.index) == JACKPOT or prize >= 1000:
 		Celebrate.run(self, "burst", 0.6)
+	if int(r.get("gems", 0)) > 0:
+		Toast.show(self, tr("+%d gems") % int(r.gems), card, 2.2, "gem")
 	spun.emit(prize)
 
 
 ## index.html's CSS timing curve cubic-bezier(x1, y1, x2, y2) at progress x (0-1).
+func _watch() -> void:
+	if flow == null or flow.busy:
+		return
+	_again.disabled = true
+	flow.watch("spin")
+
+
+func _on_watched(ok: bool, info: Dictionary) -> void:
+	if not is_instance_valid(_again):
+		return
+	_again.disabled = false
+	_result = {}
+	if ok:
+		Sound.sfx("buy")
+	else:
+		_no_more = str(info.get("error", "")) == "cap"
+		Toast.show(self, str(info.get("text", tr(AdFlow.NO_FILL_TEXT))), card, 2.4, "bad")
+	_render()
+
+
 static func bezier_ease(x: float, x1: float, y1: float, x2: float, y2: float) -> float:
 	if x <= 0.0:
 		return 0.0

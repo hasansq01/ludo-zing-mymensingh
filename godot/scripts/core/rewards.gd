@@ -237,7 +237,11 @@ static func mark_auto_open(p: Dictionary, today := "") -> void:
 # ---------- daily spin ----------
 
 static func can_spin(p: Dictionary, today := "") -> bool:
-	return str(p.get("last_spin", "")) != _today(today)
+	return str(p.get("last_spin", "")) != _today(today) or extra_spins(p) > 0
+
+## Lucky Draw: draws won by watching a video, used once the day's free one is gone (the server grants them).
+static func extra_spins(p: Dictionary) -> int:
+	return maxi(0, int(p.get("extra_spins", 0)))
 
 ## Spins the wheel: picks a segment, adds its coins and records the day.
 ## Returns {ok, index (segment 0-7), prize (coins)}; ok false (index -1) when today's spin is used.
@@ -247,6 +251,8 @@ static func spin(p: Dictionary, rng: RandomNumberGenerator, today := "", notify 
 	if not can_spin(p, today):
 		return {ok = false, index = -1, prize = 0}
 	var k := rng.randi_range(0, PRIZES.size() - 1)
+	if str(p.get("last_spin", "")) == _today(today):
+		p.extra_spins = extra_spins(p) - 1
 	p.last_spin = _today(today)
 	_add_coins(p, PRIZES[k])
 	commit(p, notify)

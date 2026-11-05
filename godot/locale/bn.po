@@ -277,7 +277,7 @@ msgstr "এই রুম শপে নেই।"
 #. catalog.gd buy_text()
 #. collection.gd buy_char()
 #. sl_scenes.gd buy_scene()
-#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:318
+#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:305
 msgid "You already own %s."
 msgstr "%s তোমার আগে থেকেই আছে।"
 
@@ -675,7 +675,8 @@ msgstr "“%s” অর্জন করো"
 #. daily_sheet.gd reward_text()
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
-#: scripts/core/collection.gd:228 scripts/core/rewards.gd:139 scripts/main.gd:886 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:243 scripts/ui/sheets/spin_sheet.gd:189
+#. welcome_sheet.gd row_note()
+#: scripts/core/collection.gd:228 scripts/core/rewards.gd:139 scripts/main.gd:897 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:247 scripts/ui/sheets/spin_sheet.gd:211 scripts/ui/sheets/welcome_sheet.gd:61
 msgid "%s coins"
 msgstr "%s কয়েন"
 
@@ -983,7 +984,7 @@ msgstr "ক্রেমা"
 #. rewards.gd grant_label()
 #. daily_sheet.gd _draw()
 #. shop_sheet.gd _title()
-#: scripts/core/rewards.gd:141 scripts/ui/sheets/daily_sheet.gd:519 scripts/ui/sheets/shop_sheet.gd:357
+#: scripts/core/rewards.gd:141 scripts/ui/sheets/daily_sheet.gd:520 scripts/ui/sheets/shop_sheet.gd:357
 msgid "%s dice"
 msgstr "%s ডাইস"
 
@@ -1018,7 +1019,7 @@ msgid "Day %d: %s"
 msgstr "দিন %d: %s"
 
 #. rewards.gd free_caption()
-#: scripts/core/rewards.gd:281
+#: scripts/core/rewards.gd:287
 msgid "Free Coins"
 msgstr "ফ্রি কয়েন"
 
@@ -1795,107 +1796,107 @@ msgstr "শিখতে থাকো"
 
 # %s: the tier names (Low / Medium / High), first the one the game closed on, then the lower one it now runs on
 #. App (pause menu, dialogs, toasts) · main.gd _ready()
-#: scripts/main.gd:172
+#: scripts/main.gd:173
 msgid "The game closed on %s graphics, so it now runs on %s."
 msgstr "গেমটি %s গ্রাফিক্সে বন্ধ হয়ে গিয়েছিল, তাই গ্রাফিক্স এখন %s করা হয়েছে।"
 
 # REVIEW: toast when online S&L is tapped; a bit long
 #. App (pause menu, dialogs, toasts) · main.gd _open_setup()
-#: scripts/main.gd:660
+#: scripts/main.gd:662
 msgid "Coming soon for Snakes & Ladders"
 msgstr "সাপ-সিঁড়ি অনলাইনে আসছে শীঘ্রই!"
 
 #. App (pause menu, dialogs, toasts) · main.gd continue_match()
-#: scripts/main.gd:708
+#: scripts/main.gd:710
 msgid "This match can’t be continued."
 msgstr "এই ম্যাচ আর চালানো যাবে না।"
 
 # REVIEW: %s is a countdown like '2h 5m'; reads '<time> পরে ফ্রি কয়েন'
 #. App (pause menu, dialogs, toasts) · main.gd _claim_free()
-#: scripts/main.gd:850
+#: scripts/main.gd:861
 msgid "Free coins in %s"
 msgstr "%s পরে ফ্রি কয়েন"
 
 # testers only: the graphics leak test (seven taps on Settings' version line)
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:928
+#: scripts/main.gd:939
 msgid "Graphics test started: keep the game open for about 4 minutes."
 msgstr "গ্রাফিক্স টেস্ট শুরু হয়েছে: প্রায় 4 মিনিট গেমটি খোলা রাখো।"
 
 # testers only
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:931
+#: scripts/main.gd:942
 msgid "Graphics test: step %d of %d"
 msgstr "গ্রাফিক্স টেস্ট: ধাপ %d / %d"
 
 # testers only
 #. App (pause menu, dialogs, toasts) · main.gd start_leak_probe()
-#: scripts/main.gd:933
+#: scripts/main.gd:944
 msgid "Graphics test done. Thank you!"
 msgstr "গ্রাফিক্স টেস্ট শেষ। ধন্যবাদ!"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1008
+#: scripts/main.gd:1019
 msgid "Menu"
 msgstr "মেনু"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1008
+#: scripts/main.gd:1019
 msgid "Paused"
 msgstr "বিরতি"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1013
+#: scripts/main.gd:1024
 msgid "The game keeps going while this is open."
 msgstr "এটা খোলা থাকলেই খেলা চলতে থাকে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1015
+#: scripts/main.gd:1026
 msgid "Back to game"
 msgstr "খেলায় ফেরো"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. settings_sheet.gd _init()
-#: scripts/main.gd:1016 scripts/main.gd:1021 scripts/ui/sheets/settings_sheet.gd:58
+#: scripts/main.gd:1027 scripts/main.gd:1032 scripts/ui/sheets/settings_sheet.gd:58
 msgid "Settings"
 msgstr "সেটিংস"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1017
+#: scripts/main.gd:1028
 msgid "Leave match"
 msgstr "ম্যাচ ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. Home screen · home_screen.gd _build_quick()
-#: scripts/main.gd:1019 scripts/ui/home_screen.gd:353
+#: scripts/main.gd:1030 scripts/ui/home_screen.gd:353
 msgid "Resume"
 msgstr "চালিয়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. update_banner.gd set_mode()
-#: scripts/main.gd:1020 scripts/main.gd:1060 scripts/ui/components/update_banner.gd:95
+#: scripts/main.gd:1031 scripts/main.gd:1071 scripts/ui/components/update_banner.gd:95
 msgid "Restart"
 msgstr "আবার শুরু"
 
 # Pause menu
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
-#: scripts/main.gd:1022
+#: scripts/main.gd:1033
 msgid "Exit to home"
 msgstr "হোমে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1033
+#: scripts/main.gd:1044
 msgid "Your place is kept: your reward comes when the game ends."
 msgstr "তোমার জায়গা ঠিক আছে, খেলা শেষ হলে রিওয়ার্ড পাবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1033
+#: scripts/main.gd:1044
 msgid "A bot plays your colour for the rest of the game."
 msgstr "তোমার রঙে বাকি খেলা বট খেলবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
-#: scripts/main.gd:1034
+#: scripts/main.gd:1045
 msgid "Leave this match?"
 msgstr "ম্যাচ ছেড়ে যাবে?"
 
@@ -1904,69 +1905,69 @@ msgstr "ম্যাচ ছেড়ে যাবে?"
 #. online.gd _ask_leave_lobby()
 #. Result screen · result_screen.gd _sync_buttons()
 #. lobby_sheet.gd _init()
-#: scripts/main.gd:1034 scripts/main.gd:1069 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
+#: scripts/main.gd:1045 scripts/main.gd:1080 scripts/net/online.gd:244 scripts/ui/components/result_screen.gd:551 scripts/ui/sheets/lobby_sheet.gd:121
 msgid "Leave"
 msgstr "ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1034 scripts/main.gd:1060 scripts/main.gd:1069
+#: scripts/main.gd:1045 scripts/main.gd:1071 scripts/main.gd:1080
 msgid "Keep playing"
 msgstr "খেলতে থাকো"
 
 # REVIEW: online, after you finished
 #. App (pause menu, dialogs, toasts) · main.gd _ask_leave_online()
 #. finish_card.gd _init()
-#: scripts/main.gd:1034 scripts/ui/components/finish_card.gd:51
+#: scripts/main.gd:1045 scripts/ui/components/finish_card.gd:51
 msgid "Keep watching"
 msgstr "দেখতে থাকো"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1060
+#: scripts/main.gd:1071
 msgid "Restart this game?"
 msgstr "খেলা আবার শুরু করবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_restart()
-#: scripts/main.gd:1060
+#: scripts/main.gd:1071
 msgid "Everyone goes back to the start."
 msgstr "সবাই আবার শুরু থেকে শুরু করবে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1069
+#: scripts/main.gd:1080
 msgid "Leave this game?"
 msgstr "খেলা ছেড়ে যাবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _ask_exit()
-#: scripts/main.gd:1069
+#: scripts/main.gd:1080
 msgid "Your progress in this match is saved."
 msgstr "এই ম্যাচের প্রোগ্রেস সেভ হয়েছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _on_gems_granted()
 #. store_sheet.gd _on_granted()
-#: scripts/main.gd:1194 scripts/ui/sheets/store_sheet.gd:163
+#: scripts/main.gd:1205 scripts/ui/sheets/store_sheet.gd:163
 msgid "+%s gems"
 msgstr "+%s জেম"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1352
+#: scripts/main.gd:1363
 msgid "Quit Ludo Zing?"
 msgstr "Ludo Zing থেকে বের হবে?"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1352
+#: scripts/main.gd:1363
 msgid "Your progress is saved."
 msgstr "তোমার প্রোগ্রেস সেভ আছে।"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
-#: scripts/main.gd:1352
+#: scripts/main.gd:1363
 msgid "Quit"
 msgstr "বের হও"
 
 #. App (pause menu, dialogs, toasts) · main.gd _confirm_quit()
 #. online.gd _ask_leave_lobby()
 #. social.gd _on_join()
-#: scripts/main.gd:1352 scripts/net/online.gd:244 scripts/net/social.gd:502
+#: scripts/main.gd:1363 scripts/net/online.gd:244 scripts/net/social.gd:502
 msgid "Stay"
 msgstr "থাকো"
 
@@ -2097,64 +2098,64 @@ msgstr "সাইন ইন হচ্ছে… একটু পরে আবা�
 #. social.gd _error_text()
 #. social.gd invite_error_text()
 #. rewards_sheet.gd _on_watched()
-#: scripts/net/account.gd:505 scripts/net/net_client.gd:215 scripts/net/social.gd:285 scripts/net/social.gd:395 scripts/ui/sheets/rewards_sheet.gd:181
+#: scripts/net/account.gd:505 scripts/net/net_client.gd:215 scripts/net/social.gd:285 scripts/net/social.gd:395 scripts/ui/sheets/rewards_sheet.gd:185
 msgid "Something went wrong. Please try again."
 msgstr "কিছু একটা গোলমাল হয়েছে। আবার চেষ্টা করো।"
 
 # Result-screen note
 #. account.gd claim_note()
-#: scripts/net/account.gd:708 scripts/net/account.gd:715
+#: scripts/net/account.gd:723 scripts/net/account.gd:730
 msgid "Daily limit reached"
 msgstr "আজকের লিমিট শেষ"
 
 #. account.gd claim_note()
-#: scripts/net/account.gd:710
+#: scripts/net/account.gd:725
 msgid "Too many matches this hour"
 msgstr "এই ঘণ্টায় অনেক বেশি ম্যাচ হয়ে গেছে"
 
 # REVIEW: result-screen note when a match was too short to earn rewards
 #. account.gd claim_note()
-#: scripts/net/account.gd:712
+#: scripts/net/account.gd:727
 msgid "Too short to count"
 msgstr "ম্যাচটা খুব ছোট ছিল"
 
 #. account.gd claim_note()
-#: scripts/net/account.gd:714
+#: scripts/net/account.gd:729
 msgid "We couldn’t verify that win"
 msgstr "জয়টা যাচাই করা যায়নি"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:878
+#: scripts/net/account.gd:893
 msgid "Google Play Games sign-in is available on Android."
 msgstr "Google Play Games সাইন ইন শুধু অ্যান্ড্রয়েডে পাওয়া যায়।"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:880
+#: scripts/net/account.gd:895
 msgid "Connect to the internet to sign in."
 msgstr "সাইন ইন করতে ইন্টারনেটে কানেক্ট করো।"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:882
+#: scripts/net/account.gd:897
 msgid "Google sign-in isn’t switched on yet. Please try again later."
 msgstr "Google সাইন ইন এখনও চালু হয়নি। পরে আবার চেষ্টা করো।"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:884
+#: scripts/net/account.gd:899
 msgid "Google sign-in didn’t work. Please try again."
 msgstr "Google সাইন ইন হয়নি। আবার চেষ্টা করো।"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:886
+#: scripts/net/account.gd:901
 msgid "This Google account can’t play online."
 msgstr "এই Google অ্যাকাউন্ট দিয়ে অনলাইনে খেলা যাবে না।"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:888
+#: scripts/net/account.gd:903
 msgid "That took too long. Please sign in again."
 msgstr "অনেক সময় লেগে গেছে। আবার সাইন ইন করো।"
 
 #. account.gd google_error_text()
-#: scripts/net/account.gd:889
+#: scripts/net/account.gd:904
 msgid "Couldn’t sign in. Please try again."
 msgstr "সাইন ইন করা যায়নি। আবার চেষ্টা করো।"
 
@@ -3035,7 +3036,8 @@ msgstr "[b]3D[/b]: তোমার সিনে বোর্ডের হেল�
 #. Info bubbles and rules text · info.gd
 #. daily_sheet.gd _init()
 #. rewards_sheet.gd
-#: scripts/ui/info.gd:68 scripts/ui/sheets/daily_sheet.gd:41 scripts/ui/sheets/rewards_sheet.gd:26
+#. welcome_sheet.gd _init()
+#: scripts/ui/info.gd:68 scripts/ui/sheets/daily_sheet.gd:41 scripts/ui/sheets/rewards_sheet.gd:26 scripts/ui/sheets/welcome_sheet.gd:25
 msgid "Daily reward"
 msgstr "ডেইলি রিওয়ার্ড"
 
@@ -3425,10 +3427,11 @@ msgstr "পরিবর্তন করা গেল না। আবার চ�
 
 #. daily_sheet.gd _build()
 #. daily_sheet.gd _render()
+#. missions_sheet.gd _action()
 #. profile_sheet.gd _ach_card()
 #. profile_sheet.gd _claim_width()
 #. rewards_sheet.gd
-#: scripts/ui/sheets/daily_sheet.gd:84 scripts/ui/sheets/daily_sheet.gd:110 scripts/ui/sheets/profile_sheet.gd:497 scripts/ui/sheets/profile_sheet.gd:541 scripts/ui/sheets/rewards_sheet.gd:26 scripts/ui/sheets/rewards_sheet.gd:27
+#: scripts/ui/sheets/daily_sheet.gd:84 scripts/ui/sheets/daily_sheet.gd:110 scripts/ui/sheets/missions_sheet.gd:96 scripts/ui/sheets/profile_sheet.gd:497 scripts/ui/sheets/profile_sheet.gd:541 scripts/ui/sheets/rewards_sheet.gd:26 scripts/ui/sheets/rewards_sheet.gd:27
 msgid "Claim"
 msgstr "নাও"
 
@@ -3468,28 +3471,28 @@ msgstr "কাল"
 msgid "%s unlocked"
 msgstr "%s আনলক হয়েছে"
 
-#. daily_sheet.gd _gui_input()
-#: scripts/ui/sheets/daily_sheet.gd:436
+#. daily_sheet.gd _tap()
+#: scripts/ui/sheets/daily_sheet.gd:437
 msgid "Day %d is already claimed."
 msgstr "দিন %d-এর রিওয়ার্ড নেওয়া হয়ে গেছে।"
 
-#. daily_sheet.gd _gui_input()
-#: scripts/ui/sheets/daily_sheet.gd:437
+#. daily_sheet.gd _tap()
+#: scripts/ui/sheets/daily_sheet.gd:438
 msgid "Day %d opens tomorrow."
 msgstr "দিন %d কাল খুলবে।"
 
-#. daily_sheet.gd _gui_input()
-#: scripts/ui/sheets/daily_sheet.gd:437
+#. daily_sheet.gd _tap()
+#: scripts/ui/sheets/daily_sheet.gd:438
 msgid "Day %d opens in a few days."
 msgstr "দিন %d কয়েকদিন পরে খুলবে।"
 
 #. daily_sheet.gd _draw()
-#: scripts/ui/sheets/daily_sheet.gd:506
+#: scripts/ui/sheets/daily_sheet.gd:507
 msgid "Day %d"
 msgstr "দিন %d"
 
 #. daily_sheet.gd _draw()
-#: scripts/ui/sheets/daily_sheet.gd:636
+#: scripts/ui/sheets/daily_sheet.gd:637
 msgid "Unlocked!"
 msgstr "আনলক!"
 
@@ -3683,7 +3686,8 @@ msgstr "রুমে ঢোকো"
 
 #. friends_sheet.gd _render()
 #. leaderboard_sheet.gd load_board()
-#: scripts/ui/sheets/friends_sheet.gd:237 scripts/ui/sheets/leaderboard_sheet.gd:115
+#. missions_sheet.gd _init()
+#: scripts/ui/sheets/friends_sheet.gd:237 scripts/ui/sheets/leaderboard_sheet.gd:115 scripts/ui/sheets/missions_sheet.gd:31
 msgid "Loading…"
 msgstr "লোড হচ্ছে…"
 
@@ -4155,6 +4159,71 @@ msgstr "হোস্ট খেলা শুরু করবে।"
 msgid "Code copied"
 msgstr "কোড কপি হয়েছে"
 
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:11
+msgid "Play a game"
+msgstr "একটি খেলা খেলুন"
+
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:12
+msgid "Play a game of Ludo"
+msgstr "এক দান লুডু খেলুন"
+
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:13
+msgid "Play Snakes & Ladders"
+msgstr "সাপ লুডু খেলুন"
+
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:14
+msgid "Play 3 games"
+msgstr "3টি খেলা খেলুন"
+
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:15
+msgid "Earn 500 coins"
+msgstr "500 কয়েন আয় করুন"
+
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:16
+msgid "Win a game"
+msgstr "একটি খেলায় জিতুন"
+
+#. missions_sheet.gd
+#: scripts/ui/sheets/missions_sheet.gd:17
+msgid "Win 2 games"
+msgstr "2টি খেলায় জিতুন"
+
+#. missions_sheet.gd _init()
+#. rewards_sheet.gd _init()
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/missions_sheet.gd:29 scripts/ui/sheets/rewards_sheet.gd:64 scripts/ui/sheets/welcome_sheet.gd:25
+msgid "Daily missions"
+msgstr "দৈনিক মিশন"
+
+#. missions_sheet.gd _render()
+#: scripts/ui/sheets/missions_sheet.gd:52
+msgid "Connect to the internet to see today’s missions."
+msgstr "আজকের মিশন দেখতে ইন্টারনেটে যুক্ত হন।"
+
+#. missions_sheet.gd _chest()
+#: scripts/ui/sheets/missions_sheet.gd:78
+msgid "Mission chest"
+msgstr "মিশনের সিন্দুক"
+
+#. missions_sheet.gd _chest()
+#: scripts/ui/sheets/missions_sheet.gd:79
+msgid "Finish all three to open it"
+msgstr "খুলতে তিনটিই শেষ করুন"
+
+#. missions_sheet.gd _claim()
+#. profile_sheet.gd _claim()
+#. rewards_sheet.gd _on_watched()
+#. spin_sheet.gd _landed()
+#: scripts/ui/sheets/missions_sheet.gd:121 scripts/ui/sheets/profile_sheet.gd:607 scripts/ui/sheets/profile_sheet.gd:609 scripts/ui/sheets/rewards_sheet.gd:180 scripts/ui/sheets/spin_sheet.gd:215
+msgid "+%d gems"
+msgstr "+%d জেম"
+
 #. pawn_sheet.gd _init()
 #: scripts/ui/sheets/pawn_sheet.gd:41
 msgid "Pawn skin · Ludo and Snakes & Ladders"
@@ -4382,12 +4451,6 @@ msgid "Claimed"
 msgstr "নেওয়া হয়েছে"
 
 #. profile_sheet.gd _claim()
-#. rewards_sheet.gd _on_watched()
-#: scripts/ui/sheets/profile_sheet.gd:607 scripts/ui/sheets/profile_sheet.gd:609 scripts/ui/sheets/rewards_sheet.gd:176
-msgid "+%d gems"
-msgstr "+%d জেম"
-
-#. profile_sheet.gd _claim()
 #: scripts/ui/sheets/profile_sheet.gd:609
 msgid "%s: %s coins"
 msgstr "%s: %s কয়েন"
@@ -4502,22 +4565,23 @@ msgstr "খোঁজা হচ্ছে"
 msgid "Win %s"
 msgstr "জিতলে %s"
 
-# Spin sheet title and Rewards row
 #. rewards_sheet.gd
 #. spin_sheet.gd _init()
-#: scripts/ui/sheets/rewards_sheet.gd:25 scripts/ui/sheets/spin_sheet.gd:38
-msgid "Daily spin"
-msgstr "ডেইলি স্পিন"
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/rewards_sheet.gd:25 scripts/ui/sheets/spin_sheet.gd:43 scripts/ui/sheets/welcome_sheet.gd:25
+msgid "Lucky Draw"
+msgstr "লাকি ড্র"
 
 #. rewards_sheet.gd
 #. spin_sheet.gd _init()
 #. spin_sheet.gd _render()
-#: scripts/ui/sheets/rewards_sheet.gd:25 scripts/ui/sheets/spin_sheet.gd:51 scripts/ui/sheets/spin_sheet.gd:113
+#: scripts/ui/sheets/rewards_sheet.gd:25 scripts/ui/sheets/spin_sheet.gd:56 scripts/ui/sheets/spin_sheet.gd:134
 msgid "Spin"
 msgstr "স্পিন"
 
 #. rewards_sheet.gd
-#: scripts/ui/sheets/rewards_sheet.gd:27
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/rewards_sheet.gd:27 scripts/ui/sheets/welcome_sheet.gd:25
 msgid "Free coins"
 msgstr "ফ্রি কয়েন"
 
@@ -4549,71 +4613,84 @@ msgid "Rewards"
 msgstr "রিওয়ার্ড"
 
 #. rewards_sheet.gd _init()
-#: scripts/ui/sheets/rewards_sheet.gd:69
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/rewards_sheet.gd:64 scripts/ui/sheets/welcome_sheet.gd:26
+msgid "Go"
+msgstr "চলুন"
+
+#. rewards_sheet.gd _init()
+#. welcome_sheet.gd row_note()
+#: scripts/ui/sheets/rewards_sheet.gd:64 scripts/ui/sheets/welcome_sheet.gd:64
+msgid "Three goals, then a chest"
+msgstr "তিনটি লক্ষ্য, তারপর একটি সিন্দুক"
+
+#. rewards_sheet.gd _init()
+#: scripts/ui/sheets/rewards_sheet.gd:73
 msgid "Free with a video"
 msgstr "ভিডিও দেখে ফ্রি"
 
 #. rewards_sheet.gd _note()
-#: scripts/ui/sheets/rewards_sheet.gd:103
+#. welcome_sheet.gd row_note()
+#: scripts/ui/sheets/rewards_sheet.gd:107 scripts/ui/sheets/welcome_sheet.gd:63
 msgid "Win up to %s coins"
 msgstr "%s কয়েন পর্যন্ত জেতো"
 
 #. rewards_sheet.gd _note()
-#: scripts/ui/sheets/rewards_sheet.gd:105
+#: scripts/ui/sheets/rewards_sheet.gd:109
 msgid "A new gift every day"
 msgstr "রোজ নতুন উপহার"
 
 # REVIEW: placeholder order kept (coins, hours)
 #. rewards_sheet.gd _note()
-#: scripts/ui/sheets/rewards_sheet.gd:107
+#: scripts/ui/sheets/rewards_sheet.gd:111
 msgid "%s coins every %dh"
 msgstr "%s কয়েন, %d ঘণ্টা পর"
 
 #. rewards_sheet.gd _refresh_videos()
-#: scripts/ui/sheets/rewards_sheet.gd:147
+#: scripts/ui/sheets/rewards_sheet.gd:151
 msgid "you have %d"
 msgstr "তোমার আছে %d"
 
 # REVIEW: see Free re-roll
 #. rewards_sheet.gd _on_watched()
-#: scripts/ui/sheets/rewards_sheet.gd:176
+#: scripts/ui/sheets/rewards_sheet.gd:180
 msgid "+%d free re-roll"
 msgstr "+%d ফ্রি রি-রোল"
 
 #. rewards_sheet.gd _wins_row()
-#: scripts/ui/sheets/rewards_sheet.gd:194
+#: scripts/ui/sheets/rewards_sheet.gd:198
 msgid "Win vs computer"
 msgstr "কম্পিউটারের সাথে জেতো"
 
 #. rewards_sheet.gd _wins_row()
-#: scripts/ui/sheets/rewards_sheet.gd:195
+#: scripts/ui/sheets/rewards_sheet.gd:199
 msgid "%s in Ludo, %s in Snakes & Ladders"
 msgstr "লুডুতে %s, সাপ-সিঁড়িতে %s"
 
 #. rewards_sheet.gd set_state()
-#: scripts/ui/sheets/rewards_sheet.gd:313
+#: scripts/ui/sheets/rewards_sheet.gd:317
 msgid "in %s"
 msgstr "%s পরে"
 
 #. rewards_sheet.gd _init()
 #. rewards_sheet.gd set_left()
 #. rewards_sheet.gd set_busy()
-#: scripts/ui/sheets/rewards_sheet.gd:366 scripts/ui/sheets/rewards_sheet.gd:392 scripts/ui/sheets/rewards_sheet.gd:396
+#: scripts/ui/sheets/rewards_sheet.gd:370 scripts/ui/sheets/rewards_sheet.gd:396 scripts/ui/sheets/rewards_sheet.gd:400
 msgid "Watch"
 msgstr "দেখো"
 
 #. rewards_sheet.gd set_left()
-#: scripts/ui/sheets/rewards_sheet.gd:390
+#: scripts/ui/sheets/rewards_sheet.gd:394
 msgid "Done today"
 msgstr "আজ শেষ"
 
 #. rewards_sheet.gd set_left()
-#: scripts/ui/sheets/rewards_sheet.gd:391
+#: scripts/ui/sheets/rewards_sheet.gd:395
 msgid "%d left today"
 msgstr "আজ আর %d বাকি"
 
 #. rewards_sheet.gd set_left()
-#: scripts/ui/sheets/rewards_sheet.gd:391
+#: scripts/ui/sheets/rewards_sheet.gd:395
 msgid "Come back tomorrow"
 msgstr "কাল আবার এসো"
 
@@ -4995,7 +5072,7 @@ msgstr "কেনা আছে"
 
 #. shop_sheet.gd _balance_button()
 #. shop_sheet.gd make_earn()
-#: scripts/ui/sheets/shop_sheet.gd:253 scripts/ui/sheets/shop_sheet.gd:959
+#: scripts/ui/sheets/shop_sheet.gd:253 scripts/ui/sheets/shop_sheet.gd:961
 msgid "Get coins"
 msgstr "কয়েন নাও"
 
@@ -5094,13 +5171,23 @@ msgstr "স্টোর খোলো"
 msgid "%s gems. You’ll have %s left."
 msgstr "%s জেম। তোমার থাকবে %s।"
 
+#. spin_sheet.gd _init()
+#: scripts/ui/sheets/spin_sheet.gd:63
+msgid "Draw again with a video"
+msgstr "ভিডিও দেখে আবার ড্র করুন"
+
+#. spin_sheet.gd _init()
+#: scripts/ui/sheets/spin_sheet.gd:71
+msgid "Every wedge has the same chance. The jackpot: %s coins and %d gems."
+msgstr "প্রতিটি অংশের সুযোগ সমান। জ্যাকপট: %s কয়েন ও %dটি জেম।"
+
 #. spin_sheet.gd _render()
-#: scripts/ui/sheets/spin_sheet.gd:119
+#: scripts/ui/sheets/spin_sheet.gd:140
 msgid "Next spin in %s"
 msgstr "পরের স্পিন %s পরে"
 
 #. spin_sheet.gd _render()
-#: scripts/ui/sheets/spin_sheet.gd:125
+#: scripts/ui/sheets/spin_sheet.gd:147
 msgid "You won %s coins!"
 msgstr "তুমি %s কয়েন জিতেছো!"
 
@@ -5188,6 +5275,41 @@ msgstr "নতুন সব ঠিকঠাক আর ফিচার পেত�
 msgid "Playing against the computer or passing the phone around still works."
 msgstr "কম্পিউটারের সাথে বা ফোন হাতবদল করে খেলা আগের মতোই চলবে।"
 
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/welcome_sheet.gd:20
+msgid "Welcome back!"
+msgstr "আবার স্বাগতম!"
+
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/welcome_sheet.gd:26
+msgid "Ready"
+msgstr "প্রস্তুত"
+
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/welcome_sheet.gd:30
+msgid "Collect"
+msgstr "সংগ্রহ করুন"
+
+#. welcome_sheet.gd _init()
+#: scripts/ui/sheets/welcome_sheet.gd:35
+msgid "Double today’s reward with a video"
+msgstr "ভিডিও দেখে আজকের পুরস্কার দ্বিগুণ করুন"
+
+#. welcome_sheet.gd row_note()
+#: scripts/ui/sheets/welcome_sheet.gd:59
+msgid "Day %d of your streak"
+msgstr "আপনার ধারাবাহিকতার %d তম দিন"
+
+#. welcome_sheet.gd refresh()
+#: scripts/ui/sheets/welcome_sheet.gd:85
+msgid "Your gifts are waiting!"
+msgstr "আপনার উপহার অপেক্ষা করছে!"
+
+#. welcome_sheet.gd refresh()
+#: scripts/ui/sheets/welcome_sheet.gd:85
+msgid "All collected. Have a great game!"
+msgstr "সব সংগ্রহ হয়েছে। দারুণ খেলুন!"
+
 # REVIEW: S&L landing; 'সিন' per glossary
 #. Snakes & Ladders landing · sl_landing.gd _ready()
 #: scripts/ui/sl_landing.gd:38
@@ -5261,7 +5383,7 @@ msgid "Sky-blue walls, floating clouds, toy blocks."
 msgstr "আকাশি দেয়াল, ভেসে চলা মেঘ আর খেলনা ব্লক।"
 
 #. rooms.gd _paint_menu()
-#: scripts/world/rooms.gd:250
+#: scripts/world/rooms.gd:269
 msgid "Today's Brew"
 msgstr "আজকের মেনু"
 
@@ -5296,23 +5418,27 @@ msgid "Glowing mushrooms, fireflies, golden snakes."
 msgstr "জ্বলজ্বলে মাশরুম, জোনাকি আর সোনালি সাপ।"
 
 #. sl_scenes.gd buy_scene()
-#: scripts/world/sl_scenes.gd:316
+#: scripts/world/sl_scenes.gd:303
 msgid "That scene isn’t in the shop."
 msgstr "এই সিন শপে নেই।"
 
 # REVIEW: painted on the 3D sign in big letters (first line)
 #. sl_scenes.gd _make_sign()
 #. TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
-#: scripts/world/sl_scenes.gd:1254
+#: scripts/world/sl_scenes.gd:1222
 msgid "SNAKES"
 msgstr "সাপ"
 
 # REVIEW: painted on the 3D sign in big letters (second line); first line is সাপ. Needs a font with Bangla glyphs.
 #. sl_scenes.gd _make_sign()
 #. TRANSLATORS: the two lines painted on the Snakes & Ladders sign above the board (big letters, keep each short)
-#: scripts/world/sl_scenes.gd:1254
+#: scripts/world/sl_scenes.gd:1222
 msgid "& LADDERS"
 msgstr "সিঁড়ি"
+
+# Spin sheet title and Rewards row
+#~ msgid "Daily spin"
+#~ msgstr "ডেইলি স্পিন"
 
 #~ msgid "The classic sunny jungle."
 #~ msgstr "ক্লাসিক রোদেলা জঙ্গল।"

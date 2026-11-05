@@ -884,6 +884,8 @@ func _on_use(kind: String, id: String) -> void:
 			"text": ok = Catalog.equip_text(id)
 			"char": ok = Collection.equip("avatar", id)
 			_: ok = Collection.equip(kind, id)
+	if ok and kind == "room":
+		Save.prefs.room_auto = false              # their pick: the café no longer follows the clock (Rooms.shown)
 	if not ok:
 		Sound.sfx("error")
 		Haptics.error()

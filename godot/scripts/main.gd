@@ -56,6 +56,7 @@ var _boost_until := 0                   # msec: Quality.game_fps() until then (s
 var _backdrop_id := 0                   # bumps on every Home backdrop change (a slow S&L scene build can't win late)
 var _match_ms := 0                      # Time.get_ticks_msec() when the current offline match began (its claim duration)
 var _pairs_start := 0                   # stats.pairsFormed when it began (the claim reports the pairs formed)
+var _welcomed := false                  # the Welcome Back sheet greeted this launch
 var _resumed := false                   # the match was continued from MatchStore (it began in an earlier session)
 var _free_busy := false                 # a Free coins claim is waiting for the server
 var _claim_id := ""                     # the claim of the match whose result is on screen
@@ -142,7 +143,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	BootTrace.mark("first frame")
 	splash.set_progress(0.08)
-	await world.build_room(baker, func(f: float): splash.set_progress(0.08 + f * 0.72), str(Save.profile.room))
+	await world.build_room(baker, func(f: float): splash.set_progress(0.08 + f * 0.72), Rooms.shown(str(Save.profile.room)))
 	BootTrace.mark("room built")
 	splash.set_progress(0.9)                 # (the S&L board is painted by its scene: SLScenes.set_scene)
 	_build_screens()
@@ -183,7 +184,7 @@ func _ready() -> void:
 		_set_screen("home")
 		var opened := notifications.take_launch()    # the notification that started the app goes first
 		if not online.try_resume() and not opened:   # a friends room kept from the last run comes back next
-			_maybe_open_daily()
+			_maybe_welcome()
 		notifications.maybe_ask()                   # the notifications question, once Home is quiet (if it is due)
 		_bg_warm_up()
 		app_update.start()                          # the update offer (on a quiet Home, once per session)
@@ -482,7 +483,7 @@ func go_home() -> void:
 	if from_game:
 		var flying := _home_fly > 0 and _home_coins() != null
 		_fly_winnings.call_deferred()
-		_maybe_open_daily(1.6 if flying else 0.6)   # after the coins have landed
+		_maybe_welcome(1.6 if flying else 0.6)   # after the coins have landed
 		notifications.maybe_ask()                   # back from a game: the notifications question, if it is due
 		app_rating.back_home()                      # after a win: Play's rating card, when due, once Home is quiet
 
@@ -510,15 +511,16 @@ func _fly_winnings() -> void:
 
 ## The reward calendar opens by itself once a day when a reward is waiting: at launch on later days, or when a game
 ## of the first day returns home. Never over the welcome, another sheet or a result.
-func _maybe_open_daily(delay := 0.6) -> void:
+func _maybe_welcome(delay := 0.6) -> void:
 	if Autoplay.requested() or not bool(Save.prefs.welcome_seen):
 		return
-	if not Rewards.should_auto_open(Save.profile):
+	if _welcomed or HomeScreen.ready_count(Save.profile) <= 0:
 		return
 	await get_tree().create_timer(delay).timeout
-	if screen == "home" and _top_sheet() == null and Rewards.should_auto_open(Save.profile):
+	if screen == "home" and _top_sheet() == null and not _welcomed:
+		_welcomed = true                             # once a launch: what's waiting greets you, then it's your game
 		Rewards.mark_auto_open(Save.profile)
-		_on_tab("daily")
+		_on_tab("welcome")
 
 ## Puts the Ludo screen up (no match started yet).
 func _enter_ludo() -> void:
@@ -780,6 +782,15 @@ func _on_tab(tab: String) -> void:
 			s.picked.connect(_on_tab)                   # each row does what its own button does (spin / daily / free)
 			s.closed.connect(home.refresh)
 			s.open(sheet_layer)
+		"welcome":
+			var s := WelcomeSheet.new()
+			s.closed.connect(home.refresh)
+			s.picked.connect(_on_tab)
+			s.open(sheet_layer)
+		"missions":
+			var s := MissionsSheet.new()
+			s.closed.connect(home.refresh)
+			s.open(sheet_layer)
 		"spin":
 			var s := SpinSheet.new()
 			s.closed.connect(home.refresh)
@@ -832,7 +843,7 @@ func _wire_shop(s: Sheet) -> void:
 
 ## Switch the café to a room theme (built on first use; the splash already built the equipped one).
 func apply_room(id: String) -> void:
-	await world.rooms.set_room(baker, id)
+	await world.rooms.set_room(baker, Rooms.shown(id))
 	_fit_home()
 
 ## The equipped dice skin on every die in the game.

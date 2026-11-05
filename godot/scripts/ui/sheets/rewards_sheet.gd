@@ -18,11 +18,11 @@ extends Sheet
 
 signal picked(id: String)                ## a row was tapped: "spin" | "daily" | "free"
 
-const ROWS := [["spin", "spin"], ["daily", "gift"], ["free", "coins"]]   # id, icon
+const ROWS := [["spin", "spin"], ["daily", "gift"], ["free", "coins"]]   # id, icon (and Daily missions under them)
 ## id -> [title, action button]; shown through L10n.t.
 # l10n:begin
 const ROW_TEXT := {
-	spin = ["Daily spin", "Spin"],
+	spin = ["Lucky Draw", "Spin"],
 	daily = ["Daily reward", "Claim"],
 	free = ["Free coins", "Claim"],
 }
@@ -61,6 +61,10 @@ func _init(title_ := "Rewards", wins_row_ := false) -> void:   # l10n
 		row.pressed.connect(_go.bind(str(r[0])))
 		list.add_child(row)
 		_rows[r[0]] = row
+	var mis := Row.new("missions", L10n.t("Daily missions"), HomeScreen.HI % "again", L10n.t("Go"), L10n.t("Three goals, then a chest"))
+	mis.pressed.connect(_go.bind("missions"))
+	mis.set_state(true, "")
+	list.add_child(mis)
 	if wins_row:
 		list.add_child(_wins_row())
 	if videos_shown():

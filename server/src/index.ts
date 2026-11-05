@@ -76,6 +76,7 @@ const POST_AUTHED: Record<string, (req: Request, env: Env, a: A.Authed, now: num
   "rewards/daily": (_req, env, a, now) => W.rewardDaily(env, a, now),
   "rewards/spin": (_req, env, a, now) => W.rewardSpin(env, a, now),
   "rewards/free": (_req, env, a, now) => W.rewardFree(env, a, now),
+  "missions/claim": W.missionClaim,
   "achievements/claim": W.achievementClaim,
   "gems/exchange": E.gemsExchange,
   "ads/start": Ads.adsStart,
@@ -129,6 +130,12 @@ async function v2(req: Request, env: Env, ctx: ExecutionContext, parts: string[]
         const a = await A.authenticate(req, env, now);
         if (a instanceof Response) return a;
         return await P.deleteToken(req, env, a);
+      }
+      case "missions": {
+        if (m !== "GET") return json({ error: "method" }, 405);
+        const a = await A.authenticate(req, env, now);
+        if (a instanceof Response) return a;
+        return await W.missionsGet(env, a, now);
       }
       case "me":
       case "tables":

@@ -186,17 +186,40 @@ describe("ad kinds and caps", () => {
     expect((await call("ads/start", g, { body: { kind: "double", ref: mid } })).body.error).toBe("not_eligible");
   });
 
-  it("12 ads a day in total, whatever the kinds", async () => {
+  it("spin: one more Lucky Draw, 3 a day, spent only after the free one", async () => {
+    const g = await guest();
+    await watch(g, "spin");
+    expect((await call("rewards/spin", g, { body: {} })).status).toBe(200);   // today's free one: the earned one stays
+    const second = await call("rewards/spin", g, { body: {} });
+    expect(second.status).toBe(200);
+    expect(second.body.draws_left).toBe(0);
+    expect((await call("rewards/spin", g, { body: {} })).status).toBe(409);
+    await watch(g, "spin");
+    await watch(g, "spin");
+    expect((await call("ads/start", g, { body: { kind: "spin" } })).body.error).toBe("cap");
+  });
+
+  it("gift: only after today's daily reward, pays those coins again, once a day", async () => {
+    const g = await guest();
+    expect((await call("ads/start", g, { body: { kind: "gift" } })).body.error).toBe("not_eligible");
+    const d = await call("rewards/daily", g, { body: {} });
+    const before = (await acc(g.account)).coins;
+    await watch(g, "gift");
+    expect((await acc(g.account)).coins).toBe(before + d.body.coins);
+    expect((await call("ads/start", g, { body: { kind: "gift" } })).body.error).toBe("cap");
+  });
+
+  it("the total cap for all kinds a day, whatever the kinds", async () => {
     const g = await guest();
     const day = Date.now();
-    // 11 already granted today (seeded), the 12th works, the 13th is over the total cap
-    const kinds = ["reroll", "reroll", "reroll", "refill", "refill", "double", "double", "gems", "gems", "gems", "gems"];
+    // all but one already granted today (seeded), the last works, the next is over the total cap
+    const kinds = ["reroll", "reroll", "reroll", "refill", "refill", "double", "double", "gems", "gems", "gems", "gems", "spin", "spin", "spin", "gift"];
     expect(kinds.length + 1).toBe(ECON_V1.ads_per_day);
     await DB.batch(kinds.map((k, i) => DB.prepare("INSERT INTO ad_rewards (nonce, account_id, kind, created_at, status, tx_id, granted_at, amount) VALUES (?, ?, ?, ?, 'granted', ?, ?, 1)").bind(`ad_seed${i}${g.account.slice(4, 21)}`, g.account, k, day, `seed${i}${g.account}`, day)));
     await watch(g, "gems");
     const t = await call("ads/today", g);
     expect(t.body.total_left).toBe(0);
-    expect(t.body.left).toEqual({ reroll: 0, refill: 0, double: 0, gems: 0 });
+    expect(t.body.left).toEqual({ reroll: 0, refill: 0, double: 0, gems: 0, spin: 0, gift: 0 });
   });
 
   it("an old nonce is rejected at the callback (and says expired)", async () => {

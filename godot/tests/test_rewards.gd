@@ -141,6 +141,19 @@ func run() -> void:
 
 	# ---- the first home visit of a day opens the calendar once ----
 	p = fresh()
+	var draw := {last_spin = day(0), extra_spins = 1, coins = 0, stats = {}}
+	check("Lucky Draw: today's used, a draw won by video still spins", R.can_spin(draw, day(0)) and R.extra_spins(draw) == 1)
+	draw.extra_spins = 0
+	check("Lucky Draw: none left, none today", not R.can_spin(draw, day(0)) and R.can_spin(draw, day(1)))
+	check("day and night: the café follows the clock", Rooms.shown("night", 10) == "cafe" and Rooms.shown("cafe", 21) == "night" and Rooms.shown("night", 5) == "night" and Rooms.shown("cafe", 6) == "cafe")
+	check("day and night: bought rooms stay as they are", Rooms.shown("dream", 21) == "dream" and Rooms.shown("cloud", 10) == "cloud")
+	var mis := MissionsSheet.new()
+	mis.data = {ok = true, missions = [{id = "win1", goal = 1, value = 1, coins = 200, done = true, claimed = false}, {id = "play3", goal = 3, value = 1, coins = 200, done = false, claimed = false}], chest = {coins = 300, gems = 3, ready = false, claimed = false}}
+	mis._render()
+	check("missions: a finished one offers Claim, the others show what they pay", mis.find_child("Claim_win1", true, false) != null and mis.find_child("Claim_play3", true, false) == null and mis.find_child("Claim_chest", true, false) == null)
+	check("missions: every mission has its words", MissionsSheet.TEXT.keys().all(func(k): return str(MissionsSheet.TEXT[k]) != ""))
+	mis.free()
+	check("welcome: what Collect takes", WelcomeSheet.collectable({daily = {}, last_free = 0, coins = 0, stats = {}}).has("free"))
 	check("a waiting reward opens the calendar by itself", R.should_auto_open(p, day(0)))
 	R.mark_auto_open(p, day(0))
 	check("only once that day", not R.should_auto_open(p, day(0)) and R.should_auto_open(p, day(1)))

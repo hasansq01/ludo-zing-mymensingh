@@ -106,11 +106,15 @@ export const ECON_V1 = {
     refill: { per_day: 2, amount: 500 },
     double: { per_day: 2, amount: 0 }, // amount = the match's payout
     gems: { per_day: 5, amount: 2 },
+    spin: { per_day: 3, amount: 1 }, // one more Lucky Draw
+    gift: { per_day: 1, amount: 0 }, // amount = today's daily reward coins again
   } as Record<string, { per_day: number; amount: number }>,
-  ads_per_day: 12,
+  ads_per_day: 16,
   /** A pending ad nonce expires after this long; `double` must start within this long after the match ended. */
   ad_nonce_ms: 30 * 60_000,
   double_within_ms: 15 * 60_000,
+  /** Lucky Draw: the 1,000 wedge also pays these gems (the jackpot). */
+  jackpot_gems: 5,
   /** Gems per level gained. */
   level_gems: 5,
   /** Weekly board prizes by rank (1-based; ranks 4-10 get the last value). */

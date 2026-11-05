@@ -596,8 +596,23 @@ func spin(notify := false) -> Dictionary:
 	if r.ok:
 		r.index = _int(r.get("index"), 0)
 		r.prize = _int(r.get("prize"), 0)
+		r.gems = _int(r.get("gems"), 0)
 	_note_next("spin", r)
 	return r
+
+## GET /v1/missions -> {ok, missions: [{id, goal, value, coins, done, claimed}], chest: {coins, gems, ready, claimed}}.
+func missions() -> Dictionary:
+	if not has_session() or not enabled:
+		return {ok = false, error = "offline"}
+	var r: Dictionary = await request(HTTPClient.METHOD_GET, "/v1/missions")
+	var out: Dictionary = r.data.duplicate() if r.ok and r.get("data") is Dictionary else {}
+	out.ok = r.ok
+	out.error = r.get("error", "")
+	return out
+
+## POST /v1/missions/claim {id} -> {ok, coins, gems}.
+func claim_mission(id: String) -> Dictionary:
+	return await _write(HTTPClient.METHOD_POST, "/v1/missions/claim", {id = id}, true)
 
 ## POST /v1/rewards/free -> {ok, coins, next_at}.
 func free_coins(notify := true) -> Dictionary:

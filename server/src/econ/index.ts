@@ -4,6 +4,7 @@ export * from "./rules";
 export * from "./profile";
 export * from "./shop";
 export * from "./rewards";
+export * from "./missions";
 export * from "./achievements";
 export * from "./matches";
 export * from "./import";

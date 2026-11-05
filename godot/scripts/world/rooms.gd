@@ -14,6 +14,8 @@ const LIST := [
 	{id = "cloud", name = "Cloudside Playroom", price = 5000, desc = "Sky-blue walls, floating clouds, toy blocks."},
 ]
 const DEFAULT := "night"
+const DAY_FROM := 6                      ## shown(): the hours of the day, local time
+const DAY_TO := 18
 ## bg (+ fog), hemisphere [sky, ground, intensity], key [colour, intensity], table tint, dark (night captions)
 const MOOD := {
 	night = {bg = Color("#2b2244"), hemi = [Color("#a688c0"), Color("#a06a48"), 0.4], key = [Color("#ffdcae"), 1.0], table = Color("#fff0dc"), dark = true},
@@ -43,6 +45,14 @@ var _room_anims := {}                    # id -> [Callable(t)]
 var _cur: Node3D
 var _anims := []
 var rng := RandomNumberGenerator.new()
+
+## The room to draw for equipped room `id`: until the player picks a room in the Shop (Save.prefs.room_auto), the café
+## follows their clock: Corner Café by day, Moonlit Café by night (both free, the same room in two lights).
+static func shown(id: String, hour := -1) -> String:
+	if id not in ["night", "cafe"] or not bool(Save.prefs.get("room_auto", true)):
+		return id
+	var h: int = hour if hour >= 0 else int(Time.get_time_dict_from_system().hour)
+	return "cafe" if h >= DAY_FROM and h < DAY_TO else "night"
 
 func _init(world_: TableWorld) -> void:
 	world = world_

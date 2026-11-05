@@ -26,6 +26,11 @@ import {
   FREE_AMOUNT,
   CATALOG,
   ECON_V1,
+  PRIZES,
+  claimMission,
+  extraSpins,
+  missionState,
+  missionsView,
 } from "./econ";
 import { type AccEnv, type Authed, type Step, BadRequest, authedJson, guardedInsert, isUnique, json, mutate, readBody } from "./accounts";
 
@@ -131,9 +136,41 @@ export async function rewardSpin(env: AccEnv, a: Authed, now: number): Promise<R
   const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {
     const s = spin(p, today, roll);
     if (!s.ok) return { result: authedJson(a, { error: "spun", next_at: next }, 409) };
+    const gems = s.prize === Math.max(...PRIZES) ? ECON_V1.jackpot_gems : 0; // the jackpot wedge
+    s.profile.gems += gems;
     return {
-      result: authedJson(a, { ok: true, profile: s.profile, index: s.index, prize: s.prize, next_at: next }),
-      write: { profile: s.profile, ledger: { coins: s.prize, xp: 0, reason: "spin", ref: `${today}:${s.index}` } },
+      result: authedJson(a, { ok: true, profile: s.profile, index: s.index, prize: s.prize, gems, draws_left: extraSpins(s.profile), next_at: next }),
+      write: { profile: s.profile, ledger: { coins: s.prize, xp: 0, gems, reason: "spin", ref: `${today}:${s.index}` } },
+    };
+  });
+  return r ?? gone();
+}
+
+/** GET /v1/missions -> {ok, missions: [{id, goal, value, coins, done, claimed}], chest: {coins, gems, ready, claimed}, next_at}. Starts the day's state. */
+export async function missionsGet(env: AccEnv, a: Authed, now: number): Promise<Response> {
+  const today = econDay(now);
+  const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {
+    const { state, fresh } = missionState(p, today);
+    const out = authedJson(a, { ok: true, ...missionsView(p, today, state), next_at: nextDayAt(today) });
+    if (!fresh) return { result: out };
+    const q = structuredClone(p);
+    (q as unknown as { missions: unknown }).missions = state;
+    return { result: out, write: { profile: q } };
+  });
+  return r ?? gone();
+}
+
+/** POST /v1/missions/claim {id} (a mission's, or "chest") -> {ok, profile, coins, gems} | 409 not_done / claimed | 404 unknown. */
+export async function missionClaim(req: Request, env: AccEnv, a: Authed, now: number): Promise<Response> {
+  const o = await readBody(req);
+  const id = typeof o.id === "string" ? o.id.slice(0, 16) : "";
+  const today = econDay(now);
+  const r = await mutate(env, a.row.id, now, (_row, p): Step<Response> => {
+    const c = claimMission(p, today, id);
+    if (!c.ok) return { result: authedJson(a, { error: c.error }, c.error === "unknown" ? 404 : 409) };
+    return {
+      result: authedJson(a, { ok: true, profile: c.profile, coins: c.coins, gems: c.gems }),
+      write: { profile: c.profile, ledger: { coins: c.coins, xp: 0, gems: c.gems, reason: "mission", ref: `${today}:${id}` } },
     };
   });
   return r ?? gone();
