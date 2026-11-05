@@ -56,7 +56,8 @@ static func row_note(id: String) -> String:
 	match id:
 		"daily":
 			var st := Rewards.daily_state(Save.profile)
-			return L10n.t("Day %d of your streak") % (int(st.get("today", 0)) + 1)
+			var day := int(st.today) + 1 if bool(st.get("claimable", false)) else int(Rewards.daily_data(Save.profile).get("streak", 1))
+			return L10n.t("Day %d of your streak") % maxi(1, day)
 		"free":
 			return L10n.t("%s coins") % Fmt.gain(Rewards.FREE_AMOUNT)
 		"spin":
