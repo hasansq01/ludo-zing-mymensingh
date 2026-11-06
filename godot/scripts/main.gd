@@ -950,7 +950,8 @@ func open_settings() -> SettingsSheet:
 	s.prefs_changed.connect(_on_prefs_changed)
 	s.language_picked.connect(set_language)
 	s.probe_requested.connect(start_leak_probe)
-	if screen in ["ludo", "sl"]:               # opened from a game: computer turns wait
+	if screen in ["ludo", "sl"]:               # opened from a game: computer turns wait, the game's options first
+		s.show_page("game")
 		paused = true
 		s.closed.connect(func(): paused = _pause_sheet != null)
 	s.open(sheet_layer)

@@ -469,18 +469,9 @@ func _shop_gems() -> void:
 	await acc.sign_in_guest()
 	var shop := ShopSheet.new("rooms")
 	_root.add_child(shop)
-	var gem_rows := shop.find_children("GemBuy", "Button", true, false)
-	check("shop: every item with a price has a gem option", gem_rows.size() >= 3, gem_rows.size())
-	var sale: Button = null
-	for g: Button in gem_rows:
-		if int(g.get_meta("gems", 0)) == 30:
-			sale = g
-	check("shop: Pastel Dream Room (3,000 coins) offers 30 gems, and the line says so", sale != null and sale.modulate.a == 1.0 and not sale.disabled and texts(sale).has("or") and texts(sale).has("30"), texts(shop))
-	var owned_row: Button = null
-	for g: Button in gem_rows:
-		if g.modulate.a == 0.0:
-			owned_row = g
-	check("shop: a gem line that isn't for sale is hidden (and not tappable)", owned_row == null or owned_row.disabled)
+	var view := PreviewSheet.new("dream", "room")
+	check("shop: Pastel Dream Room (3,000 coins): its preview offers 30 gems, and the line says so", view._gem != null and int(view._gem.get_meta("gems", 0)) == 30 and texts(view._gem).has("or") and texts(view._gem).has("30"))
+	view.free()
 	check("shop: the gem price is Catalog.gem_price", Catalog.gem_price(3000) == 30 and Catalog.gem_price(4000) == 40)
 	var err: String = await shop._purchase("room", "dream", "gems")
 	check("shop: buying with gems goes through the server (currency gems)", err == "" and f.last("/v1/shop/buy").body.currency == "gems" and Save.profile.gems == 20 and Save.profile.rooms.has("dream") and Save.profile.coins == 5000, [err, Save.profile.gems])
@@ -491,7 +482,7 @@ func _shop_gems() -> void:
 	# the tap: not enough gems asks to open the Store (the confirm's text names the shortfall)
 	var asked := [0]
 	shop.store_requested.connect(func(): asked[0] += 1)
-	shop._on_buy_gems("room", "studio", "Sunny Cozy Studio")        # 40 gems, 5 held (suspends at the confirm)
+	ShopSheet.buy_with_gems(shop, "room", "studio", "Sunny Cozy Studio")        # 40 gems, 5 held (suspends at the confirm)
 	var confirm: Sheet = null
 	for s in shop.find_children("*", "Sheet", true, false):
 		if s.has_meta("confirm"):
@@ -509,7 +500,7 @@ func _shop_gems() -> void:
 	acc._session = ""
 	Account.set_instance(null)
 	var coins_before: int = Save.profile.coins
-	shop2._on_buy_gems("room", "cloud", "Cloudside Playroom")
+	await ShopSheet.buy_with_gems(shop2, "room", "cloud", "Cloudside Playroom")
 	check("shop: without an account nothing is bought with gems", Save.profile.coins == coins_before and not Save.profile.rooms.has("cloud"))
 	shop2.free()
 	Account.set_instance(acc)

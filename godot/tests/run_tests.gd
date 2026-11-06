@@ -4,6 +4,7 @@ extends SceneTree
 ## (or tools/godot-test.sh from the repo root). `-- --only=social,net_ui` runs the suites whose file names contain one of them.
 
 const SUITES := [
+	"res://tests/test_settings_pages.gd",
 	"res://tests/test_pair_rules.gd",
 	"res://tests/test_team_rules.gd",
 	"res://tests/test_pair_capture_split.gd",

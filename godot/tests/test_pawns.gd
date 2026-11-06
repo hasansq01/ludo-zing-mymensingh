@@ -56,7 +56,7 @@ func _catalogue() -> void:
 	check("gem-only skins have their own gem price (and no coin price)", gem.all(func(d): return int(d.price) == 0 and Catalog.pawn_gems(d.id) >= 80))
 	check("every skin has a line for its sheet", Catalog.PAWNS.all(func(d): return str(d.get("desc", "")).length() > 10))
 	check("pawn(unknown) is empty", Catalog.pawn("rainbow").is_empty() and Catalog.pawn_gems("rainbow") == 0)
-	check("the Shop has a Pawns tab between Dice and Emotes", ShopSheet.TABS.map(func(t): return t.key).slice(2, 5) == ["dice", "pawns", "emotes"])
+	check("the Shop keeps Pawns and Dice together under Pieces", ShopSheet.strip_key("pawns") == "pieces" and ShopSheet.strip_key("dice") == "pieces")
 	check("the Pawns tab lists every skin as kind pawn", ShopSheet._sections("pawns")[0][1].map(func(it): return it.kind + ":" + it.id) == ids.map(func(id): return "pawn:" + id))
 	check("Shop prices: coins, gems, gem-only", ShopSheet._price("pawn", "marble") == 3500 and ShopSheet._gems("pawn", "marble") == 35
 		and ShopSheet._price("pawn", "crown") == 0 and ShopSheet._gems("pawn", "crown") == Catalog.pawn_gems("crown") and ShopSheet._gems_only("pawn", "crown")
@@ -354,17 +354,12 @@ func _wallet() -> void:
 	await acc.sign_in_guest()
 	var shop := ShopSheet.new("pawns")
 	_root.add_child(shop)
-	var gem_rows := shop.find_children("GemBuy", "Button", true, false)
-	var trim_row: Button = null
-	var crown_row: Button = null
-	for c: Control in shop._cards:
-		var gr: Array = c.find_children("GemBuy", "Button", true, false)
-		if c.get_meta("item", "") == "trim" and gr.size() == 1:
-			trim_row = gr[0]
-		if c.get_meta("item", "") == "crown" and gr.size() == 1:
-			crown_row = gr[0]
-	check("shop: a coin skin offers its gems on the card's second line", trim_row != null and int(trim_row.get_meta("gems")) == 20 and trim_row.modulate.a == 1.0 and not trim_row.disabled, gem_rows.size())
-	check("shop: a gem-only skin keeps the line's space but shows none (its Buy pays gems)", crown_row != null and crown_row.modulate.a == 0.0 and crown_row.disabled)
+	var coin_view := PawnSheet.new("trim")
+	var gem_view := PawnSheet.new("crown")
+	check("the preview of a coin skin offers its gems too", coin_view._gem != null and int(coin_view._gem.get_meta("gems")) == 20)
+	check("the preview of a gem-only skin has no second line (its Buy pays gems)", gem_view._gem == null)
+	coin_view.free()
+	gem_view.free()
 	var err: String = await ShopSheet._purchase("pawn", "crown")
 	check("a gem-only skin bought with coins: the server refuses, nothing changes", err != "" and not Save.profile.pawns_owned.has("crown") and int(Save.profile.gems) == 200, err)
 	err = await ShopSheet._purchase("pawn", "crown", "gems")

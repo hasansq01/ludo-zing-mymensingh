@@ -1,6 +1,9 @@
 class_name SettingsSheet
 extends Sheet
-## Settings (index.html #settingsSheet; PM look with the "Settings" ribbon and the single close X). Sections:
+## Settings (index.html #settingsSheet; PM look with the "Settings" ribbon and the single close X). Four tabs (PAGES),
+## one sheet height so nothing jumps, each page about one screen: General (Language, Sound & vibration, Accessibility),
+## Game (Game, Camera view, House rules; what a match opens on), Alerts (Notifications, Friends), More (Account, Help,
+## Reset progress, the version line). The sections:
 ##   Language       Auto (<the phone's>) / English / বাংলা (Save.prefs.lang; Main.set_language switches and rebuilds
 ##                  the screen, this sheet included)
 ##   Sound & vibration  Sound on / off, Music / Effects volume ("70%"), Vibration on / off (no master slider: Save
@@ -30,6 +33,15 @@ signal prefs_changed
 signal language_picked(pref: String)     ## "auto" | "en" | "bn" (main switches the language and reopens Settings)
 signal probe_requested                   ## PROBE_TAPS taps on the version line: the graphics leak test (LeakProbe)
 
+## The pages, as tabs. l10n-keys: text
+const PAGES := [
+	{key = "general", text = "General", icon = "ic_sound", cat = "scenes"},
+	{key = "game", text = "Game", icon = "cat_dice", cat = "dice"},
+	{key = "alerts", text = "Alerts", icon = "ic_bell", cat = "coins"},
+	{key = "more", text = "More", icon = "ic_info", cat = "emotes"},
+]
+const MAX_H := 680.0                     ## one height on every page: the sheet doesn't jump between tabs
+
 const VERSION_LINE := "Ludo Zing · v%s · Flipfold Studio"
 const PROBE_TAPS := 7                    ## taps on the version line that start the graphics leak test (testers)
 ## Web pages for the Help rows. A row shows only when its URL is set (no dead "Coming soon" rows).
@@ -45,7 +57,10 @@ const TAP_SLOP := 12.0
 
 var _width := 360.0
 var _probe_taps := 0
-var _list: VBoxContainer
+var _list: VBoxContainer                 # the page being built
+var _tabs: TabStrip
+var _pages := {}                         # key -> its column of rows
+var page := "general"                    ## the page showing
 var _switch: Switch                      # the Sound switch (previews flip it)
 var _vol_lines: Array[Control] = []
 var _gfx_note: Label                     # Graphics: "... on next launch" when the pick needs one
@@ -57,24 +72,52 @@ var _notif_lines: Array[Control] = []    # the four kinds (dimmed while the mast
 func _init(width: float = UIKit.W.form) -> void:
 	super(L10n.t("Settings"), width, true, LOOK_PM)
 	_width = width
-	_list = add_scroll_body(UIKit.SPACE.sm)
+	var st := card.get_theme_stylebox("panel")        # the tabs reach the card's rim, as the Shop's
+	var bleed := maxi(0, int(st.content_margin_left) - UIKit.BW.card)
+	var tabs: Array = []
+	for t: Dictionary in PAGES:
+		var tt := t.duplicate()
+		tt.text = L10n.t(t.text)
+		tabs.append(tt)
+	_tabs = TabStrip.new(tabs, page, "gtabs")
+	_tabs.name = "SettingsTabs"
+	_tabs.picked.connect(show_page)
+	body.add_child(UIKit.margin(_tabs, -bleed, 0, -bleed, 0))
+	add_scroll_body(UIKit.SPACE.sm)
 	_build()
+	fit(0.9, MAX_H)
 
+
+## Show a page ("general" | "game" | "alerts" | "more"), from its top. Every page stays built: only one shows.
+func show_page(key: String) -> void:
+	if not _pages.has(key):
+		return
+	page = key
+	_tabs.select(key)
+	for k: String in _pages:
+		(_pages[k] as Control).visible = k == key
+	scroll_box.scroll_vertical = 0
+
+## The next rows go on this page.
+func _start_page(key: String) -> void:
+	_list = UIKit.vbox(UIKit.SPACE.sm)
+	_list.name = "Page_" + key
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_body.add_child(_list)
+	_pages[key] = _list
 
 func _build() -> void:
-	for c in _list.get_children():
+	for c in scroll_body.get_children():
+		scroll_body.remove_child(c)
 		c.queue_free()
+	_pages.clear()
 	_vol_lines.clear()
 	_notif_lines.clear()
 	var vol: Dictionary = Save.prefs.get("vol", {})
 	var sound_on := bool(Save.prefs.get("sound", true))
 
-	# --- Account (only where there is one): Guest / the Google name, opens the Profile
-	var acc := Account.instance()
-	if acc != null and acc.enabled:
-		_caption(tr("Account"))
-		_group().add_child(_account_line(acc))
-
+	# --- General: language, sound, accessibility
+	_start_page("general")
 	# --- Language
 	_caption(tr("Language"))
 	_group().add_child(_language_line())
@@ -96,6 +139,15 @@ func _build() -> void:
 	snd.add_child(_line(tr("Vibration"), "", vib, vib))
 	_dim_volumes(sound_on)
 
+	# --- Accessibility
+	_caption(tr("Accessibility"))
+	var a := _group()
+	a.add_child(_switch_line(tr("Colour-blind symbols"), tr("Shapes on pawns and players."), "colorblind"))
+	a.add_child(_divider())
+	a.add_child(_switch_line(tr("Reduce motion"), tr("Fewer animations, no shaking."), "reduce_motion"))
+
+	# --- Game: how it plays and looks
+	_start_page("game")
 	# --- Game
 	_caption(tr("Game"))
 	var g := _group()
@@ -120,6 +172,8 @@ func _build() -> void:
 	h.add_child(_divider())
 	h.add_child(_switch_line(tr("Need a 1 to start"), tr("Snakes & Ladders: only a 1 enters."), "sl_need_one"))
 
+	# --- Alerts: notifications and invites
+	_start_page("alerts")
 	# --- Notifications (the master switch, then what to be told about)
 	_caption(tr("Notifications"))
 	var nt := _group()
@@ -150,12 +204,13 @@ func _build() -> void:
 	inv.toggled.connect(_on_invites)
 	fr.add_child(_line(tr("Invites from players"), tr("People you played with or who added you can invite you to a game."), inv, inv))
 
-	# --- Accessibility
-	_caption(tr("Accessibility"))
-	var a := _group()
-	a.add_child(_switch_line(tr("Colour-blind symbols"), tr("Shapes on pawns and players."), "colorblind"))
-	a.add_child(_divider())
-	a.add_child(_switch_line(tr("Reduce motion"), tr("Fewer animations, no shaking."), "reduce_motion"))
+	# --- More: the account, help, reset, the version
+	_start_page("more")
+	# --- Account (only where there is one): Guest / the Google name, opens the Profile
+	var acc := Account.instance()
+	if acc != null and acc.enabled:
+		_caption(tr("Account"))
+		_group().add_child(_account_line(acc))
 
 	# --- Help
 	_caption(tr("Help"))
@@ -198,6 +253,7 @@ func _build() -> void:
 	foot.mouse_filter = Control.MOUSE_FILTER_PASS    # (taps still scroll the list)
 	foot.gui_input.connect(_on_version_tap)
 	_list.add_child(UIKit.margin(foot, 0, UIKit.SPACE.xs, 0, UIKit.SPACE.xs))
+	show_page(page)
 
 # Testers: PROBE_TAPS taps on the version line close Settings and start the graphics leak test.
 func _on_version_tap(e: InputEvent) -> void:
