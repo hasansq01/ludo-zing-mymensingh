@@ -34,5 +34,25 @@ func run() -> void:
 	check("frames: SpriteFrames built from the manifest", sf != null and sf.get_frame_count("default") == want, want)
 	check("frames: cached", EmoteArt.frames("happy") == sf)
 	check("frames: unknown id is null", EmoteArt.frames("nope") == null and EmoteArt.icon("nope") == null)
+	# only the last few animations stay in memory (each ~11 MB); one still on screen keeps its own reference
+	var in_use := EmoteArt.frames("happy")
+	var others: Array = (emotes.map(func(e: Dictionary) -> String: return str(e.id)) as Array).filter(func(x: String) -> bool: return x != "happy" and int(EmoteArt.info(x).frames) > 0)
+	for k in EmoteArt.KEEP_FRAMES:
+		EmoteArt.frames(others[k])
+	check("frames: at most KEEP_FRAMES stay cached", EmoteArt._frames.size() <= EmoteArt.KEEP_FRAMES, EmoteArt._frames.size())
+	check("frames: the oldest is dropped", not EmoteArt._frames.has("happy"))
+	check("frames: a sticker still playing keeps its frames", in_use.get_frame_count("default") > 0)
+	EmoteArt.frames(others[1])
+	EmoteArt.frames(others[EmoteArt.KEEP_FRAMES])
+	check("frames: a use makes it the newest", EmoteArt._frames.has(others[1]) and not EmoteArt._frames.has(others[0]))
+	check("frames: a dropped one loads again", EmoteArt.frames("happy").get_frame_count("default") == in_use.get_frame_count("default"))
+	# lossy import: lossless made the 1,560 frames 33 MB of the download, lossy 11.5 MB
+	var lossless: Array = []
+	for e in emotes:
+		for i in int(e.frames):
+			var imp := FileAccess.get_file_as_string("res://assets/emotes/%s/%03d.webp.import" % [e.id, i])
+			if not imp.contains("compress/mode=1"):
+				lossless.append("%s/%d" % [e.id, i])
+	check("frames: every frame imports lossy", lossless.is_empty(), lossless.slice(0, 4))
 	var t := EmoteArt.icon("happy")
 	check("icon: full size with alpha", t != null and t.get_width() == 344 and t.get_height() == 218 and t.get_image().detect_alpha() != Image.ALPHA_NONE)

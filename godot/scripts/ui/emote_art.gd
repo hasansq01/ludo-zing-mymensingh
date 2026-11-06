@@ -5,9 +5,13 @@ extends RefCounted
 ## icon(id): static frame for pickers and the shop. manifest(): {"emotes": [...], "sets": [...]}.
 
 const DIR := "res://assets/emotes"
+## How many emotes' animations stay in memory once nothing plays them: a frame is ~300 KB of video memory (344 x 218,
+## uncompressed), an emote up to 37 frames (~11 MB), and all 70 together ~470 MB. Whoever plays one holds its own
+## reference, so dropping it from here never stops a sticker on screen.
+const KEEP_FRAMES := 6
 
 static var _manifest: Dictionary = {}
-static var _frames: Dictionary = {}
+static var _frames: Dictionary = {}      # id -> SpriteFrames; insertion order is oldest use first
 static var _icons: Dictionary = {}
 
 
@@ -38,7 +42,10 @@ static func icon(id: String) -> Texture2D:
 
 static func frames(id: String) -> SpriteFrames:
 	if _frames.has(id):
-		return _frames[id]
+		var kept: SpriteFrames = _frames[id]
+		_frames.erase(id)                # back in as the newest
+		_frames[id] = kept
+		return kept
 	var e := info(id)
 	var sf: SpriteFrames = null
 	if not e.is_empty():
@@ -50,4 +57,6 @@ static func frames(id: String) -> SpriteFrames:
 			if tex != null:
 				sf.add_frame("default", tex)
 	_frames[id] = sf
+	while _frames.size() > KEEP_FRAMES:
+		_frames.erase(_frames.keys()[0])
 	return sf
