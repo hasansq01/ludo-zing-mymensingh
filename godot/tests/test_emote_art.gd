@@ -14,7 +14,7 @@ func run() -> void:
 		ids[e.id] = true
 	check("emotes: ids unique", ids.size() == 70, ids.size())
 	check("emotes: 4 text packs of 8 and 4 team phrases", (m.text_packs as Array).size() == 4 and (m.text_packs as Array).all(func(s: Dictionary) -> bool: return s.emotes.size() == 8) and (m.team as Array).size() == 4)
-	check("emotes: a phrase has its words and a sound", EmoteArt.info("t-bgg").name == "ভালো খেলা!" and EmoteArt.info("t-bgg").text == true and EmoteArt.info("t-bgg").sound == "hi")
+	check("emotes: a phrase has its words and a sound", EmoteArt.info("t-bgg").name == "ভালো খেলা!" and EmoteArt.info("t-bgg").text == true and EmoteArt.info("t-bgg").sound == "cheer" and EmoteArt.info("t-nooo").sound == "cry")
 	check("emotes: a character shares its emotion's sound", EmoteArt.info("gLaugh").sound == "laugh" and EmoteArt.info("grr").sound == "angry")
 	var in_sets := true
 	for s in sets:

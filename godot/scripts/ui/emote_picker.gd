@@ -321,14 +321,6 @@ static func _back_out(u: float, s: float) -> float:
 	var v := u - 1.0
 	return 1.0 + (s + 1.0) * v * v * v + s * v * v
 
-## A phrase for a picker cell: one line, or two split at the space nearest the middle.
-static func two_lines(text: String) -> String:
-	var at := -1
-	for k in text.length():
-		if text[k] == " " and (at < 0 or absi(k - text.length() / 2) < absi(at - text.length() / 2)):
-			at = k
-	return text if at < 0 else text.substr(0, at) + "\n" + text.substr(at + 1)
-
 ## The sticker without most of its transparent margin (the art leaves room round the speech bubble), so it reads
 ## bigger in a 72 x 50 cell.
 static func cropped(t: Texture2D) -> Texture2D:
@@ -486,7 +478,6 @@ class Cell extends Button:
 	var home := Vector2.ZERO
 	var k := 1.0                          # its pop-in progress (0..1)
 	var _icon: TextureRect
-	var _say: Label                       # a phrase cell: the words instead of the sticker
 	var _bg: StyleBoxFlat
 	var _bg_on: StyleBoxFlat
 	var _down := false
@@ -506,24 +497,15 @@ class Cell extends Button:
 			add_theme_stylebox_override(s, empty)
 		_bg = UIKit.box(Palette.SURFACE_2, UIKit.R.md, 2, Palette.ROW_EDGE.lerp(Palette.TAN, 0.25))
 		_bg_on = UIKit.box(Palette.HONEY_TINT.lerp(Color.WHITE, 0.35), UIKit.R.md, 2, Palette.HONEY_TINT_EDGE)
-		if info.get("text", false):
-			_say = UIKit.label(EmotePicker.two_lines(str(info.get("name", id_))), 13, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
-			_say.autowrap_mode = TextServer.AUTOWRAP_OFF
-			_say.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			_say.add_theme_constant_override("line_spacing", -2)
-			_say.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			if _say.get_minimum_size().x > CW - 4.0 or _say.get_minimum_size().y > CH:   # a long word, Bangla's tall lines
-				_say.add_theme_font_size_override("font_size", 12)
-			add_child(_say)
-			_say.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		else:
-			_icon = TextureRect.new()
-			_icon.texture = EmotePicker.cropped(EmoteArt.icon(id_))
-			_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			_icon.material = EmotePicker.grey_material()
-			add_child(_icon)
+		var phrase := bool(info.get("text", false))
+		_icon = TextureRect.new()
+		# a phrase's die-cut art fills its whole frame: uncropped, or its edges would be cut off
+		_icon.texture = EmoteArt.icon(id_) if phrase else EmotePicker.cropped(EmoteArt.icon(id_))
+		_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_icon.material = EmotePicker.grey_material()
+		add_child(_icon)
 		button_down.connect(func(): _down = true; pose(k))
 		button_up.connect(func(): _down = false; pose(k))
 		mouse_entered.connect(queue_redraw)
@@ -533,10 +515,8 @@ class Cell extends Button:
 		resized.connect(_fit)
 
 	func _fit() -> void:
-		if _say:
-			return
-		_icon.position = Vector2(3, 4)
-		_icon.size = size - Vector2(6, 8)
+		_icon.position = Vector2(1, 2) if bool(EmoteArt.info(id).get("text", false)) else Vector2(3, 4)
+		_icon.size = size - (Vector2(2, 4) if bool(EmoteArt.info(id).get("text", false)) else Vector2(6, 8))
 
 	## Its pop-in pose: from the left, small and clear, to its place (u 0..1, a small overshoot).
 	func pose(u: float) -> void:
@@ -551,10 +531,7 @@ class Cell extends Button:
 		if g == _grey:
 			return
 		_grey = g
-		if _icon:
-			(_icon.material as ShaderMaterial).set_shader_parameter("grey", g)
-		if _say:
-			_say.add_theme_color_override("font_color", Palette.INK.lerp(Palette.TAN, g))
+		(_icon.material as ShaderMaterial).set_shader_parameter("grey", g)
 		pose(k)
 
 	func _draw() -> void:

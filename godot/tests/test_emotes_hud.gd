@@ -99,24 +99,14 @@ func _picker() -> void:
 	p.guard = func() -> bool: return blocked[0]
 	p.open()
 	p.set_mode("text")
-	check("picker: the Text tab lists the phrases, the panel stays open", p.is_open and p.mode == "text" and p.ids[0] == "t-hi" and p.cells.size() == 8 and p.cells[0]._say != null)
+	check("picker: the Text tab lists the phrases, the panel stays open", p.is_open and p.mode == "text" and p.ids[0] == "t-hi" and p.cells.size() == 8)
 	p.teams = true
 	p.refresh()
 	check("picker: Pair Mode adds the team phrases", p.cells.size() == 12 and p.ids.back() == "t-partner")
-	var too_big: Array = []
-	for pk: Dictionary in Emotes.text_packs():
-		for tid: String in pk.emotes:
-			var one := EmotePicker.Cell.new(tid, 0)
-			p.panel.add_child(one)                # in the tree: the smaller font of a long phrase has taken effect
-			if one._say.get_minimum_size().x > EmotePicker.CW - 4 or one._say.get_minimum_size().y > EmotePicker.CH:
-				too_big.append([tid, one._say.get_minimum_size()])
-			p.panel.remove_child(one)
-			one.free()
-	check("picker: every phrase fits its cell", too_big.is_empty(), too_big)
-	check("picker: a phrase splits at the space nearest the middle", EmotePicker.two_lines("Nice one, partner!") == "Nice one,\npartner!" and EmotePicker.two_lines("GG") == "GG")
+	check("picker: a phrase shows its whole sticker, the stickers their cropped art", p.cells[0]._icon.texture == EmoteArt.icon("t-hi"))
 	p.teams = false
 	p.set_mode("em")
-	check("picker: back to the stickers", p.is_open and p.mode == "em" and p.cells[0]._say == null and p.ids[0] == "happy")
+	check("picker: back to the stickers", p.is_open and p.mode == "em" and p.cells[0]._icon.texture is AtlasTexture and p.ids[0] == "happy")
 	blocked[0] = true
 	p.tick(0.0)
 	check("picker: a sheet opening (guard) closes it", not p.is_open)
@@ -219,6 +209,11 @@ func _cpu_rules() -> void:
 	l.is_human_fn = func(c: int) -> bool: return c == 0
 	l.seat_fn = func(c: int) -> Dictionary: return {card = Rect2(16, 100 + c * 150, 144, 116), slot = Rect2(90, 105 + c * 150, 64, 64), inner = "right", low = false}
 	_tree().root.add_child(l)
+	var word := EmoteLayer.Bubble.new(1, "t-hi", false)
+	var art := EmoteLayer.Bubble.new(1, "happy", false)
+	check("a phrase keeps no tail and is never mirrored, a sticker does", word._phrase and not art._phrase)
+	word.free()
+	art.free()
 	check("cpu: a person never 'reacts' by itself", not l.cpu_say(0, ["happy"], 1.0))
 	check("cpu: a computer reacts", l.cpu_say(1, ["happy", "laugh"], 1.0))
 	check("cpu: not on the same frame (a short delay)", l.showing.is_empty())

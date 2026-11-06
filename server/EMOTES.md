@@ -23,8 +23,7 @@ The three character sets hold the same six emotions in the same order. Ids go ba
 | `bangla` | Bangla | 3,000 | t-bgg, t-bluck, t-bsix, t-bcome, t-bagain, t-bwon, t-bthx, t-bugh |
 | `team` | (Pair Mode only, free, not sold) | - | t-help, t-go, t-got, t-partner |
 
-Fixed phrases only: nothing is typed, so nothing rude can be sent. A phrase is a sticker too (group "text"; the picker writes
-its words, the bubble shows the sticker) and is English or Bangla in every language. The manifest
+Fixed phrases only: nothing is typed, so nothing rude can be sent. A phrase is a sticker too (group "text"; the picker and the bubble show the sticker) and is English or Bangla in every language. The manifest
 `godot/assets/emotes/emotes.json` is the source of truth for names, frames, fps and shared sounds (`sound`).
 
 ## Games from before these packs (v14, v15)
@@ -34,7 +33,7 @@ emote from its old pack too (`LEGACY_EMOTE_PACKS`, `emotePacksAllowing`), and ch
 any game with these packs ships**: an older server refuses the new ids.
 
 ## Art (EMO-ART)
-Captured from the web page by `tools/capture-emotes.mjs`. `godot/assets/emotes/<id>/NNN.webp` frames + `icon.webp`, manifest `emotes.json`; `EmoteArt` (scripts/ui/emote_art.gd):
+Stickers: captured from the web page by `tools/capture-emotes.mjs`. Phrases (`t-*`): drawn by `godot/dev/bake_text_emotes.gd`, a die-cut sticker per pack (bubble, game tile, comic burst, rickshaw-art plaque, banner), 12 frames at 12 fps, no added tail and never mirrored. `godot/assets/emotes/<id>/NNN.webp` frames + `icon.webp`, manifest `emotes.json`; `EmoteArt` (scripts/ui/emote_art.gd):
 `frames(id) -> SpriteFrames`, `icon(id) -> Texture2D`, `manifest() -> Dictionary`.
 
 ## Profile (game Save.profile and the server profile, same keys)

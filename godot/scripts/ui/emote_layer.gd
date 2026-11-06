@@ -17,6 +17,7 @@ extends Control
 ## Time is driven by tick(dt) (from _process; tests call it); now_fn is the clock in ms (tests replace it).
 ## The bubble's tail faces the sender's card: on the top edge for a bubble under a tile, the bottom edge for one above
 ## it, leaning toward the card's centre (tail_for); beside a tile it is the art's own left tail, mirrored for a right-hand tile.
+## A text emote is its own die-cut sticker: no added tail, and never mirrored, or its words would read backwards.
 ## Reduce motion: the sticker fades in and out (no pop, no frame animation).
 
 signal shown(c: int, id: String)
@@ -414,6 +415,7 @@ class Bubble extends Control:
 	var _fps := 15.0
 	var _count := 0
 	var _icon: Texture2D
+	var _phrase := false                  # a text emote: its own die-cut shape, no tail, and never mirrored
 
 	func _init(c_: int, id_: String, still_: bool) -> void:
 		c = c_
@@ -426,6 +428,7 @@ class Bubble extends Control:
 			_fps = maxf(frames.get_animation_speed("default"), 1.0)
 			_count = frames.get_frame_count("default")
 		_icon = EmoteArt.icon(id_)
+		_phrase = bool(EmoteArt.info(id_).get("text", false))
 		resized.connect(queue_redraw)
 
 	func step(dt: float) -> void:
@@ -491,12 +494,12 @@ class Bubble extends Control:
 		var m := material as ShaderMaterial
 		if m:
 			m.set_shader_parameter("px", Vector2(1.0 / size.x, 1.0 / size.y))   # UV 0..1 spans the art's rect
-			m.set_shader_parameter("tail", 1 if tail == "top" else (2 if tail == "bottom" else 0))
+			m.set_shader_parameter("tail", 0 if _phrase else (1 if tail == "top" else (2 if tail == "bottom" else 0)))
 			var tx := clampf(tail_at * 344.0, 98.0, 246.0)   # clear of the body's rounded corners
 			if tail == "top":                # the character's head rises through the top edge's middle: to one side
 				tx = 98.0 if tail_at < 0.5 else 246.0
 			m.set_shader_parameter("tail_x", tx)
-		if tail == "right":                  # the art's tail is on the left: mirrored for a bubble left of its card
+		if tail == "right" and not _phrase:  # the art's tail is on the left: mirrored for a bubble left of its card
 			draw_set_transform(Vector2(size.x, 0.0), 0.0, Vector2(-1.0, 1.0))
 		# drawn over a region a little larger than the art: the glow and the shadow have room past its edges (the
 		# frames' borders are transparent, so the clamped samples outside them are empty)
