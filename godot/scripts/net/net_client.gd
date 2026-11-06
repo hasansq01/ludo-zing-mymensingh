@@ -415,7 +415,15 @@ func _profile() -> Dictionary:
 	var save := _save_node() if use_save else null
 	var p: Dictionary = save.get("profile") if save and save.get("profile") is Dictionary else {}
 	return {name = str(p.get("name", "")), avatar = Collection.equipped("avatar", p) if not p.is_empty() else "",
-		frame = Collection.equipped("frame", p) if not p.is_empty() else "", pawn = pawn_of(p)}
+		frame = Collection.equipped("frame", p) if not p.is_empty() else "", pawn = pawn_of(p), dice = dice_of(p)}
+
+## The die profile p has in use: its saved one when it owns it, else "" (Classic).
+static func dice_of(p: Dictionary) -> String:
+	var id := str(p.get("dice", ""))
+	var owned: Variant = p.get("dice_owned", [])
+	if Catalog.dice(id).is_empty() or id == Catalog.FREE_DICE:
+		return ""
+	return id if owned is Array and (owned as Array).has(id) else ""
 
 ## The pawn skin profile p has in use: its saved one when it owns it, else "" (Classic).
 static func pawn_of(p: Dictionary) -> String:

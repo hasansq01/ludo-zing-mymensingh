@@ -142,6 +142,7 @@ interface Member {
   frame: string;
   /** Pawn skin (Catalog.PAWNS), only one the account owns ("" = Classic); missing in rooms stored before skins. */
   pawn?: string;
+  dice?: string;
   /** Epoch ms when the disconnect grace runs out (0 = none). */
   graceAt: number;
   /** The account (sessions, ONLINE_V2.md §1); null / missing = none known. */
@@ -190,6 +191,7 @@ interface Seat {
   frame: string;
   /** Pawn skin ("" = Classic); missing in matches stored before skins. */
   pawn?: string;
+  dice?: string;
   /** The member left the match: a bot plays this colour for good. */
   left: boolean;
   account?: string | null;
@@ -375,7 +377,7 @@ export interface QuickSpec {
   size: number;
   /** The coin table (ECONOMY_V1.md §3); missing: practice. */
   table?: { tier: string; entry: number };
-  humans: Array<{ account_id: string; pid: string; name: string; avatar: string; frame: string; pawn?: string; level: number; entry_id?: string }>;
+  humans: Array<{ account_id: string; pid: string; name: string; avatar: string; frame: string; pawn?: string; dice?: string; level: number; entry_id?: string }>;
   /** Tests only (TEST_MODE). */
   hooks?: TestHooks;
 }
@@ -391,9 +393,11 @@ interface Identity {
   account: string | null;
   ban: string | null;
   level: number | null;
-  /** The account's pawn skins (owned) and the one it has in use; null / "" when unknown (no account). */
+  /** The account's pawn skins and dice (owned) and the ones it has in use; null / "" when unknown (no account). */
   pawns?: string[] | null;
+  dices?: string[] | null;
   pawn?: string;
+  dice?: string;
 }
 
 // ---------- the two games behind one interface ----------
@@ -534,6 +538,13 @@ export function cleanId(x: unknown): string {
  * The pawn skin a member shows at the table (everyone sees it): the one asked for when it is a known skin the account
  * owns (`owned`, its pawns_owned; null = no account known), else "" (Classic, never a skin nobody paid for).
  */
+/** As pawnFor, for the die a member rolls with at the table: `owned` is its dice_owned. */
+export function diceFor(asked: unknown, owned: readonly string[] | null | undefined): string {
+  const id = cleanId(asked);
+  if (id === "" || id === "classic" || !econItem("dice", id)) return "";
+  return owned?.includes(id) ? id : "";
+}
+
 export function pawnFor(asked: unknown, owned: readonly string[] | null | undefined): string {
   const id = cleanId(asked);
   if (id === "" || id === FREE_PAWN || !econItem("pawn", id)) return "";
@@ -660,12 +671,13 @@ export class Room extends DurableObject<Env> {
         avatar: cleanId(h.avatar),
         frame: cleanId(h.frame),
         pawn: cleanId(h.pawn), // (the Matchmaker kept it only when the account owns it)
+        dice: cleanId(h.dice), // (the same)
         graceAt: 0,
         account: h.account_id,
         level: Math.max(1, Math.trunc(h.level) || 1),
         ...(h.entry_id ? { entry: h.entry_id } : {}),
       })),
-      ...ghosts.map((gh, k) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, pawn: gh.pawn, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g), persona: personas[k], emo: newGhostMemory(), gid: newUid() })),
+      ...ghosts.map((gh, k) => ({ pid: "", token: "", name: gh.name, avatar: gh.avatar, frame: gh.frame, pawn: gh.pawn, dice: gh.dice, graceAt: 0, account: null, level: gh.level, ghost: true, emotePack: ghostPack(g), persona: personas[k], emo: newGhostMemory(), gid: newUid() })),
     ];
     for (let k = entries.length - 1; k > 0; k--) {
       const j = cryptoInt(k + 1);
@@ -1140,6 +1152,7 @@ export class Room extends DurableObject<Env> {
     const frame = cleanId(msg.frame);
     // the pawn skin: only one the account owns (a hello without one, from an older client: the account's own)
     const pawn = pawnFor(msg.pawn ?? who.pawn, who.pawns);
+    const dice = diceFor(msg.dice ?? who.dice, who.dices);
     const token = typeof msg.token === "string" ? msg.token : "";
     const humans = r.members.filter((m) => !m.ghost);
     let mem =
@@ -1165,6 +1178,7 @@ export class Room extends DurableObject<Env> {
         mem.avatar = avatar;
         mem.frame = frame;
         mem.pawn = pawn;
+        mem.dice = dice;
       }
       if (who.account && !mem.account) mem.account = who.account;
       if (who.level !== null) mem.level = who.level;
@@ -1174,7 +1188,7 @@ export class Room extends DurableObject<Env> {
       if (r.quick) return this.fatal(ws, "full", "the room is full");
       if (r.status === "playing") return this.fatal(ws, "started", "the match is in progress");
       if (r.members.length >= LIMITS.maxMembers) return this.fatal(ws, "full", "the room is full");
-      mem = { id: r.nextId++, pid, token: randomToken(), name, avatar, frame, pawn, graceAt: 0, account: who.account };
+      mem = { id: r.nextId++, pid, token: randomToken(), name, avatar, frame, pawn, dice, graceAt: 0, account: who.account };
       if (who.level !== null) mem.level = who.level;
       r.members.push(mem);
       if (r.host < 0) r.host = mem.id;
@@ -1501,6 +1515,7 @@ export class Room extends DurableObject<Env> {
         avatar: mm.avatar,
         frame: mm.frame,
         pawn: mm.pawn ?? "",
+        dice: mm.dice ?? "",
         left: false,
         account: mm.account ?? null,
       };
@@ -2170,6 +2185,7 @@ export class Room extends DurableObject<Env> {
         avatar: m.avatar,
         frame: m.frame,
         pawn: m.pawn ?? "",
+        dice: m.dice ?? "",
         level: m.level ?? 1,
         online: this.memberOnline(m),
         color: colors[j],
@@ -2191,6 +2207,7 @@ export class Room extends DurableObject<Env> {
       avatar: st.avatar,
       frame: st.frame,
       pawn: st.pawn ?? "",
+      dice: st.dice ?? "",
       level: st.level ?? 1,
       bot: O.isCpu(m.state, st.color),
       online: st.ghost ? true : !st.left && this.online(st.id),
@@ -2859,6 +2876,8 @@ export class Room extends DurableObject<Env> {
         if (prof && Array.isArray(prof.pawns)) {
           id.pawns = prof.pawns; // what the hello's pawn skin is checked against
           id.pawn = prof.pawn ?? "";
+          id.dices = prof.dices;
+          id.dice = prof.dice ?? "";
         }
       }
     } catch (e) {

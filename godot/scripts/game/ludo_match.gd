@@ -283,6 +283,7 @@ func _open(s: Dictionary, fresh: bool) -> void:
 	board.speed = _speed()
 	board.set_movable([])
 	board.set_skins(pawn_skins())
+	hud.set_dice_skins(dice_skins())
 	board.relayout(S)
 	hud.setup(S)
 	_emote_sync()
@@ -318,14 +319,18 @@ func _open(s: Dictionary, fresh: bool) -> void:
 func pawn_skins() -> Array:
 	return skins_of(players, ns.seats if online and ns != null else null, Catalog.pawn_in_use())
 
+## The die each colour rolls with, the same way: online each seat's own, offline yours on your colour, Classic for the rest.
+func dice_skins() -> Array:
+	return skins_of(players, ns.seats if online and ns != null else null, Catalog.dice_in_use(), "dice")
+
 ## pawn_skins() as a pure function: `seats` the online seats (null offline), `mine` this device's skin.
-static func skins_of(players_: Array, seats: Variant, mine: String) -> Array:
+static func skins_of(players_: Array, seats: Variant, mine: String, field := "pawn") -> Array:
 	var out := ["", "", "", ""]
 	if seats is Array:
 		for st: Dictionary in seats:
 			var c := int(st.get("color", -1))
 			if c >= 0 and c < 4:
-				out[c] = str(st.get("pawn", ""))
+				out[c] = str(st.get(field, ""))
 		return out
 	for c in mini(4, players_.size()):
 		if players_[c] == "human":
@@ -568,6 +573,7 @@ func _tumble(c: int, v: int) -> void:
 	Sound.sfx("roll", {dur = dur, soft = soft})
 	if not soft:
 		get_tree().create_timer(dur * Sound.IMPACT_AT).timeout.connect(func(): Haptics.light())
+	hud.wear_dice_of(c)
 	await hud.dice.roll(v, k)
 
 func _after_roll(id: int, c: int, v: int, ev: Array) -> void:

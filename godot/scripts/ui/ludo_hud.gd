@@ -43,6 +43,7 @@ var safe_top := 0.0
 var safe_bottom := 0.0
 var top: GameTopBar
 var tiles: Array = []                    # per colour: Tile (a PlayerTile)
+var _dice_skins := []                    # colour -> the die it rolls with
 var dice: Dice3D
 var pair_box: PanelContainer             # the inline pair prompt
 var pair_yes: Button
@@ -237,6 +238,17 @@ class Tile extends PlayerTile:
 		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		_disc.draw_string(f, m + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.DANGER if late else Palette.INK)
 
+
+## The die each colour rolls with (LudoMatch.dice_skins; "" = Classic): the one die on screen is whoever's turn it is.
+func set_dice_skins(skins: Array) -> void:
+	_dice_skins = skins
+	for id in skins:                         # painted now, not in the middle of someone's turn
+		DiceLooks.pattern(str(DiceLooks.look(str(id) if str(id) != "" else Catalog.FREE_DICE).get("pat", "")))
+
+func wear_dice_of(c: int) -> void:
+	if dice and c >= 0 and c < _dice_skins.size():
+		var id := str(_dice_skins[c])
+		dice.wear(id if id != "" else Catalog.FREE_DICE)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -634,6 +646,7 @@ func update(s: Dictionary, turn: int) -> void:
 	dice.visible = turn >= 0 and not over
 	if turn >= 0:
 		dice.set_tint(Palette.PLAYER[turn])
+		wear_dice_of(turn)
 	_wake_dice(s, turn, over)
 	var you_pair := false
 	for q in s.pairs:

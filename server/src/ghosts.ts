@@ -59,12 +59,18 @@ export const GHOST_PAWNS: readonly (readonly [string, number])[] = (
     ["kitty", 5], ["space", 2], ["teacup", 4], ["dragon", 2], ["glitter", 3], ["crown", 2], ["knight", 1]] as const
 ).filter(([id]) => id === "" || (data.items as CatalogItemLite[]).some((it) => it.kind === "pawn" && it.id === id));
 
+/** The dice ghosts roll with, the same way: mostly Classic, the cheaper ones common, the dearest rare. */
+export const GHOST_DICE: readonly (readonly [string, number])[] = (
+  [["", 55], ["crema", 12], ["espresso", 7], ["rosewood", 6], ["marble", 5], ["rickshaw", 5], ["emerald", 3], ["neon", 3], ["galaxy", 2], ["gold", 2]] as const
+).filter(([id]) => id === "" || (data.items as CatalogItemLite[]).some((it) => it.kind === "dice" && it.id === id));
+
 export interface GhostIdentity {
   name: string;
   avatar: string;
   frame: string;
   /** Pawn skin ("" = Classic). */
   pawn: string;
+  dice: string;
   level: number;
 }
 
@@ -82,6 +88,17 @@ function intIn(lo: number, hi: number, rng: Rng): number {
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+/** A ghost's die, drawn from GHOST_DICE by weight. */
+export function ghostDice(rng: Rng): string {
+  const total = GHOST_DICE.reduce((s, [, w]) => s + w, 0);
+  let r = rng.randf() * total;
+  for (const [id, w] of GHOST_DICE) {
+    r -= w;
+    if (r < 0) return id;
+  }
+  return "";
+}
 
 /** A ghost's pawn skin, drawn from GHOST_PAWNS by weight. */
 export function ghostPawn(rng: Rng): string {
@@ -114,7 +131,7 @@ export function makeGhosts(n: number, humans: readonly HumanLite[], rng: Rng): G
     const avatar = rng.randf() < 0.35 ? DEFAULT_AVATAR : pick(fits.length ? fits : FREE_AVATARS, rng);
     const base = pick(levels, rng);
     const level = Math.max(1, base + intIn(-3, 3, rng));
-    out.push({ name, avatar, frame: "classic", pawn: ghostPawn(rng), level });
+    out.push({ name, avatar, frame: "classic", pawn: ghostPawn(rng), level, dice: ghostDice(rng) });
   }
   return out;
 }

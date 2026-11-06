@@ -78,7 +78,7 @@ describe("profile lookups", () => {
   it("getPublicProfile / accountForPid", async () => {
     const g = await guest();
     await ok("me", { session: g.session, method: "PATCH", body: { name: "Nadia", avatar: "pawn-green" } });
-    const classic = { pawn: "classic", pawns: ["classic"] };
+    const classic = { pawn: "classic", pawns: ["classic"], dice: "classic", dices: ["classic"] };
     expect(await getPublicProfile(ENV, g.id)).toEqual({ name: "Nadia", avatar: "pawn-green", frame: "classic", level: 1, ...classic });
     expect(await getPublicProfile(ENV, "acc_nosuchaccount234")).toEqual({ name: "Player", avatar: "pawn-red", frame: "classic", level: 1, ...classic });
     expect(await accountForPid(ENV, g.pid)).toEqual({ account_id: g.id, banned: false });

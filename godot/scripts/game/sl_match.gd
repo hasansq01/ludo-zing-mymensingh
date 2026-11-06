@@ -315,6 +315,7 @@ static func done_place(g: Dictionary, k: int) -> int:
 ## Pass & Play: the name pill under the die says whose turn it is (the phone goes round the table).
 func _set_dice_turn(p: Dictionary, can_tap: bool) -> void:
 	var c := int(p.c)
+	_wear_dice_of(p)
 	dice_pad.set_color(c, can_tap)
 	if can_tap and not dice.active and not dice.rolling:
 		dice.show_ready()                     # a neutral pose while waiting, not the last roll's face
@@ -428,9 +429,22 @@ func resume(state: Dictionary) -> void:
 func pawn_skins() -> Array:
 	return skins_of(G.players, ns.seats if online and ns != null else null, Catalog.pawn_in_use())
 
+## The die each player rolls with, the same way (G.players order).
+func dice_skins() -> Array:
+	return skins_of(G.players, ns.seats if online and ns != null else null, Catalog.dice_in_use(), "dice")
+
+## The one die on screen is whoever's turn it is.
+func _wear_dice_of(p: Dictionary) -> void:
+	var ids := dice_skins()
+	var id := ""
+	for k in mini(ids.size(), G.players.size()):
+		if int(G.players[k].c) == int(p.c):
+			id = str(ids[k])
+	dice.wear(id if id != "" else Catalog.FREE_DICE)
+
 ## pawn_skins() as a pure function over the rules' players: `seats` the online seats (null offline), `mine` this
 ## device's skin.
-static func skins_of(players: Array, seats: Variant, mine: String) -> Array:
+static func skins_of(players: Array, seats: Variant, mine: String, field := "pawn") -> Array:
 	var out := []
 	var given := false
 	for p: Dictionary in players:
@@ -438,7 +452,7 @@ static func skins_of(players: Array, seats: Variant, mine: String) -> Array:
 		if seats is Array:
 			for st: Dictionary in seats:
 				if int(st.get("color", -1)) == int(p.c):
-					id = str(st.get("pawn", ""))
+					id = str(st.get(field, ""))
 		elif not given and not bool(p.cpu):
 			id = mine
 			given = true
@@ -557,6 +571,7 @@ func roll(forced := 0) -> void:
 		get_tree().create_timer(dur * Sound.IMPACT_AT).timeout.connect(func():
 			if live(id):
 				Haptics.light())
+	_wear_dice_of(p)
 	await dice.roll(v, sp)
 	dice_pad.rolling = false
 	if not live(id):
@@ -964,6 +979,7 @@ func _net_act(id: int, m: Dictionary) -> void:
 					if live(id):
 						Haptics.light())
 			_set_timer(-1, 0.0, 1.0)              # the roll is in: the next `turn` shows once this act has played
+			_wear_dice_of(p)
 			await dice.roll(v, sp)
 			dice_pad.rolling = false
 			if not live(id):

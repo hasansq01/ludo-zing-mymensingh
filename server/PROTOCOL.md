@@ -36,6 +36,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 - Each client has a random **player id** (`pid`, 16+ chars, generated once and kept on the device) and per-room
   **token** issued by the server in `welcome`. Reconnecting with the token (same room) takes back the same seat.
 - Names are trimmed, 1–16 characters (default "Player"); avatar and frame are catalog ids (strings ≤ 32 chars).
+- **Dice** (`dice`, Catalog.DICE; `""` = Classic): everyone sees each player's die on their turn. The same rule as pawn skins, against `dice_owned`.
 - **Pawn skins** (`pawn`, Catalog.PAWNS: `trim`, `marble`, `crown` ...; `""` = Classic): everyone at the table sees
   each player's skin. The server keeps a hello's `pawn` only when it is a known skin the member's account owns
   (`pawns_owned`); anything else (no account, not owned, unknown, Classic) is sent as `""`. A hello without `pawn`
@@ -50,7 +51,7 @@ a client whose own hash differs asks for a full snapshot (`sync_req`) and replac
 
 | t | fields | when |
 |---|---|---|
-| `hello` | `v: 1, pid, name, avatar, frame, pawn?, token?, session?, pair_ask?, vote?, app?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
+| `hello` | `v: 1, pid, name, avatar, frame, pawn?, dice?, token?, session?, pair_ask?, vote?, app?` | first message on every connection (`pair_ask`: your own "Ask before pairing" from Settings, see below) |
 | `settings` | `teams?: bool, game?: "ludo" \| "sl"` | host, lobby only (friend rooms). A `pair_ask` from older clients is accepted and ignored |
 | `start` | – | host, lobby; needs ≥ 2 members (teams: exactly 4). After `over` it is a `rematch` (older clients' Play again), or the old instant rematch while someone can't vote |
 | `rematch` | – | friend rooms, after `over`: Play again (or Play on the prompt), you say yes; the first one opens the vote (see "Play again") |
@@ -73,7 +74,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | t | fields |
 |---|---|
 | `welcome` | `token, id` (your member id), `code`, `host` (member id) |
-| `lobby` | `code, host, members: [{id, name, avatar, frame, pawn, level, online, color}], settings: {teams, game}, max: 4` |
+| `lobby` | `code, host, members: [{id, name, avatar, frame, pawn, dice, level, online, color}], settings: {teams, game}, max: 4` |
 | `start` | `n: 0, game, seats, state, h` |
 | `act` | `n, a, h` (one action, see below; `n` = its index, `h` = server state hash after applying it) |
 | `sync` | `n, game, seats, state, h` (full snapshot; replaces the client state) |
@@ -85,7 +86,7 @@ A request with a stale `n` is ignored with `error {code: "stale"}` (protects aga
 | `pong` | `now` (only from other ping shapes; the exact `{"t":"ping"}` gets `{"t":"pong"}`, see "Keep-alive") |
 | `rematch` | `by, until, now, players: [{id, name, avatar, frame, vote: "yes" \| "no" \| "wait"}]`, at the close also `result: "go" \| "few"` (+ `ffa: true`); see "Play again" |
 
-`seats`: `[{color, id, name, avatar, frame, pawn, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
+`seats`: `[{color, id, name, avatar, frame, pawn, dice, level, bot: bool, online: bool}]` for the playing colours. `state` is the full
 LudoRules state (JSON) with `players[c]` = `"human"` (a member), `"cpu"` (a bot) or `"off"`, and `names[c]` = the
 member's name. Clients replace their own seat's display name with "You" locally (presentation only; never hashed).
 

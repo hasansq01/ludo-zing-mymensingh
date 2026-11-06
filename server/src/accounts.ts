@@ -474,15 +474,16 @@ export async function accountForPid(env: AccEnv, pid: string): Promise<{ account
 }
 
 /**
- * What other players see (rooms, leaderboards). Unknown accounts get the defaults. `pawn` / `pawns`: the pawn skin in
- * use and the owned ones (Classic first), what a room checks a hello's pawn skin against.
+ * What other players see (rooms, leaderboards). Unknown accounts get the defaults. `pawn` / `pawns`, `dice` / `dices`: the skin in
+ * use and the owned ones, what a room checks a hello's pawn skin and die against.
  */
-export async function getPublicProfile(env: AccEnv, accountId: string): Promise<{ name: string; avatar: string; frame: string; level: number; pawn: string; pawns: string[] }> {
+export async function getPublicProfile(env: AccEnv, accountId: string): Promise<{ name: string; avatar: string; frame: string; level: number; pawn: string; pawns: string[]; dice: string; dices: string[] }> {
   const row = ACCOUNT_RE.test(accountId) ? await getAccount(env.DB, accountId) : null;
-  if (!row) return { name: "Player", avatar: DEFAULT_AVATAR, frame: DEFAULT_FRAME, level: 1, pawn: FREE_PAWN, pawns: [FREE_PAWN] };
+  if (!row) return { name: "Player", avatar: DEFAULT_AVATAR, frame: DEFAULT_FRAME, level: 1, pawn: FREE_PAWN, pawns: [FREE_PAWN], dice: "classic", dices: ["classic"] };
   const p = rowToProfile(row);
   const pawns = (p.pawns_owned as unknown[]).filter((x): x is string => typeof x === "string");
-  return { name: p.name, avatar: equipped("avatar", p), frame: equipped("frame", p), level: levelInfo(Math.max(0, p.xp)).level, pawn: equipped("pawn", p), pawns };
+  const dices = (p.dice_owned as unknown[]).filter((x): x is string => typeof x === "string");
+  return { name: p.name, avatar: equipped("avatar", p), frame: equipped("frame", p), level: levelInfo(Math.max(0, p.xp)).level, pawn: equipped("pawn", p), pawns, dice: String(p.dice ?? "classic"), dices };
 }
 
 /**

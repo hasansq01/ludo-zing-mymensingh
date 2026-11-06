@@ -39,6 +39,9 @@ func _init() -> void:
 	UIKit.fit_text(_double, 13)
 	_double.pressed.connect(_watch)
 	list.add_child(_double)
+	var room := Control.new()                # (the big button's lip clears the scroll's edge)
+	room.custom_minimum_size.y = 6
+	list.add_child(room)
 	if AdFlow.available():
 		flow = AdFlow.new()
 		flow.name = "AdFlow"

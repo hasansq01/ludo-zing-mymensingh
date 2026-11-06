@@ -130,6 +130,10 @@ func _who_wears_what() -> void:
 		LudoMatch.skins_of(["human", "cpu", "cpu", "cpu"], null, "crown") == ["crown", "", "", ""])
 	check("Ludo offline: you on another colour",
 		LudoMatch.skins_of(["cpu", "off", "human", "cpu"], null, "marble") == ["", "", "marble", ""])
+	check("dice: yours on your colour, Classic for the computer", LudoMatch.skins_of(["human", "cpu", "cpu", "cpu"], null, "gold", "dice") == ["gold", "", "", ""])
+	check("dice online: each seat's own", LudoMatch.skins_of(["human", "human", "human", "off"], [{color = 0, dice = "neon"}, {color = 1, dice = ""}, {color = 2, dice = "gold"}], "crema", "dice") == ["neon", "", "gold", ""])
+	check("dice in S&L: by player", SLMatch.skins_of([{c = 0, cpu = false}, {c = 1, cpu = true}], null, "gold", "dice") == ["gold", ""])
+	check("hello: only a die you own is sent", NetClient.dice_of({dice = "gold", dice_owned = ["classic", "gold"]}) == "gold" and NetClient.dice_of({dice = "gold", dice_owned = ["classic"]}) == "" and NetClient.dice_of({dice = "classic", dice_owned = ["classic"]}) == "")
 	check("Ludo Pass & Play: the first player (this device's profile) wears it, the others Classic",
 		LudoMatch.skins_of(["human", "human", "human", "off"], null, "kitty") == ["kitty", "", "", ""])
 	var seats := [{color = 0, pawn = "trim"}, {color = 2, pawn = ""}, {color = 1, pawn = "knight"}]

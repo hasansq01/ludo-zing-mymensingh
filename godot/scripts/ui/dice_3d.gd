@@ -175,6 +175,7 @@ var _pop := 0.0                        # landing pop (1 -> 0)
 var ready_pose := false                ## the die shows the neutral pose (show_ready), not a result
 var _ready_tw: Tween
 var _ready_k := 0.0                    # 0 = face-on, 1 = the neutral pose (eases the size with the turn)
+var _worn := ""                        # the skin on now (wear): turn after turn it is often the same
 var shine := 0.0                       ## a band of light crosses this skin while it waits and when it lands (wear)
 var flash := Color("#ffe9b0")          ## the landing's flash, in the skin's colour (wear)
 var _flash := 0.0                      # landing flash (1 -> 0)
@@ -480,8 +481,9 @@ func set_skin(bg: Color, edge: Color, pip: Color, one: Color) -> void:
 ## Puts dice skin `id` on this die: Catalog's colours and DiceLooks' material. Unknown ids change nothing.
 func wear(id: String) -> void:
 	var d := Catalog.dice(id)
-	if d.is_empty() or mat == null:
+	if d.is_empty() or mat == null or id == _worn:
 		return
+	_worn = id
 	set_skin(d.bg, d.edge, d.pip, d.one)
 	var l := DiceLooks.look(id)
 	var tex := DiceLooks.pattern(str(l.get("pat", "")))
