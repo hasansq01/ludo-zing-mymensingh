@@ -17,6 +17,7 @@ extends RefCounted
 ##       interface always draws at full resolution
 ##   **  0 (no atlas at all) while no light casts positional shadows (TableWorld.SHADOWS is off)
 ##   *** steam, light shafts, sways, particles: callers check Quality.extras()
+## On a native Mali driver the main view never uses MSAA, whatever the tier (main_msaa()); SubViewports keep theirs.
 ##
 ## Others read: Quality.tier(), game_fps(), menu_fps(), extras(), live_previews(), texture_scale(), shadow_atlas_size(), and call
 ## apply_sub(vp) on their own 3D SubViewports (MSAA + atlas per tier). set_tier(t) (Settings) saves the choice and
@@ -71,6 +72,8 @@ static var _file_args: Variant = null    # ARGS_FILE's options (read once)
 static var _tex_used := false            # texture_scale() was read (textures were baked at the launch tier's size)
 ## learn_crash() lowered the cap at this launch: {from, to} (main shows a message once the home screen is up).
 static var lowered := {}
+## Tests: the GPU name main_msaa_now() goes by instead of the real one (debug builds also take `--gpu=<name>`).
+static var gpu_stand_in := ""
 
 
 # ---------- the tier ----------
@@ -236,12 +239,29 @@ static func apply(viewport: Viewport) -> void:
 	var s := settings(t)
 	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR   # the only mode the Compatibility renderer has
 	viewport.scaling_3d_scale = render_scale(t, Vector2(viewport.get_visible_rect().size) if viewport is SubViewport else Vector2(DisplayServer.window_get_size()))
-	viewport.msaa_3d = s.msaa
+	viewport.msaa_3d = main_msaa_now(t) as Viewport.MSAA
 	viewport.anisotropic_filtering_level = s.aniso
 	viewport.positional_shadow_atlas_size = shadow_atlas_size(t)
 	viewport.positional_shadow_atlas_16_bits = bool(s.atlas_16)
 	RenderingServer.positional_soft_shadow_filter_set_quality(int(s.shadow_filter) as RenderingServer.ShadowQuality)
 	RenderingServer.directional_soft_shadow_filter_set_quality(int(s.shadow_filter) as RenderingServer.ShadowQuality)
+
+## The main view's MSAA for tier `t` on GPU `gpu` (GL_RENDERER): the tier's, but off where main_view_msaa_leaks().
+static func main_msaa(t: String, gpu: String) -> int:
+	return Viewport.MSAA_DISABLED if main_view_msaa_leaks(gpu) else int(SETTINGS[t].msaa)
+
+## main_msaa() on this device.
+static func main_msaa_now(t: String) -> int:
+	var gpu := gpu_stand_in if gpu_stand_in != "" else arg("gpu")
+	return main_msaa(t, gpu if gpu != "" else RenderingServer.get_video_adapter_name())
+
+## A native Mali driver (libGLES_mali) leaks native memory and mappings on every frame the main view draws 3D with
+## MSAA, until the app dies after ~20 minutes (Infinix X6886, Mali-G57 r54p1; LeakProbe's report: ~93 MB and ~2,700
+## mappings a minute, 3 MB and 54 mappings with only the main view's MSAA off; SubViewports' MSAA changed nothing, an
+## Adreno 730 stayed flat). ANGLE runs on Vulkan instead, so it isn't that driver.
+static func main_view_msaa_leaks(gpu: String) -> bool:
+	var n := gpu.to_lower()
+	return n.contains("mali") and not n.contains("angle")
 
 ## A 3D SubViewport of the interface (preview, dice, thumbnails): MSAA and anisotropy per tier (no extra scaling:
 ## those are small). shadows = false: no positional atlas (worlds whose lights cast none).

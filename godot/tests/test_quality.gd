@@ -233,6 +233,22 @@ func _settings() -> void:
 	Quality.set_tier("auto")
 	check("set_tier(auto): saved as auto, the detected tier in use", fake.prefs.quality == "auto" and Quality.tier() == Quality.detected())
 	check("apply_subs counts the SubViewports", Quality.apply_subs(root) == 1)
+	# a native Mali driver leaks with MSAA on the main view: off there, whatever the tier; SubViewports keep theirs
+	for g: String in ["Mali-G57 MC2", "Mali-G68 MC4", "Mali-G78 MP14", "Mali-G52"]:
+		for t: String in Quality.TIERS:
+			check("main view MSAA off: %s, %s" % [g, t], Quality.main_msaa(t, g) == Viewport.MSAA_DISABLED)
+	check("main view MSAA stays per tier off Mali", Quality.main_msaa("medium", "Adreno (TM) 730") == Viewport.MSAA_2X \
+		and Quality.main_msaa("high", "Adreno (TM) 730") == Viewport.MSAA_4X and Quality.main_msaa("low", "Adreno (TM) 730") == Viewport.MSAA_DISABLED \
+		and Quality.main_msaa("high", "PowerVR Rogue GE8320") == Viewport.MSAA_4X and Quality.main_msaa("high", "") == Viewport.MSAA_4X)
+	check("a Mali behind ANGLE isn't that driver", Quality.main_msaa("medium", "ANGLE (ARM, Vulkan 1.3.278 (Mali-G52 MC2 (0x74021000)), ...)") == Viewport.MSAA_2X)
+	Quality.gpu_stand_in = "Mali-G57 MC2"
+	Quality.set_tier("high")
+	check("on Mali, set_tier leaves the main view without MSAA and the SubViewports with it", root.msaa_3d == Viewport.MSAA_DISABLED and dice.msaa_3d == Viewport.MSAA_4X, [root.msaa_3d, dice.msaa_3d])
+	Quality.gpu_stand_in = "Adreno (TM) 730"
+	Quality.set_tier("high")
+	check("off Mali, set_tier gives the main view its MSAA back", root.msaa_3d == Viewport.MSAA_4X)
+	Quality.gpu_stand_in = ""
+	Quality.set_tier("auto")
 	# the Settings row (reads the stand-in save; a pick goes through set_tier)
 	fake.prefs.quality = "medium"
 	Quality.force("")
