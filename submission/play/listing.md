@@ -24,16 +24,16 @@ TWO CLASSIC GAMES
 A CAFE FOR EVERY MOOD
 - Play in several cafe rooms and Snakes & Ladders scenes, from a cozy cafe to a jungle clearing and a frosty wonderland.
 - Switch between the 3D view and a Top View of the board.
-- Choose your dice style, avatar, frame, nameplate and badge to make the table yours.
+- Choose your dice, pawns, avatar, frame, nameplate and badge to make the table yours.
 
 EMOTES
-Cheer, laugh, tease or show off with quick emotes during a match, offline or online.
+Cheer, laugh, tease or show off during a match with animated stickers, character emotes and text emotes, including phrases in Bangla, offline or online.
 
 DAILY REWARDS
-Come back every day for a daily reward calendar, a free spin and free coins. Level up as you play and unlock more tables and items.
+Come back every day for a daily reward calendar, daily missions, a free Lucky Draw spin and free coins. Level up as you play and unlock more tables and items.
 
 COINS AND GEMS
-Coins and gems are virtual items for use inside the game, for example to enter coin tables and to unlock dice, rooms, scenes, avatars and emote packs. They have no real-world value and cannot be cashed out or exchanged for money or prizes. Ludo Zing is a game for fun only. Some items can be bought with gems, and gems can optionally be bought in the game. The game may show optional rewarded videos in exchange for in-game extras.
+Coins and gems are virtual items for use inside the game, for example to enter coin tables and to unlock dice, pawns, rooms, scenes, avatars and emote packs. They have no real-world value and cannot be cashed out or exchanged for money or prizes. Ludo Zing is a game for fun only. Some items can be bought with gems, and gems can optionally be bought in the game. The game may show optional rewarded videos in exchange for in-game extras.
 
 FRIENDLY AND FAIR
 Online games are refereed by our server, so every roll and every move follows the rules. If a friend drops out, a computer player can keep the seat warm until they are back.
