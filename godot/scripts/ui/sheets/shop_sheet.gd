@@ -368,15 +368,22 @@ static func _price(kind: String, id: String) -> int:
 		"emotes": return int(Catalog.emote_pack(id).get("price", 0))
 		"text": return int(Catalog.text_pack(id).get("price", 0))
 		"char": return int(Collection.character(id).get("price", 0))
+		"frame": return Collection.frame_price(id)
 	return 0
 
-## The gem price: ceil(coins / 100) (Catalog.gem_price), or a gem-only pawn skin's own; 0 when not sold.
+## The gem price: ceil(coins / 100) (Catalog.gem_price), or a gem-only pawn skin's or frame's own; 0 when not sold.
 static func _gems(kind: String, id: String) -> int:
-	return Catalog.pawn_gems(id) if kind == "pawn" else Catalog.gem_price(_price(kind, id))
+	match kind:
+		"pawn": return Catalog.pawn_gems(id)
+		"frame": return Collection.frame_gems(id)
+	return Catalog.gem_price(_price(kind, id))
 
-## Sold for gems only (a premium pawn skin): no coin price, the card's Buy pays gems.
+## Sold for gems only (a premium pawn skin or frame): no coin price, the card's Buy pays gems.
 static func _gems_only(kind: String, id: String) -> bool:
-	return kind == "pawn" and Catalog.pawn_gems_only(id)
+	match kind:
+		"pawn": return Catalog.pawn_gems_only(id)
+		"frame": return Collection.frame_gems_only(id)
+	return false
 
 ## The name in sentences: "Royal Gold dice", "Marble pawns", "Pastel Dream Room".
 static func _title(kind: String, name_: String) -> String:
@@ -573,7 +580,7 @@ func _art(kind: String, id: String) -> Control:
 		"avatar", "char":
 			c.add_child(Collection.make_avatar_of(id, Collection.equipped("frame"), 62))
 		"frame":
-			c.add_child(Collection.make_avatar_of(Collection.equipped("avatar"), id, 62))
+			c.add_child(Collection.make_avatar_of(Collection.equipped("avatar"), id, 60))
 		"plate":
 			c.add_child(Collection.make_plate(_player_name(), id, "", 15, true, 112.0))
 		"badge":
@@ -817,6 +824,7 @@ static func _purchase(kind: String, id: String, currency := "coins") -> String:
 		"emotes": return Catalog.buy_emotes(id)
 		"text": return Catalog.buy_text(id)
 		"char": return Collection.buy_char(id, true)
+		"frame": return Collection.buy_frame(id)
 	return L10n.t("That isn’t for sale.")
 
 ## "<Item> is yours!" ("are" for dice).

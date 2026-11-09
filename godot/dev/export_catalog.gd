@@ -62,7 +62,11 @@ static func build() -> Dictionary:
 	for a: Dictionary in Collection.AVATARS:
 		items.append(_item("avatar", a, false, not a.has("unlock"), a.id == Collection.DEFAULT_AVATAR))
 	for fr: Dictionary in Collection.FRAMES:
-		items.append(_item("frame", fr, false, not fr.has("unlock"), fr.id == Collection.DEFAULT_FRAME))
+		var sold := int(fr.get("price", 0)) > 0 or int(fr.get("gems", 0)) > 0
+		var fi := _item("frame", fr, int(fr.get("price", 0)) > 0, not fr.has("unlock") and not sold, fr.id == Collection.DEFAULT_FRAME)
+		if Collection.frame_gems_only(fr.id):
+			fi["gems"] = Collection.frame_gems(fr.id)
+		items.append(fi)
 	for pl: Dictionary in Collection.PLATES:
 		items.append(_item("plate", pl, false, not pl.has("unlock"), pl.id == Collection.DEFAULT_PLATE))
 	for b: String in Collection.BADGES:

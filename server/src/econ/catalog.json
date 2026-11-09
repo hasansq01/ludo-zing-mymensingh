@@ -459,16 +459,6 @@
     },
     {
       "kind": "scene",
-      "id": "trail",
-      "name": "Snake Trail",
-      "price": 0,
-      "buy": false,
-      "free": true,
-      "default": false,
-      "unlock": null
-    },
-    {
-      "kind": "scene",
       "id": "frost",
       "name": "Frosty Wonderland",
       "price": 20000,
@@ -957,6 +947,17 @@
     },
     {
       "kind": "frame",
+      "id": "silver",
+      "name": "Silver",
+      "price": 1500,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 15
+    },
+    {
+      "kind": "frame",
       "id": "gold",
       "name": "Gold",
       "price": 0,
@@ -970,7 +971,7 @@
     {
       "kind": "frame",
       "id": "mint",
-      "name": "Mint",
+      "name": "Emerald",
       "price": 0,
       "buy": false,
       "free": false,
@@ -982,7 +983,7 @@
     {
       "kind": "frame",
       "id": "royal",
-      "name": "Royal",
+      "name": "Royal Crown",
       "price": 0,
       "buy": false,
       "free": false,
@@ -990,6 +991,72 @@
       "unlock": {
         "ach": "coins"
       }
+    },
+    {
+      "kind": "frame",
+      "id": "rose",
+      "name": "Rose Hearts",
+      "price": 4000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 40
+    },
+    {
+      "kind": "frame",
+      "id": "ludo",
+      "name": "Ludo Champ",
+      "price": 6000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 60
+    },
+    {
+      "kind": "frame",
+      "id": "ice",
+      "name": "Frost",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 80
+    },
+    {
+      "kind": "frame",
+      "id": "rickshaw",
+      "name": "Rickshaw Art",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 100
+    },
+    {
+      "kind": "frame",
+      "id": "wings",
+      "name": "Angel Wings",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 120
+    },
+    {
+      "kind": "frame",
+      "id": "diamond",
+      "name": "Diamond",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 150
     },
     {
       "kind": "plate",

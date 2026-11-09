@@ -96,7 +96,8 @@ msgid "Glitter"
 msgstr "ঝিকিমিকি"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:15
+#. collection.gd
+#: scripts/core/catalog.gd:15 scripts/core/collection.gd:96
 msgid "Royal Crown"
 msgstr "রাজমুকুট"
 
@@ -161,7 +162,8 @@ msgid "Rickshaw"
 msgstr "রিকশা"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:16
+#. collection.gd
+#: scripts/core/catalog.gd:16 scripts/core/collection.gd:95
 msgid "Emerald"
 msgstr "পান্না"
 
@@ -276,8 +278,9 @@ msgstr "এই রুম শপে নেই।"
 #. catalog.gd buy_emotes()
 #. catalog.gd buy_text()
 #. collection.gd buy_char()
+#. collection.gd buy_frame()
 #. sl_scenes.gd buy_scene()
-#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:273 scripts/world/sl_scenes.gd:305
+#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:291 scripts/core/collection.gd:310 scripts/world/sl_scenes.gd:305
 msgid "You already own %s."
 msgstr "%s তোমার আগে থেকেই আছে।"
 
@@ -563,109 +566,134 @@ msgid "Crown"
 msgstr "মুকুট"
 
 #. collection.gd
-#: scripts/core/collection.gd:87
+#: scripts/core/collection.gd:92
 msgid "Wood"
 msgstr "কাঠ"
 
 #. collection.gd
-#: scripts/core/collection.gd:88
+#: scripts/core/collection.gd:93
+msgid "Silver"
+msgstr "রুপালি"
+
+#. collection.gd
+#: scripts/core/collection.gd:94
 msgid "Gold"
 msgstr "গোল্ড"
 
 #. collection.gd
-#: scripts/core/collection.gd:89
-msgid "Mint"
-msgstr "মিন্ট"
+#: scripts/core/collection.gd:97
+msgid "Rose Hearts"
+msgstr "গোলাপি হার্ট"
 
 #. collection.gd
-#: scripts/core/collection.gd:90
-msgid "Royal"
-msgstr "রয়্যাল"
+#: scripts/core/collection.gd:98
+msgid "Ludo Champ"
+msgstr "লুডু চ্যাম্প"
 
 #. collection.gd
-#: scripts/core/collection.gd:94
+#: scripts/core/collection.gd:99
+msgid "Frost"
+msgstr "তুষার"
+
+#. collection.gd
+#: scripts/core/collection.gd:100
+msgid "Rickshaw Art"
+msgstr "রিকশা আর্ট"
+
+#. collection.gd
+#: scripts/core/collection.gd:101
+msgid "Angel Wings"
+msgstr "পরীর ডানা"
+
+#. collection.gd
+#: scripts/core/collection.gd:102
+msgid "Diamond"
+msgstr "হীরা"
+
+#. collection.gd
+#: scripts/core/collection.gd:110
 msgid "Plain"
 msgstr "সাধারণ"
 
 # same in Bangla: plate / dice name
 #. collection.gd
 #. rewards.gd
-#: scripts/core/collection.gd:95 scripts/core/rewards.gd:28
+#: scripts/core/collection.gd:111 scripts/core/rewards.gd:28
 msgid "Espresso"
 msgstr "এসপ্রেসো"
 
 #. collection.gd
-#: scripts/core/collection.gd:96
+#: scripts/core/collection.gd:112
 msgid "Ruby"
 msgstr "রুবি"
 
 #. collection.gd
-#: scripts/core/collection.gd:102
+#: scripts/core/collection.gd:118
 msgid "First Victory"
 msgstr "প্রথম জয়"
 
 #. collection.gd
-#: scripts/core/collection.gd:102
+#: scripts/core/collection.gd:118
 msgid "Win a game against the computer."
 msgstr "কম্পিউটারের সাথে একটা খেলা জেতো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:103
+#: scripts/core/collection.gd:119
 msgid "Winning Streak"
 msgstr "জয়ের স্ট্রিক"
 
 #. collection.gd
-#: scripts/core/collection.gd:103
+#: scripts/core/collection.gd:119
 msgid "Win 3 games in a row."
 msgstr "পরপর 3টা খেলা জেতো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:104
+#: scripts/core/collection.gd:120
 msgid "Experienced Player"
 msgstr "অভিজ্ঞ প্লেয়ার"
 
 #. collection.gd
-#: scripts/core/collection.gd:104
+#: scripts/core/collection.gd:120
 msgid "Finish 25 games."
 msgstr "25টা খেলা শেষ করো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:105
+#: scripts/core/collection.gd:121
 msgid "Master of Pairs"
 msgstr "জোড়ার ওস্তাদ"
 
 #. collection.gd
-#: scripts/core/collection.gd:105
+#: scripts/core/collection.gd:121
 msgid "Form 10 pairs."
 msgstr "10টা জোড়া বাঁধো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:106
+#: scripts/core/collection.gd:122
 msgid "Multiplayer Champion"
 msgstr "মাল্টিপ্লেয়ার চ্যাম্পিয়ন"
 
 #. collection.gd
-#: scripts/core/collection.gd:106
+#: scripts/core/collection.gd:122
 msgid "Finish 5 Pass & Play games."
 msgstr "এক ফোনে 5টা খেলা শেষ করো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:107
+#: scripts/core/collection.gd:123
 msgid "Coin Collector"
 msgstr "কয়েন কালেক্টর"
 
 #. collection.gd
-#: scripts/core/collection.gd:107
+#: scripts/core/collection.gd:123
 msgid "Earn 10,000 coins in total."
 msgstr "মোট 10,000 কয়েন জমাও।"
 
 #. collection.gd item()
-#: scripts/core/collection.gd:161
+#: scripts/core/collection.gd:177
 msgid "No badge"
 msgstr "ব্যাজ নেই"
 
 #. collection.gd unlock_text()
-#: scripts/core/collection.gd:225 scripts/core/collection.gd:234
+#: scripts/core/collection.gd:241 scripts/core/collection.gd:252
 msgid "Earn “%s”"
 msgstr "“%s” অর্জন করো"
 
@@ -676,25 +704,41 @@ msgstr "“%s” অর্জন করো"
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
 #. welcome_sheet.gd row_note()
-#: scripts/core/collection.gd:228 scripts/core/rewards.gd:139 scripts/main.gd:897 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:247 scripts/ui/sheets/spin_sheet.gd:211 scripts/ui/sheets/welcome_sheet.gd:65
+#: scripts/core/collection.gd:244 scripts/core/rewards.gd:139 scripts/main.gd:897 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:247 scripts/ui/sheets/spin_sheet.gd:211 scripts/ui/sheets/welcome_sheet.gd:65
 msgid "%s coins"
 msgstr "%s কয়েন"
 
 #. collection.gd unlock_text()
+#. store_sheet.gd _pack_row()
+#: scripts/core/collection.gd:246 scripts/ui/sheets/store_sheet.gd:136
+msgid "%s gems"
+msgstr "%s জেম"
+
+#. collection.gd unlock_text()
 #. shop_sheet.gd _unlock_note()
-#: scripts/core/collection.gd:233 scripts/ui/sheets/shop_sheet.gd:393
+#: scripts/core/collection.gd:251 scripts/ui/sheets/shop_sheet.gd:400
 msgid "Reach level %d"
 msgstr "%d লেভেলে পৌঁছাও"
 
 #. collection.gd buy_char()
-#: scripts/core/collection.gd:268
+#: scripts/core/collection.gd:286
 msgid "That character isn’t in the collection."
 msgstr "এই ক্যারেক্টার কালেকশনে নেই।"
 
 #. collection.gd buy_char()
-#: scripts/core/collection.gd:271
+#: scripts/core/collection.gd:289
 msgid "%s is free to use."
 msgstr "%s ফ্রি, এখনই লাগাও।"
+
+#. collection.gd buy_frame()
+#: scripts/core/collection.gd:308
+msgid "That frame isn’t in the collection."
+msgstr "এই ফ্রেম কালেকশনে নেই।"
+
+#. collection.gd buy_frame()
+#: scripts/core/collection.gd:314
+msgid "%s is sold for gems only."
+msgstr "%s শুধু জেম দিয়ে কেনা যায়।"
 
 # REVIEW: "Need 2.5K" -> "2.5K লাগবে"
 #. Numbers and times · fmt.gd shortfall()
@@ -986,7 +1030,7 @@ msgstr "ক্রেমা"
 #. rewards.gd grant_label()
 #. daily_sheet.gd _draw()
 #. shop_sheet.gd _title()
-#: scripts/core/rewards.gd:141 scripts/ui/sheets/daily_sheet.gd:520 scripts/ui/sheets/shop_sheet.gd:385
+#: scripts/core/rewards.gd:141 scripts/ui/sheets/daily_sheet.gd:520 scripts/ui/sheets/shop_sheet.gd:392
 msgid "%s dice"
 msgstr "%s ডাইস"
 
@@ -2300,7 +2344,7 @@ msgstr "হ্যাঁ"
 #. invite_banner.gd _init()
 #. friends_sheet.gd _invite_text()
 #. shop_sheet.gd buy_with_gems()
-#: scripts/net/notifications.gd:352 scripts/ui/components/invite_banner.gd:77 scripts/ui/sheets/friends_sheet.gd:388 scripts/ui/sheets/shop_sheet.gd:847
+#: scripts/net/notifications.gd:352 scripts/ui/components/invite_banner.gd:77 scripts/ui/sheets/friends_sheet.gd:388 scripts/ui/sheets/shop_sheet.gd:855
 msgid "Not now"
 msgstr "এখন না"
 
@@ -3566,7 +3610,7 @@ msgstr "ঘুম পাচ্ছে"
 #. preview_sheet.gd _on_act()
 #. shop_sheet.gd buy_with_coins()
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/emote_pack_sheet.gd:49 scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/item_sheet.gd:56 scripts/ui/sheets/pawn_sheet.gd:52 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:261 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:783 scripts/ui/sheets/shop_sheet.gd:857
+#: scripts/ui/sheets/emote_pack_sheet.gd:49 scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/item_sheet.gd:67 scripts/ui/sheets/pawn_sheet.gd:52 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:261 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:790 scripts/ui/sheets/shop_sheet.gd:865
 msgid "Buy"
 msgstr "কিনো"
 
@@ -3575,7 +3619,7 @@ msgstr "কিনো"
 #. pawn_sheet.gd _init()
 #. preview_sheet.gd _build_panel()
 #. shop_sheet.gd _card()
-#: scripts/ui/sheets/emote_pack_sheet.gd:55 scripts/ui/sheets/item_sheet.gd:62 scripts/ui/sheets/pawn_sheet.gd:58 scripts/ui/sheets/preview_sheet.gd:267 scripts/ui/sheets/shop_sheet.gd:447
+#: scripts/ui/sheets/emote_pack_sheet.gd:55 scripts/ui/sheets/item_sheet.gd:73 scripts/ui/sheets/pawn_sheet.gd:58 scripts/ui/sheets/preview_sheet.gd:267 scripts/ui/sheets/shop_sheet.gd:454
 msgid "Use"
 msgstr "লাগাও"
 
@@ -3589,7 +3633,7 @@ msgstr "%s চালু আছে"
 #. pawn_sheet.gd _on_act()
 #. preview_sheet.gd _on_act()
 #. shop_sheet.gd buy_with_coins()
-#: scripts/ui/sheets/emote_pack_sheet.gd:156 scripts/ui/sheets/pawn_sheet.gd:151 scripts/ui/sheets/preview_sheet.gd:386 scripts/ui/sheets/shop_sheet.gd:772
+#: scripts/ui/sheets/emote_pack_sheet.gd:156 scripts/ui/sheets/pawn_sheet.gd:151 scripts/ui/sheets/preview_sheet.gd:386 scripts/ui/sheets/shop_sheet.gd:779
 msgid "Need %s more coins"
 msgstr "আরও %s কয়েন লাগবে"
 
@@ -3598,7 +3642,7 @@ msgstr "আরও %s কয়েন লাগবে"
 #. preview_sheet.gd _on_act()
 #. shop_sheet.gd buy_with_coins()
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:783 scripts/ui/sheets/shop_sheet.gd:857
+#: scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:790 scripts/ui/sheets/shop_sheet.gd:865
 msgid "Buy %s?"
 msgstr "%s কিনবে?"
 
@@ -3606,14 +3650,14 @@ msgstr "%s কিনবে?"
 #. pawn_sheet.gd _on_act()
 #. preview_sheet.gd _on_act()
 #. shop_sheet.gd buy_with_coins()
-#: scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:783
+#: scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:790
 msgid "%s coins. You’ll have %s left."
 msgstr "%s কয়েন। তোমার থাকবে %s।"
 
 #. emote_pack_sheet.gd _on_act()
 #. preview_sheet.gd _on_act()
 #. shop_sheet.gd _yours()
-#: scripts/ui/sheets/emote_pack_sheet.gd:186 scripts/ui/sheets/preview_sheet.gd:397 scripts/ui/sheets/shop_sheet.gd:824
+#: scripts/ui/sheets/emote_pack_sheet.gd:186 scripts/ui/sheets/preview_sheet.gd:397 scripts/ui/sheets/shop_sheet.gd:832
 msgid "%s is yours!"
 msgstr "%s এখন তোমার!"
 
@@ -3956,12 +4000,17 @@ msgid "Computer skill (Easy, Normal, Hard) only changes how it moves."
 msgstr "কম্পিউটারের লেভেল (সহজ, মাঝারি, কঠিন) শুধু ওর চাল বদলায়।"
 
 #. item_sheet.gd _init()
-#: scripts/ui/sheets/item_sheet.gd:49
+#: scripts/ui/sheets/item_sheet.gd:58
 msgid "Dice · Ludo and Snakes & Ladders"
 msgstr "ডাইস · লুডু আর সাপ-সিঁড়ি"
 
 #. item_sheet.gd _init()
-#: scripts/ui/sheets/item_sheet.gd:49
+#: scripts/ui/sheets/item_sheet.gd:58
+msgid "Frame · round your picture in every game"
+msgstr "ফ্রেম · সব খেলায় তোমার ছবির চারপাশে"
+
+#. item_sheet.gd _init()
+#: scripts/ui/sheets/item_sheet.gd:58
 msgid "Character · your picture in every game"
 msgstr "চরিত্র · সব খেলায় তোমার ছবি"
 
@@ -4252,7 +4301,7 @@ msgstr "%s গুটি চালু আছে"
 
 #. pawn_sheet.gd _on_act()
 #. shop_sheet.gd _yours()
-#: scripts/ui/sheets/pawn_sheet.gd:176 scripts/ui/sheets/shop_sheet.gd:824
+#: scripts/ui/sheets/pawn_sheet.gd:176 scripts/ui/sheets/shop_sheet.gd:832
 msgid "%s are yours!"
 msgstr "%s এখন তোমার!"
 
@@ -5098,7 +5147,7 @@ msgstr "ব্যাজ"
 
 #. shop_sheet.gd _balance_button()
 #. shop_sheet.gd make_earn()
-#: scripts/ui/sheets/shop_sheet.gd:259 scripts/ui/sheets/shop_sheet.gd:978
+#: scripts/ui/sheets/shop_sheet.gd:259 scripts/ui/sheets/shop_sheet.gd:986
 msgid "Get coins"
 msgstr "কয়েন নাও"
 
@@ -5113,82 +5162,82 @@ msgid "More characters"
 msgstr "আরও ক্যারেক্টার"
 
 #. shop_sheet.gd _title()
-#: scripts/ui/sheets/shop_sheet.gd:384
+#: scripts/ui/sheets/shop_sheet.gd:391
 msgid "%s pawns"
 msgstr "%s গুটি"
 
 #. shop_sheet.gd gem_option()
-#: scripts/ui/sheets/shop_sheet.gd:534
+#: scripts/ui/sheets/shop_sheet.gd:541
 msgid "or"
 msgstr "অথবা"
 
 #. shop_sheet.gd _emote_art()
-#: scripts/ui/sheets/shop_sheet.gd:626
+#: scripts/ui/sheets/shop_sheet.gd:633
 msgid "Premium"
 msgstr "প্রিমিয়াম"
 
 #. shop_sheet.gd _view_button()
-#: scripts/ui/sheets/shop_sheet.gd:666
+#: scripts/ui/sheets/shop_sheet.gd:673
 msgid "View"
 msgstr "দেখো"
 
 #. shop_sheet.gd in_use_pill()
-#: scripts/ui/sheets/shop_sheet.gd:704
+#: scripts/ui/sheets/shop_sheet.gd:711
 msgid "In use"
 msgstr "চালু আছে"
 
 # Under the Owned filter: "3 more in the shop · Show all"
 #. shop_sheet.gd _more_row()
-#: scripts/ui/sheets/shop_sheet.gd:725
+#: scripts/ui/sheets/shop_sheet.gd:732
 msgid "%d more in the shop"
 msgstr "শপে আরও %dটা"
 
 #. shop_sheet.gd _more_row()
 #. shop_sheet.gd _empty()
-#: scripts/ui/sheets/shop_sheet.gd:727 scripts/ui/sheets/shop_sheet.gd:748
+#: scripts/ui/sheets/shop_sheet.gd:734 scripts/ui/sheets/shop_sheet.gd:755
 msgid "Open shop"
 msgstr "শপ খোলো"
 
 #. shop_sheet.gd _more_row()
 #. shop_sheet.gd _empty()
-#: scripts/ui/sheets/shop_sheet.gd:727 scripts/ui/sheets/shop_sheet.gd:748
+#: scripts/ui/sheets/shop_sheet.gd:734 scripts/ui/sheets/shop_sheet.gd:755
 msgid "Show all"
 msgstr "সব দেখাও"
 
 #. shop_sheet.gd _empty()
-#: scripts/ui/sheets/shop_sheet.gd:747
+#: scripts/ui/sheets/shop_sheet.gd:754
 msgid "You don’t own any of these yet."
 msgstr "এগুলোর কোনোটাই এখনো তোমার নেই।"
 
 #. shop_sheet.gd _purchase()
-#: scripts/ui/sheets/shop_sheet.gd:820
+#: scripts/ui/sheets/shop_sheet.gd:828
 msgid "That isn’t for sale."
 msgstr "এটা বিক্রির জন্য নয়।"
 
 #. shop_sheet.gd gems_need_text()
 #. store_sheet.gd _on_swap()
-#: scripts/ui/sheets/shop_sheet.gd:828 scripts/ui/sheets/store_sheet.gd:233 scripts/ui/sheets/store_sheet.gd:256
+#: scripts/ui/sheets/shop_sheet.gd:836 scripts/ui/sheets/store_sheet.gd:233 scripts/ui/sheets/store_sheet.gd:256
 msgid "Not enough gems — you need %s more."
 msgstr "জেম কম পড়েছে - আরও %s লাগবে।"
 
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/shop_sheet.gd:847
+#: scripts/ui/sheets/shop_sheet.gd:855
 msgid "Not enough gems"
 msgstr "জেম কম পড়েছে"
 
 # REVIEW: placeholders kept in code order (needed, item name, owned)
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/shop_sheet.gd:847
+#: scripts/ui/sheets/shop_sheet.gd:855
 msgid "You need %s more gems for %s. You have %s."
 msgstr "আরও %s জেম লাগবে, %s-এর জন্য। তোমার আছে %s।"
 
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/shop_sheet.gd:847
+#: scripts/ui/sheets/shop_sheet.gd:855
 msgid "Open Store"
 msgstr "স্টোর খোলো"
 
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/shop_sheet.gd:857
+#: scripts/ui/sheets/shop_sheet.gd:865
 msgid "%s gems. You’ll have %s left."
 msgstr "%s জেম। তোমার থাকবে %s।"
 
@@ -5238,11 +5287,6 @@ msgstr "আরও %d"
 #: scripts/ui/sheets/store_sheet.gd:100
 msgid "Gem packs are available in the Android app."
 msgstr "জেম প্যাক শুধু অ্যান্ড্রয়েড অ্যাপে পাওয়া যায়।"
-
-#. store_sheet.gd _pack_row()
-#: scripts/ui/sheets/store_sheet.gd:136
-msgid "%s gems"
-msgstr "%s জেম"
 
 #. store_sheet.gd _pending_card()
 #: scripts/ui/sheets/store_sheet.gd:171
@@ -5456,6 +5500,15 @@ msgstr "সাপ"
 #: scripts/world/sl_scenes.gd:1222
 msgid "& LADDERS"
 msgstr "সিঁড়ি"
+
+#~ msgid "Golden Wings"
+#~ msgstr "সোনালি ডানা"
+
+#~ msgid "Mint"
+#~ msgstr "মিন্ট"
+
+#~ msgid "Royal"
+#~ msgstr "রয়্যাল"
 
 #~ msgid "All"
 #~ msgstr "সব"

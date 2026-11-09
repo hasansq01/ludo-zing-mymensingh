@@ -1,6 +1,7 @@
 class_name ItemSheet
 extends Sheet
-## The Shop's buy screen for what has no live preview of its own: dice (a large die) and characters (a large portrait).
+## The Shop's buy screen for what has no live preview of its own: dice (a large die), characters (a large portrait) and
+## frames (your picture in the frame, large, under a spotlight).
 ## The item's name on the ribbon, its art, and one action, like PawnSheet: Buy with the price, "Need 2.5K", Use, or the
 ## "In use" pill, with the Shop's "or [gem] N" line under a price. Buy goes through the Shop's flow (server wallet,
 ## confirm, put in use).
@@ -11,6 +12,8 @@ signal store_requested                   ## "Open Store" after "not enough gems"
 
 const MAX_W := 360.0
 const ART_H := 190.0
+const FRAME_ART_H := 236.0                ## a frame's crest and tassels need the room
+const FRAME_AVA := 150.0
 
 var kind := ""
 var item_id := ""
@@ -20,13 +23,17 @@ var _need: Button
 var _use: Button
 var _on_pill: PanelContainer
 var _gem: Button
+var _gems_only := false                  ## a premium frame: Buy pays gems (no coin price, no "or gems" line)
 var _busy := false
 
 
 func _init(kind_ := "dice", id := "classic") -> void:
 	kind = kind_
 	item_id = id
-	_name = str(Catalog.dice(id).get("name", id)) if kind == "dice" else str(Collection.character(id).get("name", id))
+	match kind:
+		"dice": _name = str(Catalog.dice(id).get("name", id))
+		"frame": _name = str(Collection.frame(id).get("name", id))
+		_: _name = str(Collection.character(id).get("name", id))
 	super(L10n.t(_name), MAX_W, true, LOOK_PM)
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	var well := PanelContainer.new()
@@ -37,23 +44,27 @@ func _init(kind_ := "dice", id := "classic") -> void:
 	var ws := UIKit.box(cat.lerp(Color.WHITE, 0.72), UIKit.R.lg)
 	UIKit.pad(ws, 0)
 	well.add_theme_stylebox_override("panel", ws)
-	well.custom_minimum_size = Vector2(0, ART_H)
+	well.custom_minimum_size = Vector2(0, FRAME_ART_H if kind == "frame" else ART_H)
+	if kind == "frame":
+		well.add_child(_spotlight())
 	var c := CenterContainer.new()
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	well.add_child(c)
-	if kind == "dice":
-		c.add_child(Thumbnailer.dice_art(id, 170))
-	else:
-		c.add_child(Collection.make_avatar_of(id, Collection.equipped("frame"), 136))
+	match kind:
+		"dice": c.add_child(Thumbnailer.dice_art(id, 170))
+		"frame": c.add_child(Collection.make_avatar_of(Collection.equipped("avatar"), id, FRAME_AVA))
+		_: c.add_child(Collection.make_avatar_of(id, Collection.equipped("frame"), 136))
 	body.add_child(well)
-	var what := UIKit.caption(tr("Dice · Ludo and Snakes & Ladders") if kind == "dice" else tr("Character · your picture in every game"))
+	var what := UIKit.caption({dice = tr("Dice · Ludo and Snakes & Ladders"), frame = tr("Frame · round your picture in every game")}.get(kind, tr("Character · your picture in every game")))
 	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(what)
 	var slot := MarginContainer.new()
 	slot.custom_minimum_size.y = UIKit.TAP + 4
 	slot.add_theme_constant_override("margin_top", UIKit.SPACE.xs)
 	var price := ShopSheet._price(kind, id)
-	_buy = UIKit.button_with(tr("Buy"), CoinAmount.new(price, "md", "plain"), "gold", "md")
+	_gems_only = ShopSheet._gems_only(kind, id)
+	var tag: Control = CoinAmount.gems(ShopSheet._gems(kind, id), "md", "plain") if _gems_only else CoinAmount.new(price, "md", "plain")
+	_buy = UIKit.button_with(tr("Buy"), tag, "gold", "md")
 	_buy.name = "Buy"
 	var row := _buy.get_node("Content") as HBoxContainer
 	row.move_child(row.get_child(0), -1)
@@ -62,7 +73,7 @@ func _init(kind_ := "dice", id := "classic") -> void:
 	_use = UIKit.btn(tr("Use"), "teal", "md")
 	_use.name = "Use"
 	for b: Button in [_buy, _need, _use]:
-		b.pressed.connect(_on_act)
+		b.pressed.connect(_on_gems if b == _buy and _gems_only else _on_act)
 		slot.add_child(b)
 	_on_pill = ShopSheet.in_use_pill()
 	_on_pill.custom_minimum_size.y = UIKit.H.md
@@ -86,7 +97,7 @@ func refresh() -> void:
 		return
 	var own := ShopSheet._owned(kind, item_id)
 	var on := own and ShopSheet._in_use(kind, item_id)
-	var short := ShopSheet._price(kind, item_id) - Catalog.coins()
+	var short := 0 if _gems_only else ShopSheet._price(kind, item_id) - Catalog.coins()
 	_buy.visible = not own and short <= 0
 	_need.visible = not own and short > 0
 	_need.text = Fmt.shortfall(short)
@@ -135,3 +146,22 @@ func _on_act() -> void:
 	if ok:
 		changed.emit()
 	refresh()
+
+
+## Behind a frame: a warm spotlight on dark wood, so gold, gems and chrome read the way they were lit.
+func _spotlight() -> TextureRect:
+	var g := GradientTexture2D.new()
+	g.width = 128; g.height = 128
+	g.fill = GradientTexture2D.FILL_RADIAL
+	g.fill_from = Vector2(0.5, 0.42); g.fill_to = Vector2(1.05, 1.0)
+	g.gradient = Gradient.new()
+	g.gradient.set_color(0, Color("#7a4a2c"))
+	g.gradient.set_color(1, Color("#2a160d"))
+	var t := TextureRect.new()
+	t.name = "Spotlight"
+	t.texture = g
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_SCALE
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return t

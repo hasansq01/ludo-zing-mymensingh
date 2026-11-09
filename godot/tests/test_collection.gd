@@ -65,7 +65,18 @@ func _run() -> void:
 	check("the expressions vary", moods.size() >= 6, moods.keys())
 	check("a new avatar is found, free, unlocked and can't be sold", Collection.avatar("w-maya").name == "Rupa" and Collection.is_character("w-maya") and Collection.is_unlocked("char", "w-maya", {coins = 0}) and Collection.buy_char("w-maya").contains("free"))
 	check("avatars match the web", _ids(Collection.AVATARS) == ["pawn-red", "pawn-green", "pawn-yellow", "pawn-blue", "latte", "dice", "robot", "crown"])
-	check("frames match the web", _ids(Collection.FRAMES) == ["classic", "gold", "mint", "royal"] and Collection.FRAMES.map(func(f): return f.name) == ["Wood", "Gold", "Mint", "Royal"])
+	check("frames: the set, in shop order", _ids(Collection.FRAMES) == ["classic", "silver", "gold", "mint", "royal", "rose", "ludo", "ice", "rickshaw", "wings", "diamond"])
+	var art_ok := true
+	var one_way := true
+	for f: Dictionary in Collection.FRAMES:
+		art_ok = art_ok and Collection.FrameArt.texture(f.id) != null
+		var ways := int(f.has("unlock")) + int(int(f.get("price", 0)) > 0) + int(int(f.get("gems", 0)) > 0)
+		one_way = one_way and (ways == 1 or (f.id == Collection.DEFAULT_FRAME and ways == 0))
+		one_way = one_way and (f.sparks as Array).size() <= 8
+	check("every frame has its rendered art (assets/frames/<id>.webp)", art_ok)
+	check("every frame is free (Wood), earned, sold for coins or sold for gems: one way only; at most 8 twinkles", one_way)
+	check("frame prices: coins also in gems, gem-only frames their own", [Collection.frame_price("rose"), Collection.frame_gems("rose"), Collection.frame_gems_only("rose"),
+		Collection.frame_price("wings"), Collection.frame_gems("wings"), Collection.frame_gems_only("wings"), Collection.frame_gems("gold")] == [4000, 40, false, 0, 120, true, 0])
 	check("plates match the web", _ids(Collection.PLATES) == ["plain", "espresso", "ruby"])
 	check("achievements match the web", _ids(Collection.ACH) == ["first", "streak", "veteran", "pairs", "party", "coins"]
 		and Collection.ACH.map(func(a): return a.reward) == [200, 300, 500, 300, 300, 500]
@@ -94,15 +105,29 @@ func _run() -> void:
 	p.stats.bestStreak = 3
 	check("Winning Streak unlocks Robot and the Ruby plate", Collection.is_unlocked("avatar", "robot") and Collection.is_unlocked("plate", "ruby"))
 	p.stats.pairsFormed = 9
-	check("9 pairs: Mint still locked", not Collection.is_unlocked("frame", "mint"))
+	check("9 pairs: Emerald still locked", not Collection.is_unlocked("frame", "mint"))
 	p.stats.pairsFormed = 10
-	check("10 pairs unlock Mint", Collection.is_unlocked("frame", "mint"))
+	check("10 pairs unlock Emerald", Collection.is_unlocked("frame", "mint"))
 	p.stats.played = 25; p.stats.coinsEarned = 10000
 	check("Espresso plate and Royal frame from their achievements", Collection.is_unlocked("plate", "espresso") and Collection.is_unlocked("frame", "royal"))
 	check("unlock texts", [Collection.unlock_text("avatar", "crown"), Collection.unlock_text("frame", "royal"), Collection.unlock_text("char", "ch-rafi"), Collection.unlock_text("avatar", "latte"), Collection.unlock_text("badge", "pairs")]
 		== ["Reach level 5", "Earn “Coin Collector”", "10K coins", "", "Earn “Master of Pairs”"],
 		[Collection.unlock_text("avatar", "crown"), Collection.unlock_text("frame", "royal"), Collection.unlock_text("char", "ch-rafi"), Collection.unlock_text("avatar", "latte"), Collection.unlock_text("badge", "pairs")])
 	check("stats as JSON floats still count", Collection.ach_done("first", {stats = {wins = 1.0}}))
+
+	# ---- buying frames ----
+	p = use(fresh(5000))
+	check("a sold frame is locked until bought", not Collection.is_unlocked("frame", "rose") and not Collection.is_unlocked("frame", "wings"))
+	err = Collection.buy_frame("rose")
+	check("buy a frame: paid once, owned and put in use", err == "" and p.coins == 1000 and p.av_owned == ["rose"] and p.frame == "rose" and Collection.equipped("frame") == "rose", [err, p])
+	check("buy a frame twice: refused", Collection.buy_frame("rose") == "You already own Rose Hearts." and p.coins == 1000)
+	check("not enough coins for a frame", Collection.buy_frame("ludo") == "Not enough coins — you need 5,000 more." and p.av_owned == ["rose"], Collection.buy_frame("ludo"))
+	check("gem-only frames can't be bought with coins", Collection.buy_frame("wings") == "Angel Wings is sold for gems only.")
+	check("earned frames say how to earn them", Collection.buy_frame("gold") == "Reach level 5", Collection.buy_frame("gold"))
+	check("Wood is everyone's, unknown frames aren't sold", Collection.buy_frame("classic") == "You already own Wood." and Collection.buy_frame("neon") == "That frame isn’t in the collection.")
+	p.av_owned = ["rose", "wings"]
+	check("a bought gem-only frame is owned and can be used", Collection.is_unlocked("frame", "wings") and Collection.equip("frame", "wings") and p.frame == "wings")
+	check("unlock text of a gem-only frame", Collection.unlock_text("frame", "diamond") == "150 gems", Collection.unlock_text("frame", "diamond"))
 
 	# ---- buying characters ----
 	p = use(fresh(12000))

@@ -284,14 +284,15 @@ function collectionItem(kind: string, id: string) {
 }
 
 /**
- * Collection.is_unlocked: a paid character once bought; otherwise free, or its level / achievement reached.
+ * Collection.is_unlocked: a paid character or frame once bought (profile.av_owned); otherwise free, or its level /
+ * achievement reached.
  * Badges: "" (none) or a done achievement. Unknown ids and other kinds: false.
  */
 export function isUnlocked(kind: string, id: string, p: Dict): boolean {
   if (kind === "badge") return id === "" || achDone(id, p);
   const it = collectionItem(kind, id);
   if (!it) return false;
-  if (it.price > 0) return list(p, "av_owned").includes(id);
+  if (it.price > 0 || (it.gems ?? 0) > 0) return list(p, "av_owned").includes(id);   // bought: characters, frames
   const u = it.unlock;
   if (!u) return true;
   if (u.level !== undefined) return levelOf(p) >= u.level;

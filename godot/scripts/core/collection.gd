@@ -6,8 +6,8 @@ extends RefCounted
 ##     and, once bought, are listed in profile.av_owned.
 ##   More characters: 12 free portraits with a wide range of looks (WORLD; they are characters too, kind "char").
 ##   Avatars: the four pawns and Latte are free; Lucky Dice / Robot unlock with an achievement, Crown at level 5.
-##   Frames (the ring around the avatar), Nameplates (behind the name) and Badges (an earned achievement's medal
-##     beside the name) unlock by level or achievement.
+##   Frames (3D-rendered art round the avatar, assets/frames) are free, sold for coins or gems, or earned; Nameplates
+##     (behind the name) and Badges (an earned achievement's medal beside the name) unlock by level or achievement.
 ##   Achievements: a stat reaching a goal; each pays its coins once (profile.claimed).
 ## Pure logic over a profile Dictionary plus the drawing helpers the rest of the app uses for the player's look:
 ##   avatar_texture(id)   the square avatar tile (gradient + art, rounded corners) as a texture
@@ -81,14 +81,30 @@ const AVATARS := [
 	{id = "crown", name = "Crown", art = "royal", a1 = "#ebdfff", a2 = "#ac8df2", body = "#8a5cf0", deep = "#5a30b8", unlock = {level = 5}},
 ]
 
-## Frames: the rings around the avatar tile (index.html .avatar.f-*: box-shadow rings + glow).
-## inner / outer ring colours and widths (px at a 60 px avatar), glow colour and blur.
+## Frames: 3D-rendered art around the avatar tile (tools/frames/frames.blend.py -> assets/frames/<id>.webp). The art is
+## a FRAME_CANVAS-times-wider square centred on the tile, so crests, wings and tassels break out of it.
+## For sale: `price` (coins; also ceil(price / 100) gems) or `gems` alone (gems only, like the premium pawn skins);
+## `unlock` = earned by level or achievement; neither = free. Once bought a frame is listed in profile.av_owned.
+## The look in motion (AvatarView's shader): `shine` = how bright the light sweep over the metal is (0 = none);
+## `sparks` = where stones twinkle, in the render's units (the tile is -1..1, y up).
+## l10n-keys: name
 const FRAMES := [
-	{id = "classic", name = "Wood", inner = "#ffffff", outer = "#e0a868", iw = 2.0, ow = 2.0, glow = "", blur = 0.0},
-	{id = "gold", name = "Gold", unlock = {level = 5}, inner = "#fff3a0", outer = "#e0a100", iw = 2.0, ow = 3.0, glow = "#f2b632", ga = 0.6, blur = 16.0},
-	{id = "mint", name = "Mint", unlock = {ach = "pairs"}, inner = "#e9fff1", outer = "#2fa86b", iw = 2.0, ow = 3.0, glow = "#2fa86b", ga = 0.5, blur = 14.0},
-	{id = "royal", name = "Royal", unlock = {ach = "coins"}, inner = "#ffffff", outer = "#7c4dff", iw = 2.0, ow = 3.0, glow = "#7c4dff", ga = 0.55, blur = 16.0},
+	{id = "classic", name = "Wood", shine = 0.0, sparks = []},
+	{id = "silver", name = "Silver", price = 1500, shine = 0.45, sparks = [[0.93, 0.93], [-0.93, -0.93], [0.0, 1.24]]},
+	{id = "gold", name = "Gold", unlock = {level = 5}, shine = 0.55, sparks = [[0.93, 0.93], [-0.93, 0.93], [0.93, -0.93], [-0.93, -0.93], [0.0, 1.26]]},
+	{id = "mint", name = "Emerald", unlock = {ach = "pairs"}, shine = 0.5, sparks = [[0.93, 0.93], [-0.93, -0.93], [0.0, 1.34], [-0.93, 0.93]]},
+	{id = "royal", name = "Royal Crown", unlock = {ach = "coins"}, shine = 0.5, sparks = [[0.0, 1.19], [0.93, 0.93], [-0.93, -0.93], [0.93, -0.93]]},
+	{id = "rose", name = "Rose Hearts", price = 4000, shine = 0.45, sparks = [[0.0, 1.31], [0.95, 0.95], [-0.95, -0.95]]},
+	{id = "ludo", name = "Ludo Champ", price = 6000, shine = 0.35, sparks = [[0.0, 1.24]]},
+	{id = "ice", name = "Frost", gems = 80, shine = 0.5, sparks = [[0.95, 0.95], [-0.95, 0.95], [0.95, -0.95], [-0.95, -0.95], [0.0, 1.5]]},
+	{id = "rickshaw", name = "Rickshaw Art", gems = 100, shine = 0.4, sparks = [[0.0, 1.22], [0.93, 0.93], [-0.93, -0.93]]},
+	{id = "wings", name = "Angel Wings", gems = 120, shine = 0.6, sparks = [[0.0, 1.28], [0.93, 0.93], [-0.93, 0.93], [0.93, -0.93], [-0.93, -0.93]]},
+	{id = "diamond", name = "Diamond", gems = 150, shine = 0.6, sparks = [[0.0, 1.46], [0.3, 1.36], [-0.3, 1.36], [0.0, -1.24], [1.1, 0.0], [-1.1, 0.0], [0.6, -1.1], [-0.6, 1.1]]},
 ]
+## The frame art spans FRAME_CANVAS tile half-widths each way (the render's canvas, tools/frames/frames.blend.py).
+const FRAME_CANVAS := 1.75
+## The tile's share of an AvatarView's square: the frame's band then just reaches the edge; crests spill past it.
+const FRAME_TILE := 0.8
 ## Nameplates (index.html .n-*): vertical gradient, 1 px inner rim, text colour. Plain has no plate.
 const PLATES := [
 	{id = "plain", name = "Plain", text = "#4a2b3d"},
@@ -210,7 +226,7 @@ static func is_unlocked(kind: String, id: String, p: Dictionary = {}) -> bool:
 	var it := item(kind, id)
 	if it.is_empty():
 		return false
-	if int(it.get("price", 0)) > 0:
+	if int(it.get("price", 0)) > 0 or int(it.get("gems", 0)) > 0:
 		return _list(_p(p), "av_owned").has(id)
 	var u: Dictionary = it.get("unlock", {})
 	if u.is_empty():
@@ -226,6 +242,8 @@ static func unlock_text(kind: String, id: String) -> String:
 	var it := item(kind, id)
 	if int(it.get("price", 0)) > 0:
 		return L10n.t("%s coins") % Fmt.coins(int(it.price))
+	if int(it.get("gems", 0)) > 0:
+		return L10n.t("%s gems") % Fmt.coins_full(int(it.gems))
 	var u: Dictionary = it.get("unlock", {})
 	if u.is_empty():
 		return ""
@@ -281,6 +299,40 @@ static func buy_char(id: String, equip_it := false) -> String:
 		if equip_it:
 			p.avatar = id)
 	return "" if ok else L10n.t(SAVE_FAILED)
+
+## Buys a frame for coins and puts it in use (the local rules; with an Account the server sells, ShopSheet._purchase).
+## Gem-only frames can't be bought here (gems live on the server). "" when bought, else the reason to show.
+static func buy_frame(id: String) -> String:
+	var f := frame(id)
+	if f.is_empty():
+		return L10n.t("That frame isn’t in the collection.")
+	if is_unlocked("frame", id):
+		return L10n.t("You already own %s.") % L10n.t(str(f.name))
+	var price := int(f.get("price", 0))
+	if price <= 0:
+		# sold for gems only, or earned (level / achievement): say how
+		return L10n.t("%s is sold for gems only.") % L10n.t(str(f.name)) if int(f.get("gems", 0)) > 0 else unlock_text("frame", id)
+	if coins() < price:
+		return Catalog.need_text(price - coins())
+	var ok := _commit(func(p: Dictionary) -> void:
+		p.coins = int(p.get("coins", 0)) - price
+		var owned := _list(p, "av_owned")
+		owned.append(id)
+		p.av_owned = owned
+		p.frame = id)
+	return "" if ok else L10n.t(SAVE_FAILED)
+
+## A frame's coin price (0 = not sold for coins) and gem price (its own for a gems-only frame, else ceil(price / 100)).
+static func frame_price(id: String) -> int:
+	return int(frame(id).get("price", 0))
+
+static func frame_gems(id: String) -> int:
+	var f := frame(id)
+	return int(f.gems) if f.has("gems") else Catalog.gem_price(int(f.get("price", 0)))
+
+static func frame_gems_only(id: String) -> bool:
+	var f := frame(id)
+	return int(f.get("gems", 0)) > 0 and int(f.get("price", 0)) <= 0
 
 ## Puts an unlocked item in use (kind "avatar" | "char" | "frame" | "plate" | "badge"; badge "" = no badge).
 ## False when it is locked or unknown (or the save failed); true when it is in use now.
@@ -832,19 +884,25 @@ void fragment() {
 		(ch as CanvasItem).use_parent_material = true
 
 
-## The avatar tile in its frame. Draws: glow, outer ring, inner ring, the tile texture.
+## The avatar tile in its frame: the tile (FRAME_TILE of the square, centred), then the frame's art over it (a child
+## with the shine / twinkle shader, so the metal moves on the GPU with no redraws). Crests and wings spill outside.
 class AvatarView extends Control:
 	var avatar_id := Collection.DEFAULT_AVATAR
 	var frame_id := Collection.DEFAULT_FRAME
 	var _src := {}           # {} = the live profile
+	var _art: FrameArt
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		resized.connect(queue_redraw)
+		resized.connect(_fit)
+		_art = FrameArt.new()
+		add_child(_art)
 
 	func set_look(id: String, f: String) -> void:
 		avatar_id = id if not Collection.avatar(id).is_empty() else Collection.DEFAULT_AVATAR
 		frame_id = f if not Collection.frame(f).is_empty() else Collection.DEFAULT_FRAME
+		_art.set_frame(frame_id)
+		_fit()
 		queue_redraw()
 
 	func use_profile(p: Dictionary) -> void:
@@ -855,37 +913,99 @@ class AvatarView extends Control:
 	func refresh() -> void:
 		set_look(Collection.equipped("avatar", _src), Collection.equipped("frame", _src))
 
-	## Ring widths scale with the avatar a little (the web uses fixed px; tiny chips get thinner rings).
-	func ring_k() -> float:
-		return clampf(minf(size.x, size.y) / 60.0, 0.6, 1.4)
+	## The avatar tile's rect (the frame's art is FRAME_CANVAS times as wide, on the same centre).
+	func tile_rect() -> Rect2:
+		var side := minf(size.x, size.y) * Collection.FRAME_TILE
+		return Rect2((size - Vector2(side, side)) / 2.0, Vector2(side, side))
+
+	func _fit() -> void:
+		var t := tile_rect()
+		var w := t.size.x * Collection.FRAME_CANVAS
+		_art.position = t.get_center() - Vector2(w, w) / 2.0
+		_art.size = Vector2(w, w)
 
 	func _draw() -> void:
-		var side := minf(size.x, size.y)
-		if side <= 0:
+		var t := tile_rect()
+		if t.size.x <= 0:
 			return
-		var f := Collection.frame(frame_id)
-		var k := ring_k()
-		var iw: float = f.iw * k
-		var ow: float = f.ow * k
-		var origin := (size - Vector2(side, side)) / 2.0
-		var tile := Rect2(origin + Vector2(iw + ow, iw + ow), Vector2.ONE * (side - 2.0 * (iw + ow)))
-		var r := tile.size.x * 0.28
-		var outer := StyleBoxFlat.new()
-		outer.bg_color = Color(f.outer)
-		outer.set_corner_radius_all(int(round(r + iw + ow)))
-		outer.corner_detail = 12
-		outer.anti_aliasing = true
-		if float(f.blur) > 0.0:
-			outer.shadow_color = Color(Color(f.glow), float(f.ga) * 0.55)
-			outer.shadow_size = int(round(float(f.blur) * 0.4 * k))
-		draw_style_box(outer, tile.grow(iw + ow))
-		var inner := StyleBoxFlat.new()
-		inner.bg_color = Color(f.inner)
-		inner.set_corner_radius_all(int(round(r + iw)))
-		inner.corner_detail = 12
-		inner.anti_aliasing = true
-		draw_style_box(inner, tile.grow(iw))
-		draw_texture_rect(Collection.avatar_texture(avatar_id), tile, false)
+		draw_texture_rect(Collection.avatar_texture(avatar_id), t, false)
+
+
+## A frame's rendered art with its motion: a light sweep over the metal every few seconds and twinkles on its stones
+## (FRAMES.shine / .sparks). The tile under it belongs to AvatarView.
+class FrameArt extends Control:
+	static var _shader: Shader
+	static var _tex := {}
+	var _mat: ShaderMaterial
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		resized.connect(queue_redraw)
+
+	static func texture(id: String) -> Texture2D:
+		if not _tex.has(id):
+			var path := "res://assets/frames/%s.webp" % id
+			_tex[id] = load(path) if ResourceLoader.exists(path) else null
+		return _tex[id]
+
+	func set_frame(id: String) -> void:
+		var f := Collection.frame(id)
+		var shine := float(f.get("shine", 0.0))
+		var sparks: Array = f.get("sparks", [])
+		if shine <= 0.0 and sparks.is_empty():
+			_mat = null
+			material = null
+		else:
+			if _shader == null:
+				_shader = Shader.new()
+				_shader.code = SHADER
+			_mat = ShaderMaterial.new()
+			_mat.shader = _shader
+			var c := Collection.FRAME_CANVAS
+			var pts := PackedVector2Array()
+			for sp: Array in sparks.slice(0, 8):
+				pts.append(Vector2((float(sp[0]) + c) / (2.0 * c), (c - float(sp[1])) / (2.0 * c)))
+			while pts.size() < 8:
+				pts.append(Vector2(-9, -9))
+			_mat.set_shader_parameter("shine", shine)
+			_mat.set_shader_parameter("pts", pts)
+			_mat.set_shader_parameter("n_pts", mini(sparks.size(), 8))
+			_mat.set_shader_parameter("phase", float(hash(id) % 1000) / 1000.0)   # frames on one screen don't sweep in step
+			material = _mat
+		set_meta("frame", id)
+		queue_redraw()
+
+	func _draw() -> void:
+		var t := texture(str(get_meta("frame", Collection.DEFAULT_FRAME)))
+		if t:
+			draw_texture_rect(t, Rect2(Vector2.ZERO, size), false)
+
+	const SHADER := """shader_type canvas_item;
+uniform float shine = 0.5;
+uniform float phase = 0.0;
+uniform int n_pts = 0;
+uniform vec2 pts[8];
+// A diagonal band of light crosses the frame in 0.9 s every 4.5 s; each stone flashes a four-point star in turn.
+void fragment() {
+	vec4 c = COLOR;
+	float t = fract(TIME / 4.5 + phase) * 5.0;
+	float d = (UV.x + UV.y) * 0.5 - (t * 1.6 - 0.3);
+	float band = exp(-d * d * 900.0) * step(t, 1.0);
+	c.rgb += band * shine * c.a * vec3(1.0, 0.96, 0.85);
+	float s = 0.0;
+	for (int i = 0; i < 8; i++) {
+		if (i >= n_pts) { break; }
+		vec2 p = UV - pts[i];
+		float tw = pow(max(0.0, sin(TIME * 1.7 + float(i) * 2.39 + phase * 6.28)), 12.0);
+		float r = length(p);
+		float star = 0.0022 / (abs(p.x * p.y) * 40.0 + 0.0022) * exp(-r * r * 2200.0);
+		s += (star * 0.8 + exp(-r * r * 9000.0)) * tw;
+	}
+	c.rgb += vec3(s);
+	c.a = max(c.a, clamp(s, 0.0, 1.0));
+	COLOR = c;
+}"""
 
 
 ## A medal: the medal_<id>.svg art (or, without it, the plain disc with its mark in Lilita One).

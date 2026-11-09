@@ -42,7 +42,8 @@ function ownedIds(v: unknown, kind: "room" | "dice" | "pawn" | "emotes" | "text"
   }
   for (const x of v) {
     const it = typeof x === "string" ? item(kind, x) : undefined;
-    // characters: paid ones only; pawn skins: only the coin ones (the gem-only skins were never sold offline)
+    // characters: paid ones only (av_owned also keeps coin frames, below); pawn skins: only the coin ones (the gem-only
+    // skins were never sold offline)
     if (!it || (kind === "char" && it.price <= 0) || (kind === "pawn" && !it.buy && it.id !== FREE_PAWN)) {
       notes.push(`${field}: dropped ${JSON.stringify(x)}`);
       continue;
@@ -96,7 +97,12 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   p.text_packs = [FREE_TEXT, ...txt.filter((e) => e !== FREE_TEXT)];
   const scenes = ownedIds(raw.scenes, "scene", "scenes", notes);
   p.scenes = [DEFAULT_SCENE, ...scenes.filter((s) => s !== DEFAULT_SCENE)];
-  p.av_owned = ownedIds(raw.av_owned, "char", "av_owned", notes);
+  // av_owned: paid characters and the frames sold for coins (gem-only frames were never sold offline)
+  const frames = isArray(raw.av_owned)
+    ? raw.av_owned.filter((x): x is string => typeof x === "string" && (item("frame", x)?.price ?? 0) > 0)
+    : [];
+  const chars = ownedIds(isArray(raw.av_owned) ? raw.av_owned.filter((x) => !frames.includes(x as string)) : raw.av_owned, "char", "av_owned", notes);
+  p.av_owned = [...chars, ...frames.filter((f, i) => frames.indexOf(f) === i)];
 
   // achievements: claimed only when they exist and are done by the imported stats
   const claimed: string[] = [];

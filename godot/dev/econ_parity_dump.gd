@@ -190,7 +190,7 @@ func rand_raw() -> Dictionary:
 		raw.text_packs = subset(text_ids(), 0.35)
 	if chance(0.6):
 		raw.text_pack = pick(text_ids() + ["bogus"])
-	raw.av_owned = subset(char_ids(), 0.2)
+	raw.av_owned = subset(char_ids(), 0.2) + subset(["silver", "rose", "ludo", "ice", "rickshaw", "wings", "diamond"], 0.25)
 	raw.avatar = pick(avatar_ids() + char_ids())
 	raw.frame = pick(frame_ids())
 	raw.plate = pick(plate_ids())
@@ -289,13 +289,15 @@ func buy_code(err: String) -> String:
 		return "coins"
 	if err.ends_with("is sold for gems only."):
 		return "gems_only"
+	if err.begins_with("Reach level") or err.begins_with("Earn “"):
+		return "locked"
 	return "?"
 
 func buy_cases() -> Array:
 	var out := []
 	var kinds := {room = room_ids() + ["nope"], emotes = emote_ids() + ["nope"], text = text_ids() + ["nope"], dice = dice_ids() + ["nope"], scene = scene_ids() + ["nope"],
-		char = char_ids() + ["pawn-red", "nope"], pawn = pawn_ids() + ["nope"]}
-	for k in 480:
+		char = char_ids() + ["pawn-red", "nope"], pawn = pawn_ids() + ["nope"], frame = frame_ids() + ["nope"]}
+	for k in 560:
 		var p := rand_profile()
 		var kind: String = pick(kinds.keys())
 		var id: String = pick(kinds[kind])
@@ -313,6 +315,7 @@ func buy_cases() -> Array:
 			"text": err = Catalog.buy_text(id)
 			"scene": err = SLScenes.buy_scene(id)
 			"char": err = Collection.buy_char(id, true)
+			"frame": err = Collection.buy_frame(id)
 		var code := buy_code(err)
 		check(code != "?", "unmapped buy message %s" % err)
 		out.append({p = before, kind = kind, id = id, err = err, code = code, out = copy(p)})

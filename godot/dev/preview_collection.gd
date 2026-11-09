@@ -68,7 +68,7 @@ func _ready() -> void:
 		for f: Dictionary in Collection.FRAMES:
 			var row := UIKit.hbox(14)
 			for sz in [36, 44, 56, 78]:
-				row.add_child(Collection.make_avatar_of(["ch-fahim", "robot", "ch-ayesha", "pawn-blue"][Collection.FRAMES.find(f)], f.id, sz))
+				row.add_child(Collection.make_avatar_of(["ch-fahim", "robot", "ch-ayesha", "pawn-blue"][Collection.FRAMES.find(f) % 4], f.id, sz))
 			var t := TextureRect.new()
 			t.texture = Collection.art_texture("ch-lamia", 128)
 			t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
