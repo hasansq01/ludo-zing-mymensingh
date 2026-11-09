@@ -88,11 +88,17 @@ func run() -> void:
 
 	# ---- LevelBadge ----
 	var lb := LevelBadge.new(2, "md")
-	check("level: size preset", lb.px == 36.0 and lb.custom_minimum_size == Vector2(36, 36))
+	check("level: size preset is the pill's height", lb.px == 26.0 and lb.bsize.y == 26.0 and lb.custom_minimum_size == lb.bsize)
+	var w1 := lb.bsize.x
 	lb.set_level(12)
-	check("level: set_level", lb.level == 12 and lb.number_size() >= UIKit.FS.small)
-	var tiny := LevelBadge.new(150, 24)
-	check("level: digits never under 12 px", tiny.number_size() >= UIKit.FS.small, tiny.number_size())
+	var w2 := lb.bsize.x
+	lb.set_level(128)
+	check("level: the pill widens with the digits", lb.level == 128 and w1 < w2 and w2 < lb.bsize.x, [w1, w2, lb.bsize.x])
+	check("level: wider than tall, room for the prefix", lb.bsize.x > lb.bsize.y * 1.6)
+	var tiny := LevelBadge.new(150, "xs")
+	check("level: digits readable on the smallest pill", tiny.number_size() >= 11, tiny.number_size())
+	tiny.place_under(40.0, 4.0)
+	check("level: placed centred under an avatar", is_equal_approx(tiny.position.x + tiny.bsize.x / 2.0, 20.0) or absf(tiny.position.x + tiny.bsize.x / 2.0 - 20.0) <= 0.5)
 	var meter := Meter.new("night", 12)
 	var row := LevelBadge.row(lb, meter)
 	check("level: row overlaps the meter", row.get_theme_constant("separation") < 0 and meter.inset_left > 0.0)

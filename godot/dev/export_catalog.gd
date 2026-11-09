@@ -68,7 +68,11 @@ static func build() -> Dictionary:
 			fi["gems"] = Collection.frame_gems(fr.id)
 		items.append(fi)
 	for pl: Dictionary in Collection.PLATES:
-		items.append(_item("plate", pl, false, not pl.has("unlock"), pl.id == Collection.DEFAULT_PLATE))
+		var psold := int(pl.get("price", 0)) > 0 or int(pl.get("gems", 0)) > 0
+		var pi := _item("plate", pl, int(pl.get("price", 0)) > 0, not pl.has("unlock") and not psold, pl.id == Collection.DEFAULT_PLATE)
+		if Collection.look_gems_only("plate", pl.id):
+			pi["gems"] = Collection.look_gems("plate", pl.id)
+		items.append(pi)
 	for b: String in Collection.BADGES:
 		var it := Collection.item("badge", b)
 		items.append({kind = "badge", id = b, name = str(it.get("name", b)), price = 0, buy = false, free = b == "",

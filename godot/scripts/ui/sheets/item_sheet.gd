@@ -33,6 +33,7 @@ func _init(kind_ := "dice", id := "classic") -> void:
 	match kind:
 		"dice": _name = str(Catalog.dice(id).get("name", id))
 		"frame": _name = str(Collection.frame(id).get("name", id))
+		"plate": _name = str(Collection.plate(id).get("name", id))
 		_: _name = str(Collection.character(id).get("name", id))
 	super(L10n.t(_name), MAX_W, true, LOOK_PM)
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
@@ -44,8 +45,8 @@ func _init(kind_ := "dice", id := "classic") -> void:
 	var ws := UIKit.box(cat.lerp(Color.WHITE, 0.72), UIKit.R.lg)
 	UIKit.pad(ws, 0)
 	well.add_theme_stylebox_override("panel", ws)
-	well.custom_minimum_size = Vector2(0, FRAME_ART_H if kind == "frame" else ART_H)
-	if kind == "frame":
+	well.custom_minimum_size = Vector2(0, FRAME_ART_H if kind == "frame" else (150.0 if kind == "plate" else ART_H))
+	if kind in ["frame", "plate"]:
 		well.add_child(_spotlight())
 	var c := CenterContainer.new()
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -53,9 +54,10 @@ func _init(kind_ := "dice", id := "classic") -> void:
 	match kind:
 		"dice": c.add_child(Thumbnailer.dice_art(id, 170))
 		"frame": c.add_child(Collection.make_avatar_of(Collection.equipped("avatar"), id, FRAME_AVA))
+		"plate": c.add_child(Collection.make_plate(str(Collection.profile().get("name", "You")), id, "", 30, true, 220.0))
 		_: c.add_child(Collection.make_avatar_of(id, Collection.equipped("frame"), 136))
 	body.add_child(well)
-	var what := UIKit.caption({dice = tr("Dice · Ludo and Snakes & Ladders"), frame = tr("Frame · round your picture in every game")}.get(kind, tr("Character · your picture in every game")))
+	var what := UIKit.caption({dice = tr("Dice · Ludo and Snakes & Ladders"), frame = tr("Frame · round your picture in every game"), plate = tr("Nameplate · under your name in every game")}.get(kind, tr("Character · your picture in every game")))
 	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(what)
 	var slot := MarginContainer.new()

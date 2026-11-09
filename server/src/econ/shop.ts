@@ -34,7 +34,8 @@ const LEGACY_EMOTE_PRICES: Readonly<Record<string, number>> = { pawns: 2500, fri
  *   gems     not enough gems (currency "gems": the item's gem price is paid from profile.gems)
  *   gems_only  currency "coins" for a pawn skin or frame sold for gems only (no coin price: nothing is ever free by mistake)
  *   locked   an unlock-only item (avatar, frame, plate, badge) that isn't unlocked yet; when it is, "owned"
- * Frames with a price or gems (Collection.FRAMES) are sold like characters: listed in av_owned and put in use.
+ * Frames and nameplates with a price or gems (Collection.FRAMES / PLATES) are sold like characters: listed in av_owned
+ * and put in use.
  */
 export function buy(profile: Profile, kind: string, id: string, currency: "coins" | "gems" = "coins", oldClient = false): BuyResult {
   switch (kind) {
@@ -107,24 +108,25 @@ export function buy(profile: Profile, kind: string, id: string, currency: "coins
         p.avatar = id;
       });
     }
-    case "frame": {
-      const it = item("frame", id);
+    case "frame":
+    case "plate": {
+      const it = item(kind, id);
       if (!it) return { ok: false, error: "unknown" };
       if (it.price > 0 || (it.gems ?? 0) > 0) {
-        // a frame the Shop sells (Collection.FRAMES price / gems): bought once, listed in av_owned, put in use
-        if (isUnlocked("frame", id, profile)) return { ok: false, error: "owned" };
+        // a frame / nameplate the Shop sells (Collection.FRAMES / PLATES price / gems): bought once, listed in
+        // av_owned, put in use
+        if (isUnlocked(kind, id, profile)) return { ok: false, error: "owned" };
         if (currency === "coins" && it.price <= 0) return { ok: false, error: "gems_only" };
         return pay(profile, kind, id, it, currency, (p) => {
           const owned = list(p, "av_owned");
           owned.push(id);
           p.av_owned = owned;
-          p.frame = id;
+          p[kind] = id;
         });
       }
       return { ok: false, error: isUnlocked(kind, id, profile) ? "owned" : "locked" };
     }
     case "avatar":
-    case "plate":
     case "badge": {
       const exists = kind === "badge" ? id === "" || item("badge", id) !== undefined : item(kind, id) !== undefined;
       if (!exists) return { ok: false, error: "unknown" };

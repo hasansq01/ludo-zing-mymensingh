@@ -105,11 +105,20 @@ const FRAMES := [
 const FRAME_CANVAS := 1.75
 ## The tile's share of an AvatarView's square: the frame's band then just reaches the edge; crests spill past it.
 const FRAME_TILE := 0.8
-## Nameplates (index.html .n-*): vertical gradient, 1 px inner rim, text colour. Plain has no plate.
+## Nameplates: 3D-rendered plates behind the name (assets/ui3d/plate_<id>.webp, tools/frames/ui_art.blend.py), drawn
+## in three slices so they stretch to any name. Plain has no plate. Sold, earned or free like the frames (price / gems /
+## unlock; bought ones listed in profile.av_owned, so plate ids never repeat a frame's or a character's). `text` is the
+## name's colour on the plate.
+## l10n-keys: name
 const PLATES := [
 	{id = "plain", name = "Plain", text = "#4a2b3d"},
-	{id = "espresso", name = "Espresso", unlock = {ach = "veteran"}, top = "#4a2c1a", bottom = "#2a170c", rim = "#8a5530", rim_a = 1.0, text = "#f7a928"},
-	{id = "ruby", name = "Ruby", unlock = {ach = "streak"}, top = "#ff6b6b", bottom = "#b51d22", rim = "#ffffff", rim_a = 0.5, text = "#ffffff"},
+	{id = "espresso", name = "Espresso", unlock = {ach = "veteran"}, text = "#ffd27a"},
+	{id = "ruby", name = "Ruby", unlock = {ach = "streak"}, text = "#ffffff"},
+	{id = "scroll", name = "Gold Scroll", price = 3000, text = "#4a2212"},
+	{id = "velvet", name = "Royal Velvet", price = 5000, text = "#ffffff"},
+	{id = "paint", name = "Rickshaw Paint", gems = 60, text = "#ffffff"},
+	{id = "neon", name = "Neon", gems = 80, text = "#c9fdff"},
+	{id = "crystal", name = "Diamond Plate", gems = 120, text = "#ffffff"},
 ]
 ## Achievements: a stat reaching a goal pays `reward` coins once. Its medal (badge) is assets/ui/medal_<id>.svg: the
 ## ribbons, a gold-rimmed disc in `color` and an emblem (trophy, flame, star, a pawn pair, two pawns, coins); `mark`
@@ -131,6 +140,7 @@ static var profile_source: Variant = null
 static var writer: Callable
 
 static var _tex := {}
+static var _medals := {}
 static var _gray: Shader
 
 
@@ -300,18 +310,18 @@ static func buy_char(id: String, equip_it := false) -> String:
 			p.avatar = id)
 	return "" if ok else L10n.t(SAVE_FAILED)
 
-## Buys a frame for coins and puts it in use (the local rules; with an Account the server sells, ShopSheet._purchase).
-## Gem-only frames can't be bought here (gems live on the server). "" when bought, else the reason to show.
-static func buy_frame(id: String) -> String:
-	var f := frame(id)
+## Buys a frame or nameplate for coins and puts it in use (the local rules; with an Account the server sells,
+## ShopSheet._purchase). Gem-only ones can't be bought here (gems live on the server). "" when bought, else the reason.
+static func buy_look(kind: String, id: String) -> String:
+	var f := item(kind, id) if kind in ["frame", "plate"] else {}
 	if f.is_empty():
-		return L10n.t("That frame isn’t in the collection.")
-	if is_unlocked("frame", id):
+		return L10n.t("That frame isn’t in the collection.") if kind == "frame" else L10n.t("That nameplate isn’t in the collection.")
+	if is_unlocked(kind, id):
 		return L10n.t("You already own %s.") % L10n.t(str(f.name))
 	var price := int(f.get("price", 0))
 	if price <= 0:
 		# sold for gems only, or earned (level / achievement): say how
-		return L10n.t("%s is sold for gems only.") % L10n.t(str(f.name)) if int(f.get("gems", 0)) > 0 else unlock_text("frame", id)
+		return L10n.t("%s is sold for gems only.") % L10n.t(str(f.name)) if int(f.get("gems", 0)) > 0 else unlock_text(kind, id)
 	if coins() < price:
 		return Catalog.need_text(price - coins())
 	var ok := _commit(func(p: Dictionary) -> void:
@@ -319,20 +329,37 @@ static func buy_frame(id: String) -> String:
 		var owned := _list(p, "av_owned")
 		owned.append(id)
 		p.av_owned = owned
-		p.frame = id)
+		p[kind] = id)
 	return "" if ok else L10n.t(SAVE_FAILED)
+
+static func buy_frame(id: String) -> String:
+	return buy_look("frame", id)
+
+static func buy_plate(id: String) -> String:
+	return buy_look("plate", id)
+
+## A frame's or nameplate's coin price (0 = not sold for coins) and gem price (its own when sold for gems only, else
+## ceil(price / 100)).
+static func look_price(kind: String, id: String) -> int:
+	return int(item(kind, id).get("price", 0))
+
+static func look_gems(kind: String, id: String) -> int:
+	var f := item(kind, id)
+	return int(f.gems) if f.has("gems") else Catalog.gem_price(int(f.get("price", 0)))
+
+static func look_gems_only(kind: String, id: String) -> bool:
+	var f := item(kind, id)
+	return int(f.get("gems", 0)) > 0 and int(f.get("price", 0)) <= 0
 
 ## A frame's coin price (0 = not sold for coins) and gem price (its own for a gems-only frame, else ceil(price / 100)).
 static func frame_price(id: String) -> int:
-	return int(frame(id).get("price", 0))
+	return look_price("frame", id)
 
 static func frame_gems(id: String) -> int:
-	var f := frame(id)
-	return int(f.gems) if f.has("gems") else Catalog.gem_price(int(f.get("price", 0)))
+	return look_gems("frame", id)
 
 static func frame_gems_only(id: String) -> bool:
-	var f := frame(id)
-	return int(f.get("gems", 0)) > 0 and int(f.get("price", 0)) <= 0
+	return look_gems_only("frame", id)
 
 ## Puts an unlocked item in use (kind "avatar" | "char" | "frame" | "plate" | "badge"; badge "" = no badge).
 ## False when it is locked or unknown (or the save failed); true when it is in use now.
@@ -790,8 +817,15 @@ static func _circle(x: float, y: float, r: float, fill: String) -> String:
 ## An achievement's medal: assets/ui/medal_<id>.svg (the icon family: plum outlines, a white gloss), mipmapped.
 ## Without that file: the plain ribbons + disc of badgeSVG (BadgeView then draws the mark on it).
 static func medal_texture(id: String) -> Texture2D:
+	if ach(id).is_empty():
+		return null
+	var art := "res://assets/ui3d/medal_%s.webp" % id          # the 3D-rendered medal (tools/frames/ui_art.blend.py)
+	if ResourceLoader.exists(art):
+		if not _medals.has(id):            # kept: a texture loaded only inside _draw is freed before it is drawn (white)
+			_medals[id] = load(art)
+		return _medals[id]
 	var path := "%smedal_%s.svg" % [UIKit.ICON_DIR, id]
-	if ach(id).is_empty() or not ResourceLoader.exists(path):
+	if not ResourceLoader.exists(path):
 		return null
 	return UIKit.svg(path)
 
@@ -1038,7 +1072,8 @@ class BadgeView extends Control:
 		draw_string(font, Vector2(o.x + (side - w) / 2.0, cy + (asc - desc) / 2.0 - side * 0.01), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 
 
-## The name on its plate (pill with a vertical gradient and a thin rim), the badge after the name.
+## The name on its plate, the badge after the name. A plate is 3D art in three slices (assets/ui3d/plate_<id>.webp:
+## 512 x 128, square caps at both ends, a centre that stretches); Plain is no plate.
 class PlateView extends PanelContainer:
 	var plate_id := Collection.DEFAULT_PLATE
 	var label: Label
@@ -1046,6 +1081,13 @@ class PlateView extends PanelContainer:
 	var max_text_w := 220.0
 	var _padded := true
 	var _fs := 20
+	static var _tex := {}
+
+	static func art(id: String) -> Texture2D:
+		if not _tex.has(id):
+			var path := "res://assets/ui3d/plate_%s.webp" % id
+			_tex[id] = load(path) if ResourceLoader.exists(path) else null
+		return _tex[id]
 
 	func setup(text: String, pid: String, bid: String, fs: int, padded: bool) -> void:
 		_fs = fs
@@ -1074,30 +1116,47 @@ class PlateView extends PanelContainer:
 		badge.visible = bid != ""
 		badge.queue_redraw()
 		var pl := Collection.plate(plate_id)
-		label.add_theme_color_override("font_color", Color(pl.text))
-		var plain := plate_id == Collection.DEFAULT_PLATE
+		var col := Color(pl.text)
+		label.add_theme_color_override("font_color", col)
+		var plain := plate_id == Collection.DEFAULT_PLATE or art(plate_id) == null
+		# a dark outline under light names on the plates (the art is busy); none on Plain or the gold plate
+		var light := col.get_luminance() > 0.6
+		label.add_theme_constant_override("outline_size", 0 if plain or not light else maxi(3, int(_fs / 6.0)))
+		label.add_theme_color_override("font_outline_color", Color(0.12, 0.05, 0.06, 0.6))
 		var st := StyleBoxEmpty.new()
-		var padx := 0.0 if plain and not _padded else roundf(_fs * 0.6)
-		st.content_margin_left = padx
-		st.content_margin_right = padx if not badge.visible else roundf(padx * 0.6)
-		st.content_margin_top = 0.0 if plain and not _padded else roundf(_fs * 0.12)
-		st.content_margin_bottom = st.content_margin_top
+		if plain:
+			var padx := 0.0 if not _padded else roundf(_fs * 0.6)
+			st.content_margin_left = padx
+			st.content_margin_right = padx if not badge.visible else roundf(padx * 0.6)
+			st.content_margin_top = 0.0 if not _padded else roundf(_fs * 0.12)
+			st.content_margin_bottom = st.content_margin_top
+		else:
+			var hh := plate_height()
+			st.content_margin_left = roundf(hh * 0.62)          # inside the caps' ornaments
+			st.content_margin_right = roundf(hh * (0.62 if not badge.visible else 0.5))
+			st.content_margin_top = roundf((hh - _fs * 1.25) / 2.0)
+			st.content_margin_bottom = st.content_margin_top
 		add_theme_stylebox_override("panel", st)
 		queue_redraw()
 
+	## A plate's height for this font size (the band holds the name, the caps stand taller).
+	func plate_height() -> float:
+		return roundf(_fs * 2.1)
+
 	func _draw() -> void:
-		var pl := Collection.plate(plate_id)
-		if not pl.has("top") or size.x < 2 or size.y < 2:
+		var t := art(plate_id)
+		if plate_id == Collection.DEFAULT_PLATE or t == null or size.x < 2 or size.y < 2:
 			return
-		var w := int(roundf(size.x))
-		var h := int(roundf(size.y))
-		var key := "plate:%s:%dx%d" % [plate_id, w, h]
-		var rim_a: float = pl.rim_a
-		var svg := ('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d"><defs>' % [w, h, w, h]
-			+ '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s"/><stop offset="1" stop-color="%s"/></linearGradient></defs>' % [pl.top, pl.bottom]
-			+ '<rect width="%d" height="%d" rx="%s" fill="url(#g)"/>' % [w, h, h / 2.0]
-			+ '<rect x="0.5" y="0.5" width="%s" height="%s" rx="%s" fill="none" stroke="%s" stroke-opacity="%s" stroke-width="1"/></svg>' % [w - 1.0, h - 1.0, (h - 1.0) / 2.0, pl.rim, rim_a])
-		draw_texture_rect(Collection._svg_texture(key, svg, 3.0), Rect2(Vector2.ZERO, Vector2(w, h)), false)
+		var h := size.y
+		var tw := float(t.get_width())
+		var th := float(t.get_height())
+		var cap := th                          # square caps
+		var cw := minf(h, size.x / 2.0)        # caps drawn h wide (narrower on a very short plate)
+		var src_cw := cap * cw / h
+		draw_texture_rect_region(t, Rect2(0, 0, cw, h), Rect2(0, 0, src_cw, th))
+		draw_texture_rect_region(t, Rect2(size.x - cw, 0, cw, h), Rect2(tw - src_cw, 0, src_cw, th))
+		if size.x > 2.0 * cw:
+			draw_texture_rect_region(t, Rect2(cw, 0, size.x - 2.0 * cw, h), Rect2(cap, 0, tw - 2.0 * cap, th))
 
 
 # =====================================================================================================================

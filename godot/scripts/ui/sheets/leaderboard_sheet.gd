@@ -13,7 +13,7 @@ extends Sheet
 
 const ROW_H := 60.0
 const ME_NOTE_W := 40.0                 # the pinned bar's note: wraps inside at least this width
-const AVA_PX := 40.0
+const AVA_PX := 48.0                     ## the avatar in its frame (the frame art needs the room to read)
 const CACHE_SEC := 30.0
 const PULL_PX := 90.0
 const FIXED_H := 700.0
@@ -224,8 +224,9 @@ func _row(e: Dictionary, board_: String, mine := 0) -> Control:
 	nm.clip_text = true
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(nm)
-	var lv := UIKit.label(tr("Level %d") % maxi(1, int(e.get("level", 1))), UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
+	var lv := LevelBadge.new(maxi(1, int(e.get("level", 1))), "xs")       # "Lv 9": the pill, as on the avatars
 	lv.name = "Level"
+	lv.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	col.add_child(lv)
 	h.add_child(col)
 	var val := UIKit.label(value_text(int(e.get("value", 0)), board_), UIKit.FS.h3, Palette.INK, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_RIGHT)
@@ -234,6 +235,15 @@ func _row(e: Dictionary, board_: String, mine := 0) -> Control:
 	h.add_child(val)
 	var p := UIKit.list_row(h, "you" if rank > 0 and rank == mine else "")   # rank 1 has its medal: no gold rim
 	p.name = "Row%d" % rank
+	if rank >= 1 and rank <= 3 and rank != mine:      # the top three: a wash of their medal's metal and a rim of it
+		var st := (p.get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
+		var metal := PlayerTile.PlaceBadge.face_color(rank)
+		st.bg_color = st.bg_color.lerp(metal, 0.16)
+		st.border_color = metal.darkened(0.08)
+		for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT]:
+			st.set_border_width(side, UIKit.BW.line)
+		st.border_width_bottom = UIKit.LIP.md
+		p.add_theme_stylebox_override("panel", st)
 	var uid := str(e.get("uid", ""))
 	var acc := Account.instance()
 	var own := acc != null and str(acc.account.get("uid", "")) == uid
@@ -258,8 +268,8 @@ func _rank_cell(rank: int) -> Control:
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.name = "Rank"
 	if rank >= 1 and rank <= 3:
-		var m := PlayerTile.PlaceBadge.make(rank, 30.0)
-		m.position = Vector2(1, (AVA_PX - 30.0) / 2.0)
+		var m := PlayerTile.PlaceBadge.make(rank, 32.0)
+		m.position = Vector2(0, (AVA_PX - 32.0) / 2.0)
 		cell.add_child(m)
 		return cell
 	var l := UIKit.label(str(rank), UIKit.FS.h3, Palette.MUTED, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)

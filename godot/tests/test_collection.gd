@@ -77,7 +77,19 @@ func _run() -> void:
 	check("every frame is free (Wood), earned, sold for coins or sold for gems: one way only; at most 8 twinkles", one_way)
 	check("frame prices: coins also in gems, gem-only frames their own", [Collection.frame_price("rose"), Collection.frame_gems("rose"), Collection.frame_gems_only("rose"),
 		Collection.frame_price("wings"), Collection.frame_gems("wings"), Collection.frame_gems_only("wings"), Collection.frame_gems("gold")] == [4000, 40, false, 0, 120, true, 0])
-	check("plates match the web", _ids(Collection.PLATES) == ["plain", "espresso", "ruby"])
+	check("plates: the set, in shop order", _ids(Collection.PLATES) == ["plain", "espresso", "ruby", "scroll", "velvet", "paint", "neon", "crystal"])
+	var plate_art := true
+	var plate_ids_free := true
+	var others := _ids(Collection.FRAMES) + _ids(Collection.CHARS) + _ids(Collection.WORLD) + _ids(Collection.AVATARS)
+	for pl: Dictionary in Collection.PLATES:
+		plate_art = plate_art and (pl.id == "plain" or Collection.PlateView.art(pl.id) != null)
+		plate_ids_free = plate_ids_free and not others.has(pl.id)
+	check("every plate but Plain has its rendered art (assets/ui3d/plate_<id>.webp)", plate_art)
+	check("plate ids never repeat a frame's or character's (they share av_owned)", plate_ids_free)
+	var pp := use(fresh(4000))
+	check("buy a coin plate: paid, owned, in use", Collection.buy_plate("scroll") == "" and pp.coins == 1000 and pp.plate == "scroll" and pp.av_owned == ["scroll"], pp)
+	check("gem-only plates refuse coins", Collection.buy_plate("neon") == "Neon is sold for gems only.")
+	check("earned plates say how to earn them", Collection.buy_plate("ruby") == "Earn “Winning Streak”", Collection.buy_plate("ruby"))
 	check("achievements match the web", _ids(Collection.ACH) == ["first", "streak", "veteran", "pairs", "party", "coins"]
 		and Collection.ACH.map(func(a): return a.reward) == [200, 300, 500, 300, 300, 500]
 		and Collection.ACH.map(func(a): return a.goal) == [1, 3, 25, 10, 5, 10000])

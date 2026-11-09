@@ -168,7 +168,8 @@ msgid "Emerald"
 msgstr "পান্না"
 
 #. catalog.gd
-#: scripts/core/catalog.gd:16
+#. collection.gd
+#: scripts/core/catalog.gd:16 scripts/core/collection.gd:120
 msgid "Neon"
 msgstr "নিয়ন"
 
@@ -278,9 +279,9 @@ msgstr "এই রুম শপে নেই।"
 #. catalog.gd buy_emotes()
 #. catalog.gd buy_text()
 #. collection.gd buy_char()
-#. collection.gd buy_frame()
+#. collection.gd buy_look()
 #. sl_scenes.gd buy_scene()
-#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:291 scripts/core/collection.gd:310 scripts/world/sl_scenes.gd:305
+#: scripts/core/catalog.gd:238 scripts/core/catalog.gd:257 scripts/core/catalog.gd:310 scripts/core/catalog.gd:339 scripts/core/collection.gd:300 scripts/core/collection.gd:319 scripts/world/sl_scenes.gd:305
 msgid "You already own %s."
 msgstr "%s তোমার আগে থেকেই আছে।"
 
@@ -323,7 +324,7 @@ msgstr "সবাই অফলাইনে থাকায় ম্যাচ �
 # Table name in the quick-match picker and sentences; kept as the usual loanword প্র্যাকটিস
 #. coin_tables.gd label()
 #. quick_sheet.gd _init()
-#: scripts/core/coin_tables.gd:109 scripts/ui/sheets/quick_sheet.gd:456
+#: scripts/core/coin_tables.gd:109 scripts/ui/sheets/quick_sheet.gd:455
 msgid "Practice"
 msgstr "অনুশীলন"
 
@@ -611,89 +612,109 @@ msgid "Diamond"
 msgstr "হীরা"
 
 #. collection.gd
-#: scripts/core/collection.gd:110
+#: scripts/core/collection.gd:114
 msgid "Plain"
 msgstr "সাধারণ"
 
 # same in Bangla: plate / dice name
 #. collection.gd
 #. rewards.gd
-#: scripts/core/collection.gd:111 scripts/core/rewards.gd:28
+#: scripts/core/collection.gd:115 scripts/core/rewards.gd:28
 msgid "Espresso"
 msgstr "এসপ্রেসো"
 
 #. collection.gd
-#: scripts/core/collection.gd:112
+#: scripts/core/collection.gd:116
 msgid "Ruby"
 msgstr "রুবি"
 
 #. collection.gd
+#: scripts/core/collection.gd:117
+msgid "Gold Scroll"
+msgstr "সোনালি স্ক্রল"
+
+#. collection.gd
 #: scripts/core/collection.gd:118
+msgid "Royal Velvet"
+msgstr "রাজকীয় ভেলভেট"
+
+#. collection.gd
+#: scripts/core/collection.gd:119
+msgid "Rickshaw Paint"
+msgstr "রিকশা পেইন্ট"
+
+#. collection.gd
+#: scripts/core/collection.gd:121
+msgid "Diamond Plate"
+msgstr "হীরার প্লেট"
+
+#. collection.gd
+#: scripts/core/collection.gd:127
 msgid "First Victory"
 msgstr "প্রথম জয়"
 
 #. collection.gd
-#: scripts/core/collection.gd:118
+#: scripts/core/collection.gd:127
 msgid "Win a game against the computer."
 msgstr "কম্পিউটারের সাথে একটা খেলা জেতো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:119
+#: scripts/core/collection.gd:128
 msgid "Winning Streak"
 msgstr "জয়ের স্ট্রিক"
 
 #. collection.gd
-#: scripts/core/collection.gd:119
+#: scripts/core/collection.gd:128
 msgid "Win 3 games in a row."
 msgstr "পরপর 3টা খেলা জেতো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:120
+#: scripts/core/collection.gd:129
 msgid "Experienced Player"
 msgstr "অভিজ্ঞ প্লেয়ার"
 
 #. collection.gd
-#: scripts/core/collection.gd:120
+#: scripts/core/collection.gd:129
 msgid "Finish 25 games."
 msgstr "25টা খেলা শেষ করো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:121
+#: scripts/core/collection.gd:130
 msgid "Master of Pairs"
 msgstr "জোড়ার ওস্তাদ"
 
 #. collection.gd
-#: scripts/core/collection.gd:121
+#: scripts/core/collection.gd:130
 msgid "Form 10 pairs."
 msgstr "10টা জোড়া বাঁধো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:122
+#: scripts/core/collection.gd:131
 msgid "Multiplayer Champion"
 msgstr "মাল্টিপ্লেয়ার চ্যাম্পিয়ন"
 
 #. collection.gd
-#: scripts/core/collection.gd:122
+#: scripts/core/collection.gd:131
 msgid "Finish 5 Pass & Play games."
 msgstr "এক ফোনে 5টা খেলা শেষ করো।"
 
 #. collection.gd
-#: scripts/core/collection.gd:123
+#: scripts/core/collection.gd:132
 msgid "Coin Collector"
 msgstr "কয়েন কালেক্টর"
 
 #. collection.gd
-#: scripts/core/collection.gd:123
+#: scripts/core/collection.gd:132
 msgid "Earn 10,000 coins in total."
 msgstr "মোট 10,000 কয়েন জমাও।"
 
 #. collection.gd item()
-#: scripts/core/collection.gd:177
+#: scripts/core/collection.gd:186
 msgid "No badge"
 msgstr "ব্যাজ নেই"
 
 #. collection.gd unlock_text()
-#: scripts/core/collection.gd:241 scripts/core/collection.gd:252
+#: scripts/core/collection.gd:250 scripts/core/collection.gd:261
 msgid "Earn “%s”"
 msgstr "“%s” অর্জন করো"
 
@@ -704,39 +725,44 @@ msgstr "“%s” অর্জন করো"
 #. rewards_sheet.gd _local()
 #. spin_sheet.gd _landed()
 #. welcome_sheet.gd row_note()
-#: scripts/core/collection.gd:244 scripts/core/rewards.gd:139 scripts/main.gd:897 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:247 scripts/ui/sheets/spin_sheet.gd:211 scripts/ui/sheets/welcome_sheet.gd:65
+#: scripts/core/collection.gd:253 scripts/core/rewards.gd:139 scripts/main.gd:897 scripts/ui/sheets/daily_sheet.gd:223 scripts/ui/sheets/rewards_sheet.gd:247 scripts/ui/sheets/spin_sheet.gd:211 scripts/ui/sheets/welcome_sheet.gd:65
 msgid "%s coins"
 msgstr "%s কয়েন"
 
 #. collection.gd unlock_text()
 #. store_sheet.gd _pack_row()
-#: scripts/core/collection.gd:246 scripts/ui/sheets/store_sheet.gd:136
+#: scripts/core/collection.gd:255 scripts/ui/sheets/store_sheet.gd:136
 msgid "%s gems"
 msgstr "%s জেম"
 
 #. collection.gd unlock_text()
 #. shop_sheet.gd _unlock_note()
-#: scripts/core/collection.gd:251 scripts/ui/sheets/shop_sheet.gd:400
+#: scripts/core/collection.gd:260 scripts/ui/sheets/shop_sheet.gd:400
 msgid "Reach level %d"
 msgstr "%d লেভেলে পৌঁছাও"
 
 #. collection.gd buy_char()
-#: scripts/core/collection.gd:286
+#: scripts/core/collection.gd:295
 msgid "That character isn’t in the collection."
 msgstr "এই ক্যারেক্টার কালেকশনে নেই।"
 
 #. collection.gd buy_char()
-#: scripts/core/collection.gd:289
+#: scripts/core/collection.gd:298
 msgid "%s is free to use."
 msgstr "%s ফ্রি, এখনই লাগাও।"
 
-#. collection.gd buy_frame()
-#: scripts/core/collection.gd:308
+#. collection.gd buy_look()
+#: scripts/core/collection.gd:317
 msgid "That frame isn’t in the collection."
 msgstr "এই ফ্রেম কালেকশনে নেই।"
 
-#. collection.gd buy_frame()
-#: scripts/core/collection.gd:314
+#. collection.gd buy_look()
+#: scripts/core/collection.gd:317
+msgid "That nameplate isn’t in the collection."
+msgstr "এই নেমপ্লেট কালেকশনে নেই।"
+
+#. collection.gd buy_look()
+#: scripts/core/collection.gd:323
 msgid "%s is sold for gems only."
 msgstr "%s শুধু জেম দিয়ে কেনা যায়।"
 
@@ -789,7 +815,7 @@ msgstr "%d দিন আগে"
 #. Result screen · result_screen.gd _vote_chip()
 #. Result screen · result_screen.gd card_data()
 #. leaderboard_sheet.gd _render_me()
-#: scripts/core/l10n.gd:60 scripts/game/sl_match.gd:387 scripts/game/sl_match.gd:698 scripts/game/sl_match.gd:1168 scripts/ui/components/result_screen.gd:660 scripts/ui/components/result_screen.gd:1025 scripts/ui/sheets/leaderboard_sheet.gd:292
+#: scripts/core/l10n.gd:60 scripts/game/sl_match.gd:387 scripts/game/sl_match.gd:698 scripts/game/sl_match.gd:1168 scripts/ui/components/result_screen.gd:660 scripts/ui/components/result_screen.gd:1025 scripts/ui/sheets/leaderboard_sheet.gd:302
 msgid "You"
 msgstr "তুমি"
 
@@ -866,7 +892,7 @@ msgstr "লুডু · এক ফোনে"
 #. profile_sheet.gd _build_stats()
 #. settings_sheet.gd _build()
 #. shop_sheet.gd
-#: scripts/core/match_store.gd:41 scripts/net/share.gd:16 scripts/ui/components/invite_banner.gd:95 scripts/ui/home_screen.gd:713 scripts/ui/setup_sheet.gd:49 scripts/ui/sheets/friends_sheet.gd:363 scripts/ui/sheets/howto_sheet.gd:58 scripts/ui/sheets/howto_sheet.gd:168 scripts/ui/sheets/lobby_sheet.gd:79 scripts/ui/sheets/profile_sheet.gd:391 scripts/ui/sheets/settings_sheet.gd:165 scripts/ui/sheets/shop_sheet.gd:53
+#: scripts/core/match_store.gd:41 scripts/net/share.gd:16 scripts/ui/components/invite_banner.gd:94 scripts/ui/home_screen.gd:711 scripts/ui/setup_sheet.gd:49 scripts/ui/sheets/friends_sheet.gd:362 scripts/ui/sheets/howto_sheet.gd:58 scripts/ui/sheets/howto_sheet.gd:168 scripts/ui/sheets/lobby_sheet.gd:79 scripts/ui/sheets/profile_sheet.gd:391 scripts/ui/sheets/settings_sheet.gd:165 scripts/ui/sheets/shop_sheet.gd:53
 msgid "Snakes & Ladders"
 msgstr "সাপ-সিঁড়ি"
 
@@ -881,7 +907,7 @@ msgstr "সাপ-সিঁড়ি"
 #. lobby_sheet.gd _init()
 #. settings_sheet.gd _build()
 #. shop_sheet.gd
-#: scripts/core/match_store.gd:41 scripts/net/share.gd:16 scripts/ui/components/invite_banner.gd:95 scripts/ui/home_screen.gd:48 scripts/ui/home_screen.gd:713 scripts/ui/setup_sheet.gd:49 scripts/ui/sheets/friends_sheet.gd:363 scripts/ui/sheets/howto_sheet.gd:57 scripts/ui/sheets/lobby_sheet.gd:79 scripts/ui/sheets/settings_sheet.gd:162 scripts/ui/sheets/shop_sheet.gd:53
+#: scripts/core/match_store.gd:41 scripts/net/share.gd:16 scripts/ui/components/invite_banner.gd:94 scripts/ui/home_screen.gd:48 scripts/ui/home_screen.gd:711 scripts/ui/setup_sheet.gd:49 scripts/ui/sheets/friends_sheet.gd:362 scripts/ui/sheets/howto_sheet.gd:57 scripts/ui/sheets/lobby_sheet.gd:79 scripts/ui/sheets/settings_sheet.gd:162 scripts/ui/sheets/shop_sheet.gd:53
 msgid "Ludo"
 msgstr "লুডু"
 
@@ -1666,7 +1692,7 @@ msgstr "কেউ একজন"
 #. Snakes & Ladders match · sl_match.gd net_status()
 #. lobby_sheet.gd _status_pill()
 #. lobby_sheet.gd set_status()
-#: scripts/game/sl_match.gd:1191 scripts/ui/sheets/lobby_sheet.gd:212 scripts/ui/sheets/lobby_sheet.gd:380
+#: scripts/game/sl_match.gd:1191 scripts/ui/sheets/lobby_sheet.gd:212 scripts/ui/sheets/lobby_sheet.gd:379
 msgid "Reconnecting…"
 msgstr "আবার কানেক্ট হচ্ছে…"
 
@@ -1914,7 +1940,7 @@ msgstr "ম্যাচ ছেড়ে যাও"
 
 #. App (pause menu, dialogs, toasts) · main.gd open_pause()
 #. Home screen · home_screen.gd _build_quick()
-#: scripts/main.gd:1031 scripts/ui/home_screen.gd:353
+#: scripts/main.gd:1031 scripts/ui/home_screen.gd:352
 msgid "Resume"
 msgstr "চালিয়ে যাও"
 
@@ -2268,7 +2294,7 @@ msgstr "শুরু করতে কমপক্ষে 2 জন প্লেয
 #. net_client.gd error_text()
 #. lobby_sheet.gd _init()
 #. lobby_sheet.gd _refresh()
-#: scripts/net/net_client.gd:194 scripts/ui/sheets/lobby_sheet.gd:110 scripts/ui/sheets/lobby_sheet.gd:136 scripts/ui/sheets/lobby_sheet.gd:430
+#: scripts/net/net_client.gd:194 scripts/ui/sheets/lobby_sheet.gd:110 scripts/ui/sheets/lobby_sheet.gd:136 scripts/ui/sheets/lobby_sheet.gd:429
 msgid "Teams need exactly 4 players."
 msgstr "টিমে ঠিক 4 জন প্লেয়ার লাগবে।"
 
@@ -2344,7 +2370,7 @@ msgstr "হ্যাঁ"
 #. invite_banner.gd _init()
 #. friends_sheet.gd _invite_text()
 #. shop_sheet.gd buy_with_gems()
-#: scripts/net/notifications.gd:352 scripts/ui/components/invite_banner.gd:77 scripts/ui/sheets/friends_sheet.gd:388 scripts/ui/sheets/shop_sheet.gd:855
+#: scripts/net/notifications.gd:352 scripts/ui/components/invite_banner.gd:76 scripts/ui/sheets/friends_sheet.gd:387 scripts/ui/sheets/shop_sheet.gd:855
 msgid "Not now"
 msgstr "এখন না"
 
@@ -2606,7 +2632,7 @@ msgstr "এর বদলে %s-এর রুমে ঢুকবে।"
 
 #. social.gd _on_join()
 #. invite_banner.gd _init()
-#: scripts/net/social.gd:502 scripts/ui/components/invite_banner.gd:79
+#: scripts/net/social.gd:502 scripts/ui/components/invite_banner.gd:78
 msgid "Join"
 msgstr "ঢোকো"
 
@@ -2634,12 +2660,12 @@ msgid "Home"
 msgstr "হোম"
 
 #. invite_banner.gd _init()
-#: scripts/ui/components/invite_banner.gd:65
+#: scripts/ui/components/invite_banner.gd:64
 msgid "%s invited you"
 msgstr "%s তোমাকে ডেকেছে"
 
 #. invite_banner.gd sub_text()
-#: scripts/ui/components/invite_banner.gd:96
+#: scripts/ui/components/invite_banner.gd:95
 msgid "Room %s"
 msgstr "রুম %s"
 
@@ -2654,7 +2680,7 @@ msgstr "বট"
 #. reroll_button.gd price_text()
 #. reroll_button.gd _draw()
 #. quick_sheet.gd _init()
-#: scripts/ui/components/reroll_button.gd:69 scripts/ui/components/reroll_button.gd:137 scripts/ui/sheets/quick_sheet.gd:473
+#: scripts/ui/components/reroll_button.gd:69 scripts/ui/components/reroll_button.gd:137 scripts/ui/sheets/quick_sheet.gd:472
 msgid "Free"
 msgstr "ফ্রি"
 
@@ -2856,31 +2882,31 @@ msgstr "আমার সংগ্রহ"
 #. Home screen · home_screen.gd _build_top_bar()
 #. shop_sheet.gd _gems_button()
 #. store_sheet.gd _init()
-#: scripts/ui/home_screen.gd:267 scripts/ui/sheets/shop_sheet.gd:269 scripts/ui/sheets/store_sheet.gd:28
+#: scripts/ui/home_screen.gd:266 scripts/ui/sheets/shop_sheet.gd:269 scripts/ui/sheets/store_sheet.gd:28
 msgid "Store"
 msgstr "স্টোর"
 
 #. Home screen · home_screen.gd _build_dock()
 #. friends_sheet.gd _init()
 #. settings_sheet.gd _build()
-#: scripts/ui/home_screen.gd:310 scripts/ui/sheets/friends_sheet.gd:57 scripts/ui/sheets/settings_sheet.gd:200
+#: scripts/ui/home_screen.gd:309 scripts/ui/sheets/friends_sheet.gd:57 scripts/ui/sheets/settings_sheet.gd:200
 msgid "Friends"
 msgstr "বন্ধুরা"
 
 # Home pill title
 #. Home screen · home_screen.gd _build_quick()
-#: scripts/ui/home_screen.gd:347
+#: scripts/ui/home_screen.gd:346
 msgid "Continue match"
 msgstr "ম্যাচ চালিয়ে যাও"
 
 # Big honey button, caps title (28 px)
 #. Home screen · home_screen.gd _big_play()
-#: scripts/ui/home_screen.gd:442
+#: scripts/ui/home_screen.gd:441
 msgid "QUICK MATCH"
 msgstr "কুইক ম্যাচ"
 
 #. Home screen · home_screen.gd _big_play()
-#: scripts/ui/home_screen.gd:445
+#: scripts/ui/home_screen.gd:444
 msgid "Play online now"
 msgstr "অনলাইনে খেলো"
 
@@ -3275,7 +3301,7 @@ msgstr "কঠিন"
 #. Game setup sheet · setup_sheet.gd _init()
 #. lobby_sheet.gd _init()
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/setup_sheet.gd:90 scripts/ui/sheets/lobby_sheet.gd:124 scripts/ui/sheets/lobby_sheet.gd:416
+#: scripts/ui/setup_sheet.gd:90 scripts/ui/sheets/lobby_sheet.gd:124 scripts/ui/sheets/lobby_sheet.gd:415
 msgid "Start game"
 msgstr "খেলা শুরু"
 
@@ -3610,7 +3636,7 @@ msgstr "ঘুম পাচ্ছে"
 #. preview_sheet.gd _on_act()
 #. shop_sheet.gd buy_with_coins()
 #. shop_sheet.gd buy_with_gems()
-#: scripts/ui/sheets/emote_pack_sheet.gd:49 scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/item_sheet.gd:67 scripts/ui/sheets/pawn_sheet.gd:52 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:261 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:790 scripts/ui/sheets/shop_sheet.gd:865
+#: scripts/ui/sheets/emote_pack_sheet.gd:49 scripts/ui/sheets/emote_pack_sheet.gd:169 scripts/ui/sheets/item_sheet.gd:69 scripts/ui/sheets/pawn_sheet.gd:52 scripts/ui/sheets/pawn_sheet.gd:165 scripts/ui/sheets/preview_sheet.gd:261 scripts/ui/sheets/preview_sheet.gd:389 scripts/ui/sheets/shop_sheet.gd:790 scripts/ui/sheets/shop_sheet.gd:865
 msgid "Buy"
 msgstr "কিনো"
 
@@ -3619,7 +3645,7 @@ msgstr "কিনো"
 #. pawn_sheet.gd _init()
 #. preview_sheet.gd _build_panel()
 #. shop_sheet.gd _card()
-#: scripts/ui/sheets/emote_pack_sheet.gd:55 scripts/ui/sheets/item_sheet.gd:73 scripts/ui/sheets/pawn_sheet.gd:58 scripts/ui/sheets/preview_sheet.gd:267 scripts/ui/sheets/shop_sheet.gd:454
+#: scripts/ui/sheets/emote_pack_sheet.gd:55 scripts/ui/sheets/item_sheet.gd:75 scripts/ui/sheets/pawn_sheet.gd:58 scripts/ui/sheets/preview_sheet.gd:267 scripts/ui/sheets/shop_sheet.gd:454
 msgid "Use"
 msgstr "লাগাও"
 
@@ -3674,14 +3700,14 @@ msgstr "বন্ধুদের সাথে খেলো"
 #. friends_sheet.gd _init()
 #. lobby_sheet.gd _kicker_text()
 #. quick_sheet.gd _init()
-#: scripts/ui/sheets/friends_sheet.gd:52 scripts/ui/sheets/lobby_sheet.gd:387 scripts/ui/sheets/quick_sheet.gd:69
+#: scripts/ui/sheets/friends_sheet.gd:52 scripts/ui/sheets/lobby_sheet.gd:386 scripts/ui/sheets/quick_sheet.gd:69
 msgid "Snakes & Ladders online"
 msgstr "সাপ-সিঁড়ি অনলাইন"
 
 #. friends_sheet.gd _init()
 #. lobby_sheet.gd _kicker_text()
 #. quick_sheet.gd _init()
-#: scripts/ui/sheets/friends_sheet.gd:52 scripts/ui/sheets/lobby_sheet.gd:387 scripts/ui/sheets/quick_sheet.gd:69
+#: scripts/ui/sheets/friends_sheet.gd:52 scripts/ui/sheets/lobby_sheet.gd:386 scripts/ui/sheets/quick_sheet.gd:69
 msgid "Ludo online"
 msgstr "লুডু অনলাইন"
 
@@ -3702,7 +3728,7 @@ msgstr "3 জন পর্যন্ত বন্ধুর সাথে যার
 
 #. friends_sheet.gd _room_pane()
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:120 scripts/ui/sheets/friends_sheet.gd:462
+#: scripts/ui/sheets/friends_sheet.gd:120 scripts/ui/sheets/friends_sheet.gd:461
 msgid "Create room"
 msgstr "রুম বানাও"
 
@@ -3729,7 +3755,7 @@ msgstr "পেস্ট"
 
 #. friends_sheet.gd _room_pane()
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:153 scripts/ui/sheets/friends_sheet.gd:463
+#: scripts/ui/sheets/friends_sheet.gd:153 scripts/ui/sheets/friends_sheet.gd:462
 msgid "Join room"
 msgstr "রুমে ঢোকো"
 
@@ -3783,53 +3809,53 @@ msgid "Play an online match, and the people you meet show up here."
 msgstr "অনলাইন ম্যাচ খেলো, যাদের সাথে দেখা হবে তারা এখানে আসবে।"
 
 #. friends_sheet.gd _person_row()
-#: scripts/ui/sheets/friends_sheet.gd:335
+#: scripts/ui/sheets/friends_sheet.gd:334
 msgid "Remove from friends"
 msgstr "বন্ধু তালিকা থেকে সরাও"
 
 #. friends_sheet.gd _person_row()
-#: scripts/ui/sheets/friends_sheet.gd:335
+#: scripts/ui/sheets/friends_sheet.gd:334
 msgid "Add to friends"
 msgstr "বন্ধু তালিকায় যোগ করো"
 
 #. friends_sheet.gd sub_text()
-#: scripts/ui/sheets/friends_sheet.gd:367
+#: scripts/ui/sheets/friends_sheet.gd:366
 msgid "Added %s"
 msgstr "যোগ করেছ %s"
 
 #. friends_sheet.gd _invite_text()
-#: scripts/ui/sheets/friends_sheet.gd:384
+#: scripts/ui/sheets/friends_sheet.gd:383
 msgid "Invited"
 msgstr "ডাকা হয়েছে"
 
 #. friends_sheet.gd _invite_text()
-#: scripts/ui/sheets/friends_sheet.gd:386
+#: scripts/ui/sheets/friends_sheet.gd:385
 msgid "Remind"
 msgstr "মনে করান"
 
 #. friends_sheet.gd _invite_text()
 #. lobby_sheet.gd _member_row()
-#: scripts/ui/sheets/friends_sheet.gd:389 scripts/ui/sheets/lobby_sheet.gd:280
+#: scripts/ui/sheets/friends_sheet.gd:388 scripts/ui/sheets/lobby_sheet.gd:280
 msgid "Invite"
 msgstr "ডাকো"
 
 #. friends_sheet.gd _invite()
-#: scripts/ui/sheets/friends_sheet.gd:396
+#: scripts/ui/sheets/friends_sheet.gd:395
 msgid "Inviting…"
 msgstr "ডাকা হচ্ছে…"
 
 #. friends_sheet.gd paste()
-#: scripts/ui/sheets/friends_sheet.gd:422
+#: scripts/ui/sheets/friends_sheet.gd:421
 msgid "No room code to paste"
 msgstr "পেস্ট করার মতো রুম কোড নেই"
 
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:462
+#: scripts/ui/sheets/friends_sheet.gd:461
 msgid "Creating…"
 msgstr "বানানো হচ্ছে…"
 
 #. friends_sheet.gd _refresh()
-#: scripts/ui/sheets/friends_sheet.gd:463
+#: scripts/ui/sheets/friends_sheet.gd:462
 msgid "Joining…"
 msgstr "যুক্ত হচ্ছে…"
 
@@ -4000,17 +4026,22 @@ msgid "Computer skill (Easy, Normal, Hard) only changes how it moves."
 msgstr "কম্পিউটারের লেভেল (সহজ, মাঝারি, কঠিন) শুধু ওর চাল বদলায়।"
 
 #. item_sheet.gd _init()
-#: scripts/ui/sheets/item_sheet.gd:58
+#: scripts/ui/sheets/item_sheet.gd:60
 msgid "Dice · Ludo and Snakes & Ladders"
 msgstr "ডাইস · লুডু আর সাপ-সিঁড়ি"
 
 #. item_sheet.gd _init()
-#: scripts/ui/sheets/item_sheet.gd:58
+#: scripts/ui/sheets/item_sheet.gd:60
 msgid "Frame · round your picture in every game"
 msgstr "ফ্রেম · সব খেলায় তোমার ছবির চারপাশে"
 
 #. item_sheet.gd _init()
-#: scripts/ui/sheets/item_sheet.gd:58
+#: scripts/ui/sheets/item_sheet.gd:60
+msgid "Nameplate · under your name in every game"
+msgstr "নেমপ্লেট · সব খেলায় তোমার নামের নিচে"
+
+#. item_sheet.gd _init()
+#: scripts/ui/sheets/item_sheet.gd:60
 msgid "Character · your picture in every game"
 msgstr "চরিত্র · সব খেলায় তোমার ছবি"
 
@@ -4050,40 +4081,39 @@ msgstr "লিডারবোর্ড এখন পাওয়া যাচ্
 msgid "No one is on the board yet. Play online matches to be the first."
 msgstr "বোর্ডে এখনো কেউ নেই। অনলাইন ম্যাচ খেলে প্রথম হও।"
 
-#. leaderboard_sheet.gd _row()
-#. leaderboard_sheet.gd _render_me()
-#. quick_sheet.gd _init()
-#: scripts/ui/sheets/leaderboard_sheet.gd:227 scripts/ui/sheets/leaderboard_sheet.gd:313 scripts/ui/sheets/quick_sheet.gd:471
-msgid "Level %d"
-msgstr "লেভেল %d"
-
 # same in Bangla
 #. leaderboard_sheet.gd value_text()
-#: scripts/ui/sheets/leaderboard_sheet.gd:274
+#: scripts/ui/sheets/leaderboard_sheet.gd:284
 msgid "%s XP"
 msgstr "%s XP"
 
 #. leaderboard_sheet.gd value_text()
-#: scripts/ui/sheets/leaderboard_sheet.gd:275
+#: scripts/ui/sheets/leaderboard_sheet.gd:285
 msgid "%s win"
 msgid_plural "%s wins"
 msgstr[0] "%s জয়"
 msgstr[1] "%s জয়"
 
 #. leaderboard_sheet.gd _render_me()
-#: scripts/ui/sheets/leaderboard_sheet.gd:306
+#: scripts/ui/sheets/leaderboard_sheet.gd:316
 msgid "Play %d more match to appear"
 msgid_plural "Play %d more matches to appear"
 msgstr[0] "লিস্টে আসতে আরও %d ম্যাচ খেলো।"
 msgstr[1] "লিস্টে আসতে আরও %d ম্যাচ খেলো।"
 
 #. leaderboard_sheet.gd _render_me()
-#: scripts/ui/sheets/leaderboard_sheet.gd:309
+#: scripts/ui/sheets/leaderboard_sheet.gd:319
 msgid "Not ranked yet"
 msgstr "এখনো র‍্যাঙ্ক নেই"
 
 #. leaderboard_sheet.gd _render_me()
-#: scripts/ui/sheets/leaderboard_sheet.gd:316
+#. quick_sheet.gd _init()
+#: scripts/ui/sheets/leaderboard_sheet.gd:323 scripts/ui/sheets/quick_sheet.gd:470
+msgid "Level %d"
+msgstr "লেভেল %d"
+
+#. leaderboard_sheet.gd _render_me()
+#: scripts/ui/sheets/leaderboard_sheet.gd:326
 msgid "Connect to see your rank"
 msgstr "র‍্যাঙ্ক দেখতে কানেক্ট করো"
 
@@ -4117,7 +4147,7 @@ msgstr "নিয়ম শুধু হোস্ট বদলাতে পা�
 
 #. lobby_sheet.gd _init()
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:111 scripts/ui/sheets/lobby_sheet.gd:414
+#: scripts/ui/sheets/lobby_sheet.gd:111 scripts/ui/sheets/lobby_sheet.gd:413
 msgid "Red + Yellow vs Green + Blue"
 msgstr "লাল + হলুদ বনাম সবুজ + নীল"
 
@@ -4158,69 +4188,69 @@ msgid "Waiting for one more friend…"
 msgstr "আরেকজন বন্ধুর অপেক্ষা…"
 
 #. lobby_sheet.gd _member_row()
-#: scripts/ui/sheets/lobby_sheet.gd:301
+#: scripts/ui/sheets/lobby_sheet.gd:300
 msgid "%s (you)"
 msgstr "%s (তুমি)"
 
 # a lobby tag: this friend hasn't answered Play again yet
 #. lobby_sheet.gd _member_row()
-#: scripts/ui/sheets/lobby_sheet.gd:313
+#: scripts/ui/sheets/lobby_sheet.gd:312
 msgid "Deciding…"
 msgstr "ভাবছে…"
 
 #. lobby_sheet.gd _member_row()
-#: scripts/ui/sheets/lobby_sheet.gd:318
+#: scripts/ui/sheets/lobby_sheet.gd:317
 msgid "Host"
 msgstr "হোস্ট"
 
 # REVIEW: presence tag "Away" (member offline); দূরে = away; maybe অফলাইন?
 #. lobby_sheet.gd _member_row()
-#: scripts/ui/sheets/lobby_sheet.gd:322
+#: scripts/ui/sheets/lobby_sheet.gd:321
 msgid "Away"
 msgstr "অফলাইন"
 
 #. lobby_sheet.gd set_status()
-#: scripts/ui/sheets/lobby_sheet.gd:380
+#: scripts/ui/sheets/lobby_sheet.gd:379
 msgid "Connecting…"
 msgstr "কানেক্ট হচ্ছে…"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:397
+#: scripts/ui/sheets/lobby_sheet.gd:396
 msgid "%d of %d"
 msgstr "%d / %d"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:414
+#: scripts/ui/sheets/lobby_sheet.gd:413
 msgid "Needs exactly 4 players"
 msgstr "ঠিক 4 জন প্লেয়ার লাগবে"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:416
+#: scripts/ui/sheets/lobby_sheet.gd:415
 msgid "Waiting for host…"
 msgstr "হোস্টের অপেক্ষায়…"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:424
+#: scripts/ui/sheets/lobby_sheet.gd:423
 msgid "Your friends are still deciding. You’re in for the next game."
 msgstr "বন্ধুরা এখনো ভাবছে। পরের খেলায় তুমি আছো।"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:428
+#: scripts/ui/sheets/lobby_sheet.gd:427
 msgid "Share the code. The game can start when a friend joins."
 msgstr "কোড শেয়ার করো। বন্ধু যুক্ত হলে খেলা শুরু করা যাবে।"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:432
+#: scripts/ui/sheets/lobby_sheet.gd:431
 msgid "Everyone’s here? Start when you’re ready."
 msgstr "সবাই এসে গেছে? রেডি হলে শুরু করো।"
 
 #. lobby_sheet.gd _refresh()
-#: scripts/ui/sheets/lobby_sheet.gd:434
+#: scripts/ui/sheets/lobby_sheet.gd:433
 msgid "The host starts the game."
 msgstr "হোস্ট খেলা শুরু করবে।"
 
 #. lobby_sheet.gd copy_code()
-#: scripts/ui/sheets/lobby_sheet.gd:445
+#: scripts/ui/sheets/lobby_sheet.gd:444
 msgid "Code copied"
 msgstr "কোড কপি হয়েছে"
 
@@ -4626,7 +4656,7 @@ msgstr "খোঁজা হচ্ছে"
 
 # REVIEW: prize label "Win 228"; জিতলে %s = "if you win 228"
 #. quick_sheet.gd _init()
-#: scripts/ui/sheets/quick_sheet.gd:475
+#: scripts/ui/sheets/quick_sheet.gd:474
 msgid "Win %s"
 msgstr "জিতলে %s"
 

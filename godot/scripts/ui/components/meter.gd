@@ -1,7 +1,8 @@
 class_name Meter
 extends Control
 ## A progress bar drawn in code: a rounded track with a rounded fill. At 0 no fill is drawn (the bare light track reads
-## as "no progress yet"); any progress shows at least a round dot as wide as the bar is tall. Looks:
+## as "no progress yet"); any progress shows at least MIN_SHOWN of the bar (and a round dot), gold fills end in a
+## glint. Looks:
 ##   "xp"     GOLD_FILL (glossy) on the light TRACK         (XP on cream cards: profile, result screen)
 ##   "night"  GOLD_FILL (glossy) on a dark INK track, inset (web .pxp / .xpbar: the home top bar)
 ##   "track"  PEACH on TRACK                                (neutral progress: steps, collection counts)
@@ -17,6 +18,7 @@ extends Control
 
 const LOOKS := ["xp", "night", "track", "teal"]
 const SEC := 0.5
+const MIN_SHOWN := 0.06              ## the least fill any progress shows (a fraction of the bar)
 
 var look := "xp"
 var value := 0.0                     ## the value (clamped to 0..max_value)
@@ -130,10 +132,12 @@ func _draw() -> void:
 	if vis <= 0.0 or inner.size.y <= 0.0:
 		return
 	var w: float
+	# any progress shows at least MIN_SHOWN of the bar (an XP bar early in a level shouldn't read as empty)
+	var shown := maxf(_shown, MIN_SHOWN) if _shown > 0.001 else 0.0
 	if inset_left > 0.0:                               # from behind the badge: at least half a dot shows past it
-		w = inset_left + clampf(vis * _shown, minf(inner.size.y * 0.5, vis), vis)
+		w = inset_left + clampf(vis * shown, minf(inner.size.y * 0.5, vis), vis)
 	else:
-		w = clampf(inner.size.x * _shown, minf(inner.size.y, inner.size.x), inner.size.x)   # never narrower than a round dot
+		w = clampf(inner.size.x * shown, minf(inner.size.y, inner.size.x), inner.size.x)   # never narrower than a round dot
 	var fill := Rect2(inner.position, Vector2(w, inner.size.y))
 	var fill_col: Color
 	match look:
@@ -155,6 +159,11 @@ func _draw() -> void:
 		var gr := Rect2(fill.position + Vector2(minf(3.0, fill.size.x * 0.25), 1.0), Vector2(maxf(0.0, fill.size.x - 2.0 * minf(3.0, fill.size.x * 0.25)), gh))
 		if gr.size.x > 2.0:
 			draw_style_box(g, gr)
+		# a glint at the tip of a gold fill: the bar looks lit, and the tip reads as "you are here"
+		if look in ["xp", "night"] and fill.size.x >= fill.size.y * 1.5:
+			var gc := Vector2(fill.end.x - fill.size.y * 0.42, fill.position.y + fill.size.y * 0.36)
+			draw_circle(gc, maxf(1.0, fill.size.y * 0.16), Color(1, 1, 1, 0.85))
+			draw_circle(gc, maxf(1.5, fill.size.y * 0.3), Color(1, 1, 1, 0.22))
 	var t := label_text()
 	if t == "":
 		return

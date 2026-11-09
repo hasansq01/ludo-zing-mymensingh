@@ -1,5 +1,6 @@
 // Frames (Collection.FRAMES, kind "frame"): some sold for coins (also gems), some for gems only, some earned. Buying
 // lists the frame in av_owned and puts it in use; earned frames still refuse to be bought; the import keeps coin frames.
+// Nameplates (Collection.PLATES) sell the same way.
 import { describe, expect, it } from "vitest";
 import { buy, equip, equipped, importProfile, isUnlocked, item, items, newProfile, type Profile } from "../src/econ";
 
@@ -72,13 +73,31 @@ describe("frames: buying", () => {
   });
 });
 
+describe("nameplates: sold like frames", () => {
+  it("coin plates pay and equip; gem-only plates refuse coins; earned plates stay locked", () => {
+    const r = buy(wallet(4000), "plate", "scroll");
+    expect(r.ok && [r.profile.coins, r.profile.av_owned, r.profile.plate]).toEqual([1000, ["scroll"], "scroll"]);
+    expect(buy(wallet(99999, 500), "plate", "neon")).toEqual({ ok: false, error: "gems_only" });
+    const g = buy(wallet(0, 130), "plate", "crystal", "gems");
+    expect(g.ok && [g.profile.gems, g.profile.plate]).toEqual([10, "crystal"]);
+    expect(buy(wallet(99999), "plate", "ruby")).toEqual({ ok: false, error: "locked" });
+    expect(buy(wallet(0), "plate", "plain")).toEqual({ ok: false, error: "owned" });
+  });
+
+  it("plate ids never repeat a frame's or a character's (they share av_owned)", () => {
+    const plates = items("plate").map((p) => p.id);
+    const others = [...items("frame"), ...items("char"), ...items("avatar")].map((p) => p.id);
+    expect(plates.filter((id) => others.includes(id))).toEqual([]);
+  });
+});
+
 describe("frames: import", () => {
   it("keeps paid characters and coin frames, drops gem-only frames and junk", () => {
     const base = newProfile(ID);
-    const r = importProfile({ av_owned: ["ch-rafi", "silver", "wings", "nope", "silver", 3], frame: "silver" }, base, "2026-10-31", 1_800_000_000);
+    const r = importProfile({ av_owned: ["ch-rafi", "silver", "wings", "nope", "silver", 3, "scroll", "neon"], frame: "silver" }, base, "2026-10-31", 1_800_000_000);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.profile.av_owned).toEqual(["ch-rafi", "silver"]);
+    expect(r.profile.av_owned).toEqual(["ch-rafi", "silver", "scroll"]);
     expect(r.profile.frame).toBe("silver");
   });
 });

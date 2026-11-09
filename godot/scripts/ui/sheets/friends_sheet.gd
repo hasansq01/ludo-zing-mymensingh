@@ -305,8 +305,7 @@ func _person_row(p: Dictionary, key: String) -> Control:
 	av.add_child(a)
 	var lv := LevelBadge.new(maxi(1, int(p.get("level", 1))), "xs")
 	lv.name = "Level"
-	lv.position = Vector2(-3.0, AVA - lv.px + 3.0)
-	lv.size = Vector2(lv.px, lv.px)
+	lv.place_under(AVA, 5.0)
 	av.add_child(lv)
 	h.add_child(av)
 	var col := UIKit.vbox(0)

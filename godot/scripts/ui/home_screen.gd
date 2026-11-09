@@ -193,7 +193,7 @@ static func _fill(c: Control) -> void:
 func _build_top_bar() -> void:
 	_top = UIKit.hbox(UIKit.SPACE.sm)
 	add_child(_top)
-	# player chip: avatar, name, the level star over the XP bar (opens the profile)
+	# player chip: avatar with its level pill, name, the XP bar (opens the profile)
 	_chip = _flat_button(_chip_style(), _chip_style(18, true))
 	_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_chip.custom_minimum_size = Vector2(BAR_H, BAR_H)
@@ -203,8 +203,7 @@ func _build_top_bar() -> void:
 	_fill(r)
 	r.offset_left = 5; r.offset_top = 5; r.offset_right = -10; r.offset_bottom = -5
 	_chip.add_child(r)
-	# the avatar with the level star on its bottom-right corner (a 28 px badge, 12 px digits: readable, and never
-	# on top of the XP bar)
+	# the avatar with the level pill ("Lv 47") centred on its bottom edge
 	var av := Control.new()
 	av.custom_minimum_size = Vector2(AVATAR, AVATAR)
 	av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -632,10 +631,9 @@ func _pulse(on: bool) -> void:
 	_badge_tw.tween_interval(1.0)
 
 
-## The level star on the avatar's bottom-right corner, placed from its real px (two-digit levels never drop below 28).
+## The level pill centred on the avatar's bottom edge (it widens with the digits).
 func _place_level() -> void:
-	_level.position = Vector2(AVATAR - _level.px + 9.0, AVATAR - _level.px + 4.0)
-	_level.size = Vector2(_level.px, _level.px)
+	_level.place_under(AVATAR, 7.0)
 
 func refresh() -> void:
 	if not is_inside_tree():

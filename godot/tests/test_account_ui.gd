@@ -142,7 +142,9 @@ func _leaderboard() -> void:
 	check("leaderboard: asked board xp, weekly first", calls == [["xp", "week"]], calls)
 	var texts := []
 	_collect(s, texts)
-	check("leaderboard: names, level and value", texts.has("Player 1") and texts.has("Level 10") and texts.has("1K XP") or texts.has("1,000 XP") or texts.has("1.0K XP"), texts)
+	check("leaderboard: names and value", texts.has("Player 1") and (texts.has("1K XP") or texts.has("1,000 XP") or texts.has("1.0K XP")), texts)
+	var lv_pill := s.find_child("Row1", true, false).find_child("Level", true, false) if s.find_child("Row1", true, false) else null
+	check("leaderboard: each row's level is the pill", lv_pill is LevelBadge and (lv_pill as LevelBadge).level == 10, lv_pill)
 	var r1 := s.find_child("Row1", true, false)
 	var medal := r1.find_child("Rank", true, false).get_child(0) if r1 else null
 	check("leaderboard: rank 1 has a medal, rank 4 a number", medal is PlayerTile.PlaceBadge and s.find_child("Row4", true, false).find_child("Rank", true, false).get_child(0) is Label)

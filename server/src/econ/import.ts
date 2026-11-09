@@ -97,9 +97,9 @@ export function importProfile(raw: unknown, base: Profile, today: string, now: n
   p.text_packs = [FREE_TEXT, ...txt.filter((e) => e !== FREE_TEXT)];
   const scenes = ownedIds(raw.scenes, "scene", "scenes", notes);
   p.scenes = [DEFAULT_SCENE, ...scenes.filter((s) => s !== DEFAULT_SCENE)];
-  // av_owned: paid characters and the frames sold for coins (gem-only frames were never sold offline)
+  // av_owned: paid characters and the frames / nameplates sold for coins (gem-only ones were never sold offline)
   const frames = isArray(raw.av_owned)
-    ? raw.av_owned.filter((x): x is string => typeof x === "string" && (item("frame", x)?.price ?? 0) > 0)
+    ? raw.av_owned.filter((x): x is string => typeof x === "string" && ((item("frame", x)?.price ?? 0) > 0 || (item("plate", x)?.price ?? 0) > 0))
     : [];
   const chars = ownedIds(isArray(raw.av_owned) ? raw.av_owned.filter((x) => !frames.includes(x as string)) : raw.av_owned, "char", "av_owned", notes);
   p.av_owned = [...chars, ...frames.filter((f, i) => frames.indexOf(f) === i)];

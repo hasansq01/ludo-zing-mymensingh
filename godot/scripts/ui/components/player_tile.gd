@@ -365,9 +365,17 @@ class Pip extends Control:
 			draw_circle(c, r - 2.0, Color.WHITE, true, -1.0, true)
 
 
-## A round place badge: 1st gold (crown above), 2nd silver, 3rd bronze, 4th plain.
+## A round place badge: 1st gold (crowned), 2nd silver, 3rd bronze as 3D-rendered medals (assets/ui3d/place_<n>.webp,
+## tools/frames/ui_art.blend.py) with the place written on the enamel; 4th and after a plain disc.
 class PlaceBadge extends Control:
 	var n := 1
+	static var _tex := {}
+
+	static func medal(n_: int) -> Texture2D:
+		if not _tex.has(n_):
+			var path := "res://assets/ui3d/place_%d.webp" % n_
+			_tex[n_] = load(path) if n_ >= 1 and n_ <= 3 and ResourceLoader.exists(path) else null
+		return _tex[n_]
 
 	static func make(n_: int, px := 26.0) -> PlaceBadge:
 		var b := PlaceBadge.new()
@@ -387,6 +395,19 @@ class PlaceBadge extends Control:
 	func _draw() -> void:
 		var s := minf(size.x, size.y)
 		var c := size / 2.0
+		var art := medal(n)
+		if art:
+			texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			var k := s * 1.12                       # the render's canvas is a little wider than the disc
+			draw_texture_rect(art, Rect2(c - Vector2(k, k) / 2.0, Vector2(k, k)), false)
+			var af := UIKit.font_display()
+			var afs := int(s * 0.5)
+			var at := str(n)
+			var aw := af.get_string_size(at, HORIZONTAL_ALIGNMENT_LEFT, -1, afs).x
+			var ap := Vector2(c.x - aw / 2.0, c.y + afs * 0.36)
+			draw_string_outline(af, ap, at, HORIZONTAL_ALIGNMENT_LEFT, -1, afs, maxi(2, int(s / 10.0)), Color(0.18, 0.06, 0.04, 0.85))
+			draw_string(af, ap, at, HORIZONTAL_ALIGNMENT_LEFT, -1, afs, Color.WHITE)
+			return
 		var face := face_color(n)
 		draw_circle(c + Vector2(0, 1.5), s / 2.0, Palette.shadow(0.3), true, -1.0, true)
 		draw_circle(c, s / 2.0, Color.WHITE, true, -1.0, true)

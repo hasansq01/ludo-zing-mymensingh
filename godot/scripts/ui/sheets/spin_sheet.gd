@@ -339,53 +339,69 @@ class Wheel extends Control:
 			pts.append(Vector2(cos(a), sin(a)) * r)
 		return pts
 
+	## The 3D-rendered parts (tools/frames/ui_art.blend.py), each laid on the wheel's 220-unit square.
+	static var _art := {}
+	static func art(name: String) -> Texture2D:
+		if not _art.has(name):
+			var path := "res://assets/ui3d/%s.webp" % name
+			_art[name] = load(path) if ResourceLoader.exists(path) else null
+		return _art[name]
+
+	## Which of the 16 rim bulbs are lit now: while spinning a fast chase (every fourth bulb), at rest every other one.
+	func _bulb_lit(k: int) -> bool:
+		if _dur > 0.0:
+			return (k + int(_t * 14.0)) % 4 == 0
+		if _flash_k >= 0:
+			return (k + int(_flash_t * 6.0)) % 2 == 0
+		return k % 2 == 0
+
 	func _draw() -> void:
 		var d := minf(size.x, size.y)
 		var s := d / 220.0
 		var c := size / 2.0
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		# soft drop shadow (filter: drop-shadow(0 8px 16px rgba(110,60,90,.28)))
 		for i in 8:
 			draw_circle(c + Vector2(0, 8 * s), (104.0 + i * 1.6) * s, Palette.shadow(0.045), true, -1.0, true)
 		var rot := deg_to_rad(angle)
+		var face := art("wheel_face")
+		var full := Rect2(-Vector2(110, 110) * s, Vector2(220, 220) * s)
 		draw_set_transform(c, rot)
-		var r := 100.0 * s
+		var r := 99.0 * s
 		var pulse := 0.0
 		if _flash_k >= 0:   # three soft pulses, then it stays lit a little
 			pulse = 0.5 - 0.5 * cos(minf(_flash_t, 1.8) / 0.6 * TAU)
 			pulse = maxf(pulse, clampf((_flash_t - 1.5) / 0.3, 0.0, 1.0) * 0.35)
+		if face:
+			draw_texture_rect(face, full, false)
 		for k in 8:
 			var pts := _seg_points(k, r)
-			var col: Color = SEG[k]
-			if _flash_k >= 0 and k != _flash_k:
-				col = col.lerp(Palette.INK, 0.25 * minf(1.0, _flash_t / 0.25))   # the others step back
-			draw_colored_polygon(pts, col)
-			if k == JACKPOT_K:   # a lighter inner band on the jackpot
-				draw_colored_polygon(_seg_points(k, r * 0.55), Color(Color.WHITE, 0.08))
+			if not face:
+				draw_colored_polygon(pts, SEG[k])
+			if _flash_k >= 0 and k != _flash_k:     # the others step back
+				draw_colored_polygon(pts, Color(Palette.INK, 0.3 * minf(1.0, _flash_t / 0.25)))
 			if k == _flash_k:
 				draw_colored_polygon(pts, Color(1, 1, 1, 0.38 * pulse))
-		for k in 8:   # white separators (2 px in the SVG)
-			var a := deg_to_rad(k * 45.0 - 90.0)
-			draw_line(Vector2.ZERO, Vector2(cos(a), sin(a)) * r, Color.WHITE, 2.0 * s, true)
 		if _flash_k >= 0:   # the winning segment's gold outline
 			var o := _seg_points(_flash_k, r - 2.0 * s)
 			o.append(o[0])
 			draw_polyline(o, Color(Palette.GOLD_HI, minf(1.0, _flash_t / 0.2)), 4.0 * s, true)
 		draw_set_transform(Vector2.ZERO)
 		_draw_labels(c, s, rot)
-		# rim, pegs, hub
-		draw_arc(c, 102.0 * s, 0, TAU, 160, Palette.GOLD, 8.0 * s, true)
-		draw_arc(c, 98.4 * s, 0, TAU, 160, Color(Palette.GOLD_DEEP, 0.55), 1.2 * s, true)
-		draw_arc(c, 105.6 * s, 0, TAU, 160, Color(Palette.GOLD_HI, 0.9), 1.2 * s, true)
-		for k in 8:
-			var a := rot + deg_to_rad(k * 45.0 - 90.0)
-			var p := c + Vector2(cos(a), sin(a)) * 102.0 * s
-			draw_circle(p + Vector2(0, 0.8 * s), 2.8 * s, Color(Palette.GOLD_DEEP, 0.7), true, -1.0, true)
-			draw_circle(p, 2.6 * s, Color.WHITE, true, -1.0, true)
-		draw_circle(c + Vector2(0, 2 * s), 19.0 * s, Palette.shadow(0.25), true, -1.0, true)
-		draw_circle(c, 19.0 * s, Color.WHITE, true, -1.0, true)
-		draw_circle(c, 15.0 * s, Palette.GOLD, true, -1.0, true)
-		draw_circle(c + Vector2(0, -1.2 * s), 13.0 * s, Palette.GOLD_HI, true, -1.0, true)
-		draw_circle(c + Vector2(-4, -5) * s, 4.5 * s, Palette.GLOSS, true, -1.0, true)
+		# the fixed gold rim with its bulbs, lit by the game
+		var rim := art("wheel_rim")
+		if rim:
+			draw_texture_rect(rim, Rect2(c + full.position, full.size), false)
+		for k in 16:
+			if _bulb_lit(k):
+				var a := deg_to_rad(k * 22.5 - 90.0)
+				var p := c + Vector2(cos(a), sin(a)) * 103.4 * s
+				draw_circle(p, 7.0 * s, Color(1.0, 0.85, 0.45, 0.35), true, -1.0, true)
+				draw_circle(p, 3.6 * s, Color(1.0, 0.97, 0.8, 0.95), true, -1.0, true)
+		var hub := art("wheel_hub")
+		if hub:
+			var hw := 47.0 * s
+			draw_texture_rect(hub, Rect2(c - Vector2(hw, hw) / 2.0, Vector2(hw, hw)), false)
 		_draw_pointer(Vector2(size.x / 2.0, -8.0 * s), s)
 
 	## Prize labels, tangential and always upright to the viewer (labels past the sides flip, never upside down).
@@ -421,6 +437,14 @@ class Wheel extends Control:
 	## The coral pointer (.pointer: 28 × 26 px with a white edge), flicked sideways when a segment edge passes it.
 	func _draw_pointer(top: Vector2, s: float) -> void:
 		var kick := -0.32 * sin(_kick * PI) * _kick
+		var ptr := art("wheel_pointer")
+		if ptr:                                    # the jewelled pointer, swinging on a pivot above its tip
+			var pw := 40.0 * s
+			var pivot := top + Vector2(0, 2.0 * s)
+			draw_set_transform(pivot, kick)
+			draw_texture_rect(ptr, Rect2(Vector2(-pw / 2.0, -pw * 0.3), Vector2(pw, pw)), false)
+			draw_set_transform(Vector2.ZERO)
+			return
 		var k := clampf(s, 0.8, 1.3)
 		var pts := PackedVector2Array([Vector2(-15, -2), Vector2(15, -2), Vector2(0, 26)])
 		var x := Transform2D(kick, top)

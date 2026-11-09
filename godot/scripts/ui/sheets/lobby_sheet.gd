@@ -290,12 +290,11 @@ func _member_row(m: Dictionary, index: int) -> Control:
 	a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	av.add_child(a)
 	var dot := OnlineDot.new(bool(m.get("online", true)))
-	dot.position = Vector2(AVA - 11.0, AVA - 11.0)
+	dot.position = Vector2(AVA - 11.0, -1.0)                # top right: the level pill sits on the bottom edge
 	av.add_child(dot)
 	var lv := LevelBadge.new(maxi(1, int(m.get("level", 1))), "xs")
 	lv.name = "Level"
-	lv.position = Vector2(-2.0, AVA - lv.px + 2.0)       # inside the avatar's box, bottom left
-	lv.size = Vector2(lv.px, lv.px)
+	lv.place_under(AVA, 5.0)
 	av.add_child(lv)
 	row.add_child(av)
 	var nm := UIKit.label((tr("%s (you)") % L10n.seat_name(str(m.get("name", "Player")))) if mine else L10n.seat_name(str(m.get("name", "Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))

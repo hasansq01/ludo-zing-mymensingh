@@ -1093,6 +1093,61 @@
       }
     },
     {
+      "kind": "plate",
+      "id": "scroll",
+      "name": "Gold Scroll",
+      "price": 3000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 30
+    },
+    {
+      "kind": "plate",
+      "id": "velvet",
+      "name": "Royal Velvet",
+      "price": 5000,
+      "buy": true,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 50
+    },
+    {
+      "kind": "plate",
+      "id": "paint",
+      "name": "Rickshaw Paint",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 60
+    },
+    {
+      "kind": "plate",
+      "id": "neon",
+      "name": "Neon",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 80
+    },
+    {
+      "kind": "plate",
+      "id": "crystal",
+      "name": "Diamond Plate",
+      "price": 0,
+      "buy": false,
+      "free": false,
+      "default": false,
+      "unlock": null,
+      "gems": 120
+    },
+    {
       "kind": "badge",
       "id": "",
       "name": "No badge",

@@ -299,4 +299,4 @@ func _clamped_width() -> void:
 	check("clamp: a 900 px child doesn't widen the card", s.card.size.x <= 340.5, str(s.card.size.x))
 	s.close()
 	await _tree().create_timer(0.3).timeout
-	check("badge: level 12 never below 28 px", LevelBadge.new(12, "xs").px == 28.0 and LevelBadge.new(9, "xs").px == 24.0)
+	check("badge: two digits widen the pill, never shrink it", LevelBadge.new(12, "xs").bsize.x > LevelBadge.new(9, "xs").bsize.x and LevelBadge.new(12, "xs").px == LevelBadge.new(9, "xs").px)

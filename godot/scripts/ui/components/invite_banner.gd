@@ -55,8 +55,7 @@ func _init(invite_: Dictionary = {}, now := 0) -> void:
 	a.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	av.add_child(a)
 	var lv := LevelBadge.new(maxi(1, int(from.get("level", 1))), "xs")
-	lv.position = Vector2(-3.0, AVA - lv.px + 3.0)
-	lv.size = Vector2(lv.px, lv.px)
+	lv.place_under(AVA, 5.0)
 	av.add_child(lv)
 	top.add_child(av)
 	var text := UIKit.vbox(0)

@@ -393,9 +393,8 @@ class Slot extends VBoxContainer:
 		if _badge == null:
 			_badge = LevelBadge.new(level_, "xs" if px < 60.0 else "sm")
 			ring.add_child(_badge)
-		_badge.set_level(level_)                      # size_for may grow the star for two digits: place it after
-		_badge.position = Vector2(px + 8.0 - _badge.px + 2.0, px + 8.0 - _badge.px + 2.0)
-		_badge.size = Vector2(_badge.px, _badge.px)
+		_badge.set_level(level_)                      # the pill widens with the digits: place it after
+		_badge.place_under(px + 8.0, 6.0)
 		name_label.text = L10n.seat_name(nm)
 		name_label.add_theme_color_override("font_color", Palette.INK)
 		name_label.add_theme_font_override("font", UIKit.font_body(900))
