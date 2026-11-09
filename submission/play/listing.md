@@ -54,4 +54,4 @@ Board, Ludo, Multiplayer, Casual, Dice
 ## Assets in this folder
 - icon-512.png (512x512, 32-bit PNG)
 - feature-1024x500.png (1024x500, no transparency)
-- screenshots/01..08 (1080x1920): home, Ludo 3D board, Snakes & Ladders, quick match tables, win result, emotes, daily reward, shop
+- screenshots/01..08 (1080x1920): home, Ludo 3D board, Snakes & Ladders, quick match tables, win result, emotes, Lucky Draw, shop (pawns)
