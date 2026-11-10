@@ -7,6 +7,8 @@ extends Control
 ##   "night"  GOLD_FILL (glossy) on a dark INK track, inset (web .pxp / .xpbar: the home top bar)
 ##   "track"  PEACH on TRACK                                (neutral progress: steps, collection counts)
 ##   "teal"   TEAL_SOFT on TRACK                            (achievements, collection progress)
+##   "game"   a gold gradient on a dark rimmed track, Lilita numbers in white (the game look: Profile)
+##   "game_teal" the same with a teal fill (the game look's achievements)
 ## Optional centred numbers ("45 / 150 XP", Nunito 900, 12-14 px with an outline so they read on fill and track);
 ## numbers need a bar of at least 16 px (the height grows to 16 when they're on).
 ## inset_left: the length of the left end an overlapping LevelBadge covers (LevelBadge.row sets it). The fill starts
@@ -16,7 +18,10 @@ extends Control
 ##   var xp2 := Meter.new("xp", 20, true, "XP")    # profile: "45 / 150 XP"
 ##   xp2.set_value(45, 150, true)
 
-const LOOKS := ["xp", "night", "track", "teal"]
+const LOOKS := ["xp", "night", "track", "teal", "game", "game_teal"]
+## The game look: [track, rim, fill top, fill bottom] (mock-up: #1a0b05 / #6b3a20, #ffe27a -> #f7a928).
+const GAME := {game = [Color("#1a0b05"), Color("#6b3a20"), Color("#ffe27a"), Color("#f7a928")],
+	game_teal = [Color("#1a0b05"), Color("#6b3a20"), Color("#7fe8d4"), Color("#2fb39c")]}
 const SEC := 0.5
 const MIN_SHOWN := 0.06              ## the least fill any progress shows (a fraction of the bar)
 
@@ -115,6 +120,9 @@ func _box(key: String, bg: Color) -> StyleBoxFlat:
 
 
 func _draw() -> void:
+	if GAME.has(look):
+		_draw_game()
+		return
 	var h := size.y
 	var track := Rect2(Vector2.ZERO, size)
 	var night := look == "night"
@@ -179,3 +187,56 @@ func _draw() -> void:
 	var ol := Color(Palette.INK_STRONG, 0.75) if night else Color(Color.WHITE, 0.85)
 	draw_string_outline(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, ol)
 	draw_string(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fg)
+
+
+## The game look: a dark track with a 2 px rim, the fill a top-to-bottom gradient cut square at its end (the track's
+## rounded ends clip it), the numbers in white Lilita One with a dark edge.
+func _draw_game() -> void:
+	var c: Array = GAME[look]
+	var h := size.y
+	var track := Rect2(Vector2.ZERO, size)
+	var tb := _box("game_track", c[0])
+	tb.bg_color = c[0]
+	tb.set_border_width_all(2)
+	tb.border_color = c[1]
+	draw_style_box(tb, track)
+	var inner := track.grow(-2.0)
+	if _shown > 0.001 and inner.size.x > 2.0 and inner.size.y > 2.0:
+		var shown := maxf(_shown, MIN_SHOWN)
+		var w := inset_left + (inner.size.x - inset_left) * shown
+		var cut := PackedVector2Array([inner.position, inner.position + Vector2(w, 0), inner.position + Vector2(w, inner.size.y),
+			inner.position + Vector2(0, inner.size.y)])
+		var parts := Geometry2D.intersect_polygons(_pill(inner), cut)
+		if not parts.is_empty():
+			var pts: PackedVector2Array = parts[0]
+			var cols := PackedColorArray()
+			for p in pts:
+				cols.append((c[2] as Color).lerp(c[3], clampf((p.y - inner.position.y) / inner.size.y, 0.0, 1.0)))
+			draw_polygon(pts, cols)
+	var t := label_text()
+	if t == "":
+		return
+	var font := UIKit.font_display()
+	var fs := clampi(int(h) - 8, 11, 16)
+	var area := Rect2(Vector2(inset_left, 0), Vector2(size.x - inset_left, h))
+	t = fitted_text(t, font, fs, area.size.x - 8.0)
+	if t == "":
+		return
+	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var pos := Vector2(area.position.x + (area.size.x - tw) / 2.0, (h - font.get_height(fs)) / 2.0 + font.get_ascent(fs))
+	draw_string_outline(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, Color(0.23, 0.1, 0.05, 0.55))
+	draw_string(font, pos, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+
+## A pill (fully rounded ends) as a polygon.
+static func _pill(r: Rect2) -> PackedVector2Array:
+	var rad := minf(r.size.y, r.size.x) / 2.0
+	var pts := PackedVector2Array()
+	var cl := Vector2(r.position.x + rad, r.position.y + r.size.y / 2.0)
+	var cr := Vector2(r.end.x - rad, cl.y)
+	for i in 13:
+		var a := PI / 2.0 + PI * i / 12.0
+		pts.append(cl + Vector2(cos(a), sin(a)) * rad)
+	for i in 13:
+		var a := -PI / 2.0 + PI * i / 12.0
+		pts.append(cr + Vector2(cos(a), sin(a)) * rad)
+	return pts

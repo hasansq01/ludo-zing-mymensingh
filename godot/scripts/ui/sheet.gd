@@ -36,6 +36,9 @@ const NARROW_W := 340.0
 ## Centre of the close button, inset from the card's top-right corner (web .card .x-btn top/right -10 with a 2 px
 ## border; .pm .x-btn -16 with a 4 px rim: both put it over the corner, about 8 px outside the card).
 const CLOSE_INSET := 16.0
+## A full-screen page's X: its top-right corner this far inside the screen's (the mock-up's 14 px, less the 2 px the
+## 48 px tap target is bigger than the 44 px disc on each side).
+const PAGE_X_INSET := 12.0
 ## The PM ribbon's top edge above the card (web .pm-title top -24 px inside a 4 px rim).
 const RIBBON_TOP := -20.0
 ## PM: where the content starts below the card's top edge (web .pm padding-top 38 + rim 4).
@@ -55,6 +58,7 @@ var title_label: Label                   ## CARD: the title label; PM: the ribbo
 var header: Control                      ## body's first child: holds the title (CARD), the ribbon and the close button
 var close_btn: Button                    ## the red X (null when not closable)
 var as_page := false                     ## make_page(): a screen, not a dialog (see make_page)
+var page_bar := true                     ## make_page(bg, false): the screen covers Home's bottom bar and keeps its X
 static var page_inset_bottom := 0.0      ## what pages leave clear at the bottom: Home's bottom bar (main sets it)
 var _chrome: Control                     ## the card's top layer holding close_btn
 var ribbon: RibbonTitle                  ## PM look with a title
@@ -307,7 +311,7 @@ static func _restack(layer: Node) -> void:
 		s._set_cover("" if top else ("dim" if s.as_page else ("hide" if under_pm else "dim")))   # a screen stays put
 		under_pm = under_pm or s.sheet_look == LOOK_PM
 		if s.close_btn:
-			s.close_btn.visible = top and not s.as_page
+			s.close_btn.visible = top and not (s.as_page and s.page_bar)
 		var d := s._scrim_by
 		if not (is_instance_valid(d) and d.is_inside_tree() and not d.is_queued_for_deletion()):
 			s._scrim_by = null
@@ -602,14 +606,19 @@ class ClampBox extends Container:
 ## Turn this sheet into a screen (the game look's Shop / Inventory): it fills the screen from the status bar down to
 ## Home's bottom bar (page_inset_bottom, which stays visible and live), wears `bg`, has no ribbon, X, dim or pop: it
 ## shows and goes at once, like switching tabs. Back still closes it. Call after super().
-func make_page(bg: StyleBox) -> void:
+## keep_bar false (the Profile): the screen goes down to the bottom of the screen over Home's bar, and keeps its close
+## X (the game look's round red X, PAGE_X_INSET from the top-right corner).
+func make_page(bg: StyleBox, keep_bar := true) -> void:
 	as_page = true
+	page_bar = keep_bar
 	backdrop.color = Color(0, 0, 0, 0)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_theme_stylebox_override("panel", bg)
 	header.custom_minimum_size.y = 0.0
 	if close_btn:
-		close_btn.visible = false
+		if not keep_bar and close_btn is UIKit.XButton:
+			(close_btn as UIKit.XButton).look = "game"
+		close_btn.visible = not keep_bar
 	fit(1.0, 100000.0)
 
 func fit(max_h := 0.88, fixed_px := 0.0) -> void:
@@ -628,7 +637,7 @@ func fit_now() -> void:
 	var w := vp.x if as_page else minf(_sheet_w, vp.x - 2.0 * UIKit.GUTTER)
 	if as_page:
 		_center.offset_top = _safe_top()
-		offset_bottom = -page_inset_bottom
+		offset_bottom = -page_inset_bottom if page_bar else 0.0
 	if absf(card.custom_minimum_size.x - w) > 0.5:
 		card.custom_minimum_size.x = w
 	if absf(_clampbox.avail_w - (w - _card_pad_x())) > 0.5:
@@ -652,7 +661,10 @@ func fit_now() -> void:
 		var other := card.get_combined_minimum_size().y - _scroll_wrap.get_combined_minimum_size().y
 		var h: float
 		if as_page:
-			h = vp.y - _safe_top() - page_inset_bottom - other
+			var bottom := page_inset_bottom if page_bar else _safe_bottom()
+			if _kb > 0.0:                       # the keyboard is up: the page's area ends above it
+				bottom = (page_inset_bottom if page_bar else 0.0) + _kb
+			h = vp.y - _safe_top() - bottom - other
 		elif _fit_fixed > 0.0:
 			h = minf(_fit_fixed, cap) - other
 		else:
@@ -794,6 +806,15 @@ func _safe_top() -> float:
 		n = n.get_parent()
 	return 0.0
 
+## The bottom safe-area inset (Main.safe_bottom), found up the tree; 0 when there is none.
+func _safe_bottom() -> float:
+	var n := get_parent()
+	while n:
+		if "safe_bottom" in n:
+			return float(n.get("safe_bottom"))
+		n = n.get_parent()
+	return 0.0
+
 func _kb_scroll_to(e: Control) -> void:
 	if scroll_box == null or not scroll_box.is_ancestor_of(e):
 		return
@@ -815,7 +836,10 @@ func _place_chrome() -> void:
 	if close_btn:
 		var s := close_btn.size
 		close_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		close_btn.position = Vector2(card.size.x - CLOSE_INSET, CLOSE_INSET) - s / 2.0 - close_btn.get_parent().position
+		if as_page and not page_bar:              # a full screen: the X sits inside the corner
+			close_btn.position = Vector2(card.size.x - PAGE_X_INSET - s.x, PAGE_X_INSET) - close_btn.get_parent().position
+		else:
+			close_btn.position = Vector2(card.size.x - CLOSE_INSET, CLOSE_INSET) - s / 2.0 - close_btn.get_parent().position
 		if _chrome and _chrome.get_index() != card.get_child_count() - 1:
 			card.move_child(_chrome, -1)          # stays the card's last child
 	if ribbon:

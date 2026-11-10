@@ -269,6 +269,18 @@ func _profile() -> void:
 	check("profile: banned account", p.account_state() == "banned" and not p._acct_button.visible)
 	var ranks := p.find_child("Leaderboard", true, false) as Button
 	check("profile: a Leaderboard button (48 px)", ranks != null and ranks.get_combined_minimum_size().y >= UIKit.TAP)
+	check("profile: a full screen over Home's bar, with its own X", p.as_page and not p.page_bar and p.close_btn != null)
+	check("profile: four stat tiles and the three My table tiles", p.find_child("Stats", true, false).get_child_count() == 4
+		and p.find_child("MyTable", true, false).get_child_count() == 3)
+	var asked: Array[String] = []
+	p.inventory_requested.connect(func(t: String): asked.append(t))
+	p._open_inventory("frames")
+	p._customise()
+	check("profile: My table and Customise ask main for the Inventory there", asked.size() == 2 and asked[0] == "frames" and asked[1] == "avatars", asked)
+	p._toggle_edit()
+	check("profile: the pencil shows the name field, again hides it", p._edit_box.visible)
+	p._toggle_edit()
+	check("profile: ... and hides it", not p._edit_box.visible)
 	p.free()
 	pg.free()
 	drop(a)

@@ -18,6 +18,7 @@ const PREFIX := "Lv"                           ## a symbol like "XP" (not transl
 
 var level := 1
 var px := 22.0                                 ## the pill's height
+var even := false                              ## "Lv" as big as the number (the game look: Profile)
 var bsize := Vector2(44, 22)                   ## the whole pill
 var _tw: Tween
 
@@ -53,7 +54,13 @@ func number_size() -> int:
 	return maxi(10, int(round(px * 0.66)))
 
 func prefix_size() -> int:
-	return maxi(8, int(round(px * 0.44)))
+	return number_size() if even else maxi(8, int(round(px * 0.44)))
+
+## Make "Lv" as big as the number (and re-size the pill for it).
+func set_even(on: bool) -> void:
+	even = on
+	_apply_size()
+	queue_redraw()
 
 ## The pill's size for a level at a height (the width follows the digits).
 static func pill_size(level_: int, h: float) -> Vector2:
@@ -65,6 +72,11 @@ static func pill_size(level_: int, h: float) -> Vector2:
 
 func _apply_size() -> void:
 	bsize = pill_size(level, px)
+	if even:
+		var font := UIKit.font_display()
+		var grow := font.get_string_size(PREFIX, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size()).x \
+			- font.get_string_size(PREFIX, HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(8, int(round(px * 0.44)))).x
+		bsize.x = ceilf(bsize.x + grow + px * 0.1)
 	custom_minimum_size = bsize
 	size = bsize
 

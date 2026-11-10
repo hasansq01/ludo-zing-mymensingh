@@ -320,5 +320,5 @@ func _main_wiring() -> void:
 	check("main: the gift opens RewardsSheet, its rows go through _on_tab", src.contains("\"rewards\":") and src.contains("RewardsSheet.new()")
 		and src.contains("s.picked.connect(_on_tab)"))
 	check("main: Shop and Inventory open on Scenes with Snakes & Ladders picked (Change scene)", src.contains("return \"scenes\" if home and home.game == \"sl\" else \"rooms\"")
-		and src.contains("ShopSheet.new(_home_shop_tab(), 400.0, true, true)"))
+		and src.contains("open_inventory(_home_shop_tab())") and src.contains("ShopSheet.new(category, 400.0, true, true)"))
 	check("main: free coins fly from the Rewards sheet's row", src.contains("if top is RewardsSheet:"))
