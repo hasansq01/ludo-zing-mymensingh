@@ -4,7 +4,8 @@ extends PanelContainer
 ## bottom of the game screen like the pair prompt: your place badge, "You finished 1st!" (Teams: "Your team
 ## finished 1st!"), a line that the others play on, and two buttons: Keep watching (closes the card; the board stays
 ## live under it) and Home (online: leave the room; your result is granted at the end anyway). The board stays
-## visible and tappable around it.
+## visible and tappable around it. The game look: the small game card (MatchLook.card), the title in outlined gold
+## display type, chunky GameUI buttons.
 ##
 ##   var card := FinishCard.new()
 ##   card.watch_pressed.connect(...); card.home_pressed.connect(...)
@@ -26,11 +27,9 @@ var _badge: Control
 
 func _init() -> void:
 	name = "FinishCard"
-	var st := UIKit.surface("card", false, true).duplicate() as StyleBoxFlat
-	UIKit.pad(st, UIKit.SPACE.md, UIKit.SPACE.sm)
-	add_theme_stylebox_override("panel", st)
+	add_theme_stylebox_override("panel", MatchLook.card(16, 8))
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var col := UIKit.vbox(UIKit.SPACE.xs)
+	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	var head := UIKit.hbox(UIKit.SPACE.sm)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -39,23 +38,24 @@ func _init() -> void:
 	_badge_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_badge_slot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_badge_slot)
-	title = UIKit.label("", UIKit.FS.h3, Palette.INK_STRONG, UIKit.font_display())
+	title = GameUI.outlined("", UIKit.FS.h1, GameUI.GOLD, 2, HORIZONTAL_ALIGNMENT_LEFT)
 	title.name = "Title"
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(title)
 	col.add_child(head)
-	sub = UIKit.label(tr("The others play on for the next places."), UIKit.FS.label, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	sub = GameUI.text(tr("The others play on for the next places."), UIKit.FS.body_l, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.name = "Sub"
 	col.add_child(sub)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	watch_button = UIKit.button(tr("Keep watching"), "honey", "sm")
+	watch_button = GameUI.button(tr("Keep watching"), "gold", "sm")
 	watch_button.name = "Watch"
-	home_button = UIKit.button(tr("Home"), "ghost", "sm")
+	home_button = GameUI.button(tr("Home"), "cream", "sm")
 	home_button.name = "Home"
 	for b in [watch_button, home_button]:
-		b.custom_minimum_size.x = 128
+		b.custom_minimum_size = Vector2(128, UIKit.TAP)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(b)
+	MatchLook.fit_buttons(watch_button, home_button)
 	watch_button.pressed.connect(func():
 		visible = false
 		watch_pressed.emit())

@@ -194,6 +194,10 @@ const GL_CARD_GLOW := Color("#8a4b26")
 const GL_CARD_FACE := Color("#5a2c16")
 const GL_CARD_DEEP := Color("#351709")
 const GL_SCRIM := Color("#120602")
+# --- match (in-match HUD and the result) ---
+const GL_BURST_MID := Color("#c25a12")   ## the win burst's orange ring (the purchase reveal's)
+const GL_BURST_DEEP := Color("#3b1608")  ## the burst's dark edge
+const GL_TEAL_TEXT := Color("#7fe8d4")   ## teal text on the dark ground ("Finished", "+40 XP")
 
 static func shadow(a := 0.16) -> Color:
 	return Color(SHADOW, a)

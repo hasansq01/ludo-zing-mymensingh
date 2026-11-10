@@ -1,6 +1,6 @@
 class_name RerollButton
 extends Control
-## The "Roll again" button of a re-roll offer (server/ECONOMY_V1.md section 4): a honey pill beside the dice with a ring
+## The "Roll again" button of a re-roll offer (server/ECONOMY_V1.md section 4): a chunky gold game button beside the dice with a ring
 ## around the seconds left that shrinks over the 3 s window, "Roll again" and its price ("Free" with a free re-roll, else
 ## a small gem and the gem price). A tap emits `pressed` once; then it shows a spinner ("Rolling…") until hide_offer()
 ## (the server's `rerolled`, or an error).
@@ -104,40 +104,38 @@ func tap() -> void:
 	UIKit.sfx("tap")
 	pressed.emit()
 
+## The game look's chunky gold button (MatchLook.draw_gold_button): the seconds in a brown ring on the left, "Roll
+## again" in display type and the price under it; pressed, the face drops by its lip.
 func _draw() -> void:
-	var lip := 4.0
-	var down := lip - 2.0 if _down else 0.0
-	var face := UIKit.box(Palette.HONEY if not busy else Palette.HONEY_TINT, UIKit.R.pill, UIKit.BW.line, Palette.HONEY_RIM)
-	var base := UIKit.box(Palette.HONEY_LIP, UIKit.R.pill)
-	draw_style_box(base, Rect2(0, 2.0, W, H - 2.0))
-	draw_style_box(face, Rect2(0, down, W, H - lip))
-	var cy := (H - lip) / 2.0 + down
-	var c := Vector2(10.0 + RING_R + 2.0, cy)
-	draw_circle(c, RING_R, Color(Palette.ON_HONEY, 0.1), true, -1.0, true)
+	var ink := Palette.GL_BROWN_TEXT
+	var face := MatchLook.draw_gold_button(self, Rect2(0, 0, W, H), 18.0, _down, busy)
+	var cy := face.get_center().y
+	var c := Vector2(8.0 + RING_R + 1.0, cy)
+	draw_circle(c, RING_R, Color(ink, 0.12), true, -1.0, true)
 	if busy:
-		draw_arc(c, RING_R - 1.5, 0.0, TAU, 32, Color(Palette.ON_HONEY, 0.2), 3.0, true)
-		draw_arc(c, RING_R - 1.5, _spin, _spin + TAU * 0.3, 16, Palette.ON_HONEY, 3.0, true)
+		draw_arc(c, RING_R - 1.5, 0.0, TAU, 32, Color(ink, 0.2), 3.0, true)
+		draw_arc(c, RING_R - 1.5, _spin, _spin + TAU * 0.3, 16, ink, 3.0, true)
 	else:
 		var k := clampf(left_ms / total_ms, 0.0, 1.0)
-		draw_arc(c, RING_R - 1.5, 0.0, TAU, 32, Color(Palette.ON_HONEY, 0.16), 3.0, true)
+		draw_arc(c, RING_R - 1.5, 0.0, TAU, 32, Color(ink, 0.18), 3.0, true)
 		if k > 0.0:
-			draw_arc(c, RING_R - 1.5, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Palette.ON_HONEY, 3.0, true)
+			draw_arc(c, RING_R - 1.5, -PI / 2.0, -PI / 2.0 + TAU * k, 32, ink, 3.0, true)
 		var f := UIKit.font_display()
 		var t := str(int(ceil(left_ms / 1000.0)))
-		var fs := 18
+		var fs := 19
 		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(f, c + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.ON_HONEY)
-	var x := c.x + RING_R + 10.0
-	var f2 := UIKit.font_body(900)
-	draw_string(f2, Vector2(x, cy - 1.0), tr("Rolling…") if busy else tr("Roll again"), HORIZONTAL_ALIGNMENT_LEFT, W - x - 8.0, 16, Palette.ON_HONEY)
+		draw_string(f, c + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+	var x := c.x + RING_R + 8.0
+	var f2 := UIKit.font_display()
+	draw_string(f2, Vector2(x, cy - (0.0 if not busy else -6.0)), tr("Rolling…") if busy else tr("Roll again"), HORIZONTAL_ALIGNMENT_LEFT, W - x - 6.0, 18, ink)
 	if busy:
 		return
-	var f3 := UIKit.font_body(800, true)
+	var f3 := UIKit.font_body(900, true)
 	if costs_nothing:
-		draw_string(f3, Vector2(x, cy + 16.0), tr("Free"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(Palette.ON_HONEY, 0.8))
+		draw_string(f3, Vector2(x, cy + 16.0), tr("Free"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(ink, 0.85))
 	else:
 		draw_gem(self, Vector2(x + 7.0, cy + 10.0), 14.0)
-		draw_string(f3, Vector2(x + 18.0, cy + 16.0), str(cost), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(Palette.ON_HONEY, 0.9))
+		draw_string(f3, Vector2(x + 18.0, cy + 16.0), str(cost), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(ink, 0.9))
 
 ## A small gem (the cut-diamond shape of assets/ui/gem.svg) centred at c, size px wide, drawn on `item`.
 static func draw_gem(item: CanvasItem, c: Vector2, px: float) -> void:

@@ -1,9 +1,10 @@
 class_name WinCard
 extends Control
-## The picture a player shares after a win (1080 x 1350, the 4:5 feed shape): the Ludo Zing logo (the owner's art,
-## drawn unchanged), your avatar in its equipped frame under a crown, your name, "1ST PLACE · LUDO", the title ribbon
-## ("You win!") and the coins won, on warm gold rays. Drawn at its real size (not a scaled-up 360 px layout) so the
-## text stays sharp; every size below is in output pixels.
+## The picture a player shares after a win (1080 x 1350, the 4:5 feed shape), in the game look of the result screen:
+## the orange burst with light rays and sparkles inside a gold rim, the Ludo Zing logo (the owner's art, drawn
+## unchanged), your avatar in its equipped frame under a crown, "1ST PLACE · LUDO" on a dark chip, your name in outlined
+## white display type, the title in big outlined gold ("YOU WIN!") and the coins won on a dark pill. Drawn at its real
+## size (not a scaled-up 360 px layout) so the text stays sharp; every size below is in output pixels.
 ##
 ##   var card := WinCard.new({name = "Mocha", place = 1, title = "You win!", coins = 228, game = "ludo"})
 ##   var path := await WinCard.render(host, data)        # user://share/win_card.png, "" when nothing was drawn
@@ -43,6 +44,24 @@ func title_text() -> String:
 
 func _build() -> void:
 	var cx := W / 2.0
+	# the burst behind everything (the result screen's): glow on the avatar, rays all round
+	var burst := GamePanel.radial(Palette.GL_GOLD_GLOW, Palette.GL_GOLD, Palette.GL_BURST_MID)
+	burst.c3 = Palette.GL_BURST_DEEP
+	burst.mid = 0.2
+	burst.mid2 = 0.55
+	burst.center = Vector2(0.5, (AVA_TOP + AVA / 2.0) / H)
+	burst.reach = Vector2(0.95, 0.95 * float(W) / float(H))
+	burst.radius = 0.0
+	burst.rays = 0.26
+	burst.ray_count = 20.0
+	burst.ray_width = 7.0 / 18.0
+	burst.ray_center = burst.center
+	burst.ray_angle = deg_to_rad(4.0)
+	burst.position = Vector2.ZERO
+	burst.size = Vector2(W, H)
+	add_child(burst)
+	# (built before the card joins a tree, so no `resized` reaches the shader: hand it the size once it is ready)
+	burst.ready.connect(burst.set.bind("radius", 0.0))
 	var logo := BrandLogo.new()
 	logo.size = Vector2(400, 274)
 	logo.position = Vector2(cx - 200.0, 64)
@@ -51,9 +70,9 @@ func _build() -> void:
 	var ava_top := AVA_TOP
 	var shadow := Panel.new()
 	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ss := UIKit.box(Color(Palette.SHADOW_DEEP, 0.0), 96)
+	var ss := UIKit.box(Color(Palette.GL_INK, 0.0), 96)
 	ss.shadow_size = 46
-	ss.shadow_color = Color(Palette.SHADOW_DEEP, 0.30)
+	ss.shadow_color = Color(0, 0, 0, 0.4)
 	ss.shadow_offset = Vector2(0, 22)
 	shadow.add_theme_stylebox_override("panel", ss)
 	shadow.position = Vector2(cx - AVA / 2.0 + 24, ava_top + 24)
@@ -74,20 +93,26 @@ func _build() -> void:
 	crown.position = Vector2(cx - 75.0, ava_top - 98.0)
 	crown.visible = int(data.get("place", 1)) == 1
 	add_child(crown)
-	_text(eyebrow_text().to_upper(), Vector2(60, 792), W - 120, 44, Palette.CREMA, UIKit.font_caps(900, 4))
+	_chip(eyebrow_text().to_upper(), 798.0)
 	var who := str(data.get("name", ""))
 	var px := 92
-	while px > 56 and UIKit.font_display().get_string_size(who, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > W - 140:
+	while px > 56 and UIKit.font_display().get_string_size(who, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > W - 160:
 		px -= 4                              # a long name shrinks before it is cut
-	var nm := _text(who, Vector2(60, 838), W - 120, px, Palette.INK_STRONG, UIKit.font_display())
+	var nm := _text(who, Vector2(60, 862), W - 120, px, Color.WHITE, UIKit.font_display())
 	nm.size.y = 92.0 * 1.25
-	nm.position.y = 838.0 + (92 - px) * 0.4
+	nm.position.y = 862.0 + (92 - px) * 0.4
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_ribbon(title_text(), 948.0)
+	_outline(nm, 12)
+	_title(title_text().to_upper(), 962.0)
 	if int(data.get("coins", 0)) > 0:
-		_coins(1096.0)
-	var foot := 1244.0 if int(data.get("coins", 0)) > 0 else 1170.0
-	_text(L10n.t("Play with me on Google Play"), Vector2(60, foot), W - 120, 44, Palette.CREMA, UIKit.font_body(900))
+		_coins(1100.0)
+	var foot := 1250.0 if int(data.get("coins", 0)) > 0 else 1176.0
+	_text(L10n.t("Play with me on Google Play"), Vector2(60, foot), W - 120, 42, Palette.GL_CREAM_RIM, UIKit.font_body(900))
+	var frame := Frame.new()
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.position = Vector2.ZERO
+	frame.size = Vector2(W, H)
+	add_child(frame)
 
 ## A one-line centred label of `px` at `pos` in a box `w` wide.
 func _text(t: String, pos: Vector2, w: float, px: int, color: Color, font: Font) -> Label:
@@ -99,37 +124,41 @@ func _text(t: String, pos: Vector2, w: float, px: int, color: Color, font: Font)
 	add_child(l)
 	return l
 
-## The orange title ribbon (the app's RibbonTitle look: rim, lip, white Lilita) across the middle, at `y`.
-func _ribbon(t: String, y: float) -> void:
+## The dark outline of the game look's display type (px each side).
+static func _outline(l: Label, px: int) -> void:
+	l.add_theme_constant_override("outline_size", px * 2)
+	l.add_theme_color_override("font_outline_color", Palette.GL_INK)
+
+## "1ST PLACE · LUDO" on a dark chip (the reveal's "NEW PAWNS!"), centred at `y`.
+func _chip(t: String, y: float) -> void:
+	var font := UIKit.font_caps(900, 4)
+	var px := 40
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x + 90.0
+	var p := Panel.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_theme_stylebox_override("panel", UIKit.box(Color(Palette.GL_INK, 0.92), 34))
+	p.position = Vector2((W - w) / 2.0, y)
+	p.size = Vector2(w, 66)
+	add_child(p)
+	var l := _text(t, Vector2(p.position.x, y), w, px, Palette.GL_TITLE, font)
+	l.size.y = 66.0
+
+## The title in big outlined gold display type (the result screen's "YOU WIN!") at `y`, sized to the card.
+func _title(t: String, y: float) -> void:
 	var font := UIKit.font_display()
-	var px := 76
-	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
-	var w := clampf(tw + 150.0, 520.0, W - 120.0)
-	var h := 120.0
-	var x := (W - w) / 2.0
-	var lip := Panel.new()
-	lip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ls := UIKit.box(Palette.RIBBON_LIP, 58)
-	ls.shadow_size = 22
-	ls.shadow_color = Palette.RIBBON_SHADOW
-	ls.shadow_offset = Vector2(0, 12)
-	lip.add_theme_stylebox_override("panel", ls)
-	lip.position = Vector2(x, y + 12)
-	lip.size = Vector2(w, h)
-	add_child(lip)
-	var face := Panel.new()
-	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	face.add_theme_stylebox_override("panel", UIKit.box(Palette.RIBBON, 58, 8, Palette.RIBBON_RIM))
-	face.position = Vector2(x, y)
-	face.size = Vector2(w, h)
-	add_child(face)
-	var l := _text(t, Vector2(x, y), w, px, Color.WHITE, font)
-	l.size.y = h
-	l.add_theme_color_override("font_outline_color", Palette.RIBBON_LIP)
-	l.add_theme_constant_override("outline_size", 10)
+	var px := 118
+	while px > 64 and font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > W - 150:
+		px -= 4
+	var l := _text(t, Vector2(40, y), W - 80, px, Palette.GL_TITLE, font)
+	l.size.y = 140.0
+	l.position.y = y + (118 - px) * 0.5 - 4.0
+	_outline(l, 16)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
+	l.add_theme_constant_override("shadow_offset_y", 10)
+	l.add_theme_constant_override("shadow_offset_x", 0)
 	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 
-## The coins line: a white pill with the coin and "+228 coins".
+## The coins line: a dark pill with the coin, "+228" in outlined gold and "coins" in cream.
 func _coins(y: float) -> void:
 	var n := "+%s" % Fmt.coins_full(int(data.get("coins", 0)))
 	var big := UIKit.font_display()
@@ -144,10 +173,9 @@ func _coins(y: float) -> void:
 	var x := (W - w) / 2.0
 	var p := Panel.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var st := UIKit.box(Color.WHITE, 69, 7, Palette.HONEY_TINT_EDGE)
-	st.border_width_bottom = 16
+	var st := UIKit.box(Color(Palette.GL_INK, 0.82), 64, 5, Palette.GL_CHIP_RIM)
 	st.shadow_size = 24
-	st.shadow_color = Color(Palette.SHADOW, 0.20)
+	st.shadow_color = Color(0, 0, 0, 0.3)
 	st.shadow_offset = Vector2(0, 10)
 	p.add_theme_stylebox_override("panel", st)
 	p.position = Vector2(x, y)
@@ -159,48 +187,46 @@ func _coins(y: float) -> void:
 	ic.size = Vector2(coin, coin)
 	ic.position = Vector2(x0, cy - coin / 2.0)
 	add_child(ic)
-	var a := UIKit.label(n, 84, Palette.ON_HONEY, big)
+	var a := UIKit.label(n, 84, Palette.GL_TITLE, big)
 	a.position = Vector2(x0 + coin + 22.0, cy - 54.0)
 	a.size = Vector2(nw + 6.0, 108)
 	a.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_outline(a, 8)
 	add_child(a)
-	var b := UIKit.label(word, 46, Palette.CREMA, small)
+	var b := UIKit.label(word, 46, Palette.GL_CREAM_RIM, small)
 	b.position = Vector2(x0 + coin + 22.0 + nw + 18.0, cy - 28.0)
 	b.size = Vector2(ww + 6.0, 62)
 	b.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	add_child(b)
 
 func _draw() -> void:
-	# warm cream to honey, rays from behind the avatar, a few confetti dots, the rim of the card
-	var top := Palette.PM_RIM
-	var bot := Palette.HONEY_TINT
-	draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(W, 0), Vector2(W, H), Vector2(0, H)]),
-		PackedColorArray([top, top, bot, bot]))
-	var c := Vector2(W / 2.0, AVA_TOP + AVA / 2.0)
-	var n := 18
-	for i in n:
-		var a0 := -0.12 + TAU * i / n
-		var a1 := a0 + TAU / n * 0.5
-		draw_colored_polygon(PackedVector2Array([c, c + Vector2(cos(a0), sin(a0)) * 1500.0, c + Vector2(cos(a1), sin(a1)) * 1500.0]),
-			Color(Palette.GOLD_HI, 0.30))
-	for k in 6:
-		draw_circle(c, 330.0 - k * 36.0, Color(Color.WHITE, 0.10 + k * 0.05), true, -1.0, true)
-	var dots := [[120, 150, 0], [940, 120, 3], [70, 520, 2], [1010, 560, 1], [150, 660, 1], [950, 690, 0], [88, 1080, 3], [996, 1060, 2],
-		[100, 1200, 2], [985, 1220, 1]]
-	for d: Array in dots:
-		draw_circle(Vector2(d[0], d[1]), 16.0, Color(Palette.PLAYER[d[2]], 0.75), true, -1.0, true)
-	var rim := StyleBoxFlat.new()
-	rim.draw_center = false
-	rim.set_border_width_all(10)
-	rim.border_color = Palette.PM_RING
-	rim.set_corner_radius_all(60)
-	rim.anti_aliasing = true
-	draw_style_box(rim, Rect2(Vector2(26, 26), Vector2(W - 52, H - 52)))
-	var rim2 := rim.duplicate() as StyleBoxFlat
-	rim2.border_color = Color(Color.WHITE, 0.9)
-	rim2.set_border_width_all(6)
-	rim2.set_corner_radius_all(52)
-	draw_style_box(rim2, Rect2(Vector2(36, 36), Vector2(W - 72, H - 72)))
+	pass
+
+## Over everything: the sparkles (the reveal's white diamonds with a soft glow) and the card's gold rim.
+class Frame extends Control:
+	const SPARKS := [[150, 470, 34], [930, 430, 26], [110, 690, 22], [975, 680, 30], [150, 1180, 20], [935, 1190, 24]]
+
+	func _draw() -> void:
+		for s: Array in SPARKS:
+			var c := Vector2(s[0], s[1])
+			var r: float = s[2]
+			for j in 6:
+				var g := r + r * 0.18 + j * r * 0.17
+				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -g), c + Vector2(g, 0), c + Vector2(0, g), c + Vector2(-g, 0)]), Color(1, 1, 1, 0.12))
+			draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r, 0), c + Vector2(0, r), c + Vector2(-r, 0)]), Color.WHITE)
+		var rim := StyleBoxFlat.new()
+		rim.draw_center = false
+		rim.set_border_width_all(14)
+		rim.border_color = Palette.GL_GOLD
+		rim.set_corner_radius_all(64)
+		rim.anti_aliasing = true
+		rim.corner_detail = 16
+		draw_style_box(rim, Rect2(Vector2(22, 22), size - Vector2(44, 44)))
+		var rim2 := rim.duplicate() as StyleBoxFlat
+		rim2.border_color = Palette.GL_INK
+		rim2.set_border_width_all(6)
+		rim2.set_corner_radius_all(52)
+		draw_style_box(rim2, Rect2(Vector2(36, 36), size - Vector2(72, 72)))
 
 ## The card as a PNG under user://share/, drawn once in a temporary SubViewport (freed before this returns). `host`:
 ## any node in the tree. Returns the file's absolute path, or "" when nothing could be drawn (headless has no renderer).

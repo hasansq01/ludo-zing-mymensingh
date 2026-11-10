@@ -1,13 +1,15 @@
 class_name PlayerTile
 extends Control
-## A player's corner tile in a game (Ludo, and S&L as "tile lite"): a cream card holding the avatar and a SOLID
-## dice slot (on the side towards the screen centre), a nameplate overlapping the card's foot (name + CPU tag),
-## a progress pill (4 home pips + whole percent, or a note such as "Square 47"), an optional chip ("Help your
-## teammate") and the colour-blind symbol (pref colorblind).
+## A player's corner tile in a game (Ludo, and S&L as "tile lite"), in the game look (MatchLook): a dark wood card
+## holding the avatar and a dark dice well (on the side towards the screen centre), a nameplate in the player's colour
+## overlapping the card's foot (the name in outlined display type + a dark CPU tag), a dark progress pill (4 home pips
+## + whole percent, or a note such as "Square 47"), an optional chip ("Help your teammate") and the colour-blind
+## symbol (pref colorblind).
 ##
-## The card is framed in the player's colour (3 px; a lighter shade while waiting) and the nameplate is tinted with
-## it, so each tile reads as the base of that colour on the board. Active turn: 1.1x, the full-colour 4 px frame and a
-## soft breathing glow. Inactive: full opacity, slightly smaller (0.95). The chip can lead with colour dots
+## The card is framed in the player's colour (3 px; a muted shade while waiting) over a dark lip, and the nameplate
+## wears the colour, so each tile reads as the base of that colour on the board. Active turn: 1.1x, a warmer face,
+## the full-colour 4 px frame over a lip in the colour's dark and a soft breathing glow. Inactive: full opacity,
+## slightly smaller (0.95). The chip can lead with colour dots
 ## (set_chip_colors: the two teammates' colours in Teams). Avatars: "you" = the equipped avatar + frame (Collection.make_avatar); "cpu" = the
 ## café mascots (Mocha, Biscotti, Espresso; assets/avatars/cpu_*.svg) on a tile in the player's colour;
 ## "human" (Pass & Play) = the pawn tile of that colour.
@@ -27,6 +29,8 @@ const GAP := 6.0
 const CARD_W := PAD * 2.0 + AVA + GAP + SLOT    # 144
 const CARD_H := PAD * 2.0 + AVA                 # 74
 const NAME_OVERLAP := 9.0
+const NAME_FS := 16                             # the nameplate's display type
+const CARD_LIP := 4.0                           # the card's lip under its frame
 const ACTIVE_SCALE := 1.1
 const IDLE_SCALE := 0.95
 const CPU_IDS := ["mocha", "biscotti", "espresso"]
@@ -68,6 +72,7 @@ var _sb_glow: StyleBoxFlat
 var _glow_box: GlowPulse                 # the turn glow: drawn once, breathes by alpha / scale (no per-frame redraw)
 var _sb_mover: StyleBoxFlat
 var _sb_you: StyleBoxFlat
+var _sb_lip: StyleBoxFlat                # the card's lip (under the frame)
 
 
 func _init(color_index_ := 0, side_ := "left") -> void:
@@ -80,15 +85,18 @@ func _init(color_index_ := 0, side_ := "left") -> void:
 	_glow_box.visible = false
 	_glow_box.place(Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H)).grow(-4))
 	add_child(_glow_box)
-	_name = UIKit.label("", UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	_name = GameUI.outlined("", NAME_FS, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_CENTER)
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_cpu_tag = _small_tag(tr("CPU"), Palette.INK, Color.WHITE)
+	_cpu_tag = MatchLook.tag(tr("CPU"))
 	var nrow := UIKit.hbox(UIKit.SPACE.xs)
 	nrow.alignment = BoxContainer.ALIGNMENT_CENTER
 	nrow.add_child(_name)
 	nrow.add_child(_cpu_tag)
-	_name_pill = _pill(nrow, (Palette.TINT[color_index] as Color).lerp(Color.WHITE, 0.3), 26)
+	_name_pill = _pill(nrow, Palette.PLAYER[color_index], 27)
+	var ns := _name_pill.get_theme_stylebox("panel") as StyleBoxFlat
+	ns.border_width_bottom = 3                     # a lip in the colour's dark, like the game buttons
+	ns.border_color = Palette.PLAYER_DARK[color_index]
 	add_child(_name_pill)
 	var prow := UIKit.hbox(UIKit.SPACE.xs)
 	prow.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -100,12 +108,15 @@ func _init(color_index_ := 0, side_ := "left") -> void:
 		pips.add_child(pip)
 		_pips.append(pip)
 	prow.add_child(pips)
-	_pct = UIKit.label("0%", UIKit.FS.small, Palette.INK, UIKit.font_body(900, true))
+	_pct = UIKit.label("0%", UIKit.FS.small + 2, Palette.GL_CREAM_RIM, UIKit.font_display())
 	_pct.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	prow.add_child(_pct)
-	_prog_pill = _pill(prow, Palette.GLASS, 22)
+	_prog_pill = _pill(prow, Color(Palette.GL_CHIP_BG, MatchLook.CHIP_A), 22)
+	var ps := _prog_pill.get_theme_stylebox("panel") as StyleBoxFlat
+	ps.set_border_width_all(UIKit.BW.line)
+	ps.border_color = Palette.GL_CHIP_RIM
 	add_child(_prog_pill)
-	_chip = UIKit.label("", UIKit.FS.small, Palette.TEAL_OUTLINE, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	_chip = UIKit.label("", UIKit.FS.small, Color.WHITE, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	_chip.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_chip_dots = UIKit.hbox(2)
@@ -115,7 +126,10 @@ func _init(color_index_ := 0, side_ := "left") -> void:
 	crow.alignment = BoxContainer.ALIGNMENT_CENTER
 	crow.add_child(_chip_dots)
 	crow.add_child(_chip)
-	_chip_pill = _pill(crow, Palette.TEAL_GLOW.lerp(Color.WHITE, 0.45), 22)
+	_chip_pill = _pill(crow, Palette.GL_BTN_TEAL_LO, 22)
+	var cs := _chip_pill.get_theme_stylebox("panel") as StyleBoxFlat
+	cs.set_border_width_all(UIKit.BW.line)
+	cs.border_color = Palette.GL_TEAL_LIP
 	_chip_pill.visible = false
 	add_child(_chip_pill)
 	set_player(Palette.NAMES[color_index], "human")
@@ -169,7 +183,7 @@ func set_state(active_: bool, mover_: bool, home: int, pct: float, chip := "") -
 	_layout()
 
 ## The chip leads with a dot per colour (Teams: the two teammates' colours, so the team reads at a glance) on a
-## white pill with ink text; [] = the plain teal chip ("Help your teammate").
+## dark pill with cream text; [] = the plain teal chip ("Help your teammate").
 func set_chip_colors(cols: Array) -> void:
 	if cols == _chip_cols:
 		return
@@ -184,9 +198,10 @@ func set_chip_colors(cols: Array) -> void:
 		_chip_dots.add_child(d)
 	_chip_dots.visible = not cols.is_empty()
 	var st := _chip_pill.get_theme_stylebox("panel") as StyleBoxFlat
-	st.bg_color = Color.WHITE if not cols.is_empty() else Palette.TEAL_GLOW.lerp(Color.WHITE, 0.45)
+	st.bg_color = Color(Palette.GL_CHIP_BG, MatchLook.CHIP_A) if not cols.is_empty() else Palette.GL_BTN_TEAL_LO
+	st.border_color = Palette.GL_CHIP_RIM if not cols.is_empty() else Palette.GL_TEAL_LIP
 	UIKit.pad(st, 7 if not cols.is_empty() else 9, 0)
-	_chip.add_theme_color_override("font_color", Palette.INK if not cols.is_empty() else Palette.TEAL_OUTLINE)
+	_chip.add_theme_color_override("font_color", Palette.GL_CREAM_RIM if not cols.is_empty() else Color.WHITE)
 	_layout()
 
 ## Shows or hides the progress pill (pips + percent).
@@ -275,10 +290,11 @@ static func mascot_texture(hint: String, c := 0) -> Texture2D:
 		id = CPU_IDS[posmod(c - 1, 3)]
 	return UIKit.svg("res://assets/avatars/cpu_%s.svg" % id)
 
-## The tile frame for player c: the full colour on its turn, a lighter shade (half way to white) while waiting.
+## The tile frame for player c: the full colour on its turn, a muted shade (a third of the way into the wood) while
+## waiting.
 static func frame_color(c: int, on: bool) -> Color:
 	var col: Color = Palette.PLAYER[posmod(c, 4)]
-	return col if on else col.lerp(Color.WHITE, 0.5)
+	return col if on else col.lerp(Palette.GL_TILE_HI, 0.35)
 
 ## The text colour for player c's name on cream (PLAYER_DARK pulled towards ink until it reads; yellow needs most).
 static func name_color(c: int) -> Color:
@@ -348,7 +364,8 @@ class AvatarTile extends Control:
 		return t
 
 
-## One of the 4 home pips: a player-colour dot when that pawn is home, else a white dot with a colour ring.
+## One of the 4 home pips: a player-colour dot (with a shine) when that pawn is home, else a dark dot with a colour
+## ring.
 class Pip extends Control:
 	var color := Color.WHITE
 	var filled := false
@@ -362,7 +379,9 @@ class Pip extends Control:
 		var r := minf(size.x, size.y) / 2.0
 		draw_circle(c, r, color, true, -1.0, true)
 		if not filled:
-			draw_circle(c, r - 2.0, Color.WHITE, true, -1.0, true)
+			draw_circle(c, r - 2.0, Palette.GL_INK, true, -1.0, true)
+		else:
+			draw_circle(c - Vector2(0, r * 0.3), r * 0.36, Color(1, 1, 1, 0.4), true, -1.0, true)
 
 
 ## A round place badge: 1st gold (crowned), 2nd silver, 3rd bronze as 3D-rendered medals (assets/ui3d/place_<n>.webp,
@@ -427,17 +446,21 @@ class PlaceBadge extends Control:
 
 func _build_styles() -> void:
 	var col: Color = Palette.PLAYER[color_index]
-	_sb_card = UIKit.box(Palette.GLASS, UIKit.R.lg + 2, UIKit.BW.rim, frame_color(color_index, false))
-	_sb_card.border_width_bottom = UIKit.LIP.md + 1
-	UIKit.shade(_sb_card, "md")
+	_sb_card = UIKit.box(Color(Palette.GL_TILE_LO, 0.94), UIKit.R.lg + 2, UIKit.BW.rim, frame_color(color_index, false))
+	_sb_card.corner_detail = 10
+	_sb_card.anti_aliasing = true
 	_sb_card_on = _sb_card.duplicate()
 	_sb_card_on.set_border_width_all(UIKit.BW.card)
-	_sb_card_on.border_width_bottom = UIKit.LIP.md + 2
 	_sb_card_on.border_color = col
-	_sb_card_on.bg_color = Palette.CARD
-	_sb_slot = UIKit.box(Palette.CHIP.lerp(Palette.TINT[color_index], 0.45), UIKit.R.md, 0)
+	_sb_card_on.bg_color = Palette.GL_TILE_HI
+	_sb_lip = UIKit.box(Palette.GL_CARD_LIP, UIKit.R.lg + 2, 0)
+	_sb_lip.corner_detail = 10
+	_sb_lip.shadow_color = Color(0, 0, 0, 0.3)
+	_sb_lip.shadow_size = 8
+	_sb_lip.shadow_offset = Vector2(0, 4)
+	_sb_slot = UIKit.box(Color(Palette.GL_CHIP_BG, 0.85), UIKit.R.md, 0)
 	_sb_slot.border_width_top = 3
-	_sb_slot.border_color = Palette.TAB_HOVER.lerp(Palette.TINT[color_index], 0.3).darkened(0.06)
+	_sb_slot.border_color = Color(0, 0, 0, 0.35)
 	_sb_glow = StyleBoxFlat.new()
 	_sb_glow.bg_color = Color(col, 0.0)
 	_sb_glow.set_corner_radius_all(UIKit.R.lg + 6)
@@ -494,7 +517,7 @@ func _layout() -> void:
 		_ava.size = Vector2(AVA, AVA)
 	var y := CARD_H - NAME_OVERLAP
 	var maxw := CARD_W - 6.0
-	var nw := UIKit.font_body(900).get_string_size(_name.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.label).x + 2.0
+	var nw := UIKit.font_display().get_string_size(_name.text, HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FS).x + 6.0
 	var tagw := _cpu_tag.get_combined_minimum_size().x + UIKit.SPACE.xs if _cpu_tag.visible else 0.0
 	_name.custom_minimum_size.x = minf(nw, maxw - 18.0 - tagw)      # an ellipsis-trimmed Label reports no width
 	for p: Control in [_name_pill, _prog_pill, _chip_pill]:
@@ -574,9 +597,15 @@ func _process(delta: float) -> void:
 	_glow = 0.5 + 0.5 * sin(_t * TAU / 1.4)
 	_glow_box.pulse(_glow)
 
+## The card over its lip: the colour's dark on the turn, the dark wood while waiting.
+func _draw_card(card: Rect2) -> void:
+	_sb_lip.bg_color = Palette.PLAYER_DARK[color_index] if active else Palette.GL_CARD_LIP
+	draw_style_box(_sb_lip, Rect2(card.position + Vector2(0, CARD_LIP), card.size))
+	draw_style_box(_sb_card_on if active else _sb_card, card)
+
 func _draw() -> void:
 	var card := Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H))
-	draw_style_box(_sb_card_on if active else _sb_card, card)
+	_draw_card(card)
 	draw_style_box(_sb_slot, Rect2(_slot_pos(), Vector2(SLOT, SLOT)))
 	# (no square behind an equipped avatar: its frame is the shape; the card's rim and nameplate carry the seat colour)
 	if mover:

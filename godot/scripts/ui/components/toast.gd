@@ -1,6 +1,6 @@
 class_name Toast
 extends RefCounted
-## The one toast of the interface (web .toast): a plum pill (Palette.TOAST, radius pill, shadow) with white
+## The one toast of the interface (web .toast; the game look: a dark café pill with a gold rim, a shadow) with white
 ## Nunito 900 16 px text, centred, wrapping to at most the screen width - 32. Optional icon by kind:
 ##   "info" no icon   "good" a teal disc with a white check   "bad" a red disc with "!"   "coin" the coin   "gem" the gem
 ## Placement: above the bottom safe area (safe bottom + 104 px, like the web), or - with `near` - just under that
@@ -34,7 +34,7 @@ static func show(host: Node, text: String, near: Control = null, sec := 1.8, kin
 	pill.name = "Toast"
 	pill.set_meta("toast", true)
 	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pill.add_theme_stylebox_override("panel", UIKit.surface("toast"))
+	pill.add_theme_stylebox_override("panel", style())
 	pill.modulate.a = 0.0
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -57,6 +57,15 @@ static func show(host: Node, text: String, near: Control = null, sec := 1.8, kin
 	_attach.call_deferred(root, pill, near, sec)
 	return pill
 
+
+## The pill in the game look: the dark café chip with a gold rim (MatchLook.chip_box), the toast's own padding.
+static func style() -> StyleBoxFlat:
+	var base := UIKit.surface("toast") as StyleBoxFlat
+	var s := MatchLook.chip_box(UIKit.R.pill, Palette.GL_CHIP_RIM, 2, 0.96)
+	for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
+		s.set_content_margin(side, base.get_content_margin(side))
+	s.shadow_size = maxi(s.shadow_size, base.shadow_size)
+	return s
 
 ## Show a toast just ABOVE `above` (centred on it), e.g. over the lobby's feature tiles so it never covers the play
 ## buttons below them. Falls back to the default bottom placement when `above` isn't on screen.

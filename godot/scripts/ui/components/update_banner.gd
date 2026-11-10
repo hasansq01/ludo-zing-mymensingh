@@ -1,7 +1,8 @@
 class_name UpdateBanner
 extends PanelContainer
-## The in-app update banner (AppUpdate): the same card as the invite banner (cream with a gold rim and the large shadow,
-## at most W_MAX wide with the 12 px gutters, sliding down from the top edge under the safe area, z over the sheets).
+## The in-app update banner (AppUpdate): the same card as the invite banner (the game look's dark café card with a
+## gold rim, at most W_MAX wide with the 12 px gutters, sliding down from the top edge under the safe area, z over the
+## sheets).
 ## Three modes, set with set_mode():
 ##   "offer"        "A new version is available" and Later / Update
 ##   "downloading"  "Downloading the update…" with a progress bar (and "You can keep playing."), no buttons
@@ -37,33 +38,30 @@ func _init(mode_ := "offer") -> void:
 	name = "UpdateBanner"
 	z_index = Z
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var st := UIKit.row_style("on").duplicate() as StyleBoxFlat
-	st.bg_color = Palette.CARD
-	UIKit.shade(st, "lg")
-	add_theme_stylebox_override("panel", st)
-	var col := UIKit.vbox(UIKit.SPACE.sm)
+	add_theme_stylebox_override("panel", MatchLook.card(14, 12))
+	var col := UIKit.vbox(UIKit.SPACE.sm + 2)
 	add_child(col)
 	var text := UIKit.vbox(0)
-	title_label = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	title_label = GameUI.outlined("", UIKit.FS.h2, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_LEFT)
 	title_label.name = "Title"
 	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(title_label)
-	sub_label = UIKit.label("", UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
+	sub_label = UIKit.label("", UIKit.FS.body, GameUI.SUB, UIKit.font_body(800))
 	sub_label.name = "Sub"
 	sub_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(sub_label)
 	col.add_child(text)
-	bar = Meter.new("track", 10.0)
+	bar = Meter.new("game", 12.0)
 	bar.name = "Progress"
 	col.add_child(bar)
 	buttons = UIKit.hbox(UIKit.SPACE.sm)
-	later_button = UIKit.btn(L10n.t("Later"), "ghost", "sm")
+	later_button = GameUI.button(L10n.t("Later"), "cream", "sm")
 	later_button.name = "Later"
-	action_button = UIKit.btn(L10n.t("Update"), "honey", "sm")
+	action_button = GameUI.button(L10n.t("Update"), "gold", "sm")
 	action_button.name = "Action"
 	for b: Button in [later_button, action_button]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		UIKit.fit_text(b, 12)
+		b.custom_minimum_size.y = UIKit.TAP
 		buttons.add_child(b)
 	later_button.pressed.connect(func() -> void:
 		if not _gone:
@@ -97,7 +95,6 @@ func set_mode(mode_: String, bytes := 0, total := 0) -> void:
 	buttons.visible = mode != "downloading"
 	if mode == "downloading":
 		bar.set_value(float(bytes), float(total) if total > 0 else 1.0, true)
-	UIKit.refit_text(action_button)
 	if is_inside_tree():
 		_place()
 
@@ -132,6 +129,12 @@ func _place() -> void:
 	position.x = (w - size.x) / 2.0
 	if _top > 0.0 and position.y >= 0.0:
 		position.y = _top
+	_shrink.call_deferred()
+
+## The wrapping title measures its height only once it has its width: shrink to the content a frame later.
+func _shrink() -> void:
+	if is_inside_tree() and not _gone:
+		size = Vector2(size.x, 0)
 
 ## Slide away and free.
 func dismiss() -> void:

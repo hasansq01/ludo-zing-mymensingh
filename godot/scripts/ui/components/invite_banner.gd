@@ -3,7 +3,8 @@ extends PanelContainer
 ## The in-app game invite (Social, server/PROTOCOL.md "Recent players, friends and invites"): the sender's avatar in
 ## its frame with their level, "<Name> invited you", the game and the room, and Not now / Join. It slides down from
 ## the top edge (under the safe area, above every sheet: z Z) and leaves by itself when the invite expires (`expired`).
-## A card in the sheets' cream with a gold rim and the large shadow, at most W_MAX wide with the 12 px gutters.
+## The game look's small card (MatchLook.card: the dark café card, gold rim, lip), the name in outlined display type,
+## chunky GameUI buttons; at most W_MAX wide with the 12 px gutters.
 ##
 ##   var b := InviteBanner.new(invite, now)   # invite: {id, from: {name, avatar, frame, level}, code, game, expires_at}
 ##   b.join_pressed.connect(...); b.later_pressed.connect(...); b.expired.connect(...)
@@ -39,11 +40,8 @@ func _init(invite_: Dictionary = {}, now := 0) -> void:
 	name = "InviteBanner"
 	z_index = Z
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var st := UIKit.row_style("on").duplicate() as StyleBoxFlat
-	st.bg_color = Palette.CARD
-	UIKit.shade(st, "lg")
-	add_theme_stylebox_override("panel", st)
-	var col := UIKit.vbox(UIKit.SPACE.sm)
+	add_theme_stylebox_override("panel", MatchLook.card(14, 12))
+	var col := UIKit.vbox(UIKit.SPACE.sm + 2)
 	add_child(col)
 	var top := UIKit.hbox(UIKit.SPACE.md)
 	col.add_child(top)
@@ -61,25 +59,25 @@ func _init(invite_: Dictionary = {}, now := 0) -> void:
 	var text := UIKit.vbox(0)
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	title_label = UIKit.label(tr("%s invited you") % L10n.seat_name(str(from.get("name", "Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	title_label = GameUI.outlined(tr("%s invited you") % L10n.seat_name(str(from.get("name", "Player"))), UIKit.FS.h2, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_LEFT)
 	title_label.name = "Title"
 	title_label.clip_text = true                # one line (names are at most 16 characters): a wrap would size the card for 60 px
 	title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	text.add_child(title_label)
-	sub_label = UIKit.label(sub_text(invite), UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
+	sub_label = UIKit.label(sub_text(invite), UIKit.FS.body, GameUI.SUB, UIKit.font_body(800))
 	sub_label.name = "Sub"
 	sub_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	sub_label.clip_text = true
 	text.add_child(sub_label)
 	top.add_child(text)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	later_button = UIKit.btn(tr("Not now"), "ghost", "sm")
+	later_button = GameUI.button(tr("Not now"), "cream", "sm")
 	later_button.name = "Later"
-	join_button = UIKit.btn(tr("Join"), "honey", "sm")
+	join_button = GameUI.button(tr("Join"), "gold", "sm")
 	join_button.name = "Join"
 	for b: Button in [later_button, join_button]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		UIKit.fit_text(b, 12)
+		b.custom_minimum_size.y = UIKit.TAP
 		row.add_child(b)
 	later_button.pressed.connect(func():
 		if not _gone:

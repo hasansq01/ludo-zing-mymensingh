@@ -1,8 +1,9 @@
 class_name GameTopBar
 extends Control
 ## The game screen's top row (Ludo, Snakes & Ladders, the S&L landing): a left icon button (pause, or back),
-## the event line in the middle (a cream glass bar, 16 px Nunito, plum ink; bold names tinted with the player's
-## colour) and the gear on the right. Full width, sits under the safe area (set safe_top).
+## the event line in the middle (the game look: a dark café chip with a gold rim, 16 px Nunito in white; bold names
+## in the player's colour, lifted to read on the dark) and the gear on the right, both buttons dark chips with the
+## gold Home icons (MatchLook). An event flashes the rim gold. Full width, sits under the safe area (set safe_top).
 ##
 ## The event line has two layers:
 ##   set_idle(bb)  the persistent state ("Your turn — tap the dice", "Mocha is thinking…"), shown quietly
@@ -59,11 +60,8 @@ func _init(mode_ := "pause") -> void:
 	mode = mode_
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_sb = UIKit.glass(UIKit.R.md + 2)
-	_sb.border_width_bottom = UIKit.LIP.sm
-	_sb.border_color = Palette.LINE
+	_sb = MatchLook.chip_box(UIKit.R.md + 4)
 	UIKit.pad(_sb, UIKit.SPACE.md, 6)
-	_sb.content_margin_bottom = 6 + UIKit.LIP.sm - 1
 	_sb_event = _sb.duplicate()
 	bar = PanelContainer.new()
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -87,7 +85,7 @@ func _init(mode_ := "pause") -> void:
 	text.add_theme_font_override("bold_font", UIKit.font_body(900))
 	text.add_theme_font_size_override("normal_font_size", UIKit.FS.status)
 	text.add_theme_font_size_override("bold_font_size", UIKit.FS.status)
-	text.add_theme_color_override("default_color", Palette.INK)
+	text.add_theme_color_override("default_color", Color.WHITE)
 	text.add_theme_constant_override("line_separation", -2)
 	row.add_child(text)
 	info_slot = UIKit.hbox(0)
@@ -107,7 +105,7 @@ func _init(mode_ := "pause") -> void:
 	# content whenever the minimum changes.
 	bar.minimum_size_changed.connect(_fit_later)
 	set_mode(mode)
-	gear_button = UIKit.icon_button("ic_gear")
+	gear_button = MatchLook.icon_button("gear")
 	gear_button.pressed.connect(func(): gear_pressed.emit())
 	add_child(gear_button)
 	resized.connect(_layout)
@@ -119,7 +117,7 @@ func set_mode(m: String) -> void:
 	mode = m
 	if left_button:
 		left_button.queue_free()
-	left_button = UIKit.icon_button("ic_back" if m == "back" else "ic_pause")
+	left_button = MatchLook.icon_button("back" if m == "back" else "pause")
 	left_button.pressed.connect(func(): left_pressed.emit())
 	add_child(left_button)
 	_layout()
@@ -184,9 +182,10 @@ func show_bar() -> void:
 	visible = true
 	modulate.a = 1.0
 
-## [b]name[/b] in player c's name colour, for messages that mention someone other than the current player.
+## [b]name[/b] in player c's name colour (lifted for the dark line), for messages that mention someone other than
+## the current player.
 static func who(name: String, c: int) -> String:
-	return "[b][color=#%s]%s[/color][/b]" % [PlayerTile.name_color(c).to_html(false), L10n.seat_name(name)]
+	return "[b][color=#%s]%s[/color][/b]" % [MatchLook.name_color(c).to_html(false), L10n.seat_name(name)]
 
 ## Height of the row including the safe area (for laying out things under it).
 func bottom() -> float:
@@ -198,7 +197,8 @@ func bottom() -> float:
 func _tint(bb: String) -> String:
 	if bb == "":
 		return ""
-	var col: Color = PlayerTile.name_color(_turn) if _turn >= 0 else Palette.INK_STRONG
+	var col: Color = MatchLook.name_color(_turn) if _turn >= 0 else Palette.GL_TITLE
+	bb = MatchLook.relight(bb)               # names tinted for cream elsewhere: the light shade on this dark line
 	return bb.replace("[b]", "[b][color=#%s]" % col.to_html(false)).replace("[/b]", "[/color][/b]")
 
 func _show(bb: String, pop: bool) -> void:
@@ -237,10 +237,9 @@ func _show(bb: String, pop: bool) -> void:
 		bar.add_theme_stylebox_override("panel", _sb)
 
 func _paint_flash() -> void:
-	_sb_event.bg_color = Palette.GLASS.lerp(Palette.HONEY_TINT, 0.85 * _flash)
-	_sb_event.set_border_width_all(1 + int(round(_flash)))
-	_sb_event.border_width_bottom = UIKit.LIP.sm
-	_sb_event.border_color = Palette.LINE.lerp(Palette.HONEY_LIP, _flash)
+	_sb_event.bg_color = Color(Palette.GL_CHIP_BG.lerp(Palette.GL_WOOD, 0.8 * _flash), MatchLook.CHIP_A)
+	_sb_event.set_border_width_all(2 + int(round(_flash)))
+	_sb_event.border_color = Palette.GL_CHIP_RIM.lerp(Palette.GL_TITLE, _flash)
 
 func _process(delta: float) -> void:
 	if _flash > 0.0:
@@ -300,7 +299,7 @@ func _fit_font() -> void:
 	if int(_sb.content_margin_top) != pad:
 		for sb: StyleBoxFlat in [_sb, _sb_event]:
 			sb.content_margin_top = pad
-			sb.content_margin_bottom = pad + UIKit.LIP.sm - 1
+			sb.content_margin_bottom = pad
 
 ## The font size the line uses now (tests).
 func line_size() -> int:

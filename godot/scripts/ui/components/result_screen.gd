@@ -1,10 +1,14 @@
 class_name ResultScreen
 extends Control
-## The full-screen game result over the (blurred, dimmed) board, always headlined from the player's side: on a
-## win the winner's avatar with a crown in a burst of gold rays; on a loss your own avatar with your place badge
-## ("You finished 3rd", soft rays), the .pm card with the title ribbon, the finish order (1st–4th: place badges, avatars, names, a teal check + "Finished"
-## or the progress of the unfinished), the rewards (coins counting up, XP filling the Meter, "Level up!") and the
-## buttons Play again (honey, lg), Share (teal; a win or a podium finish only) and Home (ghost). Back = Home. Confetti only when the human (or their team) won.
+## The full-screen game result, a game moment in the game look (the purchase reveal's): on a win the whole screen an
+## orange burst with turning light rays and twinkling sparkles, the winner's avatar in a gold mount with a crown and
+## the title in big outlined display type ("YOU WIN!"); on a loss a dark café burst with faint rays, your own avatar
+## with your place medal ("YOU FINISHED 3RD"). Always headlined from the player's side. Under the title the line of
+## what happened on a dark chip ("ALL FOUR PAWNS HOME!", "MOCHA WON"), then the finish order as wood rows (1st–4th:
+## place medals, avatars, names, a teal check + "Finished" or the progress of the unfinished), the rewards as wood
+## tiles (coins counting up, XP filling the gold bar, "Level up!") and the chunky buttons PLAY AGAIN (gold, lg),
+## SHARE (teal; a win or a podium finish only) and HOME (cream). Back = Home. Confetti only when the human (or their
+## team) won.
 ##
 ##   var r := ResultScreen.new({
 ##       game = "ludo",                     # "ludo" | "sl"
@@ -46,12 +50,14 @@ signal doubled(extra: int)               ## the "double" video was granted (the 
 const CARD_W := 358.0
 const AVA_HERO := 92.0
 const AVA_ROW := 40.0
-const ROW_H := 52.0
+const ROW_H := 56.0
+const NAME_FS := 19                      ## a row's name (display type)
+const TITLE_FS := 50                     ## the title's display size (it steps down to fit)
 
 var data := {}
 var dismissable := false                 # Sheet-like: main's back handler must not just close it
 var card: PanelContainer
-var title_ribbon: Control
+var title_ribbon: Control                ## the title (outlined display type; the name is from the old ribbon)
 var content: VBoxContainer
 var again_button: Button
 var home_button: Button
@@ -67,10 +73,12 @@ var xp_meter: Meter
 var level_badge: LevelBadge
 
 var _backdrop: ColorRect
+var _burst: GamePanel                    ## the full-screen burst (radial glow + rays)
+var _sparkles: Control
 var _hero: Control
-var _rays: Rays
 var _title: Label
 var _sub: Label
+var _chip: PanelContainer                ## the sub line's dark chip
 var _rows: Array[Control] = []
 var _rewards: Control
 var _body: VBoxContainer
@@ -91,7 +99,6 @@ var _vote_sub: Label
 var _vote_timer: Label
 var _vote_names: HFlowContainer
 
-static var _blur: Shader
 
 
 func _init(data_: Dictionary = {}) -> void:
@@ -263,25 +270,26 @@ func _build() -> void:
 	_backdrop = ColorRect.new()
 	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_backdrop.material = _blur_material()
+	_backdrop.color = Color(0, 0, 0, 0)          # (the opaque burst covers the board: no blur pass under it)
 	add_child(_backdrop)
-	var won := bool(data.get("human_won", false))
+	var gold := bool(data.get("human_won", false)) or you().is_empty()
+	_burst = _make_burst(gold)
+	_backdrop.add_child(_burst)
+	_burst.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if gold:
+		_sparkles = RevealSheet.Sparkles.new()
+		_sparkles.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_backdrop.add_child(_sparkles)
+		_sparkles.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	content = UIKit.vbox(0)
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(content)
-	# hero: rays + winner avatar(s) + crown
+	# hero: the winner avatar(s) in gold mounts + the crown (the burst's rays turn round it)
 	_hero = Control.new()
-	_hero.custom_minimum_size = Vector2(CARD_W, AVA_HERO + 72)
+	_hero.custom_minimum_size = Vector2(CARD_W, AVA_HERO + 46)
 	_hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(_hero)
-	_rays = Rays.new()
-	_rays.gold = won or you().is_empty()
-	if _rays.gold:
-		var add := CanvasItemMaterial.new()
-		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		_rays.material = add
-	_hero.add_child(_rays)
 	var w := hero_rows()
 	var lost := you_lost()
 	var n := clampi(w.size(), 1, 2)
@@ -309,13 +317,32 @@ func _build() -> void:
 	crown.pivot_offset = Vector2(26, 40)
 	crown.rotation = deg_to_rad(-8.0)
 	crown.visible = not lost
-	content.add_child(_gap(6))
-	# card: ribbon title, sub line, standings, rewards
+	# the title: big outlined display type (gold on a win, white otherwise), sized to the width in _layout
+	_title = GameUI.outlined(title_text().to_upper(), TITLE_FS, GameUI.GOLD if gold else Color.WHITE, 5, HORIZONTAL_ALIGNMENT_CENTER)
+	_title.name = "Title"
+	_title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
+	_title.add_theme_constant_override("shadow_offset_y", 4)
+	_title.add_theme_constant_override("shadow_offset_x", 0)
+	title_ribbon = _title
+	content.add_child(_title)
+	# what happened, on a dark chip (the reveal's "NEW PAWNS!")
+	_chip = PanelContainer.new()
+	_chip.name = "Sub"
+	_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var cs := UIKit.box(Color(Palette.GL_INK, 0.92), UIKit.R.md, 0)
+	cs.content_margin_left = 16; cs.content_margin_right = 16
+	cs.content_margin_top = 4; cs.content_margin_bottom = 5
+	_chip.add_theme_stylebox_override("panel", cs)
+	_sub = UIKit.label(sub_text().to_upper(), UIKit.FS.body_l, GameUI.GOLD, OfferSheet.spaced_display(2), HORIZONTAL_ALIGNMENT_CENTER)
+	_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE              # (one line; _fit_title wraps a long one)
+	_chip.add_child(_sub)
+	content.add_child(_chip)
+	content.add_child(_gap(UIKit.SPACE.lg))
+	# the standings and the rewards: wood rows and tiles straight on the burst (as on the Ranks screen)
 	card = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", Sheet.PMStyle.new())
-	var pm := card.get_theme_stylebox("panel")
-	pm.content_margin_left = 14; pm.content_margin_right = 14
-	pm.content_margin_top = 34; pm.content_margin_bottom = 16
+	card.name = "Card"
+	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	card.custom_minimum_size = Vector2(CARD_W, 0)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -324,9 +351,6 @@ func _build() -> void:
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(body)
 	_body = body
-	_sub = UIKit.label(sub_text(), UIKit.FS.body_l, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
-	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_child(_sub)
 	var list := UIKit.vbox(UIKit.SPACE.sm)            # the list-row gap
 	list.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(list)
@@ -334,8 +358,7 @@ func _build() -> void:
 	var last_place := -1
 	for e: Dictionary in standings():
 		if teams and int(e.get("place", 0)) != last_place:
-			var cap := UIKit.caption(_team_caption(e))
-			cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			var cap := GameUI.outlined(_team_caption(e), UIKit.FS.body_l, GameUI.GOLD, 2, HORIZONTAL_ALIGNMENT_LEFT)
 			list.add_child(UIKit.margin(cap, 6, 2 if last_place < 0 else 4, 0, 0))
 		last_place = int(e.get("place", 0))
 		var row := _row(e)
@@ -344,27 +367,26 @@ func _build() -> void:
 	_rewards = _rewards_row()
 	body.add_child(_rewards)
 	_build_table(body)
-	title_ribbon = RibbonTitle.new(title_text())
-	title_ribbon.name = "Ribbon"
-	add_child(title_ribbon)
-	_title = (title_ribbon as RibbonTitle).label
-	content.add_child(_gap(UIKit.SPACE.lg))
-	_buttons = UIKit.vbox(UIKit.SPACE.sm)
+	content.add_child(_gap(UIKit.SPACE.lg + 4))
+	_buttons = UIKit.vbox(UIKit.SPACE.md)
 	_buttons.custom_minimum_size = Vector2(CARD_W - 20.0, 0)
 	_buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vote_card = _build_vote()
 	_buttons.add_child(vote_card)
-	again_button = UIKit.btn(tr("Play again"), "honey", "lg")
+	again_button = GameUI.button(tr("Play again"), "gold", "lg")
 	again_button.pressed.connect(_pick.bind("again"))
 	_buttons.add_child(again_button)
+	var row2 := UIKit.hbox(UIKit.SPACE.md)          # Share and Home side by side (Home alone: full width)
+	row2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buttons.add_child(row2)
 	if can_share():
-		share_button = UIKit.btn(tr("Share"), "teal", "md")
+		share_button = GameUI.button(tr("Share"), "teal", "md")
 		share_button.name = "Share"
 		share_button.pressed.connect(share)
-		_buttons.add_child(share_button)
-	home_button = UIKit.btn(tr("Home"), "ghost", "md")
+		row2.add_child(share_button)
+	home_button = GameUI.button(tr("Home"), "cream", "md")
 	home_button.pressed.connect(_pick.bind("home"))
-	_buttons.add_child(home_button)
+	row2.add_child(home_button)
 	content.add_child(_buttons)
 	_me = str(data.get("me", ""))
 	if is_online():
@@ -412,7 +434,7 @@ func _build_table(parent: VBoxContainer) -> void:
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(UIKit.icon("coin", 20))
 		var text := CoinTables.refund_text(table_refund()) if refunded else CoinTables.lost_text(int(table().entry))
-		table_note = UIKit.label(text, UIKit.FS.body_l, Palette.MUTED, UIKit.font_body(900))
+		table_note = UIKit.label(text, UIKit.FS.body_l, GameUI.SUB, UIKit.font_body(900))
 		table_note.name = "TableNote"
 		table_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(table_note)
@@ -423,13 +445,13 @@ func _build_table(parent: VBoxContainer) -> void:
 		parent.add_child(bonus_note)
 	if not _ads_ok():
 		return
-	double_button = UIKit.btn(tr("Double it with a video"), "teal", "md")
+	double_button = GameUI.button(tr("Double it with a video"), "teal", "md")
 	double_button.name = "Double"
 	double_button.pressed.connect(_double)
 	parent.add_child(double_button)
 
 func _quiet_line(text: String, node_name: String) -> Label:
-	var l := UIKit.label(text, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, UIKit.FS.body, GameUI.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	l.name = node_name
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -470,7 +492,7 @@ func set_claim_note(text: String) -> void:
 			_claim_note = null
 		return
 	if _claim_note == null:
-		_claim_note = UIKit.label(text, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+		_claim_note = UIKit.label(text, UIKit.FS.body, GameUI.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 		_claim_note.name = "ClaimNote"
 		_claim_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_claim_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -490,17 +512,19 @@ func _team_caption(e: Dictionary) -> String:
 	var label := " + ".join(cols.map(func(c): return L10n.seat_name(Palette.NAMES[c])))
 	return "%s · %s" % [ordinal(int(e.get("place", 1))), label]
 
-## An avatar in a white mount ring in the player's colour (hero).
+## An avatar in a gold mount (the game look's frames), its inner ring in the player's colour (hero).
 func _avatar_mount(e: Dictionary, px: float) -> Control:
 	var c := int(e.get("color", 0))
 	var holder := Panel.new()
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.size = Vector2(px, px)
-	var st := UIKit.box(Color.WHITE, int(px * 0.3) + 4, UIKit.BW.card, Palette.PLAYER[c])
-	st.shadow_size = 12
-	st.shadow_color = Color(Palette.SHADOW_DEEP, 0.35)
-	st.shadow_offset = Vector2(0, 6)
-	st.expand_margin_left = 5; st.expand_margin_right = 5; st.expand_margin_top = 5; st.expand_margin_bottom = 5
+	var st := UIKit.box(Palette.PLAYER[c], int(px * 0.3) + 7, 5, Palette.GL_GOLD)
+	st.shadow_size = 14
+	st.shadow_color = Color(0, 0, 0, 0.4)
+	st.shadow_offset = Vector2(0, 7)
+	st.expand_margin_left = 8; st.expand_margin_right = 8; st.expand_margin_top = 8; st.expand_margin_bottom = 8
+	st.corner_detail = 12
+	st.anti_aliasing = true
 	holder.add_theme_stylebox_override("panel", st)
 	var a := _make_avatar(e, px)
 	a.size = Vector2(px, px)
@@ -532,21 +556,16 @@ func _sync_buttons() -> void:
 	var open := not _vote.is_empty() and res == ""
 	var mine := Online.vote_of(_vote, _me) if not _vote.is_empty() else ""
 	var text := tr("Play again")
-	var kind := "honey"
 	var off := false
 	if is_online() and not bool(data.get("host", false)):
-		kind = "off"
 		off = true
 	elif mine == "wait" and open:
 		text = tr("Play")
 	elif mine == "yes":
 		text = tr("Starting…") if res == "go" else tr("Waiting…")
-		kind = "off"
 		off = true
-	if again_button.text != text or str(again_button.get_meta("kit_kind", "honey")) != kind:
+	if again_button.text != text:              # (off: the game button's face greys while disabled)
 		again_button.text = text
-		UIKit.set_kind(again_button, kind)
-		again_button.set_meta("kit_kind", kind)
 	again_button.disabled = off or not _revealed
 	home_button.text = tr("Leave") if open else tr("Home")
 	home_button.disabled = not _revealed
@@ -564,8 +583,7 @@ func _build_vote() -> PanelContainer:
 	var p := PanelContainer.new()
 	p.name = "Vote"
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var st := UIKit.box(Palette.CARD, UIKit.R.md, UIKit.BW.line, Palette.ROW_EDGE)
-	st.border_width_bottom = UIKit.LIP.sm
+	var st := UIKit.box(Palette.GL_TILE_LO, UIKit.R.md, UIKit.BW.line, Palette.GL_CHIP_RIM)
 	UIKit.pad(st, 12, 8)
 	p.add_theme_stylebox_override("panel", st)
 	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
@@ -573,7 +591,7 @@ func _build_vote() -> PanelContainer:
 	p.add_child(col)
 	var head := UIKit.hbox(UIKit.SPACE.sm)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_vote_title = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	_vote_title = UIKit.label("", UIKit.FS.h3, Color.WHITE, UIKit.font_body(900))
 	_vote_title.name = "Title"
 	_vote_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_vote_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -581,16 +599,16 @@ func _build_vote() -> PanelContainer:
 	head.add_child(_vote_title)
 	var pill := PanelContainer.new()
 	pill.name = "Timer"
-	var ps := UIKit.box(Palette.HONEY_TINT, UIKit.R.pill, UIKit.BW.line, Palette.HONEY_TINT_EDGE)
+	var ps := UIKit.box(Palette.GL_CHIP_BG, UIKit.R.pill, UIKit.BW.line, Palette.GL_CHIP_RIM)
 	UIKit.pad(ps, 10, 2)
 	pill.add_theme_stylebox_override("panel", ps)
 	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_vote_timer = UIKit.label("0:30", UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
+	_vote_timer = UIKit.label("0:30", UIKit.FS.label, Palette.GL_CREAM_RIM, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
 	pill.add_child(_vote_timer)
 	head.add_child(pill)
 	col.add_child(head)
-	_vote_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+	_vote_sub = UIKit.label("", UIKit.FS.body, GameUI.SUB, UIKit.font_body(800))
 	_vote_sub.name = "Sub"
 	_vote_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_vote_sub)
@@ -649,7 +667,7 @@ func _vote_chip(pl: Dictionary) -> Control:
 	chip.name = "Voter%s" % NetClient.id_str(pl.get("id", ""))
 	chip.set_meta("vote", v)
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var st := UIKit.box(Color.WHITE if v != "no" else Palette.CHIP, UIKit.R.pill, UIKit.BW.line, Palette.TEAL if v == "yes" else Palette.ROW_EDGE)
+	var st := UIKit.box(Palette.GL_CHIP_BG if v != "no" else Palette.GL_CARD_LIP, UIKit.R.pill, UIKit.BW.line, Palette.TEAL if v == "yes" else Palette.GL_TILE_RIM)
 	UIKit.pad(st, 6, 3)
 	st.content_margin_right = 10
 	chip.add_theme_stylebox_override("panel", st)
@@ -658,7 +676,7 @@ func _vote_chip(pl: Dictionary) -> Control:
 	row.add_child(_check_disc(16.0) if v == "yes" else _vote_mark(v, 16.0))
 	var mine := NetClient.id_str(pl.get("id", "")) == _me
 	var nm := UIKit.label(tr("You") if mine else L10n.seat_name(str(pl.get("name", "Player"))), UIKit.FS.label,
-		Palette.MUTED if v == "no" else Palette.INK, UIKit.font_body(900))
+		Palette.GL_TILE_RIM if v == "no" else Color.WHITE, UIKit.font_body(900))
 	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.custom_minimum_size.x = minf(UIKit.font_body(900).get_string_size(nm.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.label).x + 2.0, 104.0)
@@ -676,14 +694,14 @@ static func _vote_mark(v: String, px: float) -> Control:
 		var m := c.size / 2.0
 		var r := px / 2.0
 		if v == "no":
-			c.draw_circle(m, r, Palette.TAN_DEEP, true, -1.0, true)
+			c.draw_circle(m, r, Palette.GL_TILE_RIM, true, -1.0, true)
 			var d := r * 0.42
 			c.draw_line(m - Vector2(d, d), m + Vector2(d, d), Color.WHITE, 2.0, true)
 			c.draw_line(m + Vector2(-d, d), m + Vector2(d, -d), Color.WHITE, 2.0, true)
 			return
-		c.draw_arc(m, r - 1.0, 0.0, TAU, 32, Palette.TAN_DEEP, 2.0, true)
+		c.draw_arc(m, r - 1.0, 0.0, TAU, 32, Palette.GL_CHIP_RIM, 2.0, true)
 		for k in 3:
-			c.draw_circle(m + Vector2((k - 1) * r * 0.48, 0.0), 1.4, Palette.MUTED, true, -1.0, true))
+			c.draw_circle(m + Vector2((k - 1) * r * 0.48, 0.0), 1.4, Palette.GL_CREAM_TEXT, true, -1.0, true))
 	return c
 
 ## The countdown pill: the seconds left on the vote ("0:24").
@@ -691,19 +709,20 @@ func _tick_vote() -> void:
 	if _vote_timer and vote_card.visible:
 		_vote_timer.text = Fmt.clock(ceili(maxi(0, _vote_end - Time.get_ticks_msec()) / 1000.0))
 
+## A standings row: a wood tile (Ranks' rows) over a dark lip; the winner's rimmed in gold on a warmer face, yours in
+## your colour. The place medal, the avatar, the name in outlined display type (+ CPU), the result on the right.
 func _row(e: Dictionary) -> Control:
 	var c := int(e.get("color", 0))
 	var place := int(e.get("place", 0))
 	var first := place == 1
 	var mine := str(e.get("kind", "")) == "you"
-	var p := PanelContainer.new()
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var st := UIKit.box(Palette.HONEY_TINT if first else Color.WHITE, UIKit.R.md, UIKit.BW.line,
-		Palette.GOLD if first else (Palette.PLAYER[c] if mine else Palette.ROW_EDGE))
-	st.border_width_bottom = UIKit.LIP.sm
-	UIKit.pad(st, 8, 4)
-	st.content_margin_bottom = 4 + UIKit.LIP.sm - UIKit.BW.line
-	p.add_theme_stylebox_override("panel", st)
+	var p := GamePanel.vertical(Palette.GL_CARD_GLOW if first else Palette.GL_TILE_HI, Palette.GL_TILE_LO)
+	p.radius = 16.0
+	p.border = 3.0 if first or mine else 2.0
+	p.border_color = Palette.GL_TITLE if first else (Palette.PLAYER[c] if mine else Palette.GL_TILE_RIM)
+	p.lip = 4.0
+	p.lip_color = Palette.GL_CARD_LIP
+	p.pad = 8.0
 	p.custom_minimum_size = Vector2(0, ROW_H)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -718,15 +737,15 @@ func _row(e: Dictionary) -> Control:
 	var name_box := UIKit.hbox(UIKit.SPACE.xs + 2)
 	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var nm := UIKit.label(L10n.seat_name(str(e.get("name", Palette.NAMES[c]))), UIKit.FS.h3, PlayerTile.name_color(c) if not mine else Palette.INK, UIKit.font_body(900))
+	var nm := GameUI.outlined(L10n.seat_name(str(e.get("name", Palette.NAMES[c]))), NAME_FS, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_LEFT)
 	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	var tw_ := UIKit.font_body(900).get_string_size(nm.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.h3).x + 2.0
+	var tw_ := UIKit.font_display().get_string_size(nm.text, HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FS).x + 6.0
 	nm.custom_minimum_size.x = minf(tw_, 118.0)       # a trimmed Label reports no width of its own
 	name_box.add_child(nm)
 	if str(e.get("kind", "")) == "cpu":
-		var tag := UIKit.tag(tr("CPU"), "ink")
+		var tag := MatchLook.tag(tr("CPU"))
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_box.add_child(tag)
 	row.add_child(name_box)
@@ -741,21 +760,21 @@ func _result_cell(e: Dictionary) -> Control:
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if bool(e.get("finished", false)):
 		box.add_theme_constant_override("separation", UIKit.SPACE.xs)
-		box.add_child(_check_disc(18.0))
-		var f := UIKit.label(tr("Finished"), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_RIGHT)
+		box.add_child(_check_disc(20.0))
+		var f := UIKit.label(tr("Finished"), UIKit.FS.body_l, Palette.GL_TEAL_TEXT, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_RIGHT)
 		f.name = "Finished"
 		f.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		box.add_child(f)
 		return box
 	var prog := float(e.get("progress", 0.0))
-	var m := Meter.new("teal", 8)
-	m.custom_minimum_size = Vector2(56, 8)
+	var m := Meter.new("game_teal", 10)
+	m.custom_minimum_size = Vector2(56, 10)
 	m.set_value(prog, 1.0)
 	m.size_flags_horizontal = Control.SIZE_SHRINK_END
 	box.add_child(m)
 	var txt := (tr("Sq %d") % int(e.get("pos", roundi(prog * 100.0)))) if sl else Fmt.pct(prog)
-	var l := UIKit.label(txt, UIKit.FS.label, Palette.SUB, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_RIGHT)
-	l.custom_minimum_size.x = 40 if not sl else 46
+	var l := UIKit.label(txt, UIKit.FS.body_l, Palette.GL_CREAM_RIM, UIKit.font_display(), HORIZONTAL_ALIGNMENT_RIGHT)
+	l.custom_minimum_size.x = 42 if not sl else 50
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	box.add_child(l)
 	return box
@@ -787,14 +806,18 @@ func _rewards_row() -> Control:
 	var reward := int(data.get("reward", 0))
 	if reward > 0:
 		var tile := _reward_tile()
-		tile.custom_minimum_size.x = 112
+		tile.custom_minimum_size.x = 118
 		var v := UIKit.vbox(2)
 		v.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cap := UIKit.eyebrow(tr("Prize") if is_coin_table() else tr("Coins"))
+		var cap := UIKit.eyebrow(tr("Prize") if is_coin_table() else tr("Coins"), GameUI.SUB)
 		v.add_child(cap)                          # left-aligned, the value under it (like the Experience tile)
 		coins = CoinAmount.new(0, "lg", "plain", "+")
 		coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		coins.text_label.add_theme_color_override("font_color", GameUI.GOLD)
+		coins.text_label.add_theme_font_size_override("font_size", 26)
+		coins.text_label.add_theme_constant_override("outline_size", 6)
+		coins.text_label.add_theme_color_override("font_outline_color", Palette.GL_INK)
 		v.add_child(coins)
 		tile.add_child(v)
 		row.add_child(tile)
@@ -811,7 +834,7 @@ func _rewards_row() -> Control:
 	xv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cap2 := UIKit.eyebrow(tr("Experience"))
+	var cap2 := UIKit.eyebrow(tr("Experience"), GameUI.SUB)
 	cap2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(cap2)
 	# "Level up!" takes the caption's place in the head row (inside the tile): no sticker straddling the border
@@ -823,26 +846,34 @@ func _rewards_row() -> Control:
 	head.add_child(_level_up)
 	head.move_child(_level_up, 1)
 	head.custom_minimum_size.y = _level_up.get_combined_minimum_size().y      # the row doesn't grow when it shows
-	var gain := UIKit.label("+%d XP" % xp_gain(), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900, true))
+	var gain := UIKit.label("+%d XP" % xp_gain(), UIKit.FS.body_l, Palette.GL_TEAL_TEXT, UIKit.font_display())
 	head.add_child(gain)
 	xv.add_child(head)
 	var lb := _levels()
-	level_badge = LevelBadge.new(int(lb.x), "md")
-	xp_meter = Meter.new("xp", 18, true, "XP")
+	level_badge = LevelBadge.new(int(lb.x), 24.0)      # the Profile's level pill over the game look's gold bar
+	level_badge.set_even(true)
+	xp_meter = Meter.new("game", 18, true, "XP")
+	xp_meter.inset_left = 10.0
+	xp_meter.show_behind_parent = true
 	var info := Collection.level_info(int(data.get("xp_before", 0)))
 	xp_meter.set_value(float(info.into), float(info.need))
-	xv.add_child(LevelBadge.row(level_badge, xp_meter))
+	var lrow := HBoxContainer.new()
+	lrow.name = "Level"
+	lrow.add_theme_constant_override("separation", -10)
+	lrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lrow.add_child(level_badge)
+	lrow.add_child(xp_meter)
+	xv.add_child(lrow)
 	xt.add_child(xv)
 	row.add_child(xt)
 	return wrap
 
+## A rewards tile: GameUI's wood tile over a dark lip.
 func _reward_tile() -> PanelContainer:
-	var p := PanelContainer.new()
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var st := UIKit.box(Palette.PANE, UIKit.R.md, UIKit.BW.line, Palette.ROW_EDGE)
-	UIKit.pad(st, 10, 8)
-	p.add_theme_stylebox_override("panel", st)
-	p.custom_minimum_size.y = 74
+	var p := GameUI.tile(16.0, 10.0)
+	p.lip = 4.0
+	p.lip_color = Palette.GL_CARD_LIP
+	p.custom_minimum_size.y = 78
 	return p
 
 ## (level before, level after).
@@ -860,6 +891,7 @@ func _layout() -> void:
 	var vp := size if size.x > 0 else get_viewport_rect().size
 	var room := vp.x - 2.0 * UIKit.SCREEN_GUTTER
 	var cw := minf(CARD_W, room)
+	_fit_title(cw)
 	card.custom_minimum_size.x = cw
 	_buttons.custom_minimum_size.x = cw - 20.0
 	_hero.custom_minimum_size.x = cw
@@ -878,33 +910,47 @@ func _layout() -> void:
 	content.scale = Vector2(k, k)
 	content.size = Vector2(cw, need.y)
 	content.position = Vector2((vp.x - cw * k) / 2.0, safe_top + 12.0 + maxf(0.0, (avail - need.y * k) / 2.0))
-	_rays.size = Vector2(cw, _hero.custom_minimum_size.y)
-	_rays.position = Vector2.ZERO
 	var avs := _hero.get_node("Avatars") as Control
-	avs.position = Vector2((cw - avs.size.x) / 2.0, 46.0)
-	_rays.center = avs.position + avs.size / 2.0
-	_place_ribbon.call_deferred()
+	avs.position = Vector2((cw - avs.size.x) / 2.0, 34.0)
+	# the burst's glow and rays centre on the hero
+	var hc := content.position + (avs.position + avs.size / 2.0) * k
+	if vp.x > 0.0 and vp.y > 0.0:
+		_burst.center = Vector2(hc.x / vp.x, hc.y / vp.y)
+		_burst.ray_center = _burst.center
+		_burst.reach = Vector2(0.8, 0.8 * vp.x / vp.y)
+	if _sparkles:
+		_sparkles.set("top", maxf(0.0, hc.y - 240.0))
+		_sparkles.set("k", 0.7)
 
-func _place_ribbon() -> void:
-	if not is_instance_valid(card):
-		return
-	var rt := title_ribbon as RibbonTitle
-	rt.fit_to(card.size.x)
-	rt.scale = content.scale
-	var top := content.position + card.position * content.scale
-	rt.position = top + Vector2((card.size.x * content.scale.x - rt.size.x * rt.scale.x) / 2.0, -RibbonTitle.H * 0.5 * content.scale.y)
-	rt.modulate = card.modulate
+## The title fits the width: the display size steps down until the longest line fits (two lines at most).
+func _fit_title(w: float) -> void:
+	var f := UIKit.font_display()
+	var fs := TITLE_FS
+	while fs > 28 and f.get_string_size(_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 14.0 > w:
+		fs -= 2
+	_title.add_theme_font_size_override("font_size", fs)
+	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if f.get_string_size(_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 14.0 > w else TextServer.AUTOWRAP_OFF
+	_title.custom_minimum_size.x = w if _title.autowrap_mode != TextServer.AUTOWRAP_OFF else 0.0
+	# the sub chip: one line, or wrapped at the column's width (less its padding) when longer
+	var sf := _sub.get_theme_font("font")
+	var long := sf.get_string_size(_sub.text, HORIZONTAL_ALIGNMENT_LEFT, -1, _sub.get_theme_font_size("font_size")).x > w - 40.0
+	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if long else TextServer.AUTOWRAP_OFF
+	_sub.custom_minimum_size.x = w - 40.0 if long else 0.0
 
 func _process(_d: float) -> void:
-	_place_ribbon()
 	if not _vote.is_empty():
 		_tick_vote()
 
 func _play() -> void:
 	var reduce := Sheet.reduce_motion()
 	_backdrop.modulate.a = 0.0
-	for c: Control in [_hero, card, _buttons]:
+	for c: Control in [_hero, _title, _chip, card, _buttons]:
 		c.modulate.a = 0.0
+	if not reduce:                           # the rays turn slowly (one ray period a few seconds), as on the reveal
+		var bt := _burst.create_tween().set_loops()
+		bt.tween_property(_burst, "ray_angle", _burst.ray_angle + TAU / _burst.ray_count, 3.0).from(_burst.ray_angle)
+		if _sparkles:
+			_sparkles.set("twinkle", true)
 	for r in _rows:
 		r.modulate.a = 0.0
 	again_button.disabled = true
@@ -921,6 +967,11 @@ func _play() -> void:
 	var t2 := create_tween().set_parallel(true)
 	t2.tween_property(_hero, "modulate:a", 1.0, 0.18)
 	t2.tween_property(_hero, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_title.pivot_offset = _title.size / 2.0
+	_title.scale = Vector2(0.5, 0.5) if not reduce else Vector2.ONE
+	t2.tween_property(_title, "modulate:a", 1.0, 0.16).set_delay(0.12)
+	t2.tween_property(_title, "scale", Vector2.ONE, 0.45).set_delay(0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t2.tween_property(_chip, "modulate:a", 1.0, 0.2).set_delay(0.3)
 	if celebrates():
 		Celebrate.run(self)
 		Haptics.success()
@@ -1056,8 +1107,6 @@ func _pick(what: String) -> void:
 		if is_online():
 			again_button.disabled = true       # a yes in the vote (it says so next); the server's start closes the screen
 			again_button.text = tr("Waiting…")
-			UIKit.set_kind(again_button, "off")
-			again_button.set_meta("kit_kind", "off")
 			return
 	else:
 		home.emit()
@@ -1068,59 +1117,28 @@ func _pick(what: String) -> void:
 # Art
 # ---------------------------------------------------------------------------------------------------------------
 
-## The backdrop: the game behind, blurred (13 taps over two rings) and dimmed with the scrim colour.
-static func _blur_material() -> ShaderMaterial:
-	if _blur == null:
-		_blur = Shader.new()
-		_blur.code = """shader_type canvas_item;
-uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
-uniform float radius = 7.0;
-uniform vec4 tint : source_color = vec4(0.16, 0.08, 0.15, 0.55);
-void fragment() {
-	vec2 px = SCREEN_PIXEL_SIZE * radius;
-	vec3 acc = textureLod(screen_tex, SCREEN_UV, 2.0).rgb * 2.0;
-	float w = 2.0;
-	for (int i = 0; i < 6; i++) {
-		float a = float(i) * 1.0472;
-		vec2 d = vec2(cos(a), sin(a));
-		acc += textureLod(screen_tex, SCREEN_UV + d * px, 2.0).rgb;
-		acc += textureLod(screen_tex, SCREEN_UV + d.yx * vec2(-1.0, 1.0) * px * 2.2, 2.5).rgb;
-		w += 2.0;
-	}
-	vec3 c = acc / w;
-	float g = dot(c, vec3(0.299, 0.587, 0.114));
-	c = mix(c, vec3(g), 0.25);
-	COLOR = vec4(mix(c, tint.rgb, tint.a), 1.0);
-}"""
-	var m := ShaderMaterial.new()
-	m.shader = _blur
-	m.set_shader_parameter("tint", Color(Palette.SHADOW_DEEP, 0.55))
-	return m
-
-
-## A slowly turning sunburst behind the winner (gold on a win, soft cream otherwise) with a glow disc.
-class Rays extends Control:
-	var gold := true
-	var center := Vector2.ZERO
-	var _a := 0.0
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _process(d: float) -> void:
-		if not Sheet.reduce_motion():
-			_a += d * 0.25
-		queue_redraw()
-
-	func _draw() -> void:
-		var r := 150.0
-		var col := Color(Palette.GOLD, 0.30) if gold else Color(Palette.CARD, 0.12)
-		var n := 14
-		for i in n:
-			var a0 := _a + TAU * i / n
-			var a1 := a0 + TAU / n * 0.45
-			var pts := PackedVector2Array([center, center + Vector2(cos(a0), sin(a0)) * r, center + Vector2(cos(a1), sin(a1)) * r])
-			draw_colored_polygon(pts, col)
-		var glow := Color(Palette.GOLD, 0.30) if gold else Color(Palette.CARD, 0.14)
-		for k in 4:
-			draw_circle(center, 70.0 - k * 10.0, Color(glow, glow.a * (0.25 + k * 0.18)), true, -1.0, true)
+## The full-screen burst (the purchase reveal's): a radial glow with light rays. gold: a win (the orange burst, rays at
+## 0.3); else the dark café burst with faint rays.
+static func _make_burst(gold: bool) -> GamePanel:
+	var b: GamePanel
+	if gold:
+		b = GamePanel.radial(Palette.GL_GOLD_GLOW, Palette.GL_GOLD, Palette.GL_BURST_MID)
+		b.c3 = Palette.GL_BURST_DEEP
+		b.rays = 0.3
+	else:
+		b = GamePanel.radial(Palette.GL_CARD_GLOW, Palette.GL_CARD_FACE, Palette.GL_CARD_DEEP)
+		b.c3 = Palette.GL_CARD_LIP
+		b.rays = 0.06
+	b.name = "Burst"
+	b.mid = 0.22
+	b.mid2 = 0.52
+	b.center = Vector2(0.5, 0.2)
+	b.reach = Vector2(0.9, 0.5)
+	b.radius = 0.0
+	b.ray_count = 20.0
+	b.ray_width = 7.0 / 18.0
+	b.ray_reach = 0.0
+	b.ray_center = b.center
+	b.ray_angle = deg_to_rad(4.0)
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return b

@@ -157,30 +157,27 @@ func build_hud(parent: Control) -> Control:
 func _build_online() -> void:
 	banner = PanelContainer.new()
 	banner.name = "Banner"
-	var bs := UIKit.box(Palette.HONEY_TINT, UIKit.R.pill, UIKit.BW.line, Color.WHITE)
-	UIKit.shade(bs, "sm")
-	UIKit.pad(bs, UIKit.SPACE.md, UIKit.SPACE.xs)
-	banner.add_theme_stylebox_override("panel", bs)
+	banner.add_theme_stylebox_override("panel", MatchLook.note_pill())     # the game look (as Ludo's)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(LudoHUD.Spinner.new())
-	var bl := UIKit.label("", UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900))
+	var bl := MatchLook.note_label()
 	bl.name = "Text"
-	bl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(bl)
 	banner.add_child(row)
 	banner.visible = false
 	hud.add_child(banner)
 	away_box = PanelContainer.new()
 	away_box.name = "Away"
-	var st := UIKit.surface("card", false, true).duplicate() as StyleBoxFlat
-	UIKit.pad(st, UIKit.SPACE.md, UIKit.SPACE.sm)
-	away_box.add_theme_stylebox_override("panel", st)
+	away_box.add_theme_stylebox_override("panel", MatchLook.card(16, 8))
 	away_box.mouse_filter = Control.MOUSE_FILTER_STOP
-	var col := UIKit.vbox(UIKit.SPACE.xs)
-	col.add_child(UIKit.label(tr("You were away — a bot played for you."), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
-	away_button = UIKit.button(tr("I’m back"), "honey", "sm")
+	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
+	var al := GameUI.text(tr("You were away — a bot played for you."), UIKit.FS.body_l, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	al.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(al)
+	away_button = GameUI.button(tr("I’m back"), "gold", "sm")
+	away_button.custom_minimum_size.y = UIKit.TAP
 	away_button.name = "Back"
 	away_button.pressed.connect(_net_back)
 	col.add_child(away_button)
@@ -1442,7 +1439,8 @@ static func _normalized(state: Dictionary) -> Dictionary:
 
 ## A compact player tile ("PlayerTile lite"): the avatar (your equipped one, the café mascots, or the pawn tile in
 ## Pass & Play), the name and the square ("Off board", "Square 47"; the row picks one format for every tile:
-## `short` = "Sq 47" when "Square 100" doesn't fit the tile). Framed in the player's colour (lighter while waiting).
+## `short` = "Sq 47" when "Square 100" doesn't fit the tile). The game look (MatchLook): a dark wood card framed in the
+## player's colour (muted while waiting) over a lip, the name in outlined display type, the square on a dark pill.
 ## Your turn: the full-colour ring, a soft glow, a little lift and a pointer under it. Same calls as PlayerTile:
 ## set_state(active, mover, home, pct), set_note(text). set_corner(c): a small control (the rules ⓘ) in its top
 ## right corner.
@@ -1453,6 +1451,7 @@ class SLTile extends Control:
 	const NAME_H := 20.0
 	const NOTE_H := 18.0
 	const OFF_BOARD := "Off board"   # l10n
+	const NAME_FS := 15
 	var color_index := 0
 	var kind := "cpu"
 	var active := false
@@ -1467,6 +1466,7 @@ class SLTile extends Control:
 	var _sb_on: StyleBoxFlat
 	var _sb_glow: StyleBoxFlat
 	var _sb_ring: StyleBoxFlat           # "you": the ring round the avatar, in the seat colour
+	var _sb_lip: StyleBoxFlat            # the card's lip (the colour's dark on the turn)
 	var _glow_box: GlowPulse             # the turn glow and the pointer: drawn once, moved / faded (see GlowPulse)
 	var _pointer: Control
 	var _disc_step := -1
@@ -1487,14 +1487,18 @@ class SLTile extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		custom_minimum_size = Vector2(84, H)
 		var col: Color = Palette.PLAYER[color_index]
-		_sb = UIKit.box(Palette.GLASS, UIKit.R.md + 2, UIKit.BW.line, PlayerTile.frame_color(color_index, false))
-		_sb.border_width_bottom = UIKit.LIP.sm + 1
-		UIKit.shade(_sb, "sm")
+		# the game look (MatchLook): a dark wood card framed in the seat colour over a lip
+		_sb = UIKit.box(Color(Palette.GL_TILE_LO, 0.94), UIKit.R.md + 2, UIKit.BW.line + 1, PlayerTile.frame_color(color_index, false))
+		_sb.corner_detail = 10
 		_sb_on = _sb.duplicate()
-		_sb_on.bg_color = Palette.CARD
-		_sb_on.set_border_width_all(UIKit.BW.rim)
-		_sb_on.border_width_bottom = UIKit.LIP.sm + 2
+		_sb_on.bg_color = Palette.GL_TILE_HI
+		_sb_on.set_border_width_all(UIKit.BW.rim + 1)
 		_sb_on.border_color = col
+		_sb_lip = UIKit.box(Palette.GL_CARD_LIP, UIKit.R.md + 2, 0)
+		_sb_lip.corner_detail = 10
+		_sb_lip.shadow_color = Color(0, 0, 0, 0.3)
+		_sb_lip.shadow_size = 6
+		_sb_lip.shadow_offset = Vector2(0, 3)
 		_sb_glow = StyleBoxFlat.new()
 		_sb_glow.bg_color = Color(col, 0.0)
 		_sb_glow.set_corner_radius_all(UIKit.R.md + 6)
@@ -1521,14 +1525,14 @@ class SLTile extends Control:
 		add_child(_pointer)
 		_ava = PlayerTile.make_avatar(color_index, kind, AVA, cpu_id if cpu_id != "" else name_)
 		add_child(_ava)
-		_name = UIKit.label(L10n.seat_name(name_), UIKit.FS.label, Palette.INK_STRONG, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+		_name = GameUI.outlined(L10n.seat_name(name_), NAME_FS, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_CENTER)
 		_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		add_child(_name)
-		_note = UIKit.label(L10n.t(OFF_BOARD), UIKit.FS.small, PlayerTile.name_color(color_index), UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
+		_note = UIKit.label(L10n.t(OFF_BOARD), UIKit.FS.small, MatchLook.name_color(color_index), UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_CENTER)
 		_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_note_pill = PanelContainer.new()
-		var st := UIKit.box((Palette.TINT[color_index] as Color).lerp(Color.WHITE, 0.55), UIKit.R.pill, 0, Color.TRANSPARENT)
+		var st := UIKit.box(Color(Palette.GL_CHIP_BG, MatchLook.CHIP_A), UIKit.R.pill, 0, Color.TRANSPARENT)
 		UIKit.pad(st, 7, 0)
 		_note_pill.add_theme_stylebox_override("panel", st)
 		_note_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1562,7 +1566,7 @@ class SLTile extends Control:
 			_badge.queue_free()
 			_badge = null
 		if b != "":
-			_badge = UIKit.tag(tr("Bot") if b == "bot" else tr("Offline"), "ink" if b == "bot" else "white")
+			_badge = MatchLook.tag(tr("Bot") if b == "bot" else tr("Offline"))
 			_badge.name = "Badge"
 			add_child(_badge)
 		_layout()
@@ -1586,24 +1590,15 @@ class SLTile extends Control:
 			_disc_step = step
 			_disc.queue_redraw()
 
-	## A white disc with the seconds left and a ring that empties (red near the end), like the Ludo tiles'.
+	## The seconds left on a dark disc with a gold rim and a ring that empties (red near the end), like the Ludo
+	## tiles' (MatchLook.draw_timer).
 	func _draw_timer() -> void:
 		if timer_end <= 0:
 			return
 		var left := maxf(0.0, float(timer_end - Time.get_ticks_msec()))
 		var k := clampf(left / timer_total, 0.0, 1.0)
 		var m := Vector2(TIMER_R + 1.0, TIMER_R + 1.0)
-		var late := left <= 5000.0
-		_disc.draw_circle(m + Vector2(0, 1.5), TIMER_R + 1.0, Palette.shadow(0.25), true, -1.0, true)
-		_disc.draw_circle(m, TIMER_R + 1.0, Color.WHITE, true, -1.0, true)
-		_disc.draw_arc(m, TIMER_R - 2.0, 0.0, TAU, 40, Palette.TRACK, 3.0, true)
-		if k > 0.0:
-			_disc.draw_arc(m, TIMER_R - 2.0, -PI / 2.0, -PI / 2.0 + TAU * k, 40, Palette.RED if late else Palette.PLAYER[color_index], 3.0, true)
-		var f := UIKit.font_body(900, true)
-		var t := str(int(ceil(left / 1000.0)))
-		var fs: int = UIKit.FS.small
-		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		_disc.draw_string(f, m + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.DANGER if late else Palette.INK)
+		MatchLook.draw_timer(_disc, m, TIMER_R, k, int(ceil(left / 1000.0)), color_index, left <= 5000.0)
 
 	func set_width(w: float) -> void:
 		custom_minimum_size = Vector2(w, H)
@@ -1674,8 +1669,8 @@ class SLTile extends Control:
 
 	func _layout() -> void:
 		var w := size.x
-		var f := UIKit.font_body(900)
-		var fs: int = UIKit.FS.label
+		var f := UIKit.font_display()
+		var fs: int = NAME_FS
 		while fs > UIKit.FS.small and f.get_string_size(_name.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > w - 14.0:
 			fs -= 1
 		_name.add_theme_font_size_override("font_size", fs)
@@ -1727,6 +1722,8 @@ class SLTile extends Control:
 
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, Vector2(size.x, H))
+		_sb_lip.bg_color = Palette.PLAYER_DARK[color_index] if active else Palette.GL_CARD_LIP
+		draw_style_box(_sb_lip, Rect2(r.position + Vector2(0, 4), r.size))
 		draw_style_box(_sb_on if active else _sb, r)
 		if kind == "you":                    # the equipped avatar has its own colours: a ring in the seat colour
 			draw_style_box(_sb_ring, Rect2(_ava.position, _ava.size).grow(2))

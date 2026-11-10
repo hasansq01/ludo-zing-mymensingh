@@ -1053,7 +1053,8 @@ func _apply_sound() -> void:
 func _game_over() -> bool:
 	return (screen == "ludo" and ludo.S.get("phase", "") == "over") or (screen == "sl" and sl.G.get("phase", "") == "over")
 
-## The pause menu (PM look): Resume / Restart / Settings / Exit to home. Restart and Exit ask first.
+## The pause menu (the game look: Sheet.LOOK_GAME, chunky GameUI buttons): Resume / Restart / Settings / Exit to
+## home. Restart and Exit ask first.
 func open_pause() -> void:
 	if screen not in ["ludo", "sl"] or _pause_sheet != null or is_instance_valid(_result) or _game_over():
 		return
@@ -1062,13 +1063,12 @@ func open_pause() -> void:
 		return                                   # a question is open: it holds the game anyway
 	paused = true
 	var on := _online_match()
-	var s := Sheet.new(tr("Menu") if on else tr("Paused"), UIKit.W.dialog, false, "pm")
+	var s := Sheet.new(tr("Menu") if on else tr("Paused"), UIKit.W.dialog, false, Sheet.LOOK_GAME)
 	s.dismissable = true                         # Back / a backdrop tap = Resume
 	_pause_sheet = s
 	s.body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	if on:                                       # online the game goes on: no pause, no restart
-		var note := s.add_text(tr("The game keeps going while this is open."), UIKit.FS.body)
-		note.add_theme_color_override("font_color", Palette.SUB)
+		s.add_text(tr("The game keeps going while this is open."), UIKit.FS.body_l)
 		s.add_button(tr("Back to game"), "honey", s.close, "lg")
 		s.add_button(tr("Settings"), "ghost", open_settings, "md")
 		s.add_button(tr("Leave match"), "ghost", _ask_leave_online, "md")
