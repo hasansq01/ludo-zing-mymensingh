@@ -966,6 +966,9 @@ class XButton extends Button:
 				var g := 13.0 * k
 				draw_texture_rect(_x, Rect2(c - Vector2(g, g) / 2, Vector2(g, g)), false, Palette.INK)
 			return
+		if look == "game":
+			_draw_game(c, minf(size.x, size.y) / 2.0, down)
+			return
 		var rad := 24.0 * k
 		if down:
 			c.y += 2.0 * k
@@ -985,6 +988,39 @@ class XButton extends Button:
 			var rr := Rect2(c - Vector2(g, g) / 2, Vector2(g, g))
 			draw_texture_rect(_x, Rect2(rr.position + Vector2(0, 1.5 * k), rr.size), false, Color(0.35, 0.04, 0.08, 0.45))
 			draw_texture_rect(_x, rr, false)
+
+	## The game look's X (the offer card): a white 3 px ring, a red face fading down (#ff7a7a -> #e5484d) whose bottom
+	## 4 px is a darker lip (CSS inset 0 -4px 0 #a8262b), and a white X with round ends. Pressed: the lip halves.
+	func _draw_game(c: Vector2, r: float, down: bool) -> void:
+		var k := r / 22.0
+		draw_circle(c, r, Color.WHITE, true, -1.0, true)
+		var rf := r - 3.0 * k
+		draw_circle(c, rf, Color("#a8262b"), true, -1.0, true)
+		var lip := (2.0 if down else 4.0) * k
+		# the face: the disc where it overlaps itself raised by the lip (upper arc of the disc, lower arc of the raised one)
+		var a0 := asin(clampf(lip / 2.0 / rf, 0.0, 1.0))
+		var pts := PackedVector2Array()
+		var cols := PackedColorArray()
+		var top := Color("#ff7a7a")
+		var bot := Color("#e5484d")
+		var n := 24
+		for i in n + 1:
+			var a := lerpf(a0, PI - a0, float(i) / n)
+			pts.append(c + Vector2(cos(a), sin(a)) * rf - Vector2(0, lip))
+		for i in n + 1:
+			var a := lerpf(PI + a0, TAU - a0, float(i) / n)
+			pts.append(c + Vector2(cos(a), sin(a)) * rf)
+		for p in pts:
+			cols.append(top.lerp(bot, clampf((p.y - (c.y - rf)) / (2.0 * rf), 0.0, 1.0)))
+		draw_polygon(pts, cols)
+		draw_arc(c, rf - 0.25, PI + a0, TAU - a0, 32, top, 1.0, true)      # smooth the face's top edge
+		var g := 4.5 * k                  # the 18 px icon's strokes (24-unit box, 6 -> 18, width 4)
+		var w := 3.0 * k
+		var off := Vector2(0, 1.0 * k if down else 0.0)
+		for d in [Vector2(g, g), Vector2(g, -g)]:
+			draw_line(c - d + off, c + d + off, Color.WHITE, w, true)
+			draw_circle(c - d + off, w / 2.0, Color.WHITE, true, -1.0, true)
+			draw_circle(c + d + off, w / 2.0, Color.WHITE, true, -1.0, true)
 
 	## The radial gradient face: a polar mesh whose vertex colours follow the web gradient from its focal point
 	## (36% / 30% of the padding box; radius = distance to the farthest corner).

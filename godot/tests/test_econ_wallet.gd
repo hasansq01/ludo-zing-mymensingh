@@ -475,6 +475,24 @@ func _shop_gems() -> void:
 	check("shop: the gem price is Catalog.gem_price", Catalog.gem_price(3000) == 30 and Catalog.gem_price(4000) == 40)
 	var err: String = await shop._purchase("room", "dream", "gems")
 	check("shop: buying with gems goes through the server (currency gems)", err == "" and f.last("/v1/shop/buy").body.currency == "gems" and Save.profile.gems == 20 and Save.profile.rooms.has("dream") and Save.profile.coins == 5000, [err, Save.profile.gems])
+	# the offer's "or N gems": one tap buys (no "Buy X?"), through the server, then the reveal with the gems left
+	f.profile.gems = 60
+	await acc.refresh_me()
+	var layer := Control.new()
+	_root.add_child(layer)
+	var offer := ItemSheet.new("dice", "gold")
+	offer.open(layer)
+	await offer._on_gems()
+	var rv: RevealSheet = null
+	var questioned := false
+	for c in layer.get_children():
+		if c is RevealSheet:
+			rv = c
+		questioned = questioned or c.has_meta("confirm")
+	check("shop: the offer's gems: one tap, no question, the server sells it (currency gems)", not questioned and f.last("/v1/shop/buy").body == {kind = "dice", id = "gold", currency = "gems", catalog = 2} and Save.profile.dice_owned.has("gold") and Save.profile.gems == 51, [questioned, Save.profile.gems])
+	check("shop: ...and the reveal says what it cost in gems and what is left", rv != null and texts(rv).has("−9 · 51 left"), texts(rv) if rv else [])
+	layer.get_parent().remove_child(layer)
+	layer.free()
 	f.profile.gems = 5
 	await acc.refresh_me()
 	err = await shop._purchase("dice", "gold", "gems")
