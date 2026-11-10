@@ -1,8 +1,9 @@
 class_name ConflictSheet
 extends Sheet
 ## "Which progress do you want to keep?" (server/ONLINE_V2.md section 1, Policy b): Google Play Games sign-in found a
-## clash. Two cards, each a progress summary (avatar, name, level, coins, wins) with its own button and a plain
-## sentence on what happens:
+## clash. A game-look popup (the dark café card, the outlined gold title, the round red X) with two wood tiles, each
+## a progress summary (avatar, name, level, coins, wins) under an outlined gold heading, a plain cream sentence on what
+## happens and its own chunky button (gold: keep / stay, teal: the Google account / switch):
 ##   kind "conflict"     this device's guest progress vs the Google account's:
 ##                       "Keep this device’s progress" (keep "here": the Google account moves to this progress)
 ##                       "Use Google account’s progress" (keep "there": this device switches over)
@@ -26,24 +27,26 @@ var _cards: Array[Control] = []
 
 
 func _init(info: Dictionary = {}, acc: Account = null) -> void:
-	super(L10n.t("Keep which progress?") if str(info.get("kind", "conflict")) == "conflict" else L10n.t("Other Google account"), UIKit.W.catalog, true, LOOK_PM)
+	super(L10n.t("Keep which progress?") if str(info.get("kind", "conflict")) == "conflict" else L10n.t("Other Google account"), UIKit.W.catalog, true, LOOK_GAME)
 	_info = info
 	account_node = acc
 	kind = str(info.get("kind", "conflict"))
 	var list := add_scroll_body(UIKit.SPACE.md)
-	var intro := UIKit.paragraph(intro_text(kind), UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var intro := GameUI.text(intro_text(kind), UIKit.FS.body_l, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	intro.custom_minimum_size.x = 60
 	list.add_child(intro)
 	var here: Dictionary = info.get("here", {}) if info.get("here") is Dictionary else {}
 	var there: Variant = info.get("there")
 	var is_conflict := kind == "conflict"
-	here_button = UIKit.btn(here_label(kind), "honey", "sm")
+	here_button = GameUI.button(here_label(kind), "gold", "md")
 	here_button.name = "Here"
 	here_button.pressed.connect(func(): _pick("here" if is_conflict else "stay"))
-	there_button = UIKit.btn(there_label(kind), "teal", "sm")
+	there_button = GameUI.button(there_label(kind), "teal", "md")
 	there_button.name = "There"
 	there_button.pressed.connect(func(): _pick("there" if is_conflict else "switch"))
-	for b in [here_button, there_button]:
-		UIKit.fit_text(b, 13)
+	for b: GameUI.GameButton in [here_button, there_button]:
+		GameUI.fit_button_text(b, 12)
 	list.add_child(_option(here, tr("This device") if is_conflict else tr("This account"), here_text(kind), here_button))
 	list.add_child(_option(there if there is Dictionary else {}, tr("Google account") if is_conflict else tr("Other Google account"),
 		there_text(kind, there is Dictionary), there_button, not (there is Dictionary)))
@@ -74,11 +77,11 @@ static func there_text(k: String, has_account: bool) -> String:
 	return L10n.t("This device starts a new account for the other Google player. Your current account stays linked to its own.")
 
 ## A progress summary {name, avatar, level, coins, wins}: the avatar, the name, "Level 9 · 55 wins", the coins.
-## empty: the Google player has no account yet ("New account · starts at level 1").
+## empty: the Google player has no account yet ("New account · starts at level 1"). Light text, for the wood tile.
 static func summary_card(s: Dictionary, caption: String, empty := false) -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
 	if caption != "":
-		var cap := UIKit.caption(caption)
+		var cap := GameUI.outlined(caption, 18, GameUI.GOLD, 2)
 		cap.name = "Caption"
 		v.add_child(cap)
 	var row := UIKit.hbox(UIKit.SPACE.md)
@@ -90,19 +93,20 @@ static func summary_card(s: Dictionary, caption: String, empty := false) -> Cont
 	var col := UIKit.vbox(UIKit.SPACE.xxs)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var nm := UIKit.label(L10n.t("New account") if empty else str(s.get("name", L10n.t("Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_display())
+	var nm := GameUI.outlined(L10n.t("New account") if empty else str(s.get("name", L10n.t("Player"))), 21, GameUI.TEXT, 2)
 	nm.name = "Name"
 	nm.clip_text = true
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(nm)
 	var wins := int(s.get("wins", 0))
 	var meta := L10n.t("Starts at level 1") if empty else L10n.tn("Level %d · %d win", "Level %d · %d wins", wins) % [maxi(1, int(s.get("level", 1))), wins]
-	var ml := UIKit.label(meta, UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
+	var ml := GameUI.text(meta, UIKit.FS.label, GameUI.SUB)
 	ml.name = "Meta"
 	col.add_child(ml)
 	if not empty:
 		var coins := CoinAmount.new(int(s.get("coins", 0)), "sm", "plain")
 		coins.name = "Coins"
+		coins.set_color(GameUI.TEXT)
 		coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		col.add_child(coins)
 	row.add_child(col)
@@ -112,13 +116,16 @@ static func summary_card(s: Dictionary, caption: String, empty := false) -> Cont
 func _option(s: Dictionary, caption: String, consequence: String, button: Button, empty := false) -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
 	v.add_child(summary_card(s, "", empty))
-	var note := UIKit.paragraph(consequence, UIKit.FS.small, Palette.SUB)
+	var note := GameUI.text(consequence, 13, GameUI.SUB)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size.x = 60
 	note.name = "Consequence"
 	v.add_child(note)
 	v.add_child(button)
-	var p := UIKit.list_row(v)
+	var p := GameUI.tile(18.0, 14.0)
+	p.add_child(v)
 	_cards.append(p)
-	var cap := UIKit.caption(caption)                    # the heading sits above its card
+	var cap := GameUI.outlined(caption, 18, GameUI.GOLD, 2)   # the heading sits above its card
 	cap.name = "Caption"
 	var out := UIKit.vbox(UIKit.SPACE.sm)
 	out.add_child(cap)

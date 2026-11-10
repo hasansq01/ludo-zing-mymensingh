@@ -1,9 +1,10 @@
 class_name HowToSheet
 extends Sheet
-## How to play (index.html #howSheet and the INFO texts), in the .pm look with the "How to play" ribbon like its
-## sister sheets. Folder tabs Ludo / Snakes & Ladders (it opens on the game picked on Home) over one pane; each tab
-## lists its rules as cream cards (UIKit.surface("row")) with an icon per topic (Ludo: basics, captures & safe
-## squares, pairs, Teams (2 v 2); Snakes & Ladders: its card), then the fair-dice promise. Only the pane scrolls.
+## How to play (index.html #howSheet and the INFO texts), a game-look popup (the dark café card, the outlined gold
+## title, the round red X). A two-way choice Ludo / Snakes & Ladders (ShopSheet's filter buttons; it opens on the game
+## picked on Home) over the rules: each topic a wood tile with its icon and an outlined white title, the rules as cream
+## lines with gold dots and the key words in white (Ludo: basics, captures & safe squares, pairs, Teams (2 v 2);
+## Snakes & Ladders: its card), then the fair-dice promise on a gold-rimmed tile. Only the rules scroll.
 ## The close X is the only way out. The rules follow the house-rule settings (pair_ask, sl_need_one).
 ## The Ludo tab starts with a "Replay tutorial" row (from Home only, not over a live match): it starts the guided first
 ## match through the app (main.start_ludo(Tutorial.config()), which closes the sheets).
@@ -40,51 +41,37 @@ var game := "ludo"                       ## the tab on show: "ludo" | "sl"
 var _width := 370.0
 var _scroll: ScrollContainer             # (old name) the scroll area
 var _inner: VBoxContainer                # (old name) its content
-var _tabs: TabStrip
+var _tabs: HBoxContainer                # the Ludo / Snakes & Ladders choice (filter buttons, meta "value")
 var _panes := {}                         # game -> VBoxContainer
 var replay_button: Button                ## "Replay tutorial" (null when the app can't start it from here)
 
 
 ## start: "ludo" | "sl" | "" (= the game picked on Home, Save.prefs.home_game).
 func _init(width := 370.0, start := "") -> void:
-	super(tr("How to play"), width, true, LOOK_PM)
+	super(tr("How to play"), width, true, LOOK_GAME)
 	_width = width
 	game = start if start in ["ludo", "sl"] else ("sl" if _pref_str("home_game") == "sl" else "ludo")
-	var stack := UIKit.vbox(0)
-	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(stack)
-	_tabs = TabStrip.new([
-		{key = "ludo", text = tr("Ludo"), icon = "res://assets/ui/home/hi_ludo.svg"},
-		{key = "sl", text = tr("Snakes & Ladders"), icon = "res://assets/ui/home/hi_snakes.svg"},
-	], game, "folder")
-	_tabs.picked.connect(show_game)
-	stack.add_child(UIKit.margin(_tabs, 0, UIKit.SPACE.sm, 0, 0))
-	var pane := PanelContainer.new()
-	var ps := TabStrip.pane_style("folder")
-	ps.content_margin_left = UIKit.PAD.pane - 2
-	ps.content_margin_right = UIKit.PAD.pane - 2
-	ps.content_margin_top = UIKit.PAD.pane + TabStrip.F_EDGE     # under the pane's own top line
-	ps.content_margin_bottom = UIKit.SPACE.sm
-	pane.add_theme_stylebox_override("panel", ps)
-	_tabs.bind_pane(pane)
-	pane.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	stack.add_child(pane)
+	_tabs = UIKit.hbox(8)
+	_tabs.name = "GameTabs"
+	var group := ButtonGroup.new()
+	for t: Array in [["ludo", tr("Ludo"), "res://assets/ui/home/hi_ludo.svg"], ["sl", tr("Snakes & Ladders"), "res://assets/ui/home/hi_snakes.svg"]]:
+		var b := ShopSheet.filter_button(str(t[1]), group, 46.0, 15)
+		b.icon = UIKit.svg(str(t[2]))
+		b.add_theme_constant_override("icon_max_width", 22)
+		b.size_flags_stretch_ratio = 1.0 if t[0] == "ludo" else 1.7     # the long name gets the room
+		b.add_theme_constant_override("h_separation", 6)
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.set_meta("value", t[0])
+		var key: String = t[0]
+		b.toggled.connect(func(on: bool):
+			if on and key != game:
+				show_game(key))
+		UIKit.wire_press(b)
+		_tabs.add_child(b)
+	body.add_child(_tabs)
 	_inner = add_scroll_body(UIKit.SPACE.md)
 	_scroll = scroll_box
-	var wrap := scroll_box.get_parent()     # the scroll area lives in the folder pane, under the tabs
-	body.remove_child(wrap)
-	pane.add_child(wrap)
-	var fade := wrap.get_node_or_null("Fade") as TextureRect
-	if fade:                                 # the scroll fade blends into the pane's cream
-		var g := Gradient.new()
-		g.colors = PackedColorArray([Color(Palette.PANE, 0.0), Palette.PANE])
-		var gt := GradientTexture2D.new()
-		gt.gradient = g
-		gt.width = 4
-		gt.height = 32
-		gt.fill_from = Vector2(0.5, 0.0)
-		gt.fill_to = Vector2(0.5, 1.0)
-		fade.texture = gt
 	fit(0.88, FIXED_H)
 	for key in ["ludo", "sl"]:
 		var v := UIKit.vbox(UIKit.SPACE.md)
@@ -102,7 +89,8 @@ func _init(width := 370.0, start := "") -> void:
 ## Show the rules of one game ("ludo" | "sl"), from the top.
 func show_game(key: String) -> void:
 	game = "sl" if key == "sl" else "ludo"
-	_tabs.select(game)
+	for b: Button in _tabs.get_children():
+		b.set_pressed_no_signal(b.get_meta("value") == game)
 	for k in _panes:
 		(_panes[k] as Control).visible = k == game
 	if scroll_box:
@@ -129,30 +117,34 @@ func replay_tutorial() -> void:
 	if app and app.has_method("start_ludo"):
 		app.call("start_ludo", Tutorial.config())
 
-func _replay_card() -> PanelContainer:
+func _replay_card() -> Control:
 	var h := UIKit.hbox(UIKit.SPACE.md)
-	var ic := UIKit.icon("ic_hand", 32)
+	var ic := UIKit.icon("ic_hand", 34)
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(ic)
 	var v := UIKit.vbox(2)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	var t := UIKit.label(tr(REPLAY_TITLE), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	var t := GameUI.outlined(tr(REPLAY_TITLE), 20, GameUI.TEXT, 2)
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	t.custom_minimum_size.x = 40          # (a wrapping label with no width yet asks for one glyph per line)
 	v.add_child(t)
-	var p := UIKit.paragraph(tr(REPLAY_TEXT), UIKit.FS.small, Palette.SUB)
+	var p := GameUI.text(tr(REPLAY_TEXT), 14, GameUI.SUB)
+	p.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	p.custom_minimum_size.x = 40
 	v.add_child(p)
 	h.add_child(v)
 	# icon + text on one line, the full-width button under it
-	var col := UIKit.vbox(UIKit.SPACE.sm)
+	var col := UIKit.vbox(UIKit.SPACE.md)
 	col.add_child(h)
-	replay_button = UIKit.btn(tr(REPLAY_BUTTON), "honey", "sm")
+	replay_button = GameUI.button(tr(REPLAY_BUTTON), "gold", "md")
 	replay_button.name = "ReplayTutorial"
-	UIKit.fit_text(replay_button, 13)
+	GameUI.fit_button_text(replay_button, 13)
 	replay_button.pressed.connect(replay_tutorial)
 	col.add_child(replay_button)
-	return UIKit.list_row(col)
+	var tile := GameUI.tile(18.0, 14.0)
+	tile.add_child(col)
+	return tile
 
 ## Every rules card in order, with the house rules applied (Save.prefs.pair_ask, sl_need_one).
 static func sections() -> Array:
@@ -188,58 +180,65 @@ static func _pref(name: String) -> bool:
 	return prefs is Dictionary and bool((prefs as Dictionary).get(name, false))
 
 
-## A cream card: the topic's icon (else a coloured chip) + title, then the rules as a bulleted list.
-func _section(title_text: String, colour: int, lines: Array, icon := "") -> PanelContainer:
+## A wood tile: the topic's icon (else a coloured chip) + its title in outlined white, then the rules as a dotted list.
+func _section(title_text: String, colour: int, lines: Array, icon := "") -> Control:
 	var accent: Color = Palette.TEAL if colour < 0 else Palette.PLAYER[colour]
 	var v := UIKit.vbox(UIKit.SPACE.xs)
 	var head := UIKit.hbox(UIKit.SPACE.sm)
 	var tex := UIKit.svg(icon) if icon != "" else null
 	if tex:
-		var ic := UIKit.icon(icon, 30)
+		var ic := UIKit.icon(icon, 32)
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(ic)
 	else:
 		var chip := Panel.new()
-		chip.custom_minimum_size = Vector2(14, 14)
+		chip.custom_minimum_size = Vector2(16, 16)
 		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		chip.add_theme_stylebox_override("panel", UIKit.box(accent, 5, UIKit.BW.line, Color.WHITE))
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		head.add_child(chip)
-	var t := UIKit.label(tr(title_text), UIKit.FS.h2, Palette.INK, UIKit.font_display())
+	var t := GameUI.outlined(tr(title_text), 21, GameUI.TEXT, 2)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t.custom_minimum_size.x = 40
 	head.add_child(t)
-	v.add_child(UIKit.margin(head, 0, 0, 0, UIKit.SPACE.xxs))
+	v.add_child(UIKit.margin(head, 0, 0, 0, UIKit.SPACE.xs))
 	for line: String in lines:
 		v.add_child(_bullet(line))
-	return UIKit.list_row(v)
+	var tile := GameUI.tile(18.0, 14.0)
+	tile.add_child(v)
+	return tile
 
-## The fair-dice promise: a honey-tinted card with the star icon.
-func _fair_card(skill_line := true) -> PanelContainer:
+## The fair-dice promise: a wood tile with a gold rim and the dice icon, its title in gold.
+func _fair_card(skill_line := true) -> Control:
 	var h := UIKit.hbox(UIKit.SPACE.md)
-	var ic := UIKit.icon("cat_dice", 32)
-	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var ic := UIKit.icon("cat_dice", 34)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	h.add_child(ic)
-	var v := UIKit.vbox(2)
+	var v := UIKit.vbox(3)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(UIKit.label(tr("Fair dice"), UIKit.FS.h2, Palette.INK, UIKit.font_display()))
-	var p := UIKit.paragraph(tr(FAIR_DICE), UIKit.FS.body, Palette.INK)
+	v.add_child(GameUI.outlined(tr("Fair dice"), 21, GameUI.GOLD, 2))
+	var p := GameUI.text(tr(FAIR_DICE), 15, GameUI.TEXT)
+	p.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	p.custom_minimum_size.x = 40
 	v.add_child(p)
 	if skill_line:
-		v.add_child(UIKit.paragraph(tr("Computer skill (Easy, Normal, Hard) only changes how it moves."), UIKit.FS.small, Palette.SUB))
+		var s := GameUI.text(tr("Computer skill (Easy, Normal, Hard) only changes how it moves."), 13, GameUI.SUB)
+		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		s.custom_minimum_size.x = 40
+		v.add_child(s)
 	h.add_child(v)
-	var st := UIKit.surface("row", true).duplicate() as StyleBoxFlat
-	st.bg_color = Palette.HONEY_TINT
-	st.border_color = Palette.HONEY_TINT_EDGE
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", st)
-	panel.add_child(h)
-	return panel
+	var tile := GameUI.tile(18.0, 14.0)
+	tile.border_color = Palette.GL_CHIP_RIM
+	tile.add_child(h)
+	return tile
 
-## One rule: a dot (UIKit.bullet) and wrapped text (RichTextLabel, [b] for bold in INK_STRONG).
+## One rule: a gold dot and wrapped cream text (RichTextLabel, [b] for the key words in white).
 func _bullet(bb: String) -> HBoxContainer:
 	var h := UIKit.hbox(UIKit.SPACE.xxs)
-	h.add_child(UIKit.bullet(Palette.INK))
+	var dot := UIKit.bullet(GameUI.GOLD, 6.0)
+	h.add_child(dot)
 	var r := RichTextLabel.new()
 	r.bbcode_enabled = true
 	r.fit_content = true
@@ -248,13 +247,13 @@ func _bullet(bb: String) -> HBoxContainer:
 	r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.mouse_filter = Control.MOUSE_FILTER_PASS
 	r.selection_enabled = false
-	r.add_theme_font_override("normal_font", UIKit.font_body(700))
+	r.add_theme_font_override("normal_font", UIKit.font_body(800))
 	r.add_theme_font_override("bold_font", UIKit.font_body(900))
-	r.add_theme_font_size_override("normal_font_size", UIKit.FS.body)
-	r.add_theme_font_size_override("bold_font_size", UIKit.FS.body)
-	r.add_theme_color_override("default_color", Palette.INK)
-	r.add_theme_constant_override("line_separation", 2)
-	var strong := Palette.INK_STRONG.to_html(false)
+	r.add_theme_font_size_override("normal_font_size", 15)
+	r.add_theme_font_size_override("bold_font_size", 15)
+	r.add_theme_color_override("default_color", GameUI.SUB)
+	r.add_theme_constant_override("line_separation", 3)
+	var strong := Color.WHITE.to_html(false)
 	r.text = tr(bb).replace("[b]", "[b][color=#%s]" % strong).replace("[/b]", "[/color][/b]")
 	h.add_child(r)
 	return h

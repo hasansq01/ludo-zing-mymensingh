@@ -267,3 +267,27 @@ class CardStyle extends StyleBox:
 		if t < 0.45:
 			return Palette.GL_CARD_GLOW.lerp(Palette.GL_CARD_FACE, t / 0.45)
 		return Palette.GL_CARD_FACE.lerp(Palette.GL_CARD_DEEP, (t - 0.45) / 0.55)
+
+
+# --- settings ---
+
+## Keeps a GameButton's label on its face: the label's font shrinks (down to min_fs) while the upper-cased text is
+## wider than the face, on every resize and redraw (long labels, Bangla). Below min_fs it is cut at the face's edge.
+static func fit_button_text(b: GameButton, min_fs := 13) -> void:
+	var full := int(SIZES[b.size_name][1])
+	var fit := func() -> void:
+		var avail := b.size.x - 22.0
+		if b.icon_rect:
+			avail -= b.icon_rect.size.x + 8.0
+		if avail <= 0.0:
+			return
+		var font := b.label.get_theme_font("font")
+		var t := b.text.to_upper()
+		var edge := float(b.label.get_theme_constant("outline_size"))
+		var fs := full
+		while fs > min_fs and font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + edge > avail:
+			fs -= 1
+		if b.label.get_theme_font_size("font_size") != fs:
+			b.label.add_theme_font_size_override("font_size", fs)
+	b.resized.connect(fit)
+	b.draw.connect(fit)
