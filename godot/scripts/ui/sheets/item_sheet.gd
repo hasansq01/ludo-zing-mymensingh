@@ -35,19 +35,17 @@ func _init(kind_ := "dice", id := "classic") -> void:
 		"frame": _name = str(Collection.frame(id).get("name", id))
 		"plate": _name = str(Collection.plate(id).get("name", id))
 		_: _name = str(Collection.character(id).get("name", id))
-	super(L10n.t(_name), MAX_W, true, LOOK_PM)
+	super(L10n.t(_name), MAX_W, true, LOOK_GAME)
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	var well := PanelContainer.new()
 	well.name = "Art"
 	well.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	well.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	var cat: Color = (Palette.CAT.dice if kind == "dice" else Palette.CAT.avatars)[0]
-	var ws := UIKit.box(cat.lerp(Color.WHITE, 0.72), UIKit.R.lg)
+	var ws := UIKit.box(Palette.WOOD_DEEP, UIKit.R.lg, UIKit.BW.line, Palette.WOOD_RIM)
 	UIKit.pad(ws, 0)
 	well.add_theme_stylebox_override("panel", ws)
 	well.custom_minimum_size = Vector2(0, FRAME_ART_H if kind == "frame" else (150.0 if kind == "plate" else ART_H))
-	if kind in ["frame", "plate"]:
-		well.add_child(_spotlight())
+	well.add_child(ShopSheet.rarity_stage(kind, id))       # the item's rarity colours behind it, with rays
 	var c := CenterContainer.new()
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	well.add_child(c)
@@ -59,6 +57,7 @@ func _init(kind_ := "dice", id := "classic") -> void:
 	body.add_child(well)
 	var what := UIKit.caption({dice = tr("Dice · Ludo and Snakes & Ladders"), frame = tr("Frame · round your picture in every game"), plate = tr("Nameplate · under your name in every game")}.get(kind, tr("Character · your picture in every game")))
 	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	what.add_theme_color_override("font_color", Palette.G_SUB)
 	body.add_child(what)
 	var slot := MarginContainer.new()
 	slot.custom_minimum_size.y = UIKit.TAP + 4
@@ -149,21 +148,3 @@ func _on_act() -> void:
 		changed.emit()
 	refresh()
 
-
-## Behind a frame: a warm spotlight on dark wood, so gold, gems and chrome read the way they were lit.
-func _spotlight() -> TextureRect:
-	var g := GradientTexture2D.new()
-	g.width = 128; g.height = 128
-	g.fill = GradientTexture2D.FILL_RADIAL
-	g.fill_from = Vector2(0.5, 0.42); g.fill_to = Vector2(1.05, 1.0)
-	g.gradient = Gradient.new()
-	g.gradient.set_color(0, Color("#7a4a2c"))
-	g.gradient.set_color(1, Color("#2a160d"))
-	var t := TextureRect.new()
-	t.name = "Spotlight"
-	t.texture = g
-	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	t.stretch_mode = TextureRect.STRETCH_SCALE
-	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	t.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	return t

@@ -18,8 +18,9 @@ extends Sheet
 ## Economy v1: every paid item can also be bought with gems (ceil(price / 100), Catalog.gem_price), offered by the
 ## preview; pawn skins sold for gems only show gems. Too few gems: "Not enough gems", the shortfall, and "Open Store".
 ## Gems only exist on the server: offline it says "Connect to the internet to buy".
-## Buying always asks first (Sheet.confirm), then goes through Catalog / SLScenes / Collection (coins checked, never
-## charged twice, rolled back when the save fails), puts the item in use and says "<Item> is yours!".
+## Buying happens in the preview (its Buy is the second, deliberate tap: no extra question), goes through the server
+## wallet (or Catalog / SLScenes / Collection offline: coins checked, never charged twice, rolled back when the save
+## fails), puts the item in use and shows the reveal (RevealSheet: the item over rays, "It's yours!").
 ## Coins come from the Get coins sheet: the Rewards sheet (RewardsSheet.new("Get coins", true)), the same rows as
 ## Home's gift: Daily spin, Daily reward and Free coins with their live state, each opening its own sheet from Main.
 ##
@@ -63,6 +64,8 @@ const PREVIEWS := ["room", "scene", "pawn", "emotes", "text"]   ## a live previe
 const STATE_H := 36                      ## the card's state line
 const SIDE_PAD := 14                     ## card side padding
 const NAME_FS := 14
+## The rarity tiers' names (rarity()), translated where shown.
+const RARITY_NAMES := {common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary"}  # l10n
 
 static var _wells := {}                  # category -> GradientTexture2D (the art well behind dice / avatars ...)
 
@@ -86,7 +89,7 @@ var _busy := false                       # a purchase confirm is showing
 
 
 func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory_ := false) -> void:
-	super(L10n.t("Inventory") if inventory_ else L10n.t("Shop"), width, true, LOOK_PM)
+	super(L10n.t("Inventory") if inventory_ else L10n.t("Shop"), width, true, LOOK_GAME)
 	inventory = inventory_
 	owned_only = owned_only_ or inventory_
 	_open_earn = start_tab == "coins"
@@ -109,6 +112,8 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	for t: Dictionary in tabs:
 		t.text = L10n.t(t.text)
 	_tabs = TabStrip.new(tabs, strip_key(tab), "gtabs")
+	_tabs.game = true
+	_tabs.fade_color = Palette.WOOD
 	_tabs.picked.connect(show_tab)
 	_bleed = UIKit.margin(_tabs, -_bleed_px(), 0, -_bleed_px(), 0)
 	body.add_child(_bleed)
@@ -161,6 +166,7 @@ func _show_filter(strip: String) -> void:
 			c.queue_free()
 		_sub = UIKit.segmented((SUBS[strip] as Array).map(func(l: Array) -> Array: return [l[0], L10n.t(l[1])]), tab, show_tab, "sm")
 		_sub.name = "Filter"
+		UIKit.segmented_game(_sub)
 		_sub_box.add_child(_sub)
 	for b in _sub.get_children():
 		if b is Button:
@@ -178,6 +184,10 @@ func _build() -> void:
 	_updaters.clear()
 	_cards.clear()
 	var sections: Array = _sections(tab)
+	if not owned_only:
+		var feat := _featured(sections)
+		if not feat.is_empty():
+			scroll_body.add_child(_banner(feat))
 	var shown := 0
 	var total := 0
 	var gap: int = UIKit.SPACE.xs if is_narrow else UIKit.SPACE.sm
@@ -188,6 +198,7 @@ func _build() -> void:
 			continue
 		if sec[0] != "" and sections.size() > 1:
 			var cap := UIKit.caption(sec[0])
+			cap.add_theme_color_override("font_color", Palette.G_SUB)
 			cap.name = "Section"
 			scroll_body.add_child(UIKit.margin(cap, 4, UIKit.SPACE.sm if shown > 0 else 0, 0, 0))
 		var g := UIKit.grid(2 if WIDE.has(items[0].kind) else 3, gap)
@@ -282,9 +293,18 @@ func _chip(amount: CoinAmount) -> Button:
 	pl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	plus.add_child(pl)
 	var h := UIKit.hbox(UIKit.SPACE.sm)
+	amount.set_color(Palette.G_TEXT)
 	h.add_child(amount)
 	h.add_child(plus)
-	return UIKit.button_with("", h, "white", "sm")
+	var b := UIKit.button_with("", h, "white", "sm")
+	var face := UIKit.box(Palette.WOOD_DEEP, UIKit.R.pill, UIKit.BW.line, Palette.WOOD_RIM)
+	var down := UIKit.box(Palette.WOOD_LIP, UIKit.R.pill, UIKit.BW.line, Palette.WOOD_RIM)
+	for st: StyleBoxFlat in [face, down]:
+		st.content_margin_left = 12; st.content_margin_right = 6; st.content_margin_top = 4; st.content_margin_bottom = 4
+	for k in ["normal", "hover", "focus"]:
+		b.add_theme_stylebox_override(k, face)
+	b.add_theme_stylebox_override("pressed", down)
+	return b
 
 
 # =====================================================================================================================
@@ -414,7 +434,8 @@ func _card(it: Dictionary) -> PanelContainer:
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.set_meta("item", id)
-	p.add_theme_stylebox_override("panel", _card_face(false))
+	var rar := rarity(kind, id)
+	p.add_theme_stylebox_override("panel", _card_face(false, rar))
 	var v := UIKit.vbox(UIKit.SPACE.xs)
 	p.add_child(v)
 	# art
@@ -424,9 +445,17 @@ func _card(it: Dictionary) -> PanelContainer:
 	view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	if PREVIEWS.has(kind):
 		art.add_child(_view_button(kind, id))
+	if rar != "":
+		var rc := rarity_chip(rar)
+		art.add_child(rc)
+		if kind in ["emotes", "text"]:          # a pack's Premium tag has the top left corner
+			rc.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
+			rc.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	v.add_child(art)
 	# name: one line on every card
-	var nl := UIKit.label(L10n.t(it.name), NAME_FS, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	var nl := UIKit.label(L10n.t(it.name), NAME_FS + 1, Palette.G_TEXT, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	nl.add_theme_constant_override("outline_size", 5)
+	nl.add_theme_color_override("font_outline_color", Palette.G_OUTLINE)
 	nl.name = "ItemName"
 	nl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	if kind == "badge":                      # the long names ("Experienced Player"): two lines, on every badge
@@ -447,9 +476,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	var price_row := CenterContainer.new()
 	price_row.name = "Price"
 	price_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tag := CoinAmount.gems(_gems(kind, id), "sm", "plain") if gems_only else CoinAmount.new(_price(kind, id), "sm", "plain")
-	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	price_row.add_child(tag)
+	price_row.add_child(price_pill(_gems(kind, id) if gems_only else _price(kind, id), gems_only))
 	slot.add_child(price_row)
 	var use := UIKit.btn(tr("Use"), "teal", "xs")
 	use.name = "Use"
@@ -464,7 +491,7 @@ func _card(it: Dictionary) -> PanelContainer:
 	var li := UIKit.icon("ic_lock", 15)
 	li.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lock_row.add_child(li)
-	var ll := UIKit.label(_unlock_note(kind, id), 11, Palette.MUTED, UIKit.font_body(800))
+	var ll := UIKit.label(_unlock_note(kind, id), 11, Palette.G_SUB, UIKit.font_body(800))
 	ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ll.max_lines_visible = 2
 	ll.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -480,7 +507,7 @@ func _card(it: Dictionary) -> PanelContainer:
 		var owned := _owned(kind, id)
 		var on := owned and _in_use(kind, id)
 		var for_sale := not owned and (_price(kind, id) > 0 or gems_only)
-		p.add_theme_stylebox_override("panel", _card_face(on))
+		p.add_theme_stylebox_override("panel", _card_face(on, rar))
 		price_row.visible = for_sale
 		use.visible = owned and not on
 		on_pill.visible = on
@@ -488,11 +515,67 @@ func _card(it: Dictionary) -> PanelContainer:
 		(view.get_meta("art", view) as CanvasItem).modulate.a = 0.55 if lock_row.visible else 1.0)
 	return p
 
-## The catalog tile with tighter padding: the art takes the room.
-func _card_face(on: bool) -> StyleBoxFlat:
-	var st := UIKit.surface("item", on, is_narrow).duplicate() as StyleBoxFlat
+## The catalog tile on wood: its rarity's deep colour with its rim and a dark lip (plain wood when it has none);
+## the one in use wears a gold rim.
+func _card_face(on: bool, rar := "") -> StyleBoxFlat:
+	var c: Array = Palette.RARITY.get(rar, [])
+	var st := UIKit.box(c[2] if not c.is_empty() else Palette.WOOD_HI, UIKit.R.md, 3 if on else 2, Palette.G_GOLD if on else (c[3] if not c.is_empty() else Palette.WOOD_RIM))
+	st.border_width_bottom = UIKit.LIP.md + 1
+	if not on:
+		st.border_color = st.border_color.darkened(0.15)
+	st.shadow_color = Color(Palette.G_GOLD, 0.55) if on else Color(0, 0, 0, 0.35)
+	st.shadow_size = 8 if on else 3
+	st.shadow_offset = Vector2(0, 0 if on else 2)
 	UIKit.pad(st, 5 if is_narrow else 6)
 	return st
+
+## An item's rarity from what it costs (a gem price counted as 100 coins a gem): "" for free and earned items, else
+## "common" (under 3K), "rare" (under 6K), "epic" (under 12K) or "legendary".
+static func rarity(kind: String, id: String) -> String:
+	var v := _gems(kind, id) * 100 if _gems_only(kind, id) else _price(kind, id)
+	if v <= 0:
+		return ""
+	if v < 3000:
+		return "common"
+	if v < 6000:
+		return "rare"
+	return "epic" if v < 12000 else "legendary"
+
+## The rarity's name as a small dark chip on the art's top left corner.
+static func rarity_chip(rar: String) -> PanelContainer:
+	var c: Array = Palette.RARITY[rar]
+	var chip := PanelContainer.new()
+	chip.name = "Rarity"
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	chip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var st := UIKit.box(c[4], UIKit.R.sm, 0)
+	UIKit.pad(st, 5, 1)
+	chip.add_theme_stylebox_override("panel", st)
+	var names := RARITY_NAMES
+	var l := UIKit.label(L10n.t(str(names[rar])).to_upper(), 9, c[3], UIKit.font_display())
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(l)
+	chip.position = Vector2(4, 4)
+	return chip
+
+## A price as a chunky pill: gold with dark figures for coins, teal with white figures for gems.
+static func price_pill(amount: int, gems := false, size := "sm") -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = "PricePill"
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var st := UIKit.box(Palette.TEAL if gems else Palette.HONEY, UIKit.R.md, 0)
+	st.border_width_bottom = UIKit.LIP.sm
+	st.border_color = Palette.TEAL.darkened(0.35) if gems else Palette.GOLD_DEEP
+	UIKit.pad(st, 10, 2)
+	st.content_margin_bottom = 2 + UIKit.LIP.sm
+	p.add_theme_stylebox_override("panel", st)
+	var a := CoinAmount.gems(amount, size, "plain") if gems else CoinAmount.new(amount, size, "plain")
+	a.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	a.set_color(Color.WHITE if gems else Palette.INK_DEEP)
+	p.add_child(a)
+	return p
 
 ## A tap on a card: says what unlocks it, opens its preview to buy, or puts it in use.
 func _on_card(kind: String, id: String, locked_note: String, from: Control) -> void:
@@ -538,18 +621,132 @@ static func gem_option(gems: int) -> Button:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	b.add_child(h)
-	var or_l := UIKit.label(L10n.t("or"), UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
+	var or_l := UIKit.label(L10n.t("or"), UIKit.FS.label, Palette.G_SUB, UIKit.font_body(800))
 	or_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(or_l)
 	var amt := CoinAmount.gems(gems, "xs", "plain")
 	amt.name = "Amount"
-	amt.set_color(Palette.TEAL_INK)
+	amt.set_color(Palette.G_GOLD)
 	h.add_child(amt)
 	UIKit.wire_press(b)
 	return b
 
+## Today's featured item on this tab: one of its three priciest things for sale that the player doesn't own yet,
+## turning with the date ({} when there is none).
+func _featured(sections: Array) -> Dictionary:
+	var pool: Array = []
+	for sec: Array in sections:
+		for it: Dictionary in sec[1]:
+			if _owned(it.kind, it.id) or not (_price(it.kind, it.id) > 0 or _gems_only(it.kind, it.id)):
+				continue
+			pool.append([_gems(it.kind, it.id) * 100 if _gems_only(it.kind, it.id) else _price(it.kind, it.id), it])
+	if pool.is_empty():
+		return {}
+	pool.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+	var top := pool.slice(0, 3)
+	var day := int(Time.get_unix_time_from_system() / 86400.0)
+	return top[day % top.size()][1]
+
+## The featured item as a wide banner: rays in its rarity colours, the art, "Featured today", its name and price.
+## Tap: its preview (where it's bought), like its card.
+func _banner(it: Dictionary) -> Control:
+	var kind: String = it.kind
+	var id: String = it.id
+	var rar := rarity(kind, id)
+	var c: Array = Palette.RARITY.get(rar, Palette.RARITY.legendary)
+	var p := PanelContainer.new()
+	p.name = "Featured"
+	p.mouse_filter = Control.MOUSE_FILTER_PASS
+	p.custom_minimum_size = Vector2(0, 132)
+	var st := UIKit.box(c[1], UIKit.R.lg, 3, c[3])
+	st.border_width_bottom = UIKit.LIP.lg + 1
+	st.border_color = c[3]
+	st.shadow_color = Color(0, 0, 0, 0.4); st.shadow_size = 6; st.shadow_offset = Vector2(0, 3)
+	UIKit.pad(st, 0)
+	p.add_theme_stylebox_override("panel", st)
+	p.clip_contents = true
+	var rays := Rays.new(c[0], c[1], c[2])
+	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(rays)
+	var h := UIKit.hbox(UIKit.SPACE.sm)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(UIKit.margin(h, 8, 8, 10, 8))
+	var art_box := Control.new()
+	art_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_box.custom_minimum_size = Vector2(124, 112)
+	var art := _art(kind, id, true)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_box.add_child(art)
+	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	h.add_child(art_box)
+	var col := UIKit.vbox(4)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_child(col)
+	var chip := PanelContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var cs := UIKit.box(c[4], UIKit.R.sm, 0)
+	UIKit.pad(cs, 7, 1)
+	chip.add_theme_stylebox_override("panel", cs)
+	var names := RARITY_NAMES
+	var cl := UIKit.label((L10n.t("Featured today") + " · " + L10n.t(str(names.get(rar, "Legendary")))).to_upper(), 10, c[3], UIKit.font_display())
+	cl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(cl)
+	col.add_child(chip)
+	var nm := UIKit.label(_title(kind, str(it.name)), UIKit.FS.h2, Color.WHITE, UIKit.font_display())
+	nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	nm.add_theme_constant_override("outline_size", 7)
+	nm.add_theme_color_override("font_outline_color", Palette.G_OUTLINE)
+	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nm.max_lines_visible = 2
+	col.add_child(nm)
+	var gems_only := _gems_only(kind, id)
+	var pill := price_pill(_gems(kind, id) if gems_only else _price(kind, id), gems_only, "md")
+	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	col.add_child(pill)
+	UIKit.on_tap(p, func() -> void: _on_card(kind, id, "", p))
+	return UIKit.margin(p, 0, 0, 0, UIKit.SPACE.sm)
+
+
+## An item's stage in a preview: its rarity colours with rays and a glow (wood when it has no rarity), filling the
+## parent (put it first, the art over it).
+static func rarity_stage(kind: String, id: String) -> Control:
+	var rar := rarity(kind, id)
+	var c: Array = Palette.RARITY.get(rar, [Palette.WOOD_HI.lightened(0.2), Palette.WOOD_HI, Palette.WOOD_DEEP])
+	var r := Rays.new(c[0], c[1], c[2], 0.5)
+	r.name = "Stage"
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return r
+
+
+## Soft rays and a glow behind a featured banner or a preview's art, drawn once (no animation: nothing redraws).
+class Rays extends Control:
+	var glow: Color
+	var face: Color
+	var deep: Color
+	var cx := 0.2
+
+	func _init(g: Color, f: Color, d: Color, centre_x := 0.2) -> void:
+		glow = g; face = f; deep = d; cx = centre_x
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var c := Vector2(size.x * cx, size.y * 0.5)
+		var r := size.length()
+		draw_rect(Rect2(Vector2.ZERO, size), face)
+		for i in 16:
+			var a0 := TAU * i / 16.0
+			var a1 := a0 + TAU / 40.0
+			draw_colored_polygon(PackedVector2Array([c, c + Vector2(cos(a0), sin(a0)) * r, c + Vector2(cos(a1), sin(a1)) * r]), Color(1, 1, 1, 0.24))
+		for k in 6:
+			draw_circle(c, size.y * (0.75 - k * 0.1), Color(glow, 0.12 + k * 0.06), true, -1.0, true)
+
+
 ## The art of an item, filling its ArtBox.
-func _art(kind: String, id: String) -> Control:
+func _art(kind: String, id: String, bare := false) -> Control:
 	match kind:
 		"emotes":
 			return _emote_art(Emotes.pack(id).get("emotes", []), bool(Emotes.pack(id).get("premium", false)))
@@ -559,7 +756,7 @@ func _art(kind: String, id: String) -> Control:
 			return Thumbnailer.view("room", id, UIKit.R.md)
 		"scene":
 			return Thumbnailer.view("scene", id, UIKit.R.md)
-	var well := _well(kind)
+	var well := _well(kind, rarity(kind, id)) if not bare else _bare_well()
 	var c := CenterContainer.new()
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -591,6 +788,13 @@ func _art(kind: String, id: String) -> Control:
 	if not well.has_meta("art") and c.get_child_count() > 0:
 		well.set_meta("art", c.get_child(0))
 	return well
+
+## An empty container in place of a well (the featured banner draws its own ground).
+func _bare_well() -> Control:
+	var p := PanelContainer.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	return p
 
 ## A pack's icons on the Emotes tab's well: two columns (three for a Premium pack's eight), with its Premium tag.
 func _emote_art(icons: Array, premium: bool) -> Control:
@@ -636,9 +840,10 @@ func _emote_art(icons: Array, premium: bool) -> Control:
 		well.add_child(chip)
 	return well
 
-## A rounded well tinted with the tab's colour (Palette.CAT), behind dice / avatars / frames / plates / badges.
-func _well(kind: String) -> Control:
-	var cat: String = "emotes" if kind == "text" else {dice = "dice", pawn = "pawns", emotes = "emotes", avatar = "avatars", char = "avatars", frame = "frames", plate = "plates", badge = "badges"}.get(kind, "rooms")
+## A rounded well behind dice / avatars / frames / plates / badges: a radial glow in the item's rarity colours, or deep
+## wood with a soft warm glow for free and earned items.
+func _well(kind: String, rar := "") -> Control:
+	var cat: String = "rar:" + (rar if rar != "" else "none")
 	var p := PanelContainer.new()
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
@@ -646,13 +851,14 @@ func _well(kind: String) -> Control:
 	UIKit.pad(st, 0)
 	p.add_theme_stylebox_override("panel", st)
 	if not _wells.has(cat):
-		var face: Color = (Palette.CAT.get(cat, Palette.CAT.coins) as Array)[0]
+		var c: Array = Palette.RARITY.get(rar, [Palette.WOOD_HI.lightened(0.25), Palette.WOOD_HI, Palette.WOOD_DEEP])
 		var g := GradientTexture2D.new()
-		g.width = 8; g.height = 64
-		g.fill_from = Vector2(0.5, 0.0); g.fill_to = Vector2(0.5, 1.0)
+		g.width = 64; g.height = 64
+		g.fill = GradientTexture2D.FILL_RADIAL
+		g.fill_from = Vector2(0.5, 0.42); g.fill_to = Vector2(1.05, 1.05)
 		g.gradient = Gradient.new()
-		g.gradient.set_color(0, face.lerp(Color.WHITE, 0.78))
-		g.gradient.set_color(1, face.lerp(Color.WHITE, 0.5))
+		g.gradient.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+		g.gradient.colors = PackedColorArray([c[0], c[1], c[2]])
 		_wells[cat] = g
 	var tr := TextureRect.new()
 	tr.texture = _wells[cat]
@@ -729,14 +935,14 @@ func _more_row(n: int) -> Control:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	b.add_child(h)
-	var more := UIKit.label(tr("%d more in the shop") % n, UIKit.FS.label, Palette.SUB, UIKit.font_body(800))
-	var dot := UIKit.label("·", UIKit.FS.label, Palette.SUB, UIKit.font_body(900))
-	var link := UIKit.label(tr("Open shop") if inventory else tr("Show all"), UIKit.FS.label, Palette.TEAL_INK, UIKit.font_body(900))
+	var more := UIKit.label(tr("%d more in the shop") % n, UIKit.FS.label, Palette.G_SUB, UIKit.font_body(800))
+	var dot := UIKit.label("·", UIKit.FS.label, Palette.G_SUB, UIKit.font_body(900))
+	var link := UIKit.label(tr("Open shop") if inventory else tr("Show all"), UIKit.FS.label, Palette.G_GOLD, UIKit.font_body(900))
 	for l: Label in [more, dot, link]:
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		h.add_child(l)
-	b.button_down.connect(func(): link.add_theme_color_override("font_color", Palette.TEAL_LIP))
-	b.button_up.connect(func(): link.add_theme_color_override("font_color", Palette.TEAL_INK))
+	b.button_down.connect(func(): link.add_theme_color_override("font_color", Palette.G_TEXT))
+	b.button_up.connect(func(): link.add_theme_color_override("font_color", Palette.G_GOLD))
 	UIKit.wire_press(b)
 	b.pressed.connect(_show_all)
 	return UIKit.margin(b, 0, UIKit.SPACE.xs, 0, 0)
@@ -751,7 +957,7 @@ func _show_all() -> void:
 func _empty() -> Control:
 	var v := UIKit.vbox(UIKit.SPACE.md)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(UIKit.paragraph(tr("You don’t own any of these yet."), UIKit.FS.body_l, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.paragraph(tr("You don’t own any of these yet."), UIKit.FS.body_l, Palette.G_SUB, HORIZONTAL_ALIGNMENT_CENTER))
 	var b := UIKit.btn(tr("Open shop") if inventory else tr("Show all"), "white", "sm")
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.custom_minimum_size.x = 140
@@ -787,9 +993,7 @@ static func buy_with_coins(host: Sheet, kind: String, id: String, name_: String)
 			Haptics.error()
 			Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")
 			return false
-	var yes: bool = await Sheet.confirm(host, L10n.t("Buy %s?") % title, L10n.t("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], L10n.t("Buy"))
-	if not yes or not is_instance_valid(host) or host._closing:
-		return false
+	# no "Buy?" question: the preview's Buy is already the second, deliberate tap (card -> preview -> Buy)
 	var err: String = await _purchase(kind, id)
 	if not is_instance_valid(host) or host._closing:
 		return false
@@ -800,7 +1004,7 @@ static func buy_with_coins(host: Sheet, kind: String, id: String, name_: String)
 		return false
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(host, _yours(kind, title), host.card, 1.8, "good")
+	reveal(host, kind, id, title)
 	return true
 
 ## The purchase itself: "" when bought, else the reason to show. With an Account (the game) the server sells and the
@@ -826,6 +1030,14 @@ static func _purchase(kind: String, id: String, currency := "coins") -> String:
 		"char": return Collection.buy_char(id, true)
 		"frame", "plate": return Collection.buy_look(kind, id)
 	return L10n.t("That isn’t for sale.")
+
+## The reveal over the sheet that bought it (on its layer); a toast when the host isn't in a layer (tests, previews).
+static func reveal(host: Sheet, kind: String, id: String, title: String) -> void:
+	var layer := host.get_parent()
+	if layer == null:
+		Toast.show(host, _yours(kind, title), host.card, 1.8, "good")
+		return
+	RevealSheet.new(kind, id, title).open(layer)
 
 ## "<Item> is yours!" ("are" for dice).
 static func _yours(kind: String, title: String) -> String:
@@ -862,9 +1074,6 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		Haptics.error()
 		Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")
 		return ""
-	var yes: bool = await Sheet.confirm(host, L10n.t("Buy %s?") % title, L10n.t("%s gems. You’ll have %s left.") % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], L10n.t("Buy"))
-	if not yes or not is_instance_valid(host) or host._closing:
-		return ""
 	var err: String = await _purchase(kind, id, "gems")
 	if not is_instance_valid(host) or host._closing:
 		return ""
@@ -875,7 +1084,7 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		return "failed"
 	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(host, _yours(kind, title), host.card, 1.8, "good")
+	reveal(host, kind, id, title)
 	return "bought"
 
 ## Put an owned item in use, through the server when there is an Account (the look is part of the profile it keeps;
@@ -1067,7 +1276,7 @@ class NoBadge extends Control:
 	func _draw() -> void:
 		var c := size / 2.0 + Vector2(0, size.y * 0.08)
 		var r := minf(size.x, size.y) * 0.34
-		var col := Color(Palette.MUTED, 0.55)
+		var col := Color(Palette.G_SUB, 0.7)
 		var n := 16
 		for i in n:
 			var a0 := TAU * i / n

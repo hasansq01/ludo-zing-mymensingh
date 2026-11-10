@@ -25,19 +25,27 @@ var _busy := false
 
 func _init(pawn_id_ := "classic") -> void:
 	var d := Catalog.pawn(pawn_id_)
-	super(L10n.t(str(d.get("name", "Pawns"))), MAX_W, true, LOOK_PM)
+	super(L10n.t(str(d.get("name", "Pawns"))), MAX_W, true, LOOK_GAME)
 	pawn_id = pawn_id_
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	var well := PanelContainer.new()
 	well.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ws := UIKit.box((Palette.CAT.pawns as Array)[0].lerp(Color.WHITE, 0.72), UIKit.R.lg)
+	var ws := UIKit.box(Palette.WOOD_DEEP, UIKit.R.lg, UIKit.BW.line, Palette.WOOD_RIM)
 	UIKit.pad(ws, 0)
 	well.add_theme_stylebox_override("panel", ws)
 	# the skin's baked row (the four colours, as on the cards), each pawn bobbing on its own beat: no live 3D here.
 	# A transparent, multisampled SubViewport inside a clipped well made the whole screen flicker on some phones
 	# (only the café showed in alternate frames); the live stage is only the fallback for a skin without a bake.
 	if Thumbnailer.has_baked("pawnrow", pawn_id):
-		well.add_child(_baked_row())
+		var stage_box := Control.new()
+		stage_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stage_box.clip_contents = true        # a plain scissor clip (not clip_children: that's what flickered on phones)
+		stage_box.add_child(ShopSheet.rarity_stage("pawn", pawn_id))
+		var row := _baked_row()
+		stage_box.add_child(row)
+		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		stage_box.custom_minimum_size = Vector2(0, STAGE_H)
+		well.add_child(stage_box)
 	else:
 		well.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 		stage = PawnStage.new(pawn_id, PawnStage.FOUR)
@@ -46,8 +54,9 @@ func _init(pawn_id_ := "classic") -> void:
 	body.add_child(well)
 	var kind := UIKit.caption(tr("Pawn skin · Ludo and Snakes & Ladders"))
 	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kind.add_theme_color_override("font_color", Palette.G_GOLD)
 	body.add_child(kind)
-	var desc := UIKit.paragraph(tr(str(d.get("desc", ""))), UIKit.FS.body_l, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc := UIKit.paragraph(tr(str(d.get("desc", ""))), UIKit.FS.body_l, Palette.G_SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	desc.name = "Desc"
 	body.add_child(desc)
 	var slot := MarginContainer.new()
@@ -168,10 +177,6 @@ func _on_act() -> void:
 			Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
 			return
 	var title := ShopSheet._title("pawn", str(d.name))
-	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % title, tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
-	if not yes or not is_instance_valid(self) or _closing:
-		_busy = false
-		return
 	var err: String = await ShopSheet._purchase("pawn", pawn_id)
 	_busy = false
 	if not is_instance_valid(self) or _closing:
@@ -179,7 +184,7 @@ func _on_act() -> void:
 	if err == "":
 		Sound.sfx("buy")
 		Haptics.success()
-		Toast.show(self, tr("%s are yours!") % title, card, 1.8, "good")
+		ShopSheet.reveal(self, "pawn", pawn_id, title)
 		changed.emit()
 	else:
 		Sound.sfx("error")

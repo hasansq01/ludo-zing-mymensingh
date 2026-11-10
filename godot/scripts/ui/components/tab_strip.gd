@@ -44,6 +44,7 @@ var items: Array = []
 var selected := ""
 var sound := "select"                ## the press_fx sound when a tab is picked ("" = haptic only)
 var fade_color := Palette.CARD       ## gtabs: the surface behind the strip (the scroll-edge fade blends into it)
+var game := false                    ## gtabs on dark wood (Sheet.LOOK_GAME): inactive tabs wood with light labels
 
 var _tex: Array = []                 # Texture2D per item (or null)
 var _counts := {}
@@ -362,7 +363,7 @@ func _draw() -> void:
 
 
 func _draw_gtabs() -> void:
-	draw_rect(Rect2(0, size.y - BASE, size.x, BASE), Palette.TAB)
+	draw_rect(Rect2(0, size.y - BASE, size.x, BASE), Palette.WOOD_DEEP if game else Palette.TAB)
 	var font := UIKit.font_display()
 	for i in items.size():
 		var it: Dictionary = items[i]
@@ -376,7 +377,8 @@ func _draw_gtabs() -> void:
 		if pressed and not on:
 			r.position.y += 1.0
 		var cc := cat_colors(it)
-		var face: Color = cc[0] if on else (Palette.TAB_HOVER if pressed else Palette.TAB)
+		var face: Color = cc[0] if on else ((Palette.WOOD_DEEP if pressed else Palette.WOOD_HI) if game else (Palette.TAB_HOVER if pressed else Palette.TAB))
+		var ink: Color = Palette.INK_DEEP if on or not game else Palette.G_SUB
 		var st := _top_box(face, RADIUS)
 		draw_style_box(st, r)
 		if on:
@@ -391,14 +393,14 @@ func _draw_gtabs() -> void:
 			if tex:
 				draw_texture_rect(tex, Rect2(inner.get_center().x - _ic / 2.0, top, _ic, _ic), false)
 			var tx := inner.position.x + (inner.size.x - minf(tw, inner.size.x - 4.0)) / 2.0
-			draw_string(font, Vector2(tx, top + _ic + 2.0 + _fs * 0.8), text, HORIZONTAL_ALIGNMENT_LEFT, inner.size.x - 4.0, _fs, Palette.INK_DEEP, TextServer.JUSTIFICATION_NONE)
+			draw_string(font, Vector2(tx, top + _ic + 2.0 + _fs * 0.8), text, HORIZONTAL_ALIGNMENT_LEFT, inner.size.x - 4.0, _fs, ink, TextServer.JUSTIFICATION_NONE)
 		else:
 			var total := _ic + 5.0 + tw
 			var cx := inner.position.x + (inner.size.x - total) / 2.0
 			var cy := inner.get_center().y
 			if tex:
 				draw_texture_rect(tex, Rect2(cx, cy - _ic / 2.0, _ic, _ic), false)
-			draw_string(font, Vector2(cx + _ic + 5.0, cy + _fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs, Palette.INK_DEEP)
+			draw_string(font, Vector2(cx + _ic + 5.0, cy + _fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs, ink)
 		_draw_count(str(it.get("key", "")), Vector2(r.end.x - 10.0, maxf(r.position.y + 1.0, 10.0)))
 	# scroll hints: a soft fade at an edge with more tabs behind it
 	if _content_w > size.x + 0.5:
@@ -413,7 +415,7 @@ func _draw_gtabs() -> void:
 ## A small ">" (dir 1) or "<" (dir -1) at c: more tabs this way.
 func _chevron(c: Vector2, dir: float) -> void:
 	var pts := PackedVector2Array([c + Vector2(-3.0 * dir, -6.0), c + Vector2(3.0 * dir, 0.0), c + Vector2(-3.0 * dir, 6.0)])
-	draw_polyline(pts, Palette.INK_DEEP, 2.5, true)
+	draw_polyline(pts, Palette.G_TEXT if game else Palette.INK_DEEP, 2.5, true)
 
 
 func _fade(r: Rect2, left: bool) -> void:

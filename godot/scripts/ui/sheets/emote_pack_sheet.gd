@@ -29,7 +29,7 @@ var _busy := false
 
 func _init(pack_id_ := "starter", kind_ := "emotes") -> void:
 	var pk := Emotes.text_pack(pack_id_) if kind_ == "text" else Emotes.pack(pack_id_)
-	super(L10n.t(str(pk.get("name", "Emotes"))), MAX_W, true, LOOK_PM)
+	super(L10n.t(str(pk.get("name", "Emotes"))), MAX_W, true, LOOK_GAME)
 	pack_id = pack_id_
 	kind = kind_
 	var list := add_scroll_body(UIKit.SPACE.md)
@@ -166,11 +166,7 @@ func _on_act() -> void:
 			Haptics.error()
 			Toast.show(self, Account.error_text("offline", "buy"), card, 2.2, "bad")
 			return
-	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % L10n.t(pk.name), tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
-	if not yes or not is_instance_valid(self) or _closing:
-		_busy = false
-		return
-	var err := ""
+	var err := ""                          # (no "Buy?" question: this Buy is the deliberate second tap)
 	if _wallet():
 		var r: Dictionary = await Account.instance().buy(kind, pack_id)
 		if not r.get("ok", false):
@@ -183,7 +179,7 @@ func _on_act() -> void:
 	if err == "":
 		Sound.sfx("buy")
 		Haptics.success()
-		Toast.show(self, tr("%s is yours!") % L10n.t(pk.name), card, 1.8, "good")
+		ShopSheet.reveal(self, kind, pack_id, L10n.t(pk.name))
 		changed.emit()
 	else:
 		Sound.sfx("error")
@@ -217,7 +213,7 @@ class EmoteCell extends VBoxContainer:
 		_t = offset_sec
 		var well := PanelContainer.new()
 		well.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var st := UIKit.box(Palette.SURFACE_2, UIKit.R.md)
+		var st := UIKit.box(Palette.WOOD_HI, UIKit.R.md)
 		UIKit.pad(st, UIKit.SPACE.xs)
 		well.add_theme_stylebox_override("panel", st)
 		_rect = TextureRect.new()
@@ -229,7 +225,7 @@ class EmoteCell extends VBoxContainer:
 		well.add_child(_rect)
 		add_child(well)
 		var nm := L10n.t(str(EmoteArt.info(id).get("name", id)))
-		var l := UIKit.label(nm, UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+		var l := UIKit.label(nm, UIKit.FS.label, Palette.G_TEXT, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 		l.name = "Name"
 		l.visible = not phrase              # a phrase's sticker already says it
 		add_child(l)

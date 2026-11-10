@@ -169,9 +169,15 @@ func _shop_ui() -> void:
 	shop.show_tab("text")
 	check("shop: Text lists the four text packs", shop._cards.size() == 4 and _card(shop, "bangla") != null)
 	shop.show_tab("dice")
-	check("shop: square art in three columns, wide art in two", shop.scroll_body.get_child(0).columns == 3)
+	var grid_of := func(sh: ShopSheet) -> GridContainer:
+		for c in sh.scroll_body.get_children():
+			if c is GridContainer:
+				return c
+		return null
+	check("shop: square art in three columns, wide art in two", grid_of.call(shop).columns == 3)
+	check("shop: today's featured item sits above the grid (something for sale on Dice)", shop.scroll_body.get_child(0).find_child("Featured", true, false) != null)
 	shop.show_tab("rooms")
-	check("shop: ...rooms in two", shop.scroll_body.get_child(0).columns == 2)
+	check("shop: ...rooms in two", grid_of.call(shop).columns == 2)
 	shop.show_tab("emotes")
 	shop.show_tab("emotes")
 	st = _card(shop, "starter")
