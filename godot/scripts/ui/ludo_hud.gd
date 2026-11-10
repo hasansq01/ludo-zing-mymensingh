@@ -105,7 +105,7 @@ class Tile extends PlayerTile:
 	var _slot_edge := Color.WHITE
 	var _disc: Control                    # the countdown, its own drawing (redrawn ~10 times a second, not the card)
 	var _disc_step := -1
-	const TIMER_R := 13.0
+	const TIMER_R := 15.0
 
 	## Online: this player's own avatar and frame (catalog ids) instead of the pawn tile.
 	func set_look(avatar_id: String, frame_id: String) -> void:
@@ -128,7 +128,7 @@ class Tile extends PlayerTile:
 			_badge.queue_free()
 			_badge = null
 		if b != "":
-			_badge = UIKit.tag(tr("Bot") if b == "bot" else tr("Offline"), "ink" if b == "bot" else "white")
+			_badge = MatchLook.tag(tr("Bot") if b == "bot" else tr("Offline"))
 			_badge.name = "Badge"
 			add_child(_badge)
 		_apply_done()
@@ -207,7 +207,7 @@ class Tile extends PlayerTile:
 
 	func _draw() -> void:
 		var card := _card_rect()
-		draw_style_box(_sb_card_on if active else _sb_card, card)
+		_draw_card(card)
 		if open_k > 0.01:                          # waiting: nothing at all where the die parks
 			var k := clampf((open_k - 0.3) / 0.7, 0.0, 1.0)   # the slot fades in once the card has widened
 			_sb_slot.bg_color = Color(_slot_bg, _slot_bg.a * k)
@@ -217,25 +217,14 @@ class Tile extends PlayerTile:
 		if mover:
 			draw_style_box(_sb_mover, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(3))
 
-	## The server's turn countdown (on _disc, over the avatar's corner): a white disc with the seconds left and a ring
-	## that empties (red near the end).
+	## The server's turn countdown (on _disc, over the avatar's corner): a dark disc with a gold rim, the seconds left
+	## in outlined display type and a ring in the seat colour that empties (red near the end): MatchLook.draw_timer.
 	func _draw_timer() -> void:
 		if timer_end <= 0:
 			return
 		var left := maxf(0.0, float(timer_end - Time.get_ticks_msec()))
 		var k := clampf(left / maxf(timer_total, 1.0), 0.0, 1.0)
-		var m := timer_center()
-		var late := left <= 5000.0
-		_disc.draw_circle(m + Vector2(0, 1.5), TIMER_R + 1.0, Palette.shadow(0.25), true, -1.0, true)
-		_disc.draw_circle(m, TIMER_R + 1.0, Color.WHITE, true, -1.0, true)
-		_disc.draw_arc(m, TIMER_R - 2.0, 0.0, TAU, 40, Palette.TRACK, 3.0, true)
-		if k > 0.0:
-			_disc.draw_arc(m, TIMER_R - 2.0, -PI / 2.0, -PI / 2.0 + TAU * k, 40, Palette.RED if late else Palette.PLAYER[color_index], 3.0, true)
-		var f := UIKit.font_body(900, true)
-		var t := str(int(ceil(left / 1000.0)))
-		var fs := UIKit.FS.small
-		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		_disc.draw_string(f, m + Vector2(-w / 2.0, fs * 0.36), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Palette.DANGER if late else Palette.INK)
+		MatchLook.draw_timer(_disc, timer_center(), TIMER_R, k, int(ceil(left / 1000.0)), color_index, left <= 5000.0)
 
 
 ## The die each colour rolls with (LudoMatch.dice_skins; "" = Classic): the one die on screen is whoever's turn it is.
@@ -304,13 +293,11 @@ func _ready() -> void:
 
 func _build_pair_box() -> void:
 	pair_box = PanelContainer.new()
-	var st := UIKit.surface("card", false, true).duplicate() as StyleBoxFlat
-	UIKit.pad(st, UIKit.SPACE.md, UIKit.SPACE.sm)
-	pair_box.add_theme_stylebox_override("panel", st)
+	pair_box.add_theme_stylebox_override("panel", MatchLook.card(14, 7))   # (tight: no more of the board than before)
 	pair_box.mouse_filter = Control.MOUSE_FILTER_STOP
-	var col := UIKit.vbox(UIKit.SPACE.xs)
+	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	var cap := UIKit.label(tr("Join these two pawns?"), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var cap := GameUI.outlined(tr("Join these two pawns?"), UIKit.FS.h3 + 1, GameUI.GOLD, 2, HORIZONTAL_ALIGNMENT_CENTER)
 	_pair_cap = cap
 	var head := UIKit.hbox(UIKit.SPACE.xs)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -318,12 +305,13 @@ func _build_pair_box() -> void:
 	head.add_child(Info.icon("pair", false, 20))
 	col.add_child(head)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
-	pair_yes = UIKit.button(tr("Pair up"), "honey", "sm")
-	pair_no = UIKit.button(tr("Keep single"), "ghost", "sm")
+	pair_yes = GameUI.button(tr("Pair up"), "gold", "sm")
+	pair_no = GameUI.button(tr("Keep single"), "cream", "sm")
 	for b in [pair_yes, pair_no]:
-		b.custom_minimum_size.x = 132
+		b.custom_minimum_size = Vector2(132, UIKit.TAP)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(b)
+	MatchLook.fit_buttons(pair_yes, pair_no)
 	pair_yes.pressed.connect(func(): _answer(true))
 	pair_no.pressed.connect(func(): _answer(false))
 	col.add_child(row)
@@ -331,36 +319,32 @@ func _build_pair_box() -> void:
 	pair_box.visible = false
 	add_child(pair_box)
 
-## Online pieces: the reconnect pill and the away prompt (hidden until needed).
+## Online pieces: the reconnect pill and the away prompt (hidden until needed), in the game look.
 func _build_online() -> void:
 	banner = PanelContainer.new()
 	banner.name = "Banner"
-	var bs := UIKit.box(Palette.HONEY_TINT, UIKit.R.pill, UIKit.BW.line, Color.WHITE)
-	UIKit.shade(bs, "sm")
-	UIKit.pad(bs, UIKit.SPACE.md, UIKit.SPACE.xs)
-	banner.add_theme_stylebox_override("panel", bs)
+	banner.add_theme_stylebox_override("panel", MatchLook.note_pill())
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var spin := Spinner.new()
+	spin.color = Palette.GL_TITLE
 	row.add_child(spin)
-	var bl := UIKit.label("", UIKit.FS.label, Palette.ON_HONEY, UIKit.font_body(900))
+	var bl := MatchLook.note_label()
 	bl.name = "Text"
-	bl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(bl)
 	banner.add_child(row)
 	banner.visible = false
 	add_child(banner)
 	away_box = PanelContainer.new()
 	away_box.name = "Away"
-	var st := UIKit.surface("card", false, true).duplicate() as StyleBoxFlat
-	UIKit.pad(st, UIKit.SPACE.md, UIKit.SPACE.sm)
-	away_box.add_theme_stylebox_override("panel", st)
+	away_box.add_theme_stylebox_override("panel", MatchLook.card(16, 8))
 	away_box.mouse_filter = Control.MOUSE_FILTER_STOP
-	var col := UIKit.vbox(UIKit.SPACE.xs)
-	var l := UIKit.label(tr("You were away — a bot played for you."), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var col := UIKit.vbox(UIKit.SPACE.xs + 2)
+	var l := GameUI.text(tr("You were away — a bot played for you."), UIKit.FS.body_l, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(l)
-	away_button = UIKit.button(tr("I’m back"), "honey", "sm")
+	away_button = GameUI.button(tr("I’m back"), "gold", "sm")
+	away_button.custom_minimum_size.y = UIKit.TAP
 	away_button.name = "Back"
 	away_button.pressed.connect(func(): away_pressed.emit())
 	col.add_child(away_button)
@@ -822,6 +806,7 @@ func _set_box(question: String, first: String, second: String) -> void:
 	_pair_cap.text = question
 	pair_yes.text = first
 	pair_no.text = second
+	MatchLook.fit_buttons(pair_yes, pair_no)
 
 func _show_box() -> void:
 	top.set_idle("")                         # the prompt asks the question itself: the bar goes quiet,
@@ -947,6 +932,8 @@ func _on_tile_input(e: InputEvent, c: int) -> void:
 
 ## A small turning ring (the reconnect pill): drawn once, turned by rotation (no redraw a frame: see GlowPulse).
 class Spinner extends Control:
+	var color := Palette.GL_TITLE         ## the arc (on the dark note pill: gold)
+
 	func _init() -> void:
 		custom_minimum_size = Vector2(16, 16)
 		size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -959,5 +946,5 @@ class Spinner extends Control:
 
 	func _draw() -> void:
 		var m := size / 2.0
-		draw_arc(m, 6.0, 0.0, TAU, 32, Color(Palette.ON_HONEY, 0.18), 2.5, true)
-		draw_arc(m, 6.0, 0.0, TAU * 0.3, 16, Palette.ON_HONEY, 2.5, true)
+		draw_arc(m, 6.0, 0.0, TAU, 32, Color(color, 0.22), 2.5, true)
+		draw_arc(m, 6.0, 0.0, TAU * 0.3, 16, color, 2.5, true)

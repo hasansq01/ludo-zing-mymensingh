@@ -121,7 +121,10 @@ func run() -> void:
 	var fin := ResultScreen.new({game = "ludo", standings = st2, human_won = true, reward = 0})
 	var fin_l := fin.find_children("Finished", "Label", true, false)
 	check("result: finished rows say Finished", fin_l.size() == 2 and (fin_l[0] as Label).text == "Finished", fin_l.size())
-	var caps_home := fin.find_children("*", "Label", true, false).filter(func(l): return l.text == "HOME" or l.text == "SQ 100")
+	var caps_home := []                       # (in the rows: the Home button's own face reads HOME in the game look)
+	for row: Control in fin._rows:
+		caps_home.append_array(row.find_children("*", "Label", true, false).filter(func(l): return l.text == "HOME" or l.text == "SQ 100"))
+	check("result: the rows are there to look in", fin._rows.size() == 4, fin._rows.size())
 	check("result: no HOME tag", caps_home.is_empty())
 	fin.free()
 	check("place badge: gold / silver / bronze", PlayerTile.PlaceBadge.face_color(1) == Palette.GOLD

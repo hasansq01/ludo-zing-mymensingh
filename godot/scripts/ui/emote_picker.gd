@@ -348,7 +348,8 @@ void fragment() {
 	return m
 
 
-## The button: a cream chat bubble with three dots, a thin warm-brown outline and a soft lip (no background).
+## The button: a gold chat bubble with three dots and the dark outline, on a dark lip (the game look's icons; no
+## background).
 class EmoteButton extends Button:
 	var open := false:
 		set(v):
@@ -375,18 +376,18 @@ class EmoteButton extends Button:
 
 	static func texture() -> Texture2D:
 		if _tex == null:
-			var fill_hi := Palette.CARD.lerp(Color.WHITE, 0.4).to_html(false)
-			var fill_lo := Palette.HONEY_TINT.lerp(Palette.PEACH, 0.2).lerp(Color.WHITE, 0.35).to_html(false)
-			var ink := Palette.RUST.lerp(Palette.SUB, 0.15).to_html(false)
-			var lip := Palette.TAN.lerp(Palette.BRONZE, 0.4).to_html(false)
-			var shade := Palette.SHADOW.to_html(false)
+			var fill_hi := Palette.GL_GOLD_GLOW.to_html(false)
+			var fill_lo := Palette.GL_BTN_GOLD_LO.to_html(false)
+			var ink := Palette.GL_INK.to_html(false)
+			var lip := Palette.GL_GOLD_LIP.to_html(false)
+			var shade := Palette.GL_INK.to_html(false)
 			var bubble := "M9 5.5h14a6 6 0 0 1 6 6v5.5a6 6 0 0 1-6 6h-8.6l-5 4.1c-.6.5-1.5.1-1.4-.7l.3-3.6A6 6 0 0 1 3 17V11.5a6 6 0 0 1 6-6z"
 			var svg := ('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-2 -1 36 36"><defs>'
 				+ '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#%s"/><stop offset="1" stop-color="#%s"/></linearGradient></defs>' % [fill_hi, fill_lo]
-				+ '<path d="%s" transform="translate(0 3.2)" fill="#%s" fill-opacity="0.22"/>' % [bubble, shade]
-				+ '<path d="%s" transform="translate(0 1.5)" fill="#%s" fill-opacity="0.95" stroke="#%s" stroke-opacity="0.9" stroke-width="1.5" stroke-linejoin="round"/>' % [bubble, lip, lip]
-				+ '<path d="%s" fill="url(#g)" stroke="#%s" stroke-width="1.5" stroke-linejoin="round"/>' % [bubble, ink]
-				+ '<path d="M8 8.6h7" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity=".9"/>'
+				+ '<path d="%s" transform="translate(0 3.2)" fill="#%s" fill-opacity="0.35"/>' % [bubble, shade]
+				+ '<path d="%s" transform="translate(0 1.8)" fill="#%s" stroke="#%s" stroke-width="1.8" stroke-linejoin="round"/>' % [bubble, lip, ink]
+				+ '<path d="%s" fill="url(#g)" stroke="#%s" stroke-width="1.8" stroke-linejoin="round"/>' % [bubble, ink]
+				+ '<path d="M8 8.6h7" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>'
 				+ '<circle cx="10.8" cy="14.3" r="1.75" fill="#%s"/><circle cx="16" cy="14.3" r="1.75" fill="#%s"/><circle cx="21.2" cy="14.3" r="1.75" fill="#%s"/></svg>' % [ink, ink, ink])
 			var img := Image.new()
 			img.load_svg_from_string(svg, 4.0)
@@ -398,16 +399,16 @@ class EmoteButton extends Button:
 		var s := ICON * 36.0 / 32.0 * k
 		var r := Rect2(size / 2.0 - Vector2(s, s) / 2.0, Vector2(s, s))
 		if open:                              # a warm glow while the panel is open
-			draw_circle(size / 2.0 + Vector2(0, 1), s * 0.5, Color(Palette.PEACH, 0.35), true, -1.0, true)
+			draw_circle(size / 2.0 + Vector2(0, 1), s * 0.5, Color(Palette.GL_TITLE, 0.35), true, -1.0, true)
 		draw_texture_rect(texture(), r, false)
 		var p := get_parent() as EmotePicker
 		if has_focus() and p and p._kbd:
-			var st := UIKit.box(Color.TRANSPARENT, UIKit.R.sm, 2, Palette.PEACH)
+			var st := UIKit.box(Color.TRANSPARENT, UIKit.R.sm, 2, Palette.GL_TITLE)
 			st.draw_center = false
 			draw_style_box(st, Rect2(Vector2.ZERO, size).grow(2))
 
 
-## The slim cream panel (a white rim and a warm ring, a soft shadow).
+## The slim panel in the game look: a dark café face with a gold rim over a deep lip, a soft shadow.
 class PickPanel extends Control:
 	var _ring: StyleBoxFlat
 	var _face: StyleBoxFlat
@@ -415,15 +416,15 @@ class PickPanel extends Control:
 	func _init() -> void:
 		name = "EmotePanel"
 		mouse_filter = Control.MOUSE_FILTER_STOP
-		_ring = UIKit.box(Palette.HONEY_TINT_EDGE.lerp(Palette.TAN, 0.3), UIKit.R.lg + 2, 0)
-		_ring.shadow_color = Color(Palette.SHADOW_DEEP, 0.3)
+		_ring = UIKit.box(Palette.GL_CARD_LIP, UIKit.R.lg + 2, 0)
+		_ring.shadow_color = Color(0, 0, 0, 0.4)
 		_ring.shadow_size = 12
 		_ring.shadow_offset = Vector2(0, 8)
-		_face = UIKit.box(Palette.CARD, UIKit.R.lg, 3, Color.WHITE)
+		_face = UIKit.box(Palette.GL_CARD_FACE, UIKit.R.lg, 3, Palette.GL_CHIP_RIM)
 		resized.connect(queue_redraw)
 
 	func _draw() -> void:
-		draw_style_box(_ring, Rect2(Vector2.ZERO, size).grow(2))
+		draw_style_box(_ring, Rect2(Vector2(0, 5), size))
 		draw_style_box(_face, Rect2(Vector2.ZERO, size))
 
 
@@ -434,6 +435,7 @@ class Tab extends Button:
 	var _art: TextureRect
 	var _bg_on: StyleBoxFlat
 	var _bg_off: StyleBoxFlat
+	var _aa: Label
 
 	func _init(tab_: String) -> void:
 		tab = tab_
@@ -445,8 +447,8 @@ class Tab extends Button:
 		var empty := StyleBoxEmpty.new()
 		for s in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 			add_theme_stylebox_override(s, empty)
-		_bg_on = UIKit.box(Palette.HONEY_TINT, UIKit.R.sm, 2, Palette.HONEY_TINT_EDGE)
-		_bg_off = UIKit.box(Palette.SURFACE_2, UIKit.R.sm, 2, Palette.ROW_EDGE)
+		_bg_on = UIKit.box(Palette.GL_BTN_GOLD_LO, UIKit.R.sm, 2, Palette.GL_TITLE)
+		_bg_off = UIKit.box(Palette.GL_CHIP_BG, UIKit.R.sm, 2, Palette.GL_TILE_RIM)
 		if tab_ == "em":
 			_art = TextureRect.new()
 			_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -455,14 +457,16 @@ class Tab extends Button:
 			add_child(_art)
 			_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 2)
 		else:
-			var l := UIKit.label("Aa", 15, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
-			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			add_child(l)
-			l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			_aa = UIKit.label("Aa", 16, Palette.GL_CREAM_RIM, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+			_aa.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			_aa.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_aa)
+			_aa.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	func set_state(mode: String, first_sticker: String) -> void:
 		_on = mode == tab
+		if _aa:
+			_aa.add_theme_color_override("font_color", Palette.GL_BROWN_TEXT if _on else Palette.GL_CREAM_RIM)
 		if _art and first_sticker != "":
 			_art.texture = EmotePicker.cropped(EmoteArt.icon(first_sticker))
 		queue_redraw()
@@ -471,7 +475,8 @@ class Tab extends Button:
 		draw_style_box(_bg_on if _on else _bg_off, Rect2(Vector2.ZERO, size))
 
 
-## One sticker in the panel (72 x 50): a soft cream well holding the sticker; greyed while the picker cools down.
+## One sticker in the panel (72 x 50): a wood well holding the sticker (gold-rimmed under the finger / focus); greyed
+## while the picker cools down.
 class Cell extends Button:
 	var id := ""
 	var index := 0
@@ -495,8 +500,8 @@ class Cell extends Button:
 		var empty := StyleBoxEmpty.new()
 		for s in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 			add_theme_stylebox_override(s, empty)
-		_bg = UIKit.box(Palette.SURFACE_2, UIKit.R.md, 2, Palette.ROW_EDGE.lerp(Palette.TAN, 0.25))
-		_bg_on = UIKit.box(Palette.HONEY_TINT.lerp(Color.WHITE, 0.35), UIKit.R.md, 2, Palette.HONEY_TINT_EDGE)
+		_bg = UIKit.box(Palette.GL_TILE_HI, UIKit.R.md, 2, Palette.GL_TILE_RIM)
+		_bg_on = UIKit.box(Palette.GL_CARD_GLOW, UIKit.R.md, 2, Palette.GL_TITLE)
 		var phrase := bool(info.get("text", false))
 		_icon = TextureRect.new()
 		# a phrase's die-cut art fills its whole frame: uncropped, or its edges would be cut off
@@ -538,7 +543,7 @@ class Cell extends Button:
 		var hot := (is_hovered() or (has_focus() and _kbd())) and _grey <= 0.0
 		draw_style_box(_bg_on if hot else _bg, Rect2(Vector2.ZERO, size))
 		if has_focus() and _kbd():
-			var st := UIKit.box(Color.TRANSPARENT, UIKit.R.md + 2, 2, Palette.PEACH.darkened(0.1))
+			var st := UIKit.box(Color.TRANSPARENT, UIKit.R.md + 2, 2, Palette.GL_TITLE)
 			st.draw_center = false
 			draw_style_box(st, Rect2(Vector2.ZERO, size).grow(2))
 

@@ -2,14 +2,15 @@ class_name CoachMarks
 extends Control
 ## The guided first match's coach marks (Tutorial), over the Ludo HUD:
 ##   step(): a soft dim scrim with a cut-out over the target (the dice, a glowing pawn) and an optional second
-##           cut-out for something to look at (a star square, a rival pawn), a pulsing honey ring, the pointer hand
-##           and a one-line caption bubble with a tail. Taps outside the cut-out are blocked (a nudge says so);
+##           cut-out for something to look at (a star square, a rival pawn), a pulsing gold ring, the pointer hand
+##           and a one-line caption bubble with a tail (the game look: the café card's face, a gold rim, the line
+##           in outlined display type). Taps outside the cut-out are blocked (a nudge says so);
 ##           taps inside go through to the dice or the board as usual.
 ##   note(): a caption without the scrim (explanations while the computer plays). hold = true: it stays until
 ##           tapped (anywhere but the top bar; "Tap to continue" under it) or `sec` runs out, and holding() is true
 ##           meanwhile (the tutorial pauses the game on it). Otherwise input is not blocked.
 ##   card(): the "You’re ready!" card; returns the button picked.
-## A small "Skip tutorial" text button stays in the top-left corner throughout (signal skip).
+## A small "Skip tutorial" button (a dark chip with a gold rim) stays in the top-left corner throughout (signal skip).
 ## Targets are Callables returning a Rect2 in screen (UI) pixels, read every frame, so cut-outs follow the camera
 ## and the gliding die. pop_host(): a layer just above the scrim (under the caption) for the board's pop texts,
 ## which are part of the lesson ("+1 roll" after a capture, "Home!").
@@ -112,18 +113,18 @@ func _ready() -> void:
 	_skip.text = tr("Skip tutorial")
 	_skip.focus_mode = Control.FOCUS_NONE
 	_skip.custom_minimum_size = Vector2(UIKit.TAP * 2.4, UIKit.TAP)
-	var sb := UIKit.box(Palette.NIGHT_GLASS, UIKit.R.pill)
+	var sb := MatchLook.chip_box(UIKit.R.pill)              # the game look: a dark chip with a gold rim
 	UIKit.pad(sb, UIKit.SPACE.lg, UIKit.SPACE.xs)
 	var sbp := sb.duplicate() as StyleBoxFlat
-	sbp.bg_color = Palette.NIGHT_GLASS.darkened(0.3)
+	sbp.bg_color = Color(Palette.GL_CHIP_BG.darkened(0.35), MatchLook.CHIP_A)
 	for st in ["normal", "hover", "focus"]:
 		_skip.add_theme_stylebox_override(st, sb if st != "focus" else StyleBoxEmpty.new())
 	_skip.add_theme_stylebox_override("pressed", sbp)
 	_skip.add_theme_stylebox_override("hover_pressed", sbp)
-	_skip.add_theme_font_override("font", UIKit.font_body(800))
-	_skip.add_theme_font_size_override("font_size", UIKit.FS.label)
+	_skip.add_theme_font_override("font", UIKit.font_body(900))
+	_skip.add_theme_font_size_override("font_size", UIKit.FS.body)
 	for st in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
-		_skip.add_theme_color_override(st, Color.WHITE)
+		_skip.add_theme_color_override(st, Palette.GL_CREAM_RIM)
 	_skip.pressed.connect(func(): skip.emit())
 	UIKit.wire_press(_skip)
 	add_child(_skip)
@@ -133,18 +134,20 @@ func _ready() -> void:
 func _build_bubble() -> void:
 	_bubble = PanelContainer.new()
 	var st := UIKit.surface("bubble").duplicate() as StyleBoxFlat
-	st.border_color = Palette.HONEY
+	st.bg_color = Palette.GL_CARD_FACE                     # the game look: the café card's face, a gold rim
+	st.border_color = Palette.GL_CHIP_RIM
+	st.shadow_color = Color(0, 0, 0, 0.4)
 	UIKit.pad(st, UIKit.SPACE.lg, UIKit.SPACE.md)
 	_bubble.add_theme_stylebox_override("panel", st)
 	_bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var col := UIKit.vbox(UIKit.SPACE.xxs)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_title = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	_title = GameUI.outlined("", UIKit.FS.h1, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_CENTER)
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_sub = UIKit.label("", UIKit.FS.body, Palette.SUB, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
+	_sub = UIKit.label("", UIKit.FS.body_l, GameUI.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint = UIKit.label(tr(TAP_HINT), UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	_hint = UIKit.label(tr(TAP_HINT), UIKit.FS.body, GameUI.GOLD, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
 	_hint.visible = false
 	col.add_child(_title)
 	col.add_child(_sub)
@@ -458,8 +461,8 @@ func _draw() -> void:
 		var pulse := 0.0 if Sheet.reduce_motion() else (sin(_t * TAU / 1.1) + 1.0) / 2.0
 		var r := minf(_hole.size.x, _hole.size.y) / 2.0
 		var w := RING_W + _nudge * 2.0
-		_ring(_hole.grow(2.0 + pulse * 3.0), r + 2.0 + pulse * 3.0, Color(Palette.HONEY, a * (0.95 - 0.35 * pulse)), w)
-		_ring(_hole.grow(8.0 + pulse * 7.0), r + 8.0 + pulse * 7.0, Color(Palette.HONEY, a * 0.35 * (1.0 - pulse)), 2.0)
+		_ring(_hole.grow(2.0 + pulse * 3.0), r + 2.0 + pulse * 3.0, Color(Palette.GL_TITLE, a * (0.95 - 0.35 * pulse)), w)
+		_ring(_hole.grow(8.0 + pulse * 7.0), r + 8.0 + pulse * 7.0, Color(Palette.GL_TITLE, a * 0.35 * (1.0 - pulse)), 2.0)
 		if _nudge > 0.0:
 			_ring(_hole.grow(4.0), r + 4.0, Color(Color.WHITE, _nudge * a), 2.0)
 	if _mark_rect.size != Vector2.ZERO and _amount > 0.01:
@@ -500,8 +503,8 @@ func _draw_tail() -> void:
 	var br := Rect2(_bubble.position, _bubble.size)
 	var aim := _hole.get_center() if _hole.size != Vector2.ZERO else ref.get_center()
 	var tx := clampf(aim.x, br.position.x + 26.0, br.end.x - 26.0)
-	var col := Color(Palette.CARD, _bubble.modulate.a)
-	var edge := Color(Palette.HONEY, _bubble.modulate.a)
+	var col := Color(Palette.GL_CARD_FACE, _bubble.modulate.a)
+	var edge := Color(Palette.GL_CHIP_RIM, _bubble.modulate.a)
 	var pts: PackedVector2Array
 	if above:
 		var y := br.end.y - 2.0
