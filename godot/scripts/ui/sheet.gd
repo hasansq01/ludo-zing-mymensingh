@@ -32,6 +32,7 @@ signal narrow_changed(narrow: bool)      ## the card crossed 340 px (tighter lay
 
 const LOOK_CARD := "card"
 const LOOK_PM := "pm"
+const PAPER_INSET := 9.0               ## the wood frame's width around a ribbon sheet's cream paper
 const LOOK_GAME := "game"              ## the PM family (ribbon, close X) on dark wood with a gold rim (Palette.WOOD)
 const NARROW_W := 340.0
 ## Centre of the close button, inset from the card's top-right corner (web .card .x-btn top/right -10 with a 2 px
@@ -181,22 +182,35 @@ static func _card_style() -> StyleBoxFlat:
 
 ## web .pm: PM face, 4 px PM_RIM rim, r 28, a 3 px PM_RING ring outside it, 0 12px 28px rgba(50,25,40,.4).
 static func _pm_style(game := false) -> StyleBox:
+	# every ribbon sheet sits in the game's gold-rimmed wood frame; the game look is wood all through, the others keep
+	# their cream content on a paper panel inside the frame (so their text and rows read as before)
 	var s := PMStyle.new()
-	if game:
-		s.face.bg_color = Palette.WOOD
-		s.face.border_color = Palette.WOOD_RIM
-		s.face.shadow_color = Color(0, 0, 0, 0.55)
-		s.ring.border_color = Palette.WOOD_LIP
-	s.content_margin_left = UIKit.PAD.pane + 4
-	s.content_margin_right = UIKit.PAD.pane + 4
-	s.content_margin_top = UIKit.PAD.pane + 4
-	s.content_margin_bottom = UIKit.PAD.pane + 4
+	s.face.bg_color = Palette.WOOD
+	s.face.border_color = Palette.WOOD_RIM
+	s.face.shadow_color = Color(0, 0, 0, 0.55)
+	s.ring.border_color = Palette.WOOD_LIP
+	var inset := 0.0 if game else PAPER_INSET
+	if not game:
+		s.paper = StyleBoxFlat.new()
+		s.paper.bg_color = Palette.PM
+		s.paper.set_corner_radius_all(UIKit.R.xl - 4)
+		s.paper.corner_detail = 12
+		s.paper.anti_aliasing = true
+		s.paper.border_width_top = 2
+		s.paper.border_color = Color(Palette.WOOD_LIP, 0.35)          # a soft shade where the paper meets the frame
+		s.inset = inset
+	s.content_margin_left = UIKit.PAD.pane + 4 + inset
+	s.content_margin_right = UIKit.PAD.pane + 4 + inset
+	s.content_margin_top = UIKit.PAD.pane + 4 + inset
+	s.content_margin_bottom = UIKit.PAD.pane + 4 + inset
 	return s
 
 ## The .pm frame as one StyleBox: the face with its rim and drop shadow, then the orange ring just outside the box.
 class PMStyle extends StyleBox:
 	var face: StyleBoxFlat
 	var ring: StyleBoxFlat
+	var paper: StyleBoxFlat               ## the cream content panel inside the wood frame (null: wood all through)
+	var inset := 0.0
 
 	func _init() -> void:
 		face = StyleBoxFlat.new()
@@ -219,6 +233,8 @@ class PMStyle extends StyleBox:
 
 	func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 		face.draw(to_canvas_item, rect)
+		if paper:
+			paper.draw(to_canvas_item, rect.grow(-inset))
 		ring.draw(to_canvas_item, rect.grow(UIKit.BW.rim))
 
 

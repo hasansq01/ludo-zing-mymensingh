@@ -40,7 +40,7 @@ var _ticks := 0
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
 func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
-	super(L10n.t("Lucky Draw"), width, true, LOOK_PM)
+	super(L10n.t("Lucky Draw"), width, true, LOOK_GAME)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
 	_width = width
@@ -48,7 +48,9 @@ func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> voi
 	wheel = Wheel.new()
 	wheel.ticked.connect(_on_tick)
 	body.add_child(UIKit.margin(wheel, 0, UIKit.SPACE.sm, 0, 0))
-	_note = UIKit.label("", UIKit.FS.h2, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	_note = UIKit.label("", UIKit.FS.h2, Palette.G_TEXT, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	_note.add_theme_constant_override("outline_size", 6)
+	_note.add_theme_color_override("font_outline_color", Palette.G_OUTLINE)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.custom_minimum_size.y = 28   # reserved: the card doesn't jump when the result shows
 	_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -68,7 +70,7 @@ func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> voi
 	_again.pressed.connect(_watch)
 	body.add_child(_again)
 	# fair and open: what you can win, and the chances
-	var odds := UIKit.label(tr("Every wedge has the same chance. The jackpot: %s coins and %d gems.") % [Fmt.coins_full(Rewards.PRIZES.max()), JACKPOT_GEMS], UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var odds := UIKit.label(tr("Every wedge has the same chance. The jackpot: %s coins and %d gems.") % [Fmt.coins_full(Rewards.PRIZES.max()), JACKPOT_GEMS], UIKit.FS.small, Palette.G_SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	odds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(odds)
 	if AdFlow.available() and is_same(profile, Save.profile):
