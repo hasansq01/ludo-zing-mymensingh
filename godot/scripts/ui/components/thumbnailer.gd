@@ -48,10 +48,10 @@ const BAKED_DIR := "res://assets/thumbs/"
 ## ~170 px). Dice: the Dice3D's padded drawing rect (Dice3D.PAD) for an 84 px die, at 3x. Pawns: a Shop card's art
 ## (4:3, PawnStage's card pair) at 2x.
 const BAKE_SIZE := Vector2i(720, 540)
-const PAWN_SIZE := Vector2i(360, 270)
-const PAWN_CELL := Vector2i(128, 160)    ## one pawn in a skin's row picture (pawnrow_<id>.webp: the four colours side by side)
+const PAWN_SIZE := Vector2i(720, 540)
+const PAWN_CELL := Vector2i(256, 320)    ## one pawn in a skin's row picture (pawnrow_<id>.webp: the four colours side by side)
 const DICE_SIZE := 84.0
-const DICE_SCALE := 3.0
+const DICE_SCALE := 6.0
 ## The room camera (web Rooms.thumb: a corner camera at angle .72, 50 out, 24 up, looking at the far corner), in
 ## TableWorld units (the same as the web's), with a vertical lens wide enough for 4:3.
 const ROOM_CAM := {pos = Vector3(30.5, 21.0, 35.0), look = Vector3(-14, 5.0, -14), fov = 50.0}

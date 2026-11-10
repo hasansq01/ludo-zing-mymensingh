@@ -3,8 +3,8 @@ extends Node
 ## renders them live (Thumbnailer.baked):
 ##   rooms   res://assets/thumbs/room_<id>.webp    Thumbnailer's corner camera, 720 x 540
 ##   scenes  res://assets/thumbs/scene_<id>.webp   the scene's landing view (sign shrunk like the Shop's), 720 x 540
-##   dice    res://assets/thumbs/dice_<id>.webp    a Dice3D in its corner view, its padded rect, 3x an 84 px die
-##   pawns   res://assets/thumbs/pawn_<id>.webp    PawnStage's CARD pair (a red and a blue pawn in the skin), 360 x 270
+##   dice    res://assets/thumbs/dice_<id>.webp    a Dice3D in its corner view, its padded rect, 6x an 84 px die
+##   pawns   res://assets/thumbs/pawn_<id>.webp    PawnStage's CARD pair (a red and a blue pawn in the skin), 720 x 540
 ## Rooms, scenes and pawns render at 2x the picture size with 4x MSAA and are scaled down (Lanczos): clean edges. Lossy
 ## WebP (quality QUALITY) with a matching .import (lossy, no mipmaps, never VRAM-compressed: crisp UI, small download).
 ##   godot --path . res://dev/bake_thumbs.tscn [-- room|scene|dice|pawn ...]     (needs a GPU: not --headless)

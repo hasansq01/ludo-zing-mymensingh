@@ -299,7 +299,7 @@ func _layout() -> void:
 	var g := s * 1.5
 	glow.position = (s - g) / 2.0
 	glow.size = g
-	var k := clampf((get_viewport().get_final_transform() * get_global_transform_with_canvas()).get_scale().y, 1.0, 4.0)
+	var k := clampf((get_viewport().get_final_transform() * get_global_transform_with_canvas()).get_scale().y, 1.0, 8.0)   # (phones ~2.7; the Shop bake 6)
 	viewport.size = Vector2i(maxi(int(rect.size.x * k), 8), maxi(int(rect.size.y * k), 8))
 	# camera: the resting die fills DIE_FILL of the control's height and sits on the control's centre
 	var unit := s.y * fill                         # pixels per die size
