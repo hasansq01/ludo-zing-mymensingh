@@ -179,12 +179,19 @@ static func _row_button() -> Button:
 	return b
 
 
-## The cream glass of the top bar chips: glass, a white rim, a soft shadow.
+## The top bar chips in the game look: dark wood glass with a gold rim and a soft shadow.
 static func _chip_style(r := 18, pressed := false) -> StyleBoxFlat:
-	var s := UIKit.box(Palette.GLASS_PRESSED if pressed else Palette.GLASS, r, UIKit.BW.line, Color.WHITE)
+	var s := UIKit.box(Color(Palette.WOOD_LIP if pressed else Palette.WOOD_DEEP, 0.9), r, UIKit.BW.line, Palette.WOOD_RIM)
 	UIKit.shade(s, "sm")
 	UIKit.pad(s, 8, 6)
 	return s
+
+## A wood chip look on a top bar icon button (the gift, the gear).
+static func _wood_icon_button(b: Button, r: int) -> void:
+	for k in ["normal", "hover", "disabled", "focus"]:
+		b.add_theme_stylebox_override(k, _chip_style(r))
+	for k in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(k, _chip_style(r, true))
 
 
 static func _fill(c: Control) -> void:
@@ -223,7 +230,7 @@ func _build_top_bar() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
 	_chip_text = col
-	_name = UIKit.label(L10n.seat_name("You"), UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
+	_name = UIKit.label(L10n.seat_name("You"), UIKit.FS.label + 1, Palette.G_TEXT, UIKit.font_body(900))
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.clip_text = true
 	col.add_child(_name)
@@ -250,6 +257,7 @@ func _build_top_bar() -> void:
 	cr.alignment = BoxContainer.ALIGNMENT_CENTER
 	coins.add_child(cr)
 	coin_amount = CoinAmount.new(int(Save.profile.get("coins", 0)), "md", "plain")
+	coin_amount.set_color(Palette.G_TEXT)
 	coin_amount.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cr.add_child(coin_amount)
 	var plus := PanelContainer.new()
@@ -275,6 +283,7 @@ func _build_top_bar() -> void:
 	_gems_button.add_child(gr)
 	gem_amount = CoinAmount.gems(int(Save.profile.get("gems", 0)), "sm", "plain")
 	gem_amount.name = "GemAmount"
+	gem_amount.set_color(Palette.G_TEXT)
 	gr.add_child(gem_amount)
 	# the rows sit in Buttons, which don't size to their children: the chip widens itself to what they need, so a big
 	# balance ("130.1K" and the "+") never runs under the gift
@@ -286,6 +295,7 @@ func _build_top_bar() -> void:
 	# the gift: Free spin / Daily reward / Free coins (the Rewards sheet), with the count of those ready now
 	rewards_button = UIKit.icon_button(HI % "gift", "glass", int(BAR_H), 38)
 	rewards_button.name = "Rewards"
+	_wood_icon_button(rewards_button, UIKit.R.lg)
 	rewards_button.pressed.connect(func(): open_tab.emit("rewards"))
 	_top.add_child(rewards_button)
 	_gift_badge = UIKit.notify_badge("0", false)          # (its gentle pulse: _show_count, off with Reduce motion)
@@ -294,6 +304,7 @@ func _build_top_bar() -> void:
 	_gift_badge.visible = false
 	rewards_button.add_child(_gift_badge)
 	var gear := UIKit.icon_button(HI % "gear", "glass", int(BAR_H), 32)
+	_wood_icon_button(gear, UIKit.R.lg)
 	gear.pressed.connect(func(): open_tab.emit("settings"))
 	_top.add_child(gear)
 
@@ -310,11 +321,11 @@ func _fit_wallet() -> void:
 
 func _build_dock() -> void:
 	_dock = Panel.new()
-	var s := UIKit.box(Palette.CARD, 0, 0)
+	var s := UIKit.box(Palette.WOOD, 0, 0)
 	s.corner_radius_top_left = UIKit.R.xl + 2; s.corner_radius_top_right = UIKit.R.xl + 2
 	s.corner_detail = 12
-	s.shadow_size = 18; s.shadow_offset = Vector2(0, -2); s.shadow_color = Palette.shadow(0.35)
-	s.border_width_top = UIKit.BW.line; s.border_color = Color.WHITE
+	s.shadow_size = 18; s.shadow_offset = Vector2(0, -2); s.shadow_color = Color(0, 0, 0, 0.45)
+	s.border_width_top = UIKit.BW.rim; s.border_color = Palette.WOOD_RIM
 	_dock.add_theme_stylebox_override("panel", s)
 	_dock.mouse_filter = Control.MOUSE_FILTER_STOP        # taps on the dock never reach the 3D room
 	add_child(_dock)
@@ -325,19 +336,19 @@ func _build_dock() -> void:
 	add_child(quick_button)
 	_modes = UIKit.hbox(UIKit.SPACE.sm + 2)
 	_modes.name = "Modes"
-	friends_button = _tile_button(tr("Friends"), UIKit.ICON_DIR + "perk_friends.svg")
+	friends_button = _tile_button(tr("Friends"), UIKit.ICON_DIR + "perk_friends.svg", Palette.PLAYER[3])
 	friends_button.name = "Friends"
 	friends_button.pressed.connect(_friends)
 	_modes.add_child(friends_button)
-	for m in [["Computer", "cpu", "cpu"], ["Pass & Play", "pass_play", "local"]]:
-		var b := _tile_button(tr(m[0]), HI % m[1])
+	for m in [["Computer", "cpu", "cpu", Palette.PLAYER[1]], ["Pass & Play", "pass_play", "local", Palette.INFO]]:
+		var b := _tile_button(tr(m[0]), HI % m[1], m[3])
 		b.name = str(m[0]).replace(" & ", "")
 		var mode: String = m[2]
 		b.pressed.connect(func(): _play(mode))
 		_modes.add_child(b)
 	add_child(_modes)
 	_rule = ColorRect.new()
-	_rule.color = Palette.LINE
+	_rule.color = Color(Palette.WOOD_RIM, 0.35)
 	_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_rule)
 	_build_nav()
@@ -362,9 +373,9 @@ func _build_quick() -> void:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
-	_quick_title = UIKit.label(tr("Continue match"), UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
+	_quick_title = UIKit.label(tr("Continue match"), UIKit.FS.label + 1, Palette.G_TEXT, UIKit.font_body(900))
 	col.add_child(_quick_title)
-	_quick_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+	_quick_sub = UIKit.label("", UIKit.FS.small, Palette.G_SUB, UIKit.font_body(800))
 	_quick_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_quick_sub.clip_text = true
 	col.add_child(_quick_sub)
@@ -387,7 +398,7 @@ func _build_quick() -> void:
 ## is the softer SUB.
 func _build_switch() -> void:
 	_switch = PanelContainer.new()
-	var ts := UIKit.box(Palette.CHIP, UIKit.R.lg)
+	var ts := UIKit.box(Palette.WOOD_DEEP, UIKit.R.lg)
 	UIKit.pad(ts, 4)
 	_switch.add_theme_stylebox_override("panel", ts)
 	add_child(_switch)
@@ -437,7 +448,7 @@ func _build_switch() -> void:
 ## The picked game's name in INK, the other one in SUB.
 func _tint_switch() -> void:
 	for k in _switch_parts:
-		(_switch_parts[k].label as Label).add_theme_color_override("font_color", Palette.INK if k == game else Palette.SUB)
+		(_switch_parts[k].label as Label).add_theme_color_override("font_color", Palette.INK if k == game else Palette.G_SUB)
 
 
 ## The one big QUICK MATCH: honey, the bolt globe, the caps title and a one-line hint (the content follows the press).
@@ -468,9 +479,18 @@ func _big_play() -> Button:
 	return b
 
 
-## A compact mode: a white kit button with its icon over a short label (the content follows the press).
-func _tile_button(text: String, icon_path: String) -> Button:
+## A compact mode: a chunky button in its colour (Friends blue, Computer green, Pass & Play purple) with its icon over
+## an outlined label (the content follows the press).
+func _tile_button(text: String, icon_path: String, face := Palette.TEAL) -> Button:
 	var b := UIKit.button("", "white", "md")
+	var lip_px := int(UIKit.BTN.md.lip)
+	for k in ["normal", "hover", "disabled", "focus", "pressed", "hover_pressed"]:
+		var down: bool = k in ["pressed", "hover_pressed"]
+		var st := UIKit.box(face.darkened(0.08) if down else face, UIKit.R.lg, UIKit.BW.line, face.lightened(0.35))
+		st.border_width_bottom = 2 if down else lip_px
+		st.border_color = face.darkened(0.35)
+		st.border_width_top = UIKit.BW.line
+		b.add_theme_stylebox_override(k, st)
 	b.custom_minimum_size = Vector2(0, MODE_H)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var lip := float(UIKit.BTN.md.lip)
@@ -482,7 +502,9 @@ func _tile_button(text: String, icon_path: String) -> Button:
 	var ic := UIKit.icon(icon_path, 30)
 	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(ic)
-	var l := UIKit.label(text, UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, UIKit.FS.label, Color.WHITE, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	l.add_theme_constant_override("outline_size", 4)
+	l.add_theme_color_override("font_outline_color", face.darkened(0.55))
 	l.name = "Text"
 	l.clip_text = true
 	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -500,7 +522,7 @@ func _build_nav() -> void:
 		var on: bool = t[0] == "home"
 		var st := UIKit.box(Palette.HONEY_TINT if on else Color(1, 1, 1, 0), UIKit.R.lg, UIKit.BW.line if on else 0, Palette.HONEY_TINT_EDGE)
 		UIKit.pad(st, 0)
-		var pr := UIKit.box(Palette.CHIP, UIKit.R.lg)
+		var pr := UIKit.box(Palette.WOOD_DEEP, UIKit.R.lg)
 		UIKit.pad(pr, 0)
 		var b := _flat_button(st, pr)
 		b.name = str(t[1])
@@ -513,7 +535,7 @@ func _build_nav() -> void:
 		var ic := UIKit.icon(t[2], 28)
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		col.add_child(ic)
-		col.add_child(UIKit.label(tr(t[1]), UIKit.FS.small, Palette.INK if on else Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(UIKit.label(tr(t[1]), UIKit.FS.small, Palette.INK if on else Palette.G_SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
 		var id: String = t[0]
 		if not on:
 			b.pressed.connect(func(): open_tab.emit(id))
