@@ -55,8 +55,21 @@ const BOTTOM_MIN := 20.0                 # gesture-nav phones report 0 in immers
 const PILL_H := 52.0                     # the Continue match pill
 const QUICK_INNER := 40.0                # its round icon and Resume pill: (PILL_H - 40) / 2 = 6 px all round, like the row's sides
 const SWITCH_H := 56.0                   # (its halves: 48 px tall)
-const PLAY_H := 76.0                     # the one big QUICK MATCH
-const MODE_H := 64.0                     # the row of three: Friends / Computer / Pass & Play
+const PLAY_H := 88.0                     # the one big QUICK MATCH
+const MODE_H := 80.0                     # the row of three: Friends / Computer / Pass & Play
+const NAV_POP := 14.0                    # how far the picked tab's orange tile stands above the bar
+# the game look (Design canvas "Home"): dark café chips, a dark dock, chunky gradient buttons, a wood bar
+const CHIP_BG := Color(0.165, 0.075, 0.04, 0.88)
+const CHIP_RIM := Palette.GL_CHIP_RIM
+const DOCK := Palette.GL_DOCK
+const CREAM_TXT := Palette.GL_CREAM_TEXT
+const BROWN_TXT := Palette.GL_BROWN_TEXT
+const OUTLINE := Palette.GL_INK
+const MODE_LOOK := {                     # face top, face bottom, rim, lip
+	friends = [Palette.GL_BLUE_HI, Palette.GL_BLUE_LO, Palette.GL_BLUE_RIM, Palette.GL_BLUE_LIP],
+	cpu = [Palette.GL_GREEN_HI, Palette.GL_GREEN_LO, Palette.GL_GREEN_RIM, Palette.GL_GREEN_LIP],
+	local = [Palette.GL_PURPLE_HI, Palette.GL_PURPLE_LO, Palette.GL_PURPLE_RIM, Palette.GL_PURPLE_LIP],
+}
 const SHORT_H := 760.0                   # below this UI height the two get a little lower
 const TABLE_MIN := 160.0                 # the free band the logo leaves for the table (when it can)
 const AVATAR := 42.0                     # the top bar's avatar
@@ -100,6 +113,9 @@ var _badge_tw: Tween
 var _ready_n := -1                       # the count shown
 var _veil: TextureRect
 var _dock: Panel
+var _dock_fade: TextureRect              # the café fading into the dock
+var _nav_bg: GamePanel                   # the bar's wood
+var _nav_rim: ColorRect                  # its gold top edge
 var _quick: Button                       # the Continue match pill
 var _quick_icon: TextureRect
 var _quick_title: Label
@@ -112,7 +128,7 @@ var _switch_parts := {}                  # game -> {row, icon, label, text}
 var _modes: HBoxContainer                # Friends / Computer / Pass & Play
 var _tabs: HBoxContainer                 # the nav row (dev/tap_dbg.gd reads its first child)
 var nav_tab := "home"                    ## the bar's picked tab: "home" | "shop" | "leaderboard" | "inventory"
-var _nav_parts := {}                     # tab -> [button, label]
+var _nav_parts := {}                     # tab -> {button, label, col, tile, icon}
 var _rule: ColorRect
 var _timer: Timer
 var _band := Vector2(200, 500)
@@ -174,19 +190,46 @@ static func _flat_button(st: StyleBox, pr: StyleBox = null) -> Button:
 
 ## A transparent button for a row inside a chip: a soft shade while pressed.
 static func _row_button() -> Button:
-	var pr := UIKit.box(Color(0.29, 0.17, 0.24, 0.08), UIKit.R.sm)
+	var pr := UIKit.box(Color(1, 1, 1, 0.08), UIKit.R.sm)
 	UIKit.pad(pr, 0)
 	var b := _flat_button(StyleBoxEmpty.new(), pr)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return b
 
 
-## The cream glass of the top bar chips: glass, a white rim, a soft shadow.
+## The top bar chips: dark café glass with a gold rim and a soft shadow.
 static func _chip_style(r := 18, pressed := false) -> StyleBoxFlat:
-	var s := UIKit.box(Palette.GLASS_PRESSED if pressed else Palette.GLASS, r, UIKit.BW.line, Color.WHITE)
+	var s := UIKit.box(CHIP_BG.darkened(0.35) if pressed else CHIP_BG, r, 2, CHIP_RIM)
 	UIKit.shade(s, "sm")
 	UIKit.pad(s, 8, 6)
 	return s
+
+## A top bar icon button (gift, gear) in the chip look.
+static func _chip_button(b: Button, r: int) -> void:
+	for k in ["normal", "hover", "disabled"]:
+		b.add_theme_stylebox_override(k, _chip_style(r))
+	for k in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(k, _chip_style(r, true))
+
+## A label in the display face with the dark outline (the game look's type).
+static func _outlined(text: String, fs: int, col := Color.WHITE, outline := 3, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var l := UIKit.label(text, fs, col, UIKit.font_display(), align)
+	l.add_theme_constant_override("outline_size", outline * 2)
+	l.add_theme_color_override("font_outline_color", OUTLINE)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+## A shader face filling `b` behind its content (Buttons can't draw gradients); mouse passes through.
+static func _face(b: Control, p: GamePanel) -> GamePanel:
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(p)
+	b.move_child(p, 0)
+	p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return p
+
+static func _clear_styles(b: Button) -> void:
+	for k in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		b.add_theme_stylebox_override(k, StyleBoxEmpty.new())
 
 
 static func _fill(c: Control) -> void:
@@ -225,7 +268,7 @@ func _build_top_bar() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
 	_chip_text = col
-	_name = UIKit.label(L10n.seat_name("You"), UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
+	_name = UIKit.label(L10n.seat_name("You"), 16, Color.WHITE, UIKit.font_display())
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.clip_text = true
 	col.add_child(_name)
@@ -252,6 +295,7 @@ func _build_top_bar() -> void:
 	cr.alignment = BoxContainer.ALIGNMENT_CENTER
 	coins.add_child(cr)
 	coin_amount = CoinAmount.new(int(Save.profile.get("coins", 0)), "md", "plain")
+	coin_amount.set_color(Color.WHITE)
 	coin_amount.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cr.add_child(coin_amount)
 	var plus := PanelContainer.new()
@@ -277,6 +321,7 @@ func _build_top_bar() -> void:
 	_gems_button.add_child(gr)
 	gem_amount = CoinAmount.gems(int(Save.profile.get("gems", 0)), "sm", "plain")
 	gem_amount.name = "GemAmount"
+	gem_amount.set_color(Color.WHITE)
 	gr.add_child(gem_amount)
 	# the rows sit in Buttons, which don't size to their children: the chip widens itself to what they need, so a big
 	# balance ("130.1K" and the "+") never runs under the gift
@@ -288,6 +333,7 @@ func _build_top_bar() -> void:
 	# the gift: Free spin / Daily reward / Free coins (the Rewards sheet), with the count of those ready now
 	rewards_button = UIKit.icon_button(HI % "gift", "glass", int(BAR_H), 38)
 	rewards_button.name = "Rewards"
+	_chip_button(rewards_button, UIKit.R.lg)
 	rewards_button.pressed.connect(func(): open_tab.emit("rewards"))
 	_top.add_child(rewards_button)
 	_gift_badge = UIKit.notify_badge("0", false)          # (its gentle pulse: _show_count, off with Reduce motion)
@@ -296,6 +342,7 @@ func _build_top_bar() -> void:
 	_gift_badge.visible = false
 	rewards_button.add_child(_gift_badge)
 	var gear := UIKit.icon_button(HI % "gear", "glass", int(BAR_H), 32)
+	_chip_button(gear, UIKit.R.lg)
 	gear.pressed.connect(func(): open_tab.emit("settings"))
 	_top.add_child(gear)
 
@@ -311,13 +358,19 @@ func _fit_wallet() -> void:
 
 
 func _build_dock() -> void:
+	var fade := GradientTexture2D.new()                   # the café sinks into the dock's dark brown
+	fade.width = 4; fade.height = 64
+	fade.fill_from = Vector2(0.5, 0.0); fade.fill_to = Vector2(0.5, 1.0)
+	fade.gradient = Gradient.new()
+	fade.gradient.colors = PackedColorArray([Color(DOCK, 0.0), DOCK])
+	_dock_fade = TextureRect.new()
+	_dock_fade.texture = fade
+	_dock_fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_dock_fade.stretch_mode = TextureRect.STRETCH_SCALE
+	_dock_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_dock_fade)
 	_dock = Panel.new()
-	var s := UIKit.box(Palette.CARD, 0, 0)
-	s.corner_radius_top_left = UIKit.R.xl + 2; s.corner_radius_top_right = UIKit.R.xl + 2
-	s.corner_detail = 12
-	s.shadow_size = 18; s.shadow_offset = Vector2(0, -2); s.shadow_color = Palette.shadow(0.35)
-	s.border_width_top = UIKit.BW.line; s.border_color = Color.WHITE
-	_dock.add_theme_stylebox_override("panel", s)
+	_dock.add_theme_stylebox_override("panel", UIKit.box(DOCK, 0, 0))
 	_dock.mouse_filter = Control.MOUSE_FILTER_STOP        # taps on the dock never reach the 3D room
 	add_child(_dock)
 	_build_quick()
@@ -327,19 +380,19 @@ func _build_dock() -> void:
 	add_child(quick_button)
 	_modes = UIKit.hbox(UIKit.SPACE.sm + 2)
 	_modes.name = "Modes"
-	friends_button = _tile_button(tr("Friends"), UIKit.ICON_DIR + "perk_friends.svg")
+	friends_button = _tile_button(tr("Friends"), UIKit.ICON_DIR + "perk_friends.svg", "friends")
 	friends_button.name = "Friends"
 	friends_button.pressed.connect(_friends)
 	_modes.add_child(friends_button)
 	for m in [["Computer", "cpu", "cpu"], ["Pass & Play", "pass_play", "local"]]:
-		var b := _tile_button(tr(m[0]), HI % m[1])
+		var b := _tile_button(tr(m[0]), HI % m[1], m[2])
 		b.name = str(m[0]).replace(" & ", "")
 		var mode: String = m[2]
 		b.pressed.connect(func(): _play(mode))
 		_modes.add_child(b)
 	add_child(_modes)
 	_rule = ColorRect.new()
-	_rule.color = Palette.LINE
+	_rule.color = Color(0, 0, 0, 0)                  # the bar's gold edge separates now
 	_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_rule)
 	_build_nav()
@@ -364,9 +417,9 @@ func _build_quick() -> void:
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.add_child(col)
-	_quick_title = UIKit.label(tr("Continue match"), UIKit.FS.label + 1, Palette.INK, UIKit.font_body(900))
+	_quick_title = UIKit.label(tr("Continue match"), UIKit.FS.label + 1, Color.WHITE, UIKit.font_display())
 	col.add_child(_quick_title)
-	_quick_sub = UIKit.label("", UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+	_quick_sub = UIKit.label("", UIKit.FS.small, CREAM_TXT, UIKit.font_body(800))
 	_quick_sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_quick_sub.clip_text = true
 	col.add_child(_quick_sub)
@@ -389,11 +442,10 @@ func _build_quick() -> void:
 ## is the softer SUB.
 func _build_switch() -> void:
 	_switch = PanelContainer.new()
-	var ts := UIKit.box(Palette.CHIP, UIKit.R.lg)
-	UIKit.pad(ts, 4)
+	var ts := StyleBoxEmpty.new()
 	_switch.add_theme_stylebox_override("panel", ts)
 	add_child(_switch)
-	var row := UIKit.hbox(4)
+	var row := UIKit.hbox(10)
 	_switch.add_child(row)
 	var group := ButtonGroup.new()
 	var on := UIKit.box(Color.WHITE, UIKit.R.md, 0)
@@ -408,11 +460,9 @@ func _build_switch() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, UIKit.TAP)
-		for k in ["normal", "hover", "disabled"]:
-			b.add_theme_stylebox_override(k, off)
-		for k in ["pressed", "hover_pressed"]:
-			b.add_theme_stylebox_override(k, on)
-		b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		_clear_styles(b)
+		var face := _face(b, GamePanel.vertical(Palette.GL_CREAM_HI, Palette.GL_CREAM_LO))
+		face.radius = 18.0
 		UIKit.wire_press(b, "select")
 		b.clip_contents = true                # nothing ever spills past its half (the label fits, see _fit_switch)
 		var r := UIKit.hbox(UIKit.SPACE.sm)
@@ -422,13 +472,13 @@ func _build_switch() -> void:
 		var ic := UIKit.icon(HI % g[2], SWITCH_ICON)
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		r.add_child(ic)
-		var l := UIKit.label(tr(g[1]), SWITCH_FS, Palette.INK, UIKit.font_body(900))
+		var l := UIKit.label(tr(g[1]), SWITCH_FS, BROWN_TXT, UIKit.font_display())
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		l.add_theme_constant_override("line_spacing", -3)
 		r.add_child(l)
 		var key: String = g[0]
-		_switch_parts[key] = {row = r, icon = ic, label = l, text = tr(g[1])}
+		_switch_parts[key] = {row = r, icon = ic, label = l, text = tr(g[1]), face = face}
 		b.button_pressed = key == game
 		b.toggled.connect(func(v: bool): if v: _set_game(key))
 		row.add_child(b)
@@ -436,110 +486,204 @@ func _build_switch() -> void:
 	_tint_switch()
 
 
-## The picked game's name in INK, the other one in SUB.
+## The picked game: a raised cream face with a lip and brown type; the other: dark, a brown rim, cream type.
 func _tint_switch() -> void:
 	for k in _switch_parts:
-		(_switch_parts[k].label as Label).add_theme_color_override("font_color", Palette.INK if k == game else Palette.SUB)
+		var on: bool = k == game
+		(_switch_parts[k].label as Label).add_theme_color_override("font_color", BROWN_TXT if on else CREAM_TXT)
+		var f: GamePanel = _switch_parts[k].face
+		f.c0 = Palette.GL_CREAM_HI if on else Palette.GL_INK
+		f.c1 = Palette.GL_CREAM_MID if on else Palette.GL_INK
+		f.c2 = Palette.GL_CREAM_LO if on else Palette.GL_INK
+		f.border = 3.0 if on else 2.0
+		f.border_color = Palette.GL_CREAM_RIM if on else Palette.GL_WOOD
+		f.lip = 5.0 if on else 0.0
+		f.lip_color = Palette.GL_CREAM_LIP
+		(_switch_parts[k].row as Control).offset_bottom = -5.0 if on else 0.0
 
 
-## The one big QUICK MATCH: honey, the bolt globe, the caps title and a one-line hint (the content follows the press).
+## The one big QUICK MATCH (mock): a glowing gold-to-orange radial face with a cream rim and a deep lip, a cream
+## disc with the play mark, the outlined caps title and a one-line hint (the content follows the press).
 func _big_play() -> Button:
-	var b := UIKit.button("", "honey", "lg")
+	var b := Button.new()
 	b.name = "QuickMatch"
-	var lip := float(UIKit.BTN.lg.lip)
-	var r := UIKit.hbox(UIKit.SPACE.md)
+	b.focus_mode = Control.FOCUS_NONE
+	_clear_styles(b)
+	UIKit.wire_press(b)
+	var lip := 8.0
+	var glow := Panel.new()                                # the warm halo around it
+	var gs := StyleBoxFlat.new()
+	gs.draw_center = false
+	gs.set_corner_radius_all(26)
+	gs.shadow_color = Color(1.0, 0.79, 0.29, 0.5)
+	gs.shadow_size = 18
+	glow.add_theme_stylebox_override("panel", gs)
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(glow)
+	glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var face := _face(b, GamePanel.radial(Palette.GL_GOLD_GLOW, Palette.GL_GOLD, Palette.GL_GOLD_DEEP))
+	face.radius = 26.0
+	face.center = Vector2(0.3, 0.2)
+	face.reach = Vector2(0.9, 1.2)
+	face.border = 4.0
+	face.border_color = Palette.GL_CREAM_RIM
+	face.lip = lip
+	face.lip_color = Palette.GL_GOLD_LIP
+	b.move_child(glow, 0)
+	var r := UIKit.hbox(14)
 	_fill(r)
-	r.alignment = BoxContainer.ALIGNMENT_CENTER
+	r.offset_left = 18; r.offset_right = -12
 	r.offset_bottom = -lip
 	b.add_child(r)
-	var ic := UIKit.icon(HI % "quick", PLAY_H - 30.0)
-	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	r.add_child(ic)
+	var disc := PlayDisc.new()
+	disc.custom_minimum_size = Vector2(58, 58)
+	disc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r.add_child(disc)
 	var col := UIKit.vbox(0)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.add_child(col)
-	var t := UIKit.label(tr("QUICK MATCH"), 28, Palette.ON_HONEY, UIKit.font_display())
+	var t := _outlined(tr("QUICK MATCH"), 33, Color.WHITE, 5)
 	t.name = "Text"
 	col.add_child(t)
-	col.add_child(UIKit.label(tr("Play online now"), UIKit.FS.small + 1, Color(Palette.ON_HONEY, 0.72), UIKit.font_body(800)))
+	var sub := UIKit.label(tr("Play online now"), UIKit.FS.small + 2, BROWN_TXT, UIKit.font_body(900))
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(sub)
 	b.button_down.connect(func(): r.offset_top = lip - 2.0; r.offset_bottom = -2.0)
 	b.button_up.connect(func(): r.offset_top = 0.0; r.offset_bottom = -lip)
-	b.resized.connect(func() -> void:                     # a smaller bolt on a lower button (short screens)
-		ic.custom_minimum_size = Vector2.ONE * clampf(b.size.y - 30.0, 36.0, PLAY_H - 30.0))
+	b.resized.connect(func() -> void:                     # a smaller disc on a lower button (short screens)
+		disc.custom_minimum_size = Vector2.ONE * clampf(b.size.y - lip - 22.0, 40.0, 58.0))
 	return b
 
 
-## A compact mode: a white kit button with its icon over a short label (the content follows the press).
-func _tile_button(text: String, icon_path: String) -> Button:
-	var b := UIKit.button("", "white", "md")
-	b.custom_minimum_size = Vector2(0, MODE_H)
+## QUICK MATCH's cream disc with an orange play mark.
+class PlayDisc extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var d := minf(size.x, size.y)
+		var c := size / 2.0
+		draw_circle(c + Vector2(0, 2), d / 2.0, Palette.GL_DISC_LIP)
+		draw_circle(c, d / 2.0 - 2.0, Palette.GL_DISC)
+		var k := d * 0.2
+		var pts := PackedVector2Array([c + Vector2(-k * 0.8, -k * 1.15), c + Vector2(k * 1.3, 0), c + Vector2(-k * 0.8, k * 1.15)])
+		draw_colored_polygon(pts, Palette.GL_ORANGE)
+
+
+## A compact mode (mock): a chunky button in its colour (Friends blue, Computer green, Pass & Play purple), a light
+## rim and a deep lip, its icon over an outlined label (the content follows the press).
+func _tile_button(text: String, icon_path: String, look := "friends") -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	_clear_styles(b)
+	UIKit.wire_press(b)
+	b.custom_minimum_size = Vector2(0, MODE_H - 16.0)       # _layout sizes it (smaller on short screens)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var lip := float(UIKit.BTN.md.lip)
+	var c: Array = MODE_LOOK[look]
+	var face := _face(b, GamePanel.vertical(c[0], c[1]))
+	face.radius = 20.0
+	face.border = 3.0
+	face.border_color = c[2]
+	var lip := 6.0
+	face.lip = lip
+	face.lip_color = c[3]
 	var col := UIKit.vbox(2)
 	_fill(col)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.offset_bottom = -lip
 	b.add_child(col)
-	var ic := UIKit.icon(icon_path, 30)
+	var ic := UIKit.icon(icon_path, 38)
 	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(ic)
-	var l := UIKit.label(text, UIKit.FS.label, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := _outlined(text, 16, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_CENTER)
 	l.name = "Text"
 	l.clip_text = true
 	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(l)
 	b.button_down.connect(func(): col.offset_top = lip - 2.0; col.offset_bottom = -2.0)
 	b.button_up.connect(func(): col.offset_top = 0.0; col.offset_bottom = -lip)
+	b.resized.connect(func() -> void:
+		ic.custom_minimum_size = Vector2.ONE * clampf(b.size.y - lip - 34.0, 26.0, 40.0))
 	return b
 
 
 func _build_nav() -> void:
+	_nav_bg = GamePanel.vertical(Palette.GL_WOOD, Palette.GL_INK)
+	_nav_bg.radius = 0.0
+	_nav_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_nav_bg)
+	_nav_rim = ColorRect.new()
+	_nav_rim.color = CHIP_RIM
+	_nav_rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_nav_rim)
 	_tabs = UIKit.hbox(4)
 	add_child(_tabs)
 	for t in [["home", "Home", HI % "home"], ["shop", "Shop", HI % "shop"], ["leaderboard", "Ranks", TROPHY],
 			["inventory", "Inventory", HI % "inventory"]]:   # the profile: the player chip up top
-		var pr := UIKit.box(Palette.CHIP, UIKit.R.lg)
-		UIKit.pad(pr, 0)
-		var b := _flat_button(_nav_face(false), pr)
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		_clear_styles(b)
+		UIKit.wire_press(b)
 		b.name = str(t[1])
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, NAV_H - 8)
-		var col := UIKit.vbox(0)
+		var col := UIKit.vbox(1)
 		_fill(col)
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.alignment = BoxContainer.ALIGNMENT_END
 		b.add_child(col)
-		var ic := UIKit.icon(t[2], 28)
-		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		col.add_child(ic)
-		var l := UIKit.label(tr(t[1]), UIKit.FS.small, Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+		var tile := Control.new()                             # the picked tab's raised orange tile behind the icon
+		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		col.add_child(tile)
+		var tp := GamePanel.vertical(Palette.GL_ORANGE_HI, Palette.GL_ORANGE)
+		tp.radius = 16.0
+		tp.border = 3.0
+		tp.border_color = Palette.GL_CREAM_RIM
+		tp.lip = 4.0
+		tp.lip_color = Palette.GL_ORANGE_LIP
+		tile.add_child(tp)
+		tp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var ic := UIKit.icon(t[2], 30)
+		tile.add_child(ic)
+		var l := UIKit.label(tr(t[1]), UIKit.FS.small, CREAM_TXT, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+		l.add_theme_color_override("font_outline_color", OUTLINE)
 		col.add_child(l)
 		var id: String = t[0]
 		b.pressed.connect(func():
 			if id != nav_tab:
 				open_tab.emit(id))
 		_tabs.add_child(b)
-		_nav_parts[id] = [b, l]
+		_nav_parts[id] = {button = b, label = l, col = col, tile = tile, panel = tp, icon = ic}
 	set_nav("home")
 
-## Mark `tab` as the screen showing (the honey pill); the bar itself never moves.
+## Mark `tab` as the screen showing: its icon on a raised orange tile standing over the bar, its name outlined in
+## white; the others a plain icon and a cream name. The bar itself never moves.
 func set_nav(tab: String) -> void:
 	nav_tab = tab
 	for id: String in _nav_parts:
 		var on := id == tab
-		var b: Button = _nav_parts[id][0]
-		for k in ["normal", "hover", "focus", "disabled"]:
-			b.add_theme_stylebox_override(k, _nav_face(on))
-		(_nav_parts[id][1] as Label).add_theme_color_override("font_color", Palette.INK if on else Palette.SUB)
-
-static func _nav_face(on: bool) -> StyleBoxFlat:
-	var st := UIKit.box(Palette.HONEY_TINT if on else Color(1, 1, 1, 0), UIKit.R.lg, UIKit.BW.line if on else 0, Palette.HONEY_TINT_EDGE)
-	UIKit.pad(st, 0)
-	return st
+		var p: Dictionary = _nav_parts[id]
+		var tile: Control = p.tile
+		var side := 48.0 if on else 30.0
+		tile.custom_minimum_size = Vector2(side, side)
+		(p.panel as Control).visible = on
+		var ic: Control = p.icon
+		var isz := 32.0 if on else 30.0
+		ic.custom_minimum_size = Vector2(isz, isz)
+		ic.size = Vector2(isz, isz)
+		ic.position = (Vector2(side, side - (4.0 if on else 0.0)) - Vector2(isz, isz)) / 2.0
+		var l: Label = p.label
+		l.add_theme_color_override("font_color", Color.WHITE if on else CREAM_TXT)
+		l.add_theme_constant_override("outline_size", 6 if on else 0)
+		(p.col as Control).offset_top = -NAV_POP if on else 0.0
+		(p.col as Control).offset_bottom = 0.0
 
 ## Where the bar starts (global y): screens opened from it end there.
 func nav_top() -> float:
-	return _tabs.get_global_rect().position.y - 6.0 if _tabs else get_viewport_rect().size.y
+	return _nav_bg.get_global_rect().position.y - NAV_POP - 2.0 if _nav_bg else get_viewport_rect().size.y
 
 
 # =====================================================================================================================
@@ -804,6 +948,10 @@ func _layout() -> void:
 	var nav_y := bottom - NAV_H + 4
 	_tabs.position = Vector2(x - 6, nav_y)
 	_tabs.size = Vector2(cw + 12, NAV_H - 4)
+	_nav_bg.position = Vector2(0, nav_y - 4)
+	_nav_bg.size = Vector2(w, h - nav_y + 4)
+	_nav_rim.position = _nav_bg.position
+	_nav_rim.size = Vector2(w, 3)
 	_rule.position = Vector2(x, nav_y - UIKit.SPACE.sm)
 	_rule.size = Vector2(cw, 2)
 	var mh := MODE_H - 4.0 if short else MODE_H
@@ -818,6 +966,8 @@ func _layout() -> void:
 	var dock_y := _switch.position.y - UIKit.SPACE.lg - 2
 	_dock.position = Vector2(0, dock_y)
 	_dock.size = Vector2(w, h - dock_y + 4)
+	_dock_fade.position = Vector2(0, dock_y - 90)
+	_dock_fade.size = Vector2(w, 90)
 	var band_bottom := dock_y - UIKit.SPACE.sm
 	if _quick.visible:                            # Continue match: a slim pill just above the dock
 		_quick.position = Vector2(x, dock_y - UIKit.SPACE.md - PILL_H)
