@@ -1,9 +1,12 @@
 class_name SettingsSheet
 extends Sheet
-## Settings (index.html #settingsSheet; PM look with the "Settings" ribbon and the single close X). Four tabs (PAGES),
-## one sheet height so nothing jumps, each page about one screen: General (Language, Sound & vibration, Accessibility),
-## Game (Game, Camera view, House rules; what a match opens on), Alerts (Notifications, Friends), More (Account, Help,
-## Reset progress, the version line). The sections:
+## Settings, in the game look: a full screen like the Profile (Sheet.make_page(bg, false): the café-brown ground with
+## its warm glow, the big outlined "SETTINGS" title, the round red X in the corner, over Home's bar). A screen and
+## not a popup: four pages of rows read better at full width with big type than squeezed into a scrolling card, and
+## it is somewhere the player goes, not a question. Four tabs (PAGES, wood tiles like the Shop's, the picked one
+## orange), each page about one screen: General (Language, Sound & vibration, Accessibility), Game (Game, Camera
+## view, House rules; what a match opens on), Alerts (Notifications, Friends), More (Account, Help, Reset progress,
+## the version line). The sections:
 ##   Language       Auto (<the phone's>) / English / বাংলা (Save.prefs.lang; Main.set_language switches and rebuilds
 ##                  the screen, this sheet included)
 ##   Sound & vibration  Sound on / off, Music / Effects volume ("70%"), Vibration on / off (no master slider: Save
@@ -20,14 +23,16 @@ extends Sheet
 ##                  nobody can invite you, and they can't tell)
 ##   Accessibility  Colour-blind symbols (colorblind), Reduce motion (reduce_motion)
 ##   Help           How to play, Credits, Rate Ludo Zing (the Play Store page), Privacy policy, Delete my account,
-##                  Support (URLS)
-##   Reset progress (confirm first), then the version line and the Support ID (the player ID; nothing else uses it
-##   offline, so it lives here instead of on the Profile).
+##                  Support (URLS), Privacy choices (only where the ads consent says the player can change them)
+##   Reset progress (a red button; confirm first), then the version line and the Support ID (the player ID; nothing
+##   else uses it offline, so it lives here instead of on the Profile).
 ## Every change is written to Save.prefs at once (Save.save() debounces the file write), sound changes reach the
 ## Sound autoload immediately, and prefs_changed fires so the game can re-read speed / camera / rules.
-## Rows: label left (Nunito 800 16, an optional 12 px note under it), control right, 56 px tall, grouped in
-## UIKit.surface("row") cards under section labels (UIKit.caption). Switches are 48 px targets; a tap on a switch row's
-## label toggles it too.
+## Rows: one wood tile each (GameUI's tile colours), the label left in white Nunito 900 17 with an optional cream note
+## under it, the control right, at least ROW_H tall; section heads in outlined gold (Lilita One). Switches are the
+## game's chunky switch (a dark track that fills teal when on, a raised cream knob; a 72 x 48 target) and a tap on a
+## switch row's label toggles it too. Sliders: a gold fill and a gold knob on a dark track. Choices: ShopSheet's
+## filter buttons (the picked one a cream face). Help rows are links: teal text and a teal chevron.
 
 signal prefs_changed
 signal language_picked(pref: String)     ## "auto" | "en" | "bn" (main switches the language and reopens Settings)
@@ -35,12 +40,12 @@ signal probe_requested                   ## PROBE_TAPS taps on the version line:
 
 ## The pages, as tabs. l10n-keys: text
 const PAGES := [
-	{key = "general", text = "General", icon = "ic_sound", cat = "scenes"},
+	{key = "general", text = "General", icon = "res://assets/ui/home/hi_gear.svg", cat = "scenes"},
 	{key = "game", text = "Game", icon = "cat_dice", cat = "dice"},
 	{key = "alerts", text = "Alerts", icon = "ic_bell", cat = "coins"},
 	{key = "more", text = "More", icon = "ic_info", cat = "emotes"},
 ]
-const MAX_H := 680.0                     ## one height on every page: the sheet doesn't jump between tabs
+const MAX_H := 680.0                     ## (the old popup's height; the screen now fills the phone)
 
 const VERSION_LINE := "Ludo Zing · v%s · Flipfold Studio"
 const PROBE_TAPS := 7                    ## taps on the version line that start the graphics leak test (testers)
@@ -50,15 +55,19 @@ const URLS := {
 	delete = "https://ludo-zing-rooms.flipfold.workers.dev/delete-account",
 	support = "mailto:Hello@oclasp.com?subject=Ludo%20Zing",
 }
-const ROW_H := 56.0
-const SEG_W := 132.0
-const SEG_W_SHORT := 112.0              ## two short choices (3D / Top): the long row labels keep one line
+const ROW_H := 60.0
+const SEG_W := 176.0                     ## two choices right of a row's label (Relaxed / Fast)
+const SEG_W_SHORT := 132.0               ## two short choices (3D / Top): the long row labels keep one line
+const SEG_H := 44.0
 const TAP_SLOP := 12.0
+const GAP := 8                           ## between rows
+const FS_ROW := 17                       ## a row's label
+const FS_NOTE := 13                      ## the cream note under it
 
 var _width := 360.0
 var _probe_taps := 0
 var _list: VBoxContainer                 # the page being built
-var _tabs: TabStrip
+var _tabs: PageTabs
 var _pages := {}                         # key -> its column of rows
 var page := "general"                    ## the page showing
 var _switch: Switch                      # the Sound switch (previews flip it)
@@ -67,25 +76,40 @@ var _gfx_note: Label                     # Graphics: "... on next launch" when t
 var _notif_note: Label                   # Notifications: what a tap does while the phone doesn't allow them
 var _notif_master: Switch
 var _notif_lines: Array[Control] = []    # the four kinds (dimmed while the master switch is off)
+var _last_note: Label                    # the note label the last _label_box() made
 
 
 func _init(width: float = UIKit.W.form) -> void:
-	super(L10n.t("Settings"), width, true, LOOK_PM)
+	super("", width, true, LOOK_PM)
 	_width = width
-	var st := card.get_theme_stylebox("panel")        # the tabs reach the card's rim, as the Shop's
-	var bleed := maxi(0, int(st.content_margin_left) - UIKit.BW.card)
+	make_page(ShopSheet._page_bg(), false)
+	body.add_theme_constant_override("separation", 12)
+	# SETTINGS, left; the room on the right is the X's (the page's own close button, in the corner)
+	var head := UIKit.hbox(8)
+	head.custom_minimum_size.y = 46
+	var title := GameUI.outlined(L10n.t("Settings").to_upper(), 34, GameUI.GOLD, 3)
+	title.name = "PageTitle"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	head.add_child(title)
+	var x_room := Control.new()
+	x_room.custom_minimum_size.x = 52
+	x_room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(x_room)
+	body.add_child(head)
 	var tabs: Array = []
 	for t: Dictionary in PAGES:
 		var tt := t.duplicate()
 		tt.text = L10n.t(t.text)
 		tabs.append(tt)
-	_tabs = TabStrip.new(tabs, page, "gtabs")
+	_tabs = PageTabs.new(tabs, page)
 	_tabs.name = "SettingsTabs"
 	_tabs.picked.connect(show_page)
-	body.add_child(UIKit.margin(_tabs, -bleed, 0, -bleed, 0))
-	add_scroll_body(UIKit.SPACE.sm)
+	body.add_child(_tabs)
+	add_scroll_body(0)
 	_build()
-	fit(0.9, MAX_H)
 
 
 ## Show a page ("general" | "game" | "alerts" | "more"), from its top. Every page stays built: only one shows.
@@ -100,7 +124,7 @@ func show_page(key: String) -> void:
 
 ## The next rows go on this page.
 func _start_page(key: String) -> void:
-	_list = UIKit.vbox(UIKit.SPACE.sm)
+	_list = UIKit.vbox(GAP)
 	_list.name = "Page_" + key
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll_body.add_child(_list)
@@ -120,77 +144,64 @@ func _build() -> void:
 	_start_page("general")
 	# --- Language
 	_caption(tr("Language"))
-	_group().add_child(_language_line())
+	_list.add_child(_language_line())
 
 	# --- Sound
 	_caption(tr("Sound & vibration"))
-	var snd := _group()
 	_switch = Switch.new(sound_on)
 	_switch.toggled.connect(_on_sound)
-	snd.add_child(_line(tr("Sound"), "", _switch, _switch))
+	_list.add_child(_line(tr("Sound"), "", _switch, _switch))
 	for v: Array in [["music", tr("Music"), Sound.DEFAULT_MUSIC], ["sfx", tr("Effects"), Sound.DEFAULT_EFFECTS]]:
 		var line := _vol_line(v[0], v[1], int(vol.get(v[0], v[2])))
 		_vol_lines.append(line)
-		snd.add_child(_divider())
-		snd.add_child(line)
-	snd.add_child(_divider())
+		_list.add_child(line)
 	var vib := Switch.new(bool(Save.prefs.get("vibrate", true)))
 	vib.toggled.connect(_on_vibrate)
-	snd.add_child(_line(tr("Vibration"), "", vib, vib))
+	_list.add_child(_line(tr("Vibration"), "", vib, vib))
 	_dim_volumes(sound_on)
 
 	# --- Accessibility
 	_caption(tr("Accessibility"))
-	var a := _group()
-	a.add_child(_switch_line(tr("Colour-blind symbols"), tr("Shapes on pawns and players."), "colorblind"))
-	a.add_child(_divider())
-	a.add_child(_switch_line(tr("Reduce motion"), tr("Fewer animations, no shaking."), "reduce_motion"))
+	_list.add_child(_switch_line(tr("Colour-blind symbols"), tr("Shapes on pawns and players."), "colorblind"))
+	_list.add_child(_switch_line(tr("Reduce motion"), tr("Fewer animations, no shaking."), "reduce_motion"))
 
 	# --- Game: how it plays and looks
 	_start_page("game")
 	# --- Game
 	_caption(tr("Game"))
-	var g := _group()
-	g.add_child(_line(tr("Game speed"), "", _seg([[1.0, tr("Relaxed")], [0.55, tr("Fast")]], float(Save.prefs.get("speed", 1.0)),
+	_list.add_child(_line(tr("Game speed"), "", _seg([[1.0, tr("Relaxed")], [0.55, tr("Fast")]], float(Save.prefs.get("speed", 1.0)),
 			func(v): _set_pref("speed", v))))
-	g.add_child(_divider())
-	g.add_child(_graphics_line())
+	_list.add_child(_graphics_line())
 
 	# --- Camera view (one block, one row per game)
 	_caption(tr("Camera view"))
-	var cam := _group()
-	cam.add_child(_line(tr("Ludo"), "", _seg([["3d", tr("3D")], ["top", tr("Top")]], str(Save.prefs.get("cam", "top")),
+	_list.add_child(_line(tr("Ludo"), "", _seg([["3d", tr("3D")], ["top", tr("Top")]], str(Save.prefs.get("cam", "top")),
 			func(v): _set_pref("cam", v), SEG_W_SHORT)))
-	cam.add_child(_divider())
-	cam.add_child(_line(tr("Snakes & Ladders"), "", _seg([["3d", tr("3D")], ["top", tr("Top")]], str(Save.prefs.get("sl_cam", "top")),
+	_list.add_child(_line(tr("Snakes & Ladders"), "", _seg([["3d", tr("3D")], ["top", tr("Top")]], str(Save.prefs.get("sl_cam", "top")),
 			func(v): _set_pref("sl_cam", v), SEG_W_SHORT)))
 
 	# --- House rules
 	_caption(tr("House rules"))
-	var h := _group()
-	h.add_child(_switch_line(tr("Ask before pairing"), tr("Choose each time your pawns could pair."), "pair_ask"))
-	h.add_child(_divider())
-	h.add_child(_switch_line(tr("Need a 1 to start"), tr("Snakes & Ladders: only a 1 enters."), "sl_need_one"))
+	_list.add_child(_switch_line(tr("Ask before pairing"), tr("Choose each time your pawns could pair."), "pair_ask"))
+	_list.add_child(_switch_line(tr("Need a 1 to start"), tr("Snakes & Ladders: only a 1 enters."), "sl_need_one"))
 
 	# --- Alerts: notifications and invites
 	_start_page("alerts")
 	# --- Notifications (the master switch, then what to be told about)
 	_caption(tr("Notifications"))
-	var nt := _group()
 	var master := Switch.new(_notif_shown())
 	_notif_master = master
 	master.toggled.connect(_on_notif)
 	var master_line := _line(tr("Notifications"), " ", master, master)
-	_notif_note = master_line.get_child(0).get_child(0).get_child(1) as Label
-	nt.add_child(master_line)
+	_notif_note = _last_note
+	_list.add_child(master_line)
 	for k: Array in [["notif_rewards", tr("Rewards"), tr("Daily reward, free spin and free coins.")],
 			["notif_reminders", tr("Reminders"), tr("A nudge when you have been away.")],
 			["notif_game", tr("Game alerts"), tr("Your turn and friends joining a room.")],
 			["notif_offers", tr("News & offers"), tr("Gifts and updates from Ludo Zing.")]]:
-		nt.add_child(_divider())
 		var line := _switch_line(k[1], k[2], k[0])
 		_notif_lines.append(line)
-		nt.add_child(line)
+		_list.add_child(line)
 	_refresh_notif()
 	var notifs := Notifications.instance()
 	if notifs != null and not notifs.permission_changed.is_connected(_refresh_notif):
@@ -198,11 +209,10 @@ func _build() -> void:
 
 	# --- Friends: who may invite you (the server keeps it: Social)
 	_caption(tr("Friends"))
-	var fr := _group()
 	var inv := Switch.new(bool(Save.prefs.get("invites", true)))
 	inv.name = "Invites"
 	inv.toggled.connect(_on_invites)
-	fr.add_child(_line(tr("Invites from players"), tr("People you played with or who added you can invite you to a game."), inv, inv))
+	_list.add_child(_line(tr("Invites from players"), tr("People you played with or who added you can invite you to a game."), inv, inv))
 
 	# --- More: the account, help, reset, the version
 	_start_page("more")
@@ -210,41 +220,35 @@ func _build() -> void:
 	var acc := Account.instance()
 	if acc != null and acc.enabled:
 		_caption(tr("Account"))
-		_group().add_child(_account_line(acc))
+		_list.add_child(_account_line(acc))
 
 	# --- Help
 	_caption(tr("Help"))
-	var hp := _group()
-	hp.add_child(_link_line(tr("How to play"), _open_howto))
-	hp.add_child(_divider())
-	hp.add_child(_link_line(tr("Credits"), _open_credits))
-	hp.add_child(_divider())
+	_list.add_child(_link_line(tr("How to play"), _open_howto))
+	_list.add_child(_link_line(tr("Credits"), _open_credits))
 	var rate := _link_line(tr("Rate Ludo Zing"), func(): AppRating.open_store())
 	rate.name = "RateGame"
-	hp.add_child(rate)
+	_list.add_child(rate)
 	for k: Array in [["privacy", tr("Privacy policy")], ["delete", tr("Delete my account")], ["support", tr("Support")]]:
 		var url := str(URLS.get(k[0], ""))
 		if url != "":
-			hp.add_child(_divider())
-			hp.add_child(_link_line(k[1], func(): OS.shell_open(url)))
+			_list.add_child(_link_line(k[1], func(): OS.shell_open(url)))
 	# Privacy choices (ads consent): only where the consent form says the player can change them
 	var ad := Ads.instance()
 	if ad != null and ad.privacy_options_required():
-		hp.add_child(_divider())
 		var pc := _link_line(tr("Privacy choices"), func(): ad.show_privacy_options())
 		pc.name = "PrivacyChoices"
-		hp.add_child(pc)
+		_list.add_child(pc)
 
-	# --- Reset progress
-	var gap := Control.new()
-	gap.custom_minimum_size.y = UIKit.SPACE.sm
-	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_list.add_child(gap)
-	var rs := _group()
-	rs.add_child(_link_line(tr("Reset progress"), _confirm_reset, true))
+	# --- Reset progress: a red button, apart from the links
+	var reset := GameUI.button(tr("Reset progress"), "red", "md")
+	reset.name = "ResetProgress"
+	GameUI.fit_button_text(reset, 14)
+	reset.pressed.connect(_confirm_reset)
+	_list.add_child(UIKit.margin(reset, 0, 14, 0, 0))
 
 	var ver := str(ProjectSettings.get_setting("application/config/version", ""))
-	var foot := UIKit.label(VERSION_LINE % (ver if ver != "" else "0.1.0"), UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var foot := GameUI.text(VERSION_LINE % (ver if ver != "" else "0.1.0"), FS_NOTE, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var id := str(Save.profile.get("id", ""))
 	if id != "":
@@ -252,7 +256,7 @@ func _build() -> void:
 	foot.name = "VersionLine"
 	foot.mouse_filter = Control.MOUSE_FILTER_PASS    # (taps still scroll the list)
 	foot.gui_input.connect(_on_version_tap)
-	_list.add_child(UIKit.margin(foot, 0, UIKit.SPACE.xs, 0, UIKit.SPACE.xs))
+	_list.add_child(UIKit.margin(foot, 0, 6, 0, 18))
 	show_page(page)
 
 # Testers: PROBE_TAPS taps on the version line close Settings and start the graphics leak test.
@@ -270,38 +274,17 @@ func _on_version_tap(e: InputEvent) -> void:
 
 # ---------- pieces ----------
 
-## A section label above a group (UIKit.caption, the one section-label style).
+## A section head above its rows: outlined gold Lilita One (the Profile's "My table").
 func _caption(text: String) -> void:
-	var l := UIKit.caption(text)
+	var l := GameUI.outlined(text, 20, GameUI.GOLD, 2)
 	l.name = "Section"
-	_list.add_child(UIKit.margin(l, UIKit.SPACE.xs, UIKit.SPACE.sm if _list.get_child_count() > 0 else 0, 0, 0))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_list.add_child(UIKit.margin(l, 2, 10 if _list.get_child_count() > 0 else 2, 0, 0))
 
-## A row card (UIKit.surface("row")) holding lines; returns the lines' column.
-func _group() -> VBoxContainer:
-	var st := UIKit.surface("row").duplicate() as StyleBoxFlat
-	st.content_margin_top = 0
-	st.content_margin_bottom = UIKit.LIP.md - UIKit.BW.line
-	st.content_margin_left = 14
-	st.content_margin_right = 10
-	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", st)
-	var col := UIKit.vbox(0)
-	p.add_child(col)
-	_list.add_child(p)
-	return col
-
-func _divider() -> ColorRect:
-	var d := ColorRect.new()
-	d.color = Palette.ROW_EDGE
-	d.custom_minimum_size = Vector2(0, 2)
-	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return d
-
-## Label (and an optional note under it) on the left, `control` on the right, ROW_H tall. toggle: a Switch that a tap
-## on the label side also flips.
+## Label (and an optional note under it) on the left, `control` on the right, on its own wood tile. toggle: a Switch
+## that a tap on the label side also flips.
 func _line(text: String, note: String, control: Control, toggle: Switch = null) -> Control:
 	var row := Row.new()
-	row.custom_minimum_size.y = ROW_H
 	var h := UIKit.hbox(UIKit.SPACE.md)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(h)
@@ -313,26 +296,30 @@ func _line(text: String, note: String, control: Control, toggle: Switch = null) 
 		row.tapped.connect(func(): toggle.button_pressed = not toggle.button_pressed)
 	return row
 
-func _label_box(text: String, note: String, color := Palette.INK) -> VBoxContainer:
+## The label (white) and its note (cream) in a column; the note is kept in _last_note.
+func _label_box(text: String, note: String, color := GameUI.TEXT) -> VBoxContainer:
 	var v := UIKit.vbox(1)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var t := UIKit.label(text, UIKit.FS.body_l, color, UIKit.font_body(800))
+	var t := UIKit.label(text, FS_ROW, color, UIKit.font_body(900))
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t.custom_minimum_size.x = 60          # (a wrapping label with no width yet asks for one glyph per line)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(t)
+	_last_note = null
 	if note != "":
-		var s := UIKit.paragraph(note, UIKit.FS.small, Palette.SUB)
-		s.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var s := GameUI.text(note, FS_NOTE, GameUI.SUB)
+		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		s.custom_minimum_size.x = 60
 		v.add_child(s)
+		_last_note = s
 	return v
 
 ## The Account row: "Guest" or the Google name with its state under it; a tap opens the Profile, where signing in lives.
 func _account_line(acc: Account) -> Control:
 	var row := Row.new()
 	row.name = "AccountLine"
-	row.custom_minimum_size.y = ROW_H
 	row.pressable = true
 	var h := UIKit.hbox(UIKit.SPACE.md)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -349,21 +336,21 @@ func _account_line(acc: Account) -> Control:
 	if not acc.is_guest():
 		var ok := UIKit.hbox(UIKit.SPACE.xs)
 		ok.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		ok.add_child(UIKit.glyph("ic_check", 16, Palette.TEAL_INK))
-		var sl := UIKit.caps_label(tr("Synced"), Palette.TEAL_INK)
+		ok.add_child(UIKit.glyph("ic_check", 16, Palette.GL_BTN_TEAL_HI))
+		var sl := UIKit.caps_label(tr("Synced"), Palette.GL_BTN_TEAL_HI)
 		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ok.add_child(sl)
 		h.add_child(ok)
-	var chev := UIKit.icon("ic_back", 18)
-	chev.flip_h = true
-	chev.modulate = Color(1, 1, 1, 0.7)
-	chev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(UIKit.margin(chev, 0, 0, 4, 0))
+	h.add_child(Chevron.new())
 	row.tapped.connect(func():
 		UIKit.press_fx()
 		var main := get_tree().root.get_node_or_null("Main") if is_inside_tree() else null
 		if main and main.has_method("_on_tab"):
-			main.call("_on_tab", "profile"))
+			# the Profile opens over this screen (main closes the screens it replaces: not this one), and Settings is
+			# back when it closes, as before
+			as_page = false
+			main.call("_on_tab", "profile")
+			as_page = true)
 	return row
 
 ## A switch row for a boolean pref.
@@ -406,25 +393,15 @@ func _on_notif(on: bool) -> void:
 	_refresh_notif()
 	prefs_changed.emit()
 
-## A tappable row with a chevron (Help) or a red text row (danger).
-func _link_line(text: String, on_tap: Callable, danger := false) -> Control:
+## A link row (Help): teal text and a teal chevron; a tap runs on_tap.
+func _link_line(text: String, on_tap: Callable) -> Control:
 	var row := Row.new()
-	row.custom_minimum_size.y = ROW_H
 	row.pressable = true
 	var h := UIKit.hbox(UIKit.SPACE.md)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(h)
-	if danger:
-		var ic := UIKit.glyph("ic_reset", 22, Palette.DANGER)
-		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		h.add_child(ic)
-	h.add_child(_label_box(text, "", Palette.DANGER if danger else Palette.INK))
-	if not danger:
-		var chev := UIKit.icon("ic_back", 18)
-		chev.flip_h = true
-		chev.modulate = Color(1, 1, 1, 0.7)
-		chev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		h.add_child(UIKit.margin(chev, 0, 0, 4, 0))
+	h.add_child(_label_box(text, "", Palette.GL_BTN_TEAL_HI))
+	h.add_child(Chevron.new())
 	row.tapped.connect(func():
 		UIKit.press_fx()
 		on_tap.call())
@@ -435,21 +412,20 @@ func _link_line(text: String, on_tap: Callable, danger := false) -> Control:
 func _graphics_line() -> Control:
 	var row := Row.new()
 	row.name = "Graphics"
-	row.custom_minimum_size.y = ROW_H
-	var v := UIKit.vbox(UIKit.SPACE.xs)
+	var v := UIKit.vbox(UIKit.SPACE.sm)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(v)
 	var box := _label_box(tr("Graphics"), " ")
 	_gfx_note = box.get_child(1) as Label
 	v.add_child(box)
 	var opts := [["auto", tr("Auto (%s)") % tr(Quality.cap().capitalize())], ["low", tr("Low")], ["medium", tr("Medium")], ["high", tr("High")]]
-	var seg := UIKit.segmented(opts, Quality.saved_pref(), _on_quality, "sm")
+	var seg := game_seg(opts, Quality.saved_pref(), _on_quality)
 	seg.name = "QualitySeg"
 	for b: Button in seg.get_children():
 		if not Quality.allowed(str(b.get_meta("value"))):
-			UIKit.segmented_disable(b)            # more than this phone can run: it would close the game
+			seg_disable(b)                        # more than this phone can run: it would close the game
 	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UIKit.fit_segmented(seg)                      # the four labels share one size; "Auto (Medium)" gets the room it needs
+	UIKit.fit_segmented(seg, 12)                  # the four labels share one size; "Auto (Medium)" gets the room it needs
 	v.add_child(seg)
 	_gfx_hint(Quality.saved_pref())
 	return row
@@ -459,13 +435,12 @@ func _graphics_line() -> Control:
 func _language_line() -> Control:
 	var row := Row.new()
 	row.name = "Language"
-	row.custom_minimum_size.y = ROW_H
 	var opts := [["auto", tr("Auto (%s)") % L10n.NATIVE[L10n.phone()]], ["en", L10n.NATIVE.en], ["bn", L10n.NATIVE.bn]]
-	var seg := UIKit.segmented(opts, str(Save.prefs.get("lang", "auto")), _on_language, "sm")
+	var seg := game_seg(opts, str(Save.prefs.get("lang", "auto")), _on_language)
 	seg.name = "LanguageSeg"
 	seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	seg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	UIKit.fit_segmented(seg)
+	UIKit.fit_segmented(seg, 12)
 	row.add_child(seg)
 	return row
 
@@ -498,22 +473,46 @@ func _on_quality(t: Variant) -> void:
 	_gfx_hint(str(t))
 	prefs_changed.emit()
 
-## Two compact choices (UIKit.segmented "sm"), right-aligned.
+## Two compact choices, right of the row's label.
 func _seg(options: Array, selected: Variant, on_pick: Callable, width := SEG_W) -> Control:
-	var seg := UIKit.segmented(options, selected, on_pick, "sm")
+	var seg := game_seg(options, selected, on_pick)
 	seg.custom_minimum_size.x = width
 	seg.size_flags_horizontal = Control.SIZE_SHRINK_END
 	return seg
 
+## A row of choices where exactly one is picked, from ShopSheet.filter_button (the picked one a cream face with a
+## tan lip, the others an outline on the wood). options: [[value, text], ...]; on_pick(value) runs when the pick
+## changes. Each Button carries its value as meta "value" (as UIKit.segmented's).
+static func game_seg(options: Array, selected: Variant, on_pick: Callable, h := SEG_H, fs := 16) -> HBoxContainer:
+	var row := UIKit.hbox(6)
+	var group := ButtonGroup.new()
+	for o: Array in options:
+		var b := ShopSheet.filter_button(str(o[1]), group, h, fs)
+		b.set_pressed_no_signal(o[0] == selected)
+		var value: Variant = o[0]
+		b.toggled.connect(func(on_: bool):
+			if on_:
+				on_pick.call(value))
+		b.set_meta("value", value)
+		UIKit.wire_press(b)
+		row.add_child(b)
+	return row
+
+## Greys out one choice of a game_seg() row: it can't be picked, its label fades.
+static func seg_disable(b: Button) -> void:
+	b.disabled = true
+	b.add_theme_stylebox_override("disabled", b.get_theme_stylebox("normal"))
+	b.add_theme_color_override("font_disabled_color", Color(GameUI.SUB, 0.35))
+	b.mouse_default_cursor_shape = Control.CURSOR_ARROW
+
 ## Label, a 0-100 slider and its value as a percent ("70%").
 func _vol_line(key: String, text: String, value: int) -> Control:
 	var row := Row.new()
-	row.custom_minimum_size.y = ROW_H - 4.0
 	var h := UIKit.hbox(UIKit.SPACE.md)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(h)
-	var l := UIKit.label(text, UIKit.FS.body_l, Palette.INK, UIKit.font_body(800))
-	l.custom_minimum_size = Vector2(66, 0)
+	var l := UIKit.label(text, FS_ROW, GameUI.TEXT, UIKit.font_body(900))
+	l.custom_minimum_size = Vector2(70, 0)
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(l)
 	var s := VolSlider.new()
@@ -521,8 +520,8 @@ func _vol_line(key: String, text: String, value: int) -> Control:
 	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(s)
-	var out := UIKit.label(Fmt.pct(value / 100.0), UIKit.FS.label, Palette.SUB, UIKit.font_body(900, true), HORIZONTAL_ALIGNMENT_RIGHT)
-	out.custom_minimum_size = Vector2(44, 0)
+	var out := GameUI.outlined(Fmt.pct(value / 100.0), 17, GameUI.TEXT, 2, HORIZONTAL_ALIGNMENT_RIGHT)
+	out.custom_minimum_size = Vector2(48, 0)
 	out.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(out)
 	s.value_changed.connect(func(v: float):
@@ -608,74 +607,100 @@ func _confirm_reset() -> void:
 
 # ---------- widgets ----------
 
-## A settings row: lays out its one child (an HBox) and reports a tap (press and release without dragging, so the
-## list still scrolls). pressable: shows a soft pressed tint while held (link rows).
-class Row extends PanelContainer:
+## A settings row on its own wood tile (the game look's rows): lays out its one child (an HBox or a column) and reports
+## a tap (press and release without dragging, so the list still scrolls). pressable: the wood lightens while held
+## (link rows).
+class Row extends GamePanel:
 	signal tapped
 	var pressable := false
 	var _down := false
 	var _at := Vector2.ZERO
-	static var _sb_none: StyleBoxEmpty
-	static var _sb_down: StyleBoxFlat
 
 	func _init() -> void:
+		super()
+		mode = 1
+		mid = 0.5
+		radius = 16.0
+		border = 2.0
+		border_color = Palette.GL_TILE_RIM
+		_tint(false)
+		var st := StyleBoxEmpty.new()            # (GamePanel's own pad is the same on every side)
+		st.content_margin_left = 16; st.content_margin_right = 12
+		st.content_margin_top = 9; st.content_margin_bottom = 9
+		add_theme_stylebox_override("panel", st)
+		custom_minimum_size.y = SettingsSheet.ROW_H
 		mouse_filter = Control.MOUSE_FILTER_PASS
-		if _sb_none == null:
-			_sb_none = StyleBoxEmpty.new()
-			_sb_none.content_margin_top = 6; _sb_none.content_margin_bottom = 6
-			_sb_down = UIKit.box(Color(Palette.ROW_EDGE, 0.6), UIKit.R.sm)
-			_sb_down.expand_margin_left = 8; _sb_down.expand_margin_right = 4
-			_sb_down.expand_margin_top = -4; _sb_down.expand_margin_bottom = -4
-			_sb_down.content_margin_top = 6; _sb_down.content_margin_bottom = 6
-		add_theme_stylebox_override("panel", _sb_none)
 
 	func _gui_input(e: InputEvent) -> void:
 		var press := e is InputEventMouseButton and (e as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
 		if press and e.pressed:
 			_down = true
 			_at = e.position
-			_tint(true)
+			_held(true)
 		elif press and not e.pressed and _down:
 			_down = false
-			_tint(false)
+			_held(false)
 			if e.position.distance_to(_at) <= SettingsSheet.TAP_SLOP and Rect2(Vector2.ZERO, size).has_point(e.position):
 				tapped.emit()
 		elif e is InputEventMouseMotion and _down and e.position.distance_to(_at) > SettingsSheet.TAP_SLOP:
 			_down = false                    # a drag: the list scrolls, no tap
-			_tint(false)
+			_held(false)
+
+	func _held(on: bool) -> void:
+		if pressable:
+			_tint(on)
 
 	func _tint(on: bool) -> void:
-		if pressable:
-			add_theme_stylebox_override("panel", _sb_down if on else _sb_none)
+		var top := Palette.GL_CARD_GLOW if on else Palette.GL_TILE_HI
+		c0 = top
+		c1 = top.lerp(Palette.GL_TILE_LO, 0.5)
+		c2 = Palette.GL_TILE_LO
 
 
-## The on / off switch (index.html .switch without the ON / OFF text): TEAL track when on, TAN_DEEP when off, a white
-## knob that slides across. The button is a 56 x 48 target around the 52 x 30 track.
+## A link's chevron: a teal ">" in a dark disc (the Help rows, the Account row).
+class Chevron extends Control:
+	const D := 30.0
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(D, D)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := size / 2.0
+		draw_circle(c, D / 2.0, Palette.GL_CHIP_BG, true, -1.0, true)
+		draw_arc(c, D / 2.0 - 1.0, 0.0, TAU, 40, Palette.GL_TEAL_LIP, 2.0, true)
+		var k := 5.0
+		draw_polyline(PackedVector2Array([c + Vector2(-k * 0.5, -k), c + Vector2(k * 0.6, 0), c + Vector2(-k * 0.5, k)]),
+			Palette.GL_BTN_TEAL_HI, 3.2, true)
+
+
+## The game's on / off switch: a dark rimmed track that fills teal when on, and a raised cream knob (a darker lip under
+## it and a soft shadow) that slides across. The button is a 72 x 48 target around the 62 x 34 track.
 class Switch extends Button:
-	const TRACK := Vector2(52, 30)
-	const KNOB := 24.0
+	const TRACK := Vector2(62, 34)
+	const KNOB := 28.0
 	var t := 0.0
 	var _tw: Tween
-	static var _knob: StyleBoxFlat
 	static var _track: StyleBoxFlat
-	static var _inset: StyleBoxFlat
+	static var _shade: StyleBoxFlat
 
 	func _init(on: bool) -> void:
 		toggle_mode = true
 		button_pressed = on
 		t = 1.0 if on else 0.0
 		focus_mode = Control.FOCUS_NONE
-		custom_minimum_size = Vector2(56, UIKit.TAP)
+		custom_minimum_size = Vector2(72, UIKit.TAP)
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 			add_theme_stylebox_override(st, StyleBoxEmpty.new())
-		if _knob == null:
-			_track = UIKit.box(Palette.TAN_DEEP, int(TRACK.y / 2.0))
-			_track.shadow_size = 0
-			_inset = UIKit.box(Color(0, 0, 0, 0), int(TRACK.y / 2.0), 2, Color(Palette.INK, 0.12))
-			_inset.draw_center = false
-			_knob = UIKit.box(Color.WHITE, int(KNOB / 2.0), 0, Color.TRANSPARENT, 3, Palette.shadow(0.35))
-			_knob.shadow_offset = Vector2(0, 1)
+		if _track == null:
+			_track = UIKit.box(Palette.GL_CHIP_BG, int(TRACK.y / 2.0), 2, Palette.GL_WOOD)
+			_shade = UIKit.box(Color(0, 0, 0, 0), int(TRACK.y / 2.0))      # the inset shadow along the top
+			_shade.draw_center = false
+			_shade.border_width_top = 4
+			_shade.border_color = Color(0, 0, 0, 0.32)
+			_shade.border_blend = true
 		toggled.connect(_on_toggled)
 		UIKit.wire_press(self)
 
@@ -693,20 +718,25 @@ class Switch extends Button:
 		queue_redraw()
 
 	func _draw() -> void:
-		var r := Rect2((size - TRACK) / 2.0, TRACK)
-		_track.bg_color = Palette.TAN_DEEP.lerp(Palette.TEAL, t)
+		var r := Rect2(((size - TRACK) / 2.0).round(), TRACK)
+		_track.bg_color = Palette.GL_CHIP_BG.lerp(Palette.GL_BTN_TEAL_LO, t)
+		_track.border_color = Palette.GL_WOOD.lerp(Palette.GL_TEAL_LIP2, t)
 		draw_style_box(_track, r)
-		draw_style_box(_inset, r)
+		draw_style_box(_shade, r.grow(-2.0))
 		var pad := (TRACK.y - KNOB) / 2.0
-		var kx := lerpf(r.position.x + pad, r.end.x - KNOB - pad, t)
-		draw_style_box(_knob, Rect2(kx, r.position.y + pad, KNOB, KNOB))
+		var rad := KNOB / 2.0
+		var cx := lerpf(r.position.x + pad + rad, r.end.x - pad - rad, t)
+		var cy := r.position.y + TRACK.y / 2.0 - 1.0
+		draw_circle(Vector2(cx, cy + 3.0), rad, Color(0, 0, 0, 0.35), true, -1.0, true)       # shadow
+		draw_circle(Vector2(cx, cy + 1.5), rad, Palette.GL_CREAM_LIP, true, -1.0, true)       # the lip
+		draw_circle(Vector2(cx, cy - 0.5), rad - 1.0, Palette.GL_CREAM_LO, true, -1.0, true)  # the face
+		draw_circle(Vector2(cx, cy - 2.0), rad - 4.0, Palette.GL_CREAM_HI, true, -1.0, true)  # its light top
 
 
-## A 0-100 slider (step 1): TRACK track, HONEY fill and a honey knob with a white rim, a 48 px tall target.
+## A 0-100 slider (step 1): a dark rimmed track, a gold fill and a raised gold knob with a cream rim, a 48 px tall
+## target.
 class VolSlider extends HSlider:
-	const KNOB := 26.0
-	static var _knob: StyleBoxFlat
-	static var _dot: StyleBoxFlat
+	const KNOB := 30.0
 
 	func _init() -> void:
 		min_value = 0
@@ -719,31 +749,101 @@ class VolSlider extends HSlider:
 		var blank := ImageTexture.create_from_image(img)   # sizes the grab area; the knob itself is drawn below
 		for ic in ["grabber", "grabber_highlight", "grabber_disabled"]:
 			add_theme_icon_override(ic, blank)
-		var track := UIKit.box(Palette.TRACK, 6, 0)
-		track.content_margin_top = 5; track.content_margin_bottom = 5
+		var track := UIKit.box(Palette.GL_CHIP_BG, 7, 2, Palette.GL_WOOD)
+		track.content_margin_top = 6; track.content_margin_bottom = 6
 		track.content_margin_left = 0; track.content_margin_right = 0
-		var fill := track.duplicate() as StyleBoxFlat
-		fill.bg_color = Palette.HONEY
-		var fill_hi := track.duplicate() as StyleBoxFlat
-		fill_hi.bg_color = Palette.GOLD
+		var fill := UIKit.box(Palette.GL_BTN_GOLD_LO, 7, 0)
+		fill.content_margin_top = 6; fill.content_margin_bottom = 6
+		fill.border_width_top = 3
+		fill.border_color = Palette.GL_BTN_GOLD_HI
+		fill.border_blend = true
+		var fill_hi := fill.duplicate() as StyleBoxFlat
+		fill_hi.bg_color = Palette.GL_GOLD
 		add_theme_stylebox_override("slider", track)
 		add_theme_stylebox_override("grabber_area", fill)
 		add_theme_stylebox_override("grabber_area_highlight", fill_hi)
-		if _knob == null:
-			_knob = UIKit.box(Palette.HONEY, int(KNOB / 2.0), 3, Color.WHITE, 3, Palette.shadow(0.3))
-			_dot = UIKit.box(Palette.HONEY_LIP, 3)
-			_dot.shadow_size = 0
 		value_changed.connect(func(_v: float): queue_redraw())
 
 	func _draw() -> void:
 		var ratio := 0.0 if max_value <= min_value else (value - min_value) / (max_value - min_value)
-		var cx := ratio * (size.x - KNOB) + KNOB / 2.0
-		var cy := size.y / 2.0
-		draw_style_box(_knob, Rect2(cx - KNOB / 2.0, cy - KNOB / 2.0, KNOB, KNOB))
-		draw_style_box(_dot, Rect2(cx - 3.0, cy - 3.0, 6.0, 6.0))
+		var r := KNOB / 2.0
+		var cx := ratio * (size.x - KNOB) + r
+		var cy := size.y / 2.0 - 1.0
+		draw_circle(Vector2(cx, cy + 3.0), r, Color(0, 0, 0, 0.35), true, -1.0, true)
+		draw_circle(Vector2(cx, cy + 1.5), r, Palette.GL_GOLD_LIP, true, -1.0, true)
+		draw_circle(Vector2(cx, cy - 0.5), r - 1.0, Palette.GL_CREAM_RIM, true, -1.0, true)
+		draw_circle(Vector2(cx, cy - 0.5), r - 4.0, Palette.GL_BTN_GOLD_LO, true, -1.0, true)
+		draw_circle(Vector2(cx, cy - 1.5), r - 6.0, Palette.GL_BTN_GOLD_HI, true, -1.0, true)
 
 
-## Credits (Settings > Help > Credits): who made the game and the third-party parts with their licences.
+## The page tabs: wood tiles with an icon and the page's name, the picked one orange with a cream rim and a little
+## taller (the Shop's section tiles).
+class PageTabs extends HBoxContainer:
+	signal picked(key: String)
+	var selected := ""
+	var _tiles := {}          # key -> {panel, label}
+
+	func _init(items: Array, sel: String) -> void:
+		selected = sel
+		add_theme_constant_override("separation", 8)
+		custom_minimum_size.y = 72
+		for it: Dictionary in items:
+			var key: String = it.key
+			var p := GamePanel.vertical(Palette.GL_WOOD, Palette.GL_TILE_LO)
+			p.name = "Tab_" + key
+			p.radius = 16.0
+			p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			p.size_flags_vertical = Control.SIZE_SHRINK_END
+			var col := UIKit.vbox(2)
+			col.alignment = BoxContainer.ALIGNMENT_CENTER
+			col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			p.add_child(col)
+			var ic := UIKit.icon(str(it.get("icon", "")), 28)
+			ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			col.add_child(ic)
+			var l := UIKit.label(str(it.text), 14, GameUI.SUB, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			l.clip_text = true
+			l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			l.add_theme_color_override("font_outline_color", GameUI.INK)
+			col.add_child(l)
+			var b := Button.new()
+			b.flat = true
+			b.focus_mode = Control.FOCUS_NONE
+			for k in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+				b.add_theme_stylebox_override(k, StyleBoxEmpty.new())
+			b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			b.pressed.connect(func():
+				if key != selected:
+					select(key)
+					picked.emit(key))
+			UIKit.wire_press(b)
+			p.add_child(b)
+			add_child(p)
+			_tiles[key] = {panel = p, label = l}
+		select(sel)
+
+	func select(key: String) -> void:
+		selected = key
+		for k: String in _tiles:
+			var on := k == key
+			var p: GamePanel = _tiles[k].panel
+			var l: Label = _tiles[k].label
+			p.c0 = Palette.GL_ORANGE_HI if on else Palette.GL_WOOD
+			p.c1 = Palette.GL_ORANGE_HI.lerp(Palette.GL_ORANGE, 0.5) if on else Palette.GL_TILE_HI
+			p.c2 = Palette.GL_ORANGE if on else Palette.GL_TILE_LO
+			p.border = 3.0 if on else 0.0
+			p.border_color = Palette.GL_CREAM_RIM
+			p.lip = 5.0 if on else 4.0
+			p.lip_color = Palette.GL_ORANGE_LIP if on else Palette.GL_CHIP_BG
+			p.custom_minimum_size.y = 72.0 if on else 64.0
+			l.add_theme_color_override("font_color", Color.WHITE if on else GameUI.SUB)
+			l.add_theme_constant_override("outline_size", 4 if on else 0)
+			l.add_theme_font_size_override("font_size", 15 if on else 14)
+
+
+## Credits (Settings > Help > Credits): who made the game and the third-party parts with their licences. A game-look
+## popup: each part on a wood tile, its name in white display type and the line under it in cream.
 class CreditsSheet extends Sheet:
 	## Names of the game, people, fonts and licences stay as they are; titles and sentences are translated.
 	func _items() -> Array:
@@ -755,10 +855,15 @@ class CreditsSheet extends Sheet:
 		]
 
 	func _init() -> void:
-		super(L10n.t("Credits"), UIKit.W.form, true, LOOK_PM)
-		var list := add_scroll_body(UIKit.SPACE.sm)
+		super(L10n.t("Credits"), UIKit.W.form, true, LOOK_GAME)
+		var list := add_scroll_body(SettingsSheet.GAP)
 		for it: Array in _items():
-			var v := UIKit.vbox(2)
-			v.add_child(UIKit.label(str(it[0]), UIKit.FS.body_l, Palette.INK, UIKit.font_body(900)))
-			v.add_child(UIKit.paragraph(str(it[1]), UIKit.FS.body, Palette.SUB))
-			list.add_child(UIKit.panel("row", v))
+			var v := UIKit.vbox(3)
+			v.add_child(GameUI.outlined(str(it[0]), 19, GameUI.TEXT, 2))
+			var p := GameUI.text(str(it[1]), 15, GameUI.SUB)
+			p.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			p.custom_minimum_size.x = 60
+			v.add_child(p)
+			var tile := GameUI.tile(16.0, 14.0)
+			tile.add_child(v)
+			list.add_child(tile)

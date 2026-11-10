@@ -1,7 +1,9 @@
 class_name UpdateBanner
 extends PanelContainer
-## The in-app update banner (AppUpdate): the same card as the invite banner (cream with a gold rim and the large shadow,
-## at most W_MAX wide with the 12 px gutters, sliding down from the top edge under the safe area, z over the sheets).
+## The in-app update banner (AppUpdate): the game look's popup card (GameUI.card_style: dark café with a warm glow, a
+## gold rim, a 3D lip), at most W_MAX wide with the 12 px gutters, sliding down from the top edge under the safe area,
+## z over the sheets. The title in outlined white, the line in cream, the bar gold on a dark track (Meter "game"),
+## chunky Later (cream) / Update or Restart (gold) buttons.
 ## Three modes, set with set_mode():
 ##   "offer"        "A new version is available" and Later / Update
 ##   "downloading"  "Downloading the update…" with a progress bar (and "You can keep playing."), no buttons
@@ -37,33 +39,33 @@ func _init(mode_ := "offer") -> void:
 	name = "UpdateBanner"
 	z_index = Z
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var st := UIKit.row_style("on").duplicate() as StyleBoxFlat
-	st.bg_color = Palette.CARD
-	UIKit.shade(st, "lg")
+	var st := GameUI.card_style()
+	st.content_margin_left = 16; st.content_margin_right = 16; st.content_margin_top = 14
+	st.content_margin_bottom = 14 + GameUI.CardStyle.LIP
 	add_theme_stylebox_override("panel", st)
 	var col := UIKit.vbox(UIKit.SPACE.sm)
 	add_child(col)
 	var text := UIKit.vbox(0)
-	title_label = UIKit.label("", UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	title_label = GameUI.outlined("", 19, GameUI.TEXT, 2)
 	title_label.name = "Title"
 	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(title_label)
-	sub_label = UIKit.label("", UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
+	sub_label = GameUI.text("", UIKit.FS.label, GameUI.SUB)
 	sub_label.name = "Sub"
 	sub_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(sub_label)
 	col.add_child(text)
-	bar = Meter.new("track", 10.0)
+	bar = Meter.new("game", 12.0)
 	bar.name = "Progress"
 	col.add_child(bar)
 	buttons = UIKit.hbox(UIKit.SPACE.sm)
-	later_button = UIKit.btn(L10n.t("Later"), "ghost", "sm")
+	later_button = GameUI.button(L10n.t("Later"), "cream", "md")
 	later_button.name = "Later"
-	action_button = UIKit.btn(L10n.t("Update"), "honey", "sm")
+	action_button = GameUI.button(L10n.t("Update"), "gold", "md")
 	action_button.name = "Action"
 	for b: Button in [later_button, action_button]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		UIKit.fit_text(b, 12)
+		GameUI.fit_button_text(b as GameUI.GameButton, 13)
 		buttons.add_child(b)
 	later_button.pressed.connect(func() -> void:
 		if not _gone:
@@ -77,6 +79,7 @@ func _init(mode_ := "offer") -> void:
 			update_pressed.emit())
 	col.add_child(buttons)
 	set_mode(mode_)
+	minimum_size_changed.connect(func() -> void: _shrink.call_deferred())
 
 ## The texts and parts of a mode. "downloading" shows bytes / total as the bar (and a percentage once the size is known).
 func set_mode(mode_: String, bytes := 0, total := 0) -> void:
@@ -97,7 +100,6 @@ func set_mode(mode_: String, bytes := 0, total := 0) -> void:
 	buttons.visible = mode != "downloading"
 	if mode == "downloading":
 		bar.set_value(float(bytes), float(total) if total > 0 else 1.0, true)
-	UIKit.refit_text(action_button)
 	if is_inside_tree():
 		_place()
 
@@ -132,6 +134,13 @@ func _place() -> void:
 	position.x = (w - size.x) / 2.0
 	if _top > 0.0 and position.y >= 0.0:
 		position.y = _top
+	_shrink.call_deferred()
+
+## The wrapping lines are measured one glyph wide until the card has its width, which made the first height far too
+## tall (a Control never gives height back on its own): once laid out, the card takes its real height.
+func _shrink() -> void:
+	if is_inside_tree() and not _gone:
+		size = Vector2(size.x, get_combined_minimum_size().y)
 
 ## Slide away and free.
 func dismiss() -> void:
