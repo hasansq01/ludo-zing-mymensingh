@@ -10,6 +10,7 @@ extends PanelContainer
 const SHADER := """shader_type canvas_item;
 uniform vec2 size = vec2(100.0, 100.0);
 uniform float radius = 16.0;
+uniform float radius_bottom = -1.0;   // < 0: the same as radius
 uniform float border = 0.0;
 uniform float lip = 0.0;
 uniform int mode = 0;                 // 0 radial, 1 vertical
@@ -33,8 +34,9 @@ float sd_box(vec2 p, vec2 b, float r) {
 void fragment() {
 	vec2 px = UV * size;
 	vec2 face_size = vec2(size.x, max(1.0, size.y - lip));
-	float d_all = sd_box(px - size * 0.5, size * 0.5, radius);
-	float d_face = sd_box(px - face_size * 0.5, face_size * 0.5, radius);
+	float rb = radius_bottom < 0.0 ? radius : radius_bottom;
+	float d_all = sd_box(px - size * 0.5, size * 0.5, px.y > size.y * 0.5 ? rb : radius);
+	float d_face = sd_box(px - face_size * 0.5, face_size * 0.5, px.y > face_size.y * 0.5 ? rb : radius);
 	float a = clamp(0.5 - d_all, 0.0, 1.0);
 	vec2 uv = px / face_size;
 	float t = mode == 0 ? length((uv - center) / reach) : uv.y;
@@ -73,6 +75,8 @@ var reach := Vector2(0.7, 0.6):
 	set(v): reach = v; _apply()
 var radius := 16.0:
 	set(v): radius = v; _apply()
+var radius_bottom := -1.0:          ## the bottom corners' radius (< 0: radius); 0 = square (a podium block)
+	set(v): radius_bottom = v; _apply()
 var border := 0.0:
 	set(v): border = v; _apply()
 var border_color := Color.TRANSPARENT:
@@ -131,6 +135,7 @@ func _apply() -> void:
 		return
 	_mat.set_shader_parameter("size", size)
 	_mat.set_shader_parameter("radius", radius)
+	_mat.set_shader_parameter("radius_bottom", radius_bottom)
 	_mat.set_shader_parameter("border", border)
 	_mat.set_shader_parameter("lip", lip)
 	_mat.set_shader_parameter("mode", mode)

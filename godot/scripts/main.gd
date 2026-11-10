@@ -832,8 +832,8 @@ func _on_tab(tab: String) -> void:
 			s.open(sheet_layer)
 		"free":
 			_claim_free()
-		"leaderboard", "ranks":
-			LeaderboardSheet.new().open(sheet_layer)
+		"leaderboard", "ranks":                         # a screen above the bar, like the Shop
+			_open_page(LeaderboardSheet.new(), "leaderboard")
 		"profile":
 			var p := ProfileSheet.new()
 			p.profile_changed.connect(home.refresh)
