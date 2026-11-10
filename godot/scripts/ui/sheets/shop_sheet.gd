@@ -75,6 +75,7 @@ const RAR := {
 const RARITY_NAMES := {common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary"}  # l10n
 const OUTLINE := Color("#3b1a0c")
 const CARD_H := 196.0
+const BANNER_NAME_FS := 26              # the featured name's size (shrinks to fit one line)
 const GAP := 12
 
 var tab := "rooms"
@@ -756,9 +757,13 @@ func _banner(it: Dictionary) -> Control:
 		tag = L10n.t(str(RARITY_NAMES[rar])).to_upper() + " · " + tag
 	chip.add_child(UIKit.label(tag, 11, Color("#ffd45e"), UIKit.font_display()))
 	col.add_child(chip)
-	var nm := outlined(_title(kind, str(it.name)), 26, Color.WHITE, 6)
-	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	nm.max_lines_visible = 2
+	# one line, always: the banner is the same height on every tab (a long name gets a smaller size, then "...")
+	var nm := outlined(_title(kind, str(it.name)), BANNER_NAME_FS, Color.WHITE, 6)
+	nm.name = "FeaturedName"
+	nm.clip_text = true
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.custom_minimum_size.y = BANNER_NAME_FS + 8
+	nm.resized.connect(_fit_banner_name.bind(nm))
 	col.add_child(nm)
 	_banner_clock = UIKit.label("", 13, c[4], UIKit.font_body(900))
 	_banner_clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -775,6 +780,18 @@ func _banner(it: Dictionary) -> Control:
 	t.timeout.connect(_tick_banner)
 	p.add_child(t)
 	return p
+
+## The featured name at the largest size from BANNER_NAME_FS down to 18 px that fits its one line.
+static func _fit_banner_name(l: Label) -> void:
+	var w := l.size.x
+	if w <= 1.0:
+		return
+	var font := l.get_theme_font("font")
+	var fs := BANNER_NAME_FS
+	while fs > 18 and font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 6.0 > w:
+		fs -= 1
+	if l.get_theme_font_size("font_size") != fs:
+		l.add_theme_font_size_override("font_size", fs)
 
 ## "Changes in 05:42:10" (the featured item turns at 00:00 UTC).
 func _tick_banner() -> void:
