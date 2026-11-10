@@ -1,6 +1,7 @@
 class_name WelcomeSheet
 extends Sheet
-## What greets a player who comes back: today's gifts in one place, before anything else. Daily reward and Free coins go
+## What greets a player who comes back: today's gifts in one place, before anything else (a game-look popup: the
+## RewardsSheet rows as wood tiles, a chunky gold Collect, a teal video button). Daily reward and Free coins go
 ## into the wallet with one big Collect button (the coins fly); then the Lucky Draw and the Daily missions are one tap
 ## away, and today's reward can be doubled with a video. Opened by main at launch when anything is waiting.
 ##
@@ -17,26 +18,27 @@ var _rows := {}
 
 
 func _init() -> void:
-	super(L10n.t("Welcome back!"), UIKit.W.form, true, LOOK_PM)
-	var list := add_scroll_body(UIKit.SPACE.sm)
-	_note = UIKit.label("", UIKit.FS.body, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	super(L10n.t("Welcome back!"), UIKit.W.form, true, LOOK_GAME)
+	var list := add_scroll_body(UIKit.SPACE.sm + 2)
+	_note = GameUI.text("", 16, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	list.add_child(_note)
+	list.add_child(UIKit.margin(_note, 0, 0, 0, 2))
 	for r: Array in [["daily", "gift", tr("Daily reward")], ["free", "coins", tr("Free coins")], ["spin", "spin", tr("Lucky Draw")], ["missions", "again", tr("Daily missions")]]:
 		var row := RewardsSheet.Row.new(r[0], r[2], HomeScreen.HI % r[1], tr("Go") if r[0] in ["spin", "missions"] else tr("Ready"), row_note(r[0]))
 		row.pressed.connect(_tap.bind(str(r[0])))
 		list.add_child(row)
 		_rows[r[0]] = row
-	_collect = UIKit.button(tr("Collect"), "honey", "lg")
+	var gap := Control.new()                 # a little air above the big buttons
+	gap.custom_minimum_size.y = 2
+	list.add_child(gap)
+	_collect = GameUI.button(tr("Collect"), "gold", "lg")
 	_collect.name = "Collect"
-	_collect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_collect.pressed.connect(collect)
 	list.add_child(_collect)
-	_double = UIKit.button(tr("Double today’s reward with a video"), "teal", "md")
+	_double = GameUI.button(tr("Double today’s reward with a video"), "teal", "lg")
 	_double.name = "Double"
-	_double.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_double.visible = false
-	UIKit.fit_text(_double, 13)
+	RewardsSheet.fit_game(_double, 14)
 	_double.pressed.connect(_watch)
 	list.add_child(_double)
 	var room := Control.new()                # (the big button's lip clears the scroll's edge)

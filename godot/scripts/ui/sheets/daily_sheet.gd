@@ -1,11 +1,12 @@
 class_name DailySheet
 extends Sheet
-## Daily reward (index.html #dailySheet / renderDaily / claimDaily): the 7-day login calendar in the .pm sheet look
-## (Sheet "pm" + a RibbonTitle "Daily reward"; the 48 px X is the only dismiss
-## control). A pane holds a 3 x 2 grid of day tiles plus a wide Day 7: claimed (dimmed, teal check badge), today
-## (honey ring with a breathing glow, teal header; tapping it claims) or locked (muted). The art grows with the
-## reward: one coin, a pair, a pile; dice skins in their Catalog colours; characters as their portrait.
-## One honey "Claim" button; once claimed it turns into a quiet "Come back tomorrow · 13h 20m" (live countdown).
+## Daily reward (index.html #dailySheet / renderDaily / claimDaily): the 7-day login calendar in a game-look popup
+## (Sheet LOOK_GAME: the outlined "Daily reward" title; the round X is the only dismiss control). A 3 x 2 grid of wood
+## day tiles plus a wide Day 7: claimed (deeper wood, dimmed, teal check badge), today (a warmer glow, a gold rim with
+## a breathing gold glow, a teal header; tapping it claims) or locked. Day names and values in outlined display type.
+## The art grows with the reward: one coin, a pair, a pile; dice skins in their Catalog colours; characters as their
+## portrait. One chunky gold "Claim" button; once claimed it turns into a quiet wood "Come back tomorrow · 13h 20m"
+## (live countdown).
 ## A claim pops the tile, stamps the check, flies the coins to the home coin counter (CoinFly; when there is no
 ## counter on screen, a coin burst at the tile), shows a "good" Toast with what was won and plays Haptics.success().
 ## The rules live in Rewards.
@@ -35,13 +36,9 @@ var auto_close := true                ## close AUTO_CLOSE_SEC after a successful
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
 func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
-	super("", width, true, LOOK_PM)
+	super(L10n.t("Daily reward"), width, true, LOOK_GAME)   # no ⓘ: the grid explains itself
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
-	ribbon = RibbonTitle.new(tr("Daily reward"))   # the Sheet places it on the card's top edge (no ⓘ: the grid explains itself)
-	ribbon.name = "Ribbon"
-	header.add_child(ribbon)
-	title_label = ribbon.label
 	_build()
 	_render()
 
@@ -62,11 +59,9 @@ func _day() -> String:
 
 func _build() -> void:
 	var list := add_scroll_body(UIKit.SPACE.sm)   # fit(): scrolls only on very short screens
-	var pane := UIKit.panel("pane")
-	list.add_child(pane)
-	var col := UIKit.vbox(UIKit.SPACE.sm)
-	pane.add_child(col)
-	var grid := UIKit.grid(3, UIKit.SPACE.sm)
+	var col := UIKit.vbox(UIKit.SPACE.sm + 2)
+	list.add_child(UIKit.margin(col, 4, 6, 4, 4))    # room for today's glow ring
+	var grid := UIKit.grid(3, UIKit.SPACE.sm + 2)
 	col.add_child(grid)
 	for k in 7:
 		var t := Tile.new(k)
@@ -77,18 +72,16 @@ func _build() -> void:
 			grid.add_child(t)
 		else:
 			col.add_child(t)
-	_note = UIKit.paragraph("", UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
-	_note.add_theme_font_override("font", UIKit.font_body(800))
+	_note = GameUI.text("", 15, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.visible = false
 	col.add_child(_note)
-	_btn = UIKit.button(tr("Claim"), "honey", "lg")
+	_btn = GameUI.button(tr("Claim"), "gold", "lg")
 	_btn.name = "Claim"
-	_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_btn.clip_text = true
 	_btn.pressed.connect(_claim)
 	UIKit.deny_disabled(_btn, func() -> String:                    # claimed today: the button says when to come back
 		return "" if _busy or _closing else tr("Come back tomorrow for the next reward."))
-	_btn.resized.connect(_fit_btn)
+	RewardsSheet.fit_game(_btn, 14)
 	body.add_child(_btn)
 
 
@@ -103,18 +96,16 @@ func _render() -> Dictionary:
 		_tiles[k].tomorrow = k == next
 		_tiles[k].set_info(st.rewards[k])
 	var can := bool(st.claimable)
+	var b := _btn as GameUI.GameButton
 	if can:
-		if _btn.get_meta("kit_kind", "") != "honey":
-			UIKit.style_button(_btn, "honey", "lg")
+		RewardsSheet.relook(b, "gold")
 		_btn.disabled = _busy
 		_btn.text = tr("Claim")
 	else:
-		if _btn.get_meta("kit_kind", "") != "off":
-			UIKit.style_button(_btn, "off", "lg")
-			_btn.add_theme_color_override("font_disabled_color", Palette.SUB)
+		RewardsSheet.relook(b, "wood")         # the quiet wood face: the countdown, nothing to press
 		_btn.disabled = true
 		_btn.text = tr("Come back tomorrow · %s") % Fmt.until(Rewards.sec_to_midnight())
-	_fit_btn()
+	RewardsSheet.refit(b)
 	# the note only when it tells something the grid doesn't: a broken run
 	_note.text = tr("You missed a day, so you’re back to Day 1.") if can and bool(st.missed) else ""
 	_note.visible = _note.text != ""
@@ -132,19 +123,6 @@ static func status_text(status: String, is_tomorrow: bool) -> String:
 		"claimed": return L10n.t("CLAIMED")
 		"today": return L10n.t("TODAY")
 	return L10n.t("TOMORROW") if is_tomorrow else ""
-
-## The button text at the largest size that fits (lg 24, the countdown 20 down to 14).
-func _fit_btn() -> void:
-	var room := _btn.size.x
-	if room <= 0.0:
-		room = card.custom_minimum_size.x - 2.0 * (UIKit.PAD.pane + 4)
-	room -= 2.0 * float(UIKit.BTN.lg.pad)
-	var f := UIKit.font_display()
-	var fs := int(UIKit.BTN.lg.fs) if not _btn.disabled else UIKit.FS.h2
-	while fs > UIKit.FS.label and f.get_string_size(_btn.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
-		fs -= 1
-	if fs != _btn.get_theme_font_size("font_size"):
-		_btn.add_theme_font_size_override("font_size", fs)
 
 ## Once a second: a new day re-opens the calendar while it's showing; the countdown refreshes.
 func _tick() -> void:
@@ -386,6 +364,7 @@ class Tile extends Control:
 	signal refused(text: String)         ## a tap on a day that isn't today's: why
 	const HEAD := 26.0
 	const RADIUS := 14
+	const RIM := 2.0
 	var k := 0
 	var wide := false
 	var info := {}
@@ -413,7 +392,7 @@ class Tile extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		custom_minimum_size = Vector2(0, 100 if wide else 132)
-		_ring = UIKit.box(Palette.HONEY, RADIUS + 4, 0, Color.TRANSPARENT, 8, Color(Palette.GOLD, 0.35))
+		_ring = UIKit.box(Palette.GL_GOLD, RADIUS + 4, 0, Color.TRANSPARENT, 8, Color(Palette.GL_GOLD, 0.35))
 
 	func set_info(i: Dictionary) -> void:
 		var was := status
@@ -460,26 +439,51 @@ class Tile extends Control:
 		_stamp = v
 		queue_redraw()
 
-	## [face, lip, head] for a state (cached).
+	## [lip, rim, head band, face top, face bottom] for a state (cached): the game look's wood tile (today: a warmer
+	## glow, a gold rim and a teal band; claimed: a deeper, quieter wood).
 	static func _styles(st: String) -> Array:
 		if _sb.has(st):
 			return _sb[st]
-		var face: Color
 		var lip: Color
+		var rim: Color
 		var head: Color
+		var top: Color
+		var bottom: Color
 		match st:
 			"claimed":
-				face = Palette.CHIP_DIM; lip = Palette.LIP_CREAM; head = Palette.TAN_DEEP
+				lip = Palette.GL_CARD_LIP; rim = Color(Palette.GL_TILE_RIM, 0.55); head = Color(Palette.GL_CHIP_BG, 0.7)
+				top = Palette.GL_TILE_LO; bottom = Palette.GL_CHIP_BG
 			"today":
-				face = Color.WHITE; lip = Palette.HONEY_LIP; head = Palette.TEAL
+				lip = Palette.GL_GOLD_LIP; rim = Palette.GL_TITLE; head = Palette.GL_BTN_TEAL_LO
+				top = Palette.GL_CARD_GLOW; bottom = Palette.GL_TILE_HI
 			_:
-				face = Palette.CARD; lip = Palette.TAN; head = Palette.TAN
-		var f := UIKit.box(face, RADIUS)
-		var l := UIKit.box(lip, RADIUS, 0, Color.TRANSPARENT, 0 if st == "claimed" else 5, Palette.shadow(0.12))
-		var h := UIKit.box(head, RADIUS)
+				lip = Palette.GL_CARD_LIP; rim = Palette.GL_TILE_RIM; head = Color(Palette.GL_CHIP_BG, 0.6)
+				top = Palette.GL_TILE_HI; bottom = Palette.GL_TILE_LO
+		var l := UIKit.box(lip, RADIUS)
+		var r := UIKit.box(rim, RADIUS)
+		var h := UIKit.box(head, RADIUS - RIM)
 		h.corner_radius_bottom_left = 0; h.corner_radius_bottom_right = 0
-		_sb[st] = [f, l, h]
+		_sb[st] = [l, r, h, top, bottom]
 		return _sb[st]
+
+	## A rounded rect filled with a top-to-bottom gradient (vertex colours: no shader, the pop transform applies).
+	func _grad_rect(r: Rect2, rad: float, top: Color, bottom: Color) -> void:
+		rad = minf(rad, minf(r.size.x, r.size.y) / 2.0)
+		var pts := PackedVector2Array()
+		var cols := PackedColorArray()
+		var corners := [[r.position + Vector2(r.size.x - rad, rad), -PI / 2.0], [r.end - Vector2(rad, rad), 0.0],
+			[Vector2(r.position.x + rad, r.end.y - rad), PI / 2.0], [r.position + Vector2(rad, rad), PI]]
+		for cr: Array in corners:
+			for i in 9:
+				var p: Vector2 = (cr[0] as Vector2) + Vector2.from_angle(float(cr[1]) + PI / 2.0 * i / 8.0) * rad
+				pts.append(p)
+				cols.append(top.lerp(bottom, clampf((p.y - r.position.y) / r.size.y, 0.0, 1.0)))
+		draw_polygon(pts, cols)
+
+	## Display text with the game look's dark outline, centred in `width` from x = pos.x.
+	func _outlined(f: Font, pos: Vector2, text: String, width: float, fs: int, col: Color, outline := 5) -> void:
+		draw_string_outline(f, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, fs, outline, Color(Palette.GL_INK, col.a))
+		draw_string(f, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, fs, col)
 
 	func _draw() -> void:
 		if info.is_empty():
@@ -490,26 +494,29 @@ class Tile extends Control:
 		var claimed := status == "claimed"
 		var today := status == "today"
 		var sb := _styles(status)
-		if today:   # the honey ring, breathing (still with Reduce motion)
+		if today:   # the gold glow ring, breathing (still with Reduce motion)
 			var g := 0.0 if not is_processing() else 0.5 - 0.5 * cos(_glow_t * TAU / 1.6)
-			var sp := lerpf(3.0, 4.5, g)
-			_ring.bg_color = Palette.HONEY.lerp(Palette.GOLD_HI, g)
+			var sp := lerpf(2.0, 3.5, g)
+			_ring.bg_color = Palette.GL_GOLD.lerp(Palette.GL_GOLD_GLOW, g)
 			_ring.set_corner_radius_all(int(RADIUS + sp))
-			_ring.shadow_size = int(lerpf(6.0, 12.0, g))
-			_ring.shadow_color = Color(Palette.GOLD, lerpf(0.28, 0.5, g))
-			_ring.shadow_offset = Vector2(0, 3)
-			var rr := Rect2(Vector2(-sp, -sp), Vector2(w + sp * 2, h + sp * 2))
+			_ring.shadow_size = int(lerpf(8.0, 16.0, g))
+			_ring.shadow_color = Color(Palette.GL_GOLD, lerpf(0.3, 0.55, g))
+			_ring.shadow_offset = Vector2(0, 2)
+			var rr := Rect2(Vector2(-sp, -sp), Vector2(w + sp * 2, h + sp * 2 + 3))
 			draw_style_box(_ring, rr)
-		draw_style_box(sb[1], Rect2(0, 3, w, h))
-		draw_style_box(sb[0], Rect2(0, 0, w, h))
-		draw_style_box(sb[2], Rect2(0, 0, w, HEAD))
+		draw_style_box(sb[0], Rect2(0, 3, w, h))
+		draw_style_box(sb[1], Rect2(0, 0, w, h))
+		var bw := RIM + (1.0 if today else 0.0)
+		var inner := Rect2(Vector2(bw, bw), Vector2(w - 2 * bw, h - 2 * bw))
+		_grad_rect(inner, RADIUS - bw, sb[3], sb[4])
+		draw_style_box(sb[2], Rect2(inner.position, Vector2(inner.size.x, HEAD - bw)))
 		var fd := UIKit.font_display()
-		DailySheet.draw_text_shadowed(self, fd, Vector2(0, 19), tr("Day %d") % (k + 1), w, 16, Color.WHITE, Color(Palette.INK, 0.3))
-		var a := 0.5 if claimed else 1.0
+		_outlined(fd, Vector2(0, 19), tr("Day %d") % (k + 1), w, 16, Color.WHITE if not claimed else Color(Palette.GL_CREAM_TEXT, 0.8), 4)
+		var a := 0.55 if claimed else 1.0
 		var sat := 0.7 if status == "locked" else 1.0
 		var gr: Dictionary = info.grant
 		var st_text := DailySheet.status_text(status, tomorrow)
-		var st_col := Palette.TEAL_INK if today else (Palette.SUB if tomorrow else Color(Palette.MUTED, 0.8))
+		var st_col := Palette.GL_TITLE if today else (Palette.GL_BTN_TEAL_HI if claimed else Palette.GL_CREAM_TEXT)
 		if wide:
 			_draw_wide(w, gr, st_text, st_col, a, sat)
 		else:
@@ -528,7 +535,7 @@ class Tile extends Control:
 			while fs > 12 and fd.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > w - 8:
 				fs -= 1
 			var vy := HEAD + 6 + 46 + 8 + fd.get_ascent(18)
-			draw_string(fd, Vector2(0, vy), label, HORIZONTAL_ALIGNMENT_CENTER, w, fs, Color(Palette.INK, a))
+			_outlined(fd, Vector2(0, vy), label, w, fs, Color(Color.WHITE, a))
 			var sfs: int = UIKit.FS.small              # "TOMORROW" shrinks on a narrow tile instead of being cut
 			while sfs > 10 and status_font().get_string_size(st_text, HORIZONTAL_ALIGNMENT_LEFT, -1, sfs).x > w - 6.0:
 				sfs -= 1
@@ -561,7 +568,8 @@ class Tile extends Control:
 			DailySheet.draw_coins(self, art_c, 50, 3, a, sat)
 		var tx := x0 + iw + 14
 		var ly := cy + 2.0 if st_text != "" else cy + 2.0 + fd.get_ascent(fs) * 0.4   # no status line: centred alone
-		draw_string(fd, Vector2(tx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, room, fs, Color(Palette.INK, a))
+		draw_string_outline(fd, Vector2(tx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, room, fs, 5, Color(Palette.GL_INK, a))
+		draw_string(fd, Vector2(tx, ly), label, HORIZONTAL_ALIGNMENT_LEFT, room, fs, Color(Color.WHITE, a))
 		draw_string(fc, Vector2(tx, cy + 22), st_text, HORIZONTAL_ALIGNMENT_LEFT, -1, UIKit.FS.small, st_col)
 		if status == "claimed":
 			_draw_check(art_c)

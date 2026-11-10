@@ -276,10 +276,10 @@ func _broke() -> void:
 	s.ad_ok_fn = func() -> bool: return false
 	s.coins_fn = func() -> int: return 40
 	s.refresh()
-	check("broke: 'Daily bonus +300' is on", not s.bonus_button.disabled and s._bonus_text.text == "Daily bonus +300")
+	check("broke: 'Daily bonus +300' is on", not s.bonus_button.disabled and s.bonus_button.text == "Daily bonus +300")
 	check("broke: no video when none can run here", not s.video_button.visible)
 	s.set_bonus({available = false, next_at = int(Time.get_unix_time_from_system()) + 5 * 3600 + 120, amount = 300})
-	check("broke: used today: disabled with the time left", s.bonus_button.disabled and s._bonus_text.text.contains("5h"), s._bonus_text.text)
+	check("broke: used today: disabled with the time left", s.bonus_button.disabled and s.bonus_button.text.contains("5h"), s.bonus_button.text)
 	s.set_bonus({available = true, next_at = 0, amount = 300})
 	var balance := [40]
 	s.coins_fn = func() -> int: return balance[0]
