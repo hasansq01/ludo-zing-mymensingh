@@ -1131,17 +1131,6 @@ static func segmented(options: Array, selected, on_pick: Callable, size: Variant
 	return row
 
 
-## A segmented() row on dark wood (Sheet.LOOK_GAME): a deep wood track, light labels; the picked choice stays the
-## white face with dark text.
-static func segmented_game(row: HBoxContainer) -> void:
-	if row is Seg:
-		(row as Seg)._track.bg_color = Palette.WOOD_DEEP
-		row.queue_redraw()
-	for b in row.get_children():
-		if b is Button:
-			for st in ["font_color", "font_hover_color"]:
-				(b as Button).add_theme_color_override(st, Palette.G_SUB)
-
 ## Greys out one choice of a segmented() row (its Button): it can't be picked, its label fades.
 static func segmented_disable(b: Button) -> void:
 	b.disabled = true

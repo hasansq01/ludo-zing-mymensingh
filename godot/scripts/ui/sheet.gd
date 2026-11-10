@@ -32,8 +32,6 @@ signal narrow_changed(narrow: bool)      ## the card crossed 340 px (tighter lay
 
 const LOOK_CARD := "card"
 const LOOK_PM := "pm"
-const PAPER_INSET := 9.0               ## the wood frame's width around a ribbon sheet's cream paper
-const LOOK_GAME := "game"              ## the PM family (ribbon, close X) on dark wood with a gold rim (Palette.WOOD)
 const NARROW_W := 340.0
 ## Centre of the close button, inset from the card's top-right corner (web .card .x-btn top/right -10 with a 2 px
 ## border; .pm .x-btn -16 with a 4 px rim: both put it over the corner, about 8 px outside the card).
@@ -94,7 +92,7 @@ const KB_MARGIN := 12.0                  # air kept between the card and the key
 
 
 func _init(title_text := "", width: float = UIKit.W.form, closable := true, look := LOOK_CARD) -> void:
-	sheet_look = look if look in [LOOK_PM, LOOK_GAME] else LOOK_CARD
+	sheet_look = LOOK_PM if look == LOOK_PM else LOOK_CARD
 	_sheet_w = width
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -113,7 +111,7 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 	add_child(center)
 	card = PanelContainer.new()
 	card.name = "Card"
-	card.add_theme_stylebox_override("panel", _pm_style(sheet_look == LOOK_GAME) if sheet_look != LOOK_CARD else _card_style())
+	card.add_theme_stylebox_override("panel", _pm_style() if sheet_look == LOOK_PM else _card_style())
 	card.custom_minimum_size = Vector2(width, 0)
 	center.add_child(card)
 	_clampbox = ClampBox.new()
@@ -125,7 +123,7 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 	header.name = "Header"
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(header)
-	if sheet_look != LOOK_CARD:
+	if sheet_look == LOOK_PM:
 		# the content starts under the ribbon (PM_CONTENT_TOP from the card's top edge)
 		var top := (card.get_theme_stylebox("panel") as StyleBox).content_margin_top
 		header.custom_minimum_size.y = maxf(0.0, PM_CONTENT_TOP - top - UIKit.SPACE.md)
@@ -172,45 +170,22 @@ static func _is_tap(e: InputEvent) -> bool:
 # =====================================================================================================================
 
 ## web .card: CARD face, 2 px white border, r 28, shadow-lg, padding 20 (own copy: callers may change it).
-## The game look (dark wood): text and controls on it use the G_* colours.
-func is_game() -> bool:
-	return sheet_look == LOOK_GAME
-
-
 static func _card_style() -> StyleBoxFlat:
 	return UIKit.surface("card").duplicate() as StyleBoxFlat
 
 ## web .pm: PM face, 4 px PM_RIM rim, r 28, a 3 px PM_RING ring outside it, 0 12px 28px rgba(50,25,40,.4).
-static func _pm_style(game := false) -> StyleBox:
-	# every ribbon sheet sits in the game's gold-rimmed wood frame; the game look is wood all through, the others keep
-	# their cream content on a paper panel inside the frame (so their text and rows read as before)
+static func _pm_style() -> StyleBox:
 	var s := PMStyle.new()
-	s.face.bg_color = Palette.WOOD
-	s.face.border_color = Palette.WOOD_RIM
-	s.face.shadow_color = Color(0, 0, 0, 0.55)
-	s.ring.border_color = Palette.WOOD_LIP
-	var inset := 0.0 if game else PAPER_INSET
-	if not game:
-		s.paper = StyleBoxFlat.new()
-		s.paper.bg_color = Palette.PM
-		s.paper.set_corner_radius_all(UIKit.R.xl - 4)
-		s.paper.corner_detail = 12
-		s.paper.anti_aliasing = true
-		s.paper.border_width_top = 2
-		s.paper.border_color = Color(Palette.WOOD_LIP, 0.35)          # a soft shade where the paper meets the frame
-		s.inset = inset
-	s.content_margin_left = UIKit.PAD.pane + 4 + inset
-	s.content_margin_right = UIKit.PAD.pane + 4 + inset
-	s.content_margin_top = UIKit.PAD.pane + 4 + inset
-	s.content_margin_bottom = UIKit.PAD.pane + 4 + inset
+	s.content_margin_left = UIKit.PAD.pane + 4
+	s.content_margin_right = UIKit.PAD.pane + 4
+	s.content_margin_top = UIKit.PAD.pane + 4
+	s.content_margin_bottom = UIKit.PAD.pane + 4
 	return s
 
 ## The .pm frame as one StyleBox: the face with its rim and drop shadow, then the orange ring just outside the box.
 class PMStyle extends StyleBox:
 	var face: StyleBoxFlat
 	var ring: StyleBoxFlat
-	var paper: StyleBoxFlat               ## the cream content panel inside the wood frame (null: wood all through)
-	var inset := 0.0
 
 	func _init() -> void:
 		face = StyleBoxFlat.new()
@@ -233,8 +208,6 @@ class PMStyle extends StyleBox:
 
 	func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 		face.draw(to_canvas_item, rect)
-		if paper:
-			paper.draw(to_canvas_item, rect.grow(-inset))
 		ring.draw(to_canvas_item, rect.grow(UIKit.BW.rim))
 
 
@@ -325,7 +298,7 @@ static func _restack(layer: Node) -> void:
 		var top := k == stack.size() - 1
 		s.z_index = k * Z_STEP                   # a stray child z_index can't climb over the sheet above (SH-01)
 		s._set_cover("" if top else ("hide" if under_pm else "dim"))
-		under_pm = under_pm or s.sheet_look != LOOK_CARD
+		under_pm = under_pm or s.sheet_look == LOOK_PM
 		if s.close_btn:
 			s.close_btn.visible = top
 		var d := s._scrim_by
@@ -471,7 +444,7 @@ func set_kicker(text: String) -> Label:
 		kicker.set_anchors_preset(Control.PRESET_TOP_WIDE)
 		kicker.offset_left = 30.0
 		kicker.offset_right = -30.0
-		if sheet_look != LOOK_CARD:
+		if sheet_look == LOOK_PM:
 			# a fixed gap under the ribbon's bottom edge (SPACE.sm), whatever the card's centring
 			var top_m := (card.get_theme_stylebox("panel") as StyleBox).content_margin_top
 			kicker.offset_top = RIBBON_TOP + RibbonTitle.H + UIKit.SPACE.sm - top_m
@@ -488,7 +461,7 @@ func set_kicker(text: String) -> Label:
 
 ## A centred, wrapping line of text.
 func add_text(text: String, size := 16) -> Label:
-	var l := UIKit.label(text, size, Palette.G_SUB if sheet_look == LOOK_GAME else Palette.INK, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, size, Palette.INK, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(l)
 	return l
@@ -516,7 +489,7 @@ func add_scroll_body(gap: int = UIKit.SPACE.md) -> VBoxContainer:
 	_fade.size_flags_vertical = Control.SIZE_SHRINK_END
 	_fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_fade.stretch_mode = TextureRect.STRETCH_SCALE
-	var face := Palette.WOOD if sheet_look == LOOK_GAME else (Palette.PM if sheet_look != LOOK_CARD else Palette.CARD)
+	var face := Palette.PM if sheet_look == LOOK_PM else Palette.CARD
 	var g := Gradient.new()
 	g.colors = PackedColorArray([Color(face, 0.0), face])
 	var gt := GradientTexture2D.new()
@@ -651,7 +624,7 @@ func fit_now() -> void:
 		var cap := vp.y * _fit_max
 		if _kb > 0.0:                           # the keyboard is up: what is left above it (the buttons stay in view)
 			cap = minf(cap, vp.y - _kb - _safe_top() - KB_MARGIN * 2.0)
-		if sheet_look != LOOK_CARD and ribbon:
+		if sheet_look == LOOK_PM and ribbon:
 			cap += RIBBON_TOP                   # the ribbon stands above the card
 		var other := card.get_combined_minimum_size().y - _scroll_wrap.get_combined_minimum_size().y
 		var h: float

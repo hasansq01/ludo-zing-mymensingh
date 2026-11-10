@@ -85,7 +85,7 @@ const MOUSE := 1000
 
 
 func _init(id: String, kind_ := "room") -> void:
-	super(L10n.t(str(_item_of(id, kind_).get("name", ""))), 390.0, true, LOOK_GAME)
+	super(L10n.t(str(_item_of(id, kind_).get("name", ""))), 390.0, true, LOOK_PM)
 	kind = "scene" if kind_ == "scene" else "room"
 	room_id = id
 	_name_l = title_label
@@ -93,7 +93,7 @@ func _init(id: String, kind_ := "room") -> void:
 	o = {az = goal.az, el = goal.el + 0.3, zoom = goal.zoom * 0.8}   # glides in once drawing (inside the limits)
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	_clip = PanelContainer.new()
-	var cs := UIKit.box(Palette.WOOD_DEEP, UIKit.R.lg)
+	var cs := UIKit.box(Palette.CHIP, UIKit.R.lg)
 	UIKit.pad(cs, 0)
 	_clip.add_theme_stylebox_override("panel", cs)
 	_clip.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
@@ -235,7 +235,7 @@ func _build_view() -> Control:
 	_msg = PanelContainer.new()
 	_msg.add_theme_stylebox_override("panel", UIKit.surface("bubble"))
 	var mv := UIKit.vbox(UIKit.SPACE.sm)
-	mv.add_child(UIKit.label(tr("The 3D preview couldn’t load."), UIKit.FS.body, Palette.G_TEXT, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
+	mv.add_child(UIKit.label(tr("The 3D preview couldn’t load."), UIKit.FS.body, Palette.INK, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER))
 	var retry := UIKit.btn(tr("Retry"), "honey", "sm")
 	retry.name = "Retry"
 	retry.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -252,7 +252,7 @@ func _build_panel() -> Control:
 	_kind_l = UIKit.eyebrow(L10n.t(KIND_TEXT[kind]))
 	_kind_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_info.add_child(UIKit.margin(_kind_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
-	_desc_l = UIKit.paragraph("", UIKit.FS.body, Palette.G_SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	_desc_l = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	_info.add_child(UIKit.margin(_desc_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
 	var slot := MarginContainer.new()
 	slot.custom_minimum_size.y = UIKit.TAP + 4
@@ -385,11 +385,16 @@ func _on_act() -> void:
 		Haptics.error()
 		Toast.show(self, tr("Need %s more coins") % Fmt.coins(short), card, 1.8, "bad")
 		return
+	_asking = true
+	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % L10n.t(r.name), tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
+	_asking = false
+	if not yes or not is_instance_valid(self) or _closing:
+		return
 	var err := SLScenes.buy_scene(room_id, true) if kind == "scene" else Catalog.buy_room(room_id, true)
 	if err == "":
 		Sound.sfx("buy")
 		Haptics.success()
-		ShopSheet.reveal(self, kind, room_id, L10n.t(r.name))
+		Toast.show(self, tr("%s is yours!") % L10n.t(r.name), card, 1.8, "good")
 		bought.emit(room_id)
 		_changed()
 	else:

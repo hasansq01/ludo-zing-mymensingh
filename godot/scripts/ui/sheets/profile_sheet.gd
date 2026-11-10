@@ -54,31 +54,28 @@ var _acct_note: Label
 var _acct_synced: Control
 var _acct_button: Button
 var _acct_signing := false
-var _name_box: Control                 # "Your name": hidden until the nameplate's pencil
-var _show_frame: Control              # My table: the frame, pawns and dice in use
-var _show_pawn: Control
-var _show_dice: Control
 
 
 func _init(width := 360.0) -> void:
-	super(L10n.t("Profile"), width, true, Sheet.LOOK_GAME)
+	super(L10n.t("Profile"), width, true, Sheet.LOOK_PM)
 	var stack := UIKit.vbox(0)
 	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(stack)
 	_tabs = TabStrip.new([
-		{key = "profile", text = tr("Me"), icon = "tab_profile", cat = "avatars"},
-		{key = "ach", text = tr("Achievements"), icon = "ic_trophy", cat = "coins"},
-	], pane, "gtabs")
-	_tabs.game = true
-	_tabs.fade_color = Palette.WOOD
+		{key = "profile", text = tr("Me"), icon = "tab_profile"},
+		{key = "ach", text = tr("Achievements"), icon = "ic_trophy"},
+	], pane, "folder")
 	_tabs.picked.connect(show_pane)
 	# the strip stops short of the corner X: the Achievements count badge sits clear of it
 	stack.add_child(UIKit.margin(_tabs, 0, UIKit.SPACE.sm, TAB_CLEAR_X, 0))
 	_pane_box = PanelContainer.new()
-	var ps := StyleBoxEmpty.new()
-	ps.content_margin_top = UIKit.SPACE.sm
+	var ps := TabStrip.pane_style("folder")
+	ps.content_margin_left = UIKit.PAD.pane - 2
+	ps.content_margin_right = UIKit.PAD.pane - 2
+	ps.content_margin_top = UIKit.PAD.pane + TabStrip.F_EDGE     # under the pane's own top line
 	ps.content_margin_bottom = UIKit.SPACE.sm
 	_pane_box.add_theme_stylebox_override("panel", ps)
+	_tabs.bind_pane(_pane_box)
 	_pane_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	stack.add_child(_pane_box)
 	var list := add_scroll_body(UIKit.SPACE.md)
@@ -89,12 +86,8 @@ func _init(width := 360.0) -> void:
 	fit(0.88, FIXED_H)
 
 	_profile_pane = UIKit.vbox(UIKit.SPACE.md)
-	_profile_pane.add_child(_build_identity())
-	_name_box = _section(tr("Your name"), _build_name())
-	_name_box.name = "NameBox"
-	_name_box.visible = false                         # the pencil on the nameplate opens it
-	_profile_pane.add_child(_name_box)
-	_profile_pane.add_child(_build_showcase())
+	_profile_pane.add_child(UIKit.list_row(_build_identity()))
+	_profile_pane.add_child(_section(tr("Your name"), _build_name()))
 	_acct_box = _section(tr("Account"), _build_account())
 	_acct_box.name = "AccountBox"
 	_profile_pane.add_child(_acct_box)
@@ -130,7 +123,7 @@ func _tint_fade(wrap: Node) -> void:
 	if fade == null:
 		return
 	var g := Gradient.new()
-	g.colors = PackedColorArray([Color(Palette.WOOD, 0.0), Palette.WOOD])
+	g.colors = PackedColorArray([Color(Palette.PANE, 0.0), Palette.PANE])
 	var gt := GradientTexture2D.new()
 	gt.gradient = g
 	gt.width = 4
@@ -206,35 +199,26 @@ func _app() -> Node:
 ## The avatar in its frame; beside it the name on its plate (+ badge), level + XP and coins. Then Leaderboard and
 ## Inventory (one name for that place: the nav, this button and the sheet's ribbon).
 func _build_identity() -> VBoxContainer:
-	# the player card: the avatar large in its frame, the nameplate (with the badge) and a pencil to rename, the level
-	# pill over the XP bar, the coins; then Leaderboard / Inventory
-	var v := UIKit.vbox(UIKit.SPACE.sm)
-	v.name = "PlayerCard"
-	_ava = Collection.make_avatar(AVATAR_PX * 2.0) as Collection.AvatarView
-	_ava.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	v.add_child(_ava)
-	var name_row := UIKit.hbox(UIKit.SPACE.sm)
-	name_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_plate = Collection.make_plate("", Collection.DEFAULT_PLATE, "", UIKit.FS.h1, false, 170.0)
-	_plate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_plate.label.add_theme_color_override("font_color", Palette.G_TEXT)
-	name_row.add_child(_plate)
-	var pen := UIKit.icon_button("ic_edit", "glass", 40, 20)
-	pen.name = "Rename"
-	pen.tooltip_text = tr("Your name")
-	pen.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	pen.pressed.connect(_toggle_name)
-	name_row.add_child(pen)
-	v.add_child(name_row)
+	var v := UIKit.vbox(UIKit.SPACE.md)
+	var head := UIKit.hbox(UIKit.SPACE.md)
+	_ava = Collection.make_avatar(AVATAR_PX) as Collection.AvatarView
+	_ava.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(_ava)
+	var right := UIKit.vbox(UIKit.SPACE.sm)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(right)
+	_plate = Collection.make_plate("", Collection.DEFAULT_PLATE, "", UIKit.FS.h1, false, 150.0)
+	_plate.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	right.add_child(_plate)
 	_level = LevelBadge.new(1, "md")
-	_xp = Meter.new("night", 20, true, "XP")
-	var lv_row := LevelBadge.row(_level, _xp)
-	_xp.show_behind_parent = true            # the pill stays over the bar by draw order
-	v.add_child(UIKit.margin(lv_row, 18, 0, 18, 0))
+	_xp = Meter.new("xp", 20, true, "XP")
+	right.add_child(LevelBadge.row(_level, _xp))
+	_xp.show_behind_parent = true            # the star stays over the bar by draw order
 	_coins = CoinAmount.new(0, "md", "plain")
-	_coins.set_color(Palette.G_TEXT)
-	_coins.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	v.add_child(_coins)
+	_coins.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	right.add_child(_coins)
+	v.add_child(head)
 
 	var btns := UIKit.hbox(UIKit.SPACE.sm)         # Leaderboard (secondary) left, Inventory (primary) right
 	var ranks := UIKit.btn(tr("Leaderboard"), "white", "sm")
@@ -250,120 +234,15 @@ func _build_identity() -> VBoxContainer:
 	look.pressed.connect(_customise)
 	btns.add_child(look)
 	v.add_child(btns)
+
 	return v
-
-## The nameplate's pencil: shows (and focuses) or hides the name field.
-func _toggle_name() -> void:
-	_name_box.visible = not _name_box.visible
-	if _name_box.visible:
-		_name_edit.grab_focus()
-		_name_edit.select_all()
-
-## "My table": what's in use, as rarity cards (frame, pawns, dice); a tap opens the Inventory there.
-func _build_showcase() -> VBoxContainer:
-	var v := UIKit.vbox(UIKit.SPACE.sm)
-	v.name = "MyTable"
-	v.add_child(_heading(tr("My table")))
-	var g := UIKit.grid(3, UIKit.SPACE.sm)
-	_show_frame = _show_slot("frames", tr("Frame"))
-	_show_pawn = _show_slot("pawns", tr("Pawns"))
-	_show_dice = _show_slot("dice", tr("Dice"))
-	for c in [_show_frame, _show_pawn, _show_dice]:
-		g.add_child(c)
-	v.add_child(g)
-	return v
-
-func _show_slot(tab: String, caption: String) -> PanelContainer:
-	var p := PanelContainer.new()
-	p.name = "Show_" + tab
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	p.custom_minimum_size = Vector2(0, 112)
-	p.mouse_filter = Control.MOUSE_FILTER_PASS
-	p.set_meta("tab", tab)
-	var col := UIKit.vbox(2)
-	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.add_child(col)
-	var art := CenterContainer.new()
-	art.name = "Art"
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(art)
-	var l := UIKit.label(caption, UIKit.FS.small, Palette.G_TEXT, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	l.add_theme_constant_override("outline_size", 4)
-	l.add_theme_color_override("font_outline_color", Palette.G_OUTLINE)
-	col.add_child(l)
-	UIKit.on_tap(p, func() -> void: _open_tab(tab))
-	return p
-
-## Re-draw My table from what's in use (each slot wears its item's rarity).
-func _refresh_showcase() -> void:
-	if not is_instance_valid(_show_frame):
-		return
-	var items := [[_show_frame, "frame", Collection.equipped("frame")], [_show_pawn, "pawn", Catalog.pawn_in_use()], [_show_dice, "dice", Catalog.dice_in_use()]]
-	for it: Array in items:
-		var p: PanelContainer = it[0]
-		var kind: String = it[1]
-		var id: String = it[2]
-		if str(p.get_meta("shown", "")) == id:
-			continue
-		p.set_meta("shown", id)
-		var rar := ShopSheet.rarity(kind, id)
-		var c: Array = Palette.RARITY.get(rar, [Palette.WOOD_HI.lightened(0.2), Palette.WOOD_HI, Palette.WOOD_DEEP, Palette.WOOD_RIM])
-		var st := UIKit.box(c[1], UIKit.R.md, UIKit.BW.line, c[3])
-		st.border_width_bottom = UIKit.LIP.md
-		st.border_color = c[2]
-		UIKit.pad(st, 4)
-		p.add_theme_stylebox_override("panel", st)
-		var art := p.find_child("Art", true, false) as CenterContainer
-		for ch in art.get_children():
-			art.remove_child(ch)
-			ch.queue_free()
-		match kind:
-			"frame": art.add_child(Collection.make_avatar_of(Collection.equipped("avatar"), id, 70))
-			"pawn":
-				var pa := Thumbnailer.pawn_art(id)
-				pa.custom_minimum_size = Vector2(84, 64)
-				if pa is TextureRect:
-					(pa as TextureRect).stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				art.add_child(pa)
-			"dice": art.add_child(Thumbnailer.dice_art(id, 60))
-
-## The Inventory on a tab (My table's slots).
-func _open_tab(tab: String) -> void:
-	var app := _app()
-	if app and app.has_method("_on_tab"):
-		close()
-		app._on_tab("inventory")
-		return
-	_customise()
 
 ## A section: its heading above (outside) the row card that holds `content`.
 func _section(title: String, content: Control) -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
 	v.add_child(_heading(title))
-	v.add_child(_wood_row(content))
+	v.add_child(UIKit.list_row(content))
 	return v
-
-## A wood row's state: a reward waiting (on) wears a gold rim and glow.
-static func _wood_row_state(p: PanelContainer, on: bool) -> void:
-	var st := (p.get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
-	st.border_color = Palette.G_GOLD if on else Palette.WOOD_LIP
-	st.set_border_width_all(UIKit.BW.rim if on else UIKit.BW.line)
-	st.border_width_bottom = UIKit.LIP.sm + (1 if on else 0)
-	st.shadow_color = Color(Palette.G_GOLD, 0.45 if on else 0.0)
-	st.shadow_size = 8 if on else 0
-	p.add_theme_stylebox_override("panel", st)
-
-## A row card on wood (the game look's list_row).
-static func _wood_row(content: Control) -> PanelContainer:
-	var p := PanelContainer.new()
-	var st := UIKit.box(Palette.WOOD_HI, UIKit.R.md, UIKit.BW.line, Palette.WOOD_LIP)
-	st.border_width_bottom = UIKit.LIP.sm
-	UIKit.pad(st, UIKit.SPACE.md)
-	p.add_theme_stylebox_override("panel", st)
-	p.add_child(content)
-	return p
 
 ## The name field; Save appears once the name differs from the saved one; the inline error line.
 func _build_name() -> VBoxContainer:
@@ -405,7 +284,7 @@ func _open_leaderboard() -> void:
 func _build_account() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
 	var head := UIKit.hbox(UIKit.SPACE.sm)
-	_acct_title = UIKit.label(tr("Guest"), UIKit.FS.h3, Palette.G_TEXT, UIKit.font_display())
+	_acct_title = UIKit.label(tr("Guest"), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	_acct_title.name = "AccountTitle"
 	_acct_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_acct_title.clip_text = true
@@ -420,7 +299,7 @@ func _build_account() -> VBoxContainer:
 	_acct_synced.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_acct_synced)
 	v.add_child(head)
-	_acct_note = UIKit.paragraph("", UIKit.FS.small, Palette.G_SUB)
+	_acct_note = UIKit.paragraph("", UIKit.FS.small, Palette.SUB)
 	_acct_note.name = "AccountNote"
 	v.add_child(_acct_note)
 	_acct_button = UIKit.btn(tr("Sign in with Google Play Games"), "honey", "sm")
@@ -500,14 +379,13 @@ func _sign_in_google() -> void:
 ## A section label (UIKit.caption, the one section-label style).
 func _heading(text: String) -> Label:
 	var l := UIKit.caption(text)
-	l.add_theme_color_override("font_color", Palette.G_GOLD)
 	l.name = "Section"
 	return l
 
 ## Stats in tidy tiles: Ludo vs computer (2 x 2), Snakes & Ladders, Overall (pairs, Pass & Play, coins earned).
 func _build_stats() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.lg)
-	_stats_note = UIKit.paragraph(tr("Finish a game to start your stats."), UIKit.FS.body, Palette.G_SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	_stats_note = UIKit.paragraph(tr("Finish a game to start your stats."), UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_stats_note)
 	v.add_child(_stat_group(tr("Ludo vs computer"), [["played", tr("Played")], ["wins", tr("Wins")], ["winRate", tr("Win rate")], ["bestStreak", tr("Best streak")]]))
 	v.add_child(_stat_group(tr("Snakes & Ladders"), [["slPlayed", tr("Played")], ["slWins", tr("Wins")]]))
@@ -521,7 +399,7 @@ func _stat_group(title: String, items: Array) -> VBoxContainer:
 	v.add_child(_heading(title))
 	var g := UIKit.grid(2, UIKit.SPACE.sm)
 	for it: Array in items:
-		var val := UIKit.label("0", UIKit.FS.h1, Palette.G_TEXT, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+		var val := UIKit.label("0", UIKit.FS.h1, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
 		_stat_vals[it[0]] = val
 		g.add_child(_tile(val, it[1]))
 	v.add_child(g)
@@ -531,17 +409,16 @@ func _tile(value: Control, caption: String) -> PanelContainer:
 	var tv := UIKit.vbox(0)
 	tv.alignment = BoxContainer.ALIGNMENT_CENTER
 	tv.add_child(value)
-	var lab := UIKit.label(caption, UIKit.FS.small, Palette.G_SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var lab := UIKit.label(caption, UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tv.add_child(lab)
-	var tile := _wood_row(tv)
+	var tile := UIKit.panel("tile", tv)
 	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tile.mouse_filter = Control.MOUSE_FILTER_PASS
 	return tile
 
 func _coin_tile(key: String, caption: String) -> PanelContainer:
 	var amt := CoinAmount.new(0, "md", "plain")
-	amt.set_color(Palette.G_TEXT)
 	amt.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_stat_vals[key] = amt
 	return _tile(amt, caption)
@@ -553,13 +430,13 @@ func _coin_tile(key: String, caption: String) -> PanelContainer:
 
 func _build_ach() -> void:
 	var sum := UIKit.hbox(UIKit.SPACE.sm)
-	_ach_earned = UIKit.label("", UIKit.FS.body, Palette.G_SUB, UIKit.font_body(800, true))
+	_ach_earned = UIKit.label("", UIKit.FS.body, Palette.SUB, UIKit.font_body(800, true))
 	_ach_earned.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_ach_earned.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	sum.add_child(_ach_earned)
 	_ach_claim = UIKit.hbox(UIKit.SPACE.sm)               # the rewards still to claim (not the wallet)
 	_ach_claim.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_ach_claim.add_child(UIKit.label(tr("To claim"), UIKit.FS.small, Palette.G_SUB, UIKit.font_body(800)))
+	_ach_claim.add_child(UIKit.label(tr("To claim"), UIKit.FS.small, Palette.SUB, UIKit.font_body(800)))
 	_ach_coins = CoinAmount.new(0, "sm", "chip")
 	_ach_coins.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_ach_claim.add_child(_ach_coins)
@@ -584,10 +461,10 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 
 	var txt := UIKit.vbox(UIKit.SPACE.xxs)
 	txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var t := UIKit.label(tr(a.name), UIKit.FS.h3, Palette.G_TEXT, UIKit.font_display())
+	var t := UIKit.label(tr(a.name), UIKit.FS.h3, Palette.INK, UIKit.font_display())
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	txt.add_child(t)
-	var d := UIKit.paragraph(tr(a.desc), UIKit.FS.small, Palette.G_SUB)
+	var d := UIKit.paragraph(tr(a.desc), UIKit.FS.small, Palette.MUTED)
 	txt.add_child(d)
 	var foot := UIKit.hbox(UIKit.SPACE.sm)
 	var bar := Meter.new("teal", 18, true)
@@ -596,13 +473,9 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	var reward := HBoxContainer.new()                      # the coins (and, with an account, the gems) it pays
 	reward.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	reward.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var rew_c := CoinAmount.new(int(a.reward), "sm", "plain")
-	rew_c.set_color(Palette.G_TEXT)
-	reward.add_child(rew_c)
+	reward.add_child(CoinAmount.new(int(a.reward), "sm", "plain"))
 	if Account.wallet_active():
-		var rew_g := CoinAmount.gems(ACH_GEMS, "sm", "plain", "+")
-		rew_g.set_color(Palette.G_TEXT)
-		reward.add_child(rew_g)
+		reward.add_child(CoinAmount.gems(ACH_GEMS, "sm", "plain", "+"))
 	foot.add_child(reward)
 	var claimed := UIKit.hbox(UIKit.SPACE.xs)
 	claimed.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -632,7 +505,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 	foot.add_child(claim)
 	txt.add_child(UIKit.margin(foot, 0, UIKit.SPACE.xs, 0, 0))
 	top.add_child(txt)
-	var p := _wood_row(top)
+	var p := UIKit.list_row(top)
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	UIKit.on_tap(p, func() -> void:                         # a tap on one not earned yet says what it asks for
 		if not bool(Collection.ach_progress(id, Save.profile).get("done", false)):
@@ -651,7 +524,7 @@ func _ach_card(a: Dictionary) -> PanelContainer:
 		bar.visible = not claim.visible           # a ready reward: the Claim button takes the row
 		reward.visible = not done
 		claimed.visible = got
-		_wood_row_state(p, done and not got))
+		UIKit.set_row_state(p, "on" if done and not got else ""))
 	return p
 
 ## "Claim" first, then the coin amount (button_with puts its child before the text).
@@ -776,7 +649,7 @@ func _refresh() -> void:
 			"slWins":
 				if sl_played == 0: text = Fmt.EMPTY
 		lab.text = text
-		lab.add_theme_color_override("font_color", Palette.G_SUB if text == Fmt.EMPTY else Palette.G_TEXT)
+		lab.add_theme_color_override("font_color", Palette.MUTED if text == Fmt.EMPTY else Palette.INK)
 	_stats_note.visible = played == 0 and sl_played == 0 and int(st.get("ppGames", 0)) == 0
 	var earned := 0
 	var waiting := 0
@@ -794,7 +667,6 @@ func _refresh() -> void:
 	if _name_edit and not _name_edit.has_focus():
 		_validate(false)
 	_refresh_account()
-	_refresh_showcase()
 
 ## Trimmed, inner runs of spaces collapsed to one.
 static func clean_name(s: String) -> String:

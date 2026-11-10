@@ -17,7 +17,7 @@ config/quit_on_go_back=false
 ; The Play version code (version/code in export_presets.cfg; tests keep them equal): what AppUpdate reports off Android.
 config/version_code=26
 ; The version name (version/name in export_presets.cfg; tests keep them equal): the Settings footer's "v0.3.0".
-config/version="0.9.0"
+config/version="0.8.4"
 run/low_processor_mode=false
 config/icon="res://assets/icon/icon_512.png"
 boot_splash/show_image=false

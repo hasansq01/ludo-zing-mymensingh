@@ -95,25 +95,6 @@ const PLUM_NIGHT := Color("#24163a")
 const INFO := Color("#7b5cc4")         ## the info (i) disc
 const INFO_DEEP := Color("#5a3f99")
 const RIBBON := Color("#f47a52")       ## .pm-title ribbon
-
-## ---- The game look (Sheet.LOOK_GAME: the Shop, previews, rewards reveals, profile, ranks) ----
-## Dark café wood with a gold rim; light text with dark outlines; items wear their rarity's colours.
-const WOOD := Color("#3f1f10")          ## a game panel's face
-const WOOD_HI := Color("#5a2c16")       ## raised tiles on wood, the top of the face's glow
-const WOOD_DEEP := Color("#2b140a")     ## wells, chips, track on wood
-const WOOD_RIM := Color("#c98a3a")      ## the panel's gold rim, chip outlines
-const WOOD_LIP := Color("#1f0d06")      ## bottom lips and the ring outside the rim
-const G_TEXT := Color("#fff6e6")        ## primary text on wood
-const G_SUB := Color("#e7c7a6")         ## secondary text on wood
-const G_GOLD := Color("#ffd45e")        ## gold text and icons on wood
-const G_OUTLINE := Color("#3b1a0c")     ## the outline under light display text
-## Rarity: [glow (centre), face, deep (edge, lip), rim, label]. Common / Rare / Epic / Legendary.
-const RARITY := {
-	common = [Color("#f6e7d4"), Color("#c9a17a"), Color("#6b4426"), Color("#f1d6b4"), Color("#4a2b1a")],
-	rare = [Color("#d8eeff"), Color("#4f97e8"), Color("#1d4f9a"), Color("#9fd0ff"), Color("#0f2f66")],
-	epic = [Color("#ecdcff"), Color("#9b5ce6"), Color("#4f2196"), Color("#d9b8ff"), Color("#2a0d55")],
-	legendary = [Color("#fff3b0"), Color("#ffbf3c"), Color("#b8600a"), Color("#ffe08a"), Color("#3b1a0c")],
-}
 const RIBBON_LIP := Color("#cf5532")
 const RIBBON_RIM := Color("#fff4e6")
 const RIBBON_SHADOW := Color(0.59, 0.2, 0.1, 0.5)

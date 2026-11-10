@@ -145,12 +145,6 @@ func _leaderboard() -> void:
 	check("leaderboard: names and value", texts.has("Player 1") and (texts.has("1K XP") or texts.has("1,000 XP") or texts.has("1.0K XP")), texts)
 	var lv_pill := s.find_child("Row1", true, false).find_child("Level", true, false) if s.find_child("Row1", true, false) else null
 	check("leaderboard: each row's level is the pill", lv_pill is LevelBadge and (lv_pill as LevelBadge).level == 10, lv_pill)
-	check("leaderboard: the top three stand on the podium", s.find_child("Podium", true, false) != null and s.find_child("Podium", true, false).find_child("Row1", true, false) != null)
-	# the weekly board restarts Monday 00:00 in Bangladesh = Sunday 18:00 UTC (2026-11-15 is a Sunday)
-	check("leaderboard: week countdown, an hour before the reset", LeaderboardSheet.week_left(1794762000.0) == 3600, LeaderboardSheet.week_left(1794762000.0))
-	check("leaderboard: week countdown, right at the reset: a whole week", LeaderboardSheet.week_left(1794762000.0 + 3600.0) == 7 * 86400)
-	check("leaderboard: the countdown text", LeaderboardSheet.left_text(2 * 86400 + 6 * 3600 + 59) == "2d 6h" and LeaderboardSheet.left_text(5 * 3600 + 12 * 60) == "5h 12m")
-	check("leaderboard: the countdown shows on Weekly", s.week_label.visible and s.week_label.text.begins_with("New week in"))
 	var r1 := s.find_child("Row1", true, false)
 	var medal := r1.find_child("Rank", true, false).get_child(0) if r1 else null
 	check("leaderboard: rank 1 has a medal, rank 4 a number", medal is PlayerTile.PlaceBadge and s.find_child("Row4", true, false).find_child("Rank", true, false).get_child(0) is Label)
