@@ -111,6 +111,8 @@ var _switch_buttons := {}                # game -> Button
 var _switch_parts := {}                  # game -> {row, icon, label, text}
 var _modes: HBoxContainer                # Friends / Computer / Pass & Play
 var _tabs: HBoxContainer                 # the nav row (dev/tap_dbg.gd reads its first child)
+var nav_tab := "home"                    ## the bar's picked tab: "home" | "shop" | "leaderboard" | "inventory"
+var _nav_parts := {}                     # tab -> [button, label]
 var _rule: ColorRect
 var _timer: Timer
 var _band := Vector2(200, 500)
@@ -497,12 +499,9 @@ func _build_nav() -> void:
 	add_child(_tabs)
 	for t in [["home", "Home", HI % "home"], ["shop", "Shop", HI % "shop"], ["leaderboard", "Ranks", TROPHY],
 			["inventory", "Inventory", HI % "inventory"]]:   # the profile: the player chip up top
-		var on: bool = t[0] == "home"
-		var st := UIKit.box(Palette.HONEY_TINT if on else Color(1, 1, 1, 0), UIKit.R.lg, UIKit.BW.line if on else 0, Palette.HONEY_TINT_EDGE)
-		UIKit.pad(st, 0)
 		var pr := UIKit.box(Palette.CHIP, UIKit.R.lg)
 		UIKit.pad(pr, 0)
-		var b := _flat_button(st, pr)
+		var b := _flat_button(_nav_face(false), pr)
 		b.name = str(t[1])
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, NAV_H - 8)
@@ -513,11 +512,34 @@ func _build_nav() -> void:
 		var ic := UIKit.icon(t[2], 28)
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		col.add_child(ic)
-		col.add_child(UIKit.label(tr(t[1]), UIKit.FS.small, Palette.INK if on else Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
+		var l := UIKit.label(tr(t[1]), UIKit.FS.small, Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+		col.add_child(l)
 		var id: String = t[0]
-		if not on:
-			b.pressed.connect(func(): open_tab.emit(id))
+		b.pressed.connect(func():
+			if id != nav_tab:
+				open_tab.emit(id))
 		_tabs.add_child(b)
+		_nav_parts[id] = [b, l]
+	set_nav("home")
+
+## Mark `tab` as the screen showing (the honey pill); the bar itself never moves.
+func set_nav(tab: String) -> void:
+	nav_tab = tab
+	for id: String in _nav_parts:
+		var on := id == tab
+		var b: Button = _nav_parts[id][0]
+		for k in ["normal", "hover", "focus", "disabled"]:
+			b.add_theme_stylebox_override(k, _nav_face(on))
+		(_nav_parts[id][1] as Label).add_theme_color_override("font_color", Palette.INK if on else Palette.SUB)
+
+static func _nav_face(on: bool) -> StyleBoxFlat:
+	var st := UIKit.box(Palette.HONEY_TINT if on else Color(1, 1, 1, 0), UIKit.R.lg, UIKit.BW.line if on else 0, Palette.HONEY_TINT_EDGE)
+	UIKit.pad(st, 0)
+	return st
+
+## Where the bar starts (global y): screens opened from it end there.
+func nav_top() -> float:
+	return _tabs.get_global_rect().position.y - 6.0 if _tabs else get_viewport_rect().size.y
 
 
 # =====================================================================================================================

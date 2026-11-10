@@ -54,7 +54,8 @@ var body: VBoxContainer
 var title_label: Label                   ## CARD: the title label; PM: the ribbon's label (null without a title)
 var header: Control                      ## body's first child: holds the title (CARD), the ribbon and the close button
 var close_btn: Button                    ## the red X (null when not closable)
-var as_page := false                     ## make_page(): the card fills the screen (under the status bar), no ribbon / X
+var as_page := false                     ## make_page(): a screen, not a dialog (see make_page)
+static var page_inset_bottom := 0.0      ## what pages leave clear at the bottom: Home's bottom bar (main sets it)
 var _chrome: Control                     ## the card's top layer holding close_btn
 var ribbon: RibbonTitle                  ## PM look with a title
 var kicker: Label                        ## set_kicker()'s eyebrow (null until set)
@@ -227,6 +228,11 @@ func open(layer: Control) -> Sheet:
 		below._scrim_by = self                # its backdrop fades out as this one's fades in
 	layer.add_child(self)
 	tree_exited.connect(_restack.bind(layer), CONNECT_ONE_SHOT)
+	if as_page:                               # a screen: there at once, no dim, no pop
+		_scrim_by = null
+		card.modulate.a = 1.0
+		_restack(layer)
+		return self
 	_restack(layer)
 	if not is_inside_tree():
 		card.modulate.a = 1.0
@@ -271,7 +277,7 @@ func close() -> void:
 	add_child(shield)
 	if layer:
 		_restack(layer)
-	if is_inside_tree():
+	if is_inside_tree() and not as_page:      # a screen goes at once
 		var tw := create_tween().set_parallel(true)
 		tw.tween_method(_out_step.bind(next), 1.0, 0.0, OUT_SEC)
 		if not reduce_motion() and is_instance_valid(card):
@@ -298,7 +304,7 @@ static func _restack(layer: Node) -> void:
 		var s := stack[k]
 		var top := k == stack.size() - 1
 		s.z_index = k * Z_STEP                   # a stray child z_index can't climb over the sheet above (SH-01)
-		s._set_cover("" if top else ("hide" if under_pm else "dim"))
+		s._set_cover("" if top else ("dim" if s.as_page else ("hide" if under_pm else "dim")))   # a screen stays put
 		under_pm = under_pm or s.sheet_look == LOOK_PM
 		if s.close_btn:
 			s.close_btn.visible = top and not s.as_page
@@ -593,10 +599,13 @@ class ClampBox extends Container:
 ## height, then the content scrolls. fixed_px > 0: the card is always min(fixed_px, max_h of the screen) tall
 ## whatever the content (Shop: one size for every tab). Sheets without fit() still get the width rule unless they
 ## have their own _fit().
-## Turn this sheet into a full-screen page (the game look's Shop): the card fills the screen's width and height under
-## the status bar, wears `bg`, and has no ribbon or corner X (Back still closes it). Call after super().
+## Turn this sheet into a screen (the game look's Shop / Inventory): it fills the screen from the status bar down to
+## Home's bottom bar (page_inset_bottom, which stays visible and live), wears `bg`, has no ribbon, X, dim or pop: it
+## shows and goes at once, like switching tabs. Back still closes it. Call after super().
 func make_page(bg: StyleBox) -> void:
 	as_page = true
+	backdrop.color = Color(0, 0, 0, 0)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_theme_stylebox_override("panel", bg)
 	header.custom_minimum_size.y = 0.0
 	if close_btn:
@@ -619,6 +628,7 @@ func fit_now() -> void:
 	var w := vp.x if as_page else minf(_sheet_w, vp.x - 2.0 * UIKit.GUTTER)
 	if as_page:
 		_center.offset_top = _safe_top()
+		offset_bottom = -page_inset_bottom
 	if absf(card.custom_minimum_size.x - w) > 0.5:
 		card.custom_minimum_size.x = w
 	if absf(_clampbox.avail_w - (w - _card_pad_x())) > 0.5:
@@ -642,7 +652,7 @@ func fit_now() -> void:
 		var other := card.get_combined_minimum_size().y - _scroll_wrap.get_combined_minimum_size().y
 		var h: float
 		if as_page:
-			h = vp.y - _safe_top() - other
+			h = vp.y - _safe_top() - page_inset_bottom - other
 		elif _fit_fixed > 0.0:
 			h = minf(_fit_fixed, cap) - other
 		else:

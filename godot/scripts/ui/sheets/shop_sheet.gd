@@ -34,7 +34,6 @@ signal changed                           ## anything was bought or put in use (r
 signal emotes_changed                    ## an emote pack was bought / put in use
 signal store_requested                   ## "Open Store" after "not enough gems": main opens the Store sheet
 signal shop_requested(tab: String)       ## Inventory: "Open shop" (main closes the inventory and opens the Shop there)
-signal nav_picked(tab: String)           ## the page's bottom bar: "home" | "shop" | "leaderboard" | "inventory"
 
 ## l10n-keys: text
 const TABS := [
@@ -111,6 +110,10 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	var title := outlined(L10n.t("Inventory").to_upper() if inventory else L10n.t("Shop").to_upper(), 34, Color("#ffd45e"), 6)
 	title.name = "PageTitle"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.clip_text = true                   # the wallet always shows in full; a long title (Bangla) shrinks first
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	if inventory:
+		title.add_theme_font_size_override("font_size", 26)
 	row.add_child(title)
 	_earn_btn = _balance_button()
 	row.add_child(_earn_btn)
@@ -130,8 +133,6 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	_sub_box.name = "SubFilter"
 	body.add_child(_sub_box)
 	add_scroll_body(GAP)
-	var nav := _nav()
-	body.add_child(UIKit.margin(nav, -14, 0, -14, 0))
 	narrow_changed.connect(_on_narrow)
 
 
@@ -147,7 +148,7 @@ static func _page_bg() -> StyleBox:
 	var st := StyleBoxTexture.new()
 	st.texture = g
 	st.content_margin_left = 14; st.content_margin_right = 14
-	st.content_margin_top = 14; st.content_margin_bottom = 0
+	st.content_margin_top = 14; st.content_margin_bottom = 8
 	return st
 
 ## A label in Lilita One with a dark outline (the game look's display type).
@@ -764,51 +765,6 @@ func _tick_banner() -> void:
 	var now := int(Time.get_unix_time_from_system())
 	var left := 86400 - now % 86400
 	_banner_clock.text = L10n.t("Changes in %s") % ("%02d:%02d:%02d" % [left / 3600, (left % 3600) / 60, left % 60])
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# The bottom bar (the Home bar, with Shop or Inventory picked)
-
-func _nav() -> Control:
-	var bar := PanelContainer.new()
-	bar.name = "Nav"
-	var st := UIKit.box(Palette.CARD, 0, 0)
-	st.border_width_top = 1
-	st.border_color = Palette.LINE
-	st.content_margin_left = 12; st.content_margin_right = 12; st.content_margin_top = 6; st.content_margin_bottom = 8
-	bar.add_theme_stylebox_override("panel", st)
-	var row := UIKit.hbox(4)
-	bar.add_child(row)
-	var here := "inventory" if inventory else "shop"
-	for t in [["home", "Home", HomeScreen.HI % "home"], ["shop", "Shop", HomeScreen.HI % "shop"], ["leaderboard", "Ranks", HomeScreen.TROPHY],
-			["inventory", "Inventory", HomeScreen.HI % "inventory"]]:
-		var on: bool = t[0] == here
-		var b := Button.new()
-		b.name = "Nav_" + str(t[0])
-		b.focus_mode = Control.FOCUS_NONE
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size = Vector2(0, 54)
-		var face := UIKit.box(Palette.HONEY_TINT if on else Color(1, 1, 1, 0), UIKit.R.lg, UIKit.BW.line if on else 0, Palette.HONEY_TINT_EDGE)
-		var pr := UIKit.box(Palette.CHIP, UIKit.R.lg)
-		for k in ["normal", "hover", "focus", "disabled"]:
-			b.add_theme_stylebox_override(k, face)
-		for k in ["pressed", "hover_pressed"]:
-			b.add_theme_stylebox_override(k, pr)
-		var col := UIKit.vbox(0)
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
-		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(col)
-		col.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		var ic := UIKit.icon(t[2], 28)
-		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		col.add_child(ic)
-		col.add_child(UIKit.label(tr(t[1]), UIKit.FS.small, Palette.INK if on else Palette.SUB, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER))
-		var id: String = t[0]
-		if not on:
-			b.pressed.connect(func(): nav_picked.emit(id))
-		UIKit.wire_press(b)
-		row.add_child(b)
-	return bar
 
 
 ## A tap on a card: says what unlocks it, opens its preview to buy, or puts it in use.

@@ -446,6 +446,33 @@ func _input(e: InputEvent) -> void:
 # ---------- screens ----------
 
 ## Close every sheet at once (starting or leaving a game: no prompt or result is left behind).
+## Show a screen opened from Home's bottom bar (Shop, Inventory): it takes the place of the one showing (no pop, no
+## dim) and the bar, which stays, marks `tab`. Back or the bar's Home goes back to Home.
+func _open_page(s: Sheet, tab: String) -> void:
+	if screen == "home" and home.visible:
+		Sheet.page_inset_bottom = maxf(0.0, get_viewport().get_visible_rect().size.y - home.nav_top())
+	else:
+		Sheet.page_inset_bottom = 0.0
+	_close_pages()
+	home.set_nav(tab)
+	s.closed.connect(func():
+		if not _has_page():
+			home.set_nav("home"))
+	s.open(sheet_layer)
+
+## Close the screens opened from the bar (at once).
+func _close_pages() -> void:
+	for c in sheet_layer.get_children():
+		if c is Sheet and (c as Sheet).as_page:
+			(c as Sheet).close()
+	home.set_nav("home")
+
+func _has_page() -> bool:
+	for c in sheet_layer.get_children():
+		if c is Sheet and (c as Sheet).as_page and not c.is_queued_for_deletion() and not (c as Sheet)._closing:
+			return true
+	return false
+
 func close_all_sheets() -> void:
 	for c in sheet_layer.get_children():
 		sheet_layer.remove_child(c)
@@ -753,6 +780,7 @@ func _on_tab(tab: String) -> void:
 		"home":
 			if screen != "home":
 				go_home()
+			_close_pages()
 		"ludo":
 			if screen != "home":
 				go_home()
@@ -767,16 +795,15 @@ func _on_tab(tab: String) -> void:
 		"shop", "coins":
 			var s := ShopSheet.new("coins" if tab == "coins" else _home_shop_tab())
 			_wire_shop(s)
-			s.open(sheet_layer)
+			_open_page(s, "shop")
 		"inventory", "collection", "owned":                 # the nav's Inventory: what you own, ready to use
 			var s := ShopSheet.new(_home_shop_tab(), 400.0, true, true)
 			_wire_shop(s)
 			s.shop_requested.connect(func(t: String):
-				s.close()
 				var shop := ShopSheet.new(t)
 				_wire_shop(shop)
-				shop.open(sheet_layer))
-			s.open(sheet_layer)
+				_open_page(shop, "shop"))
+			_open_page(s, "inventory")
 		"rewards":                                      # Home's gift: Free spin / Daily reward / Free coins
 			var s := RewardsSheet.new()
 			s.picked.connect(_on_tab)                   # each row does what its own button does (spin / daily / free)
@@ -839,11 +866,6 @@ func _wire_shop(s: Sheet) -> void:
 				_home_backdrop())
 	if s.has_signal("store_requested"):
 		s.connect("store_requested", open_store)
-	if s.has_signal("nav_picked"):                     # the Shop page's own bottom bar
-		s.connect("nav_picked", func(tab: String):
-			s.close()
-			if tab != "home":
-				_on_tab(tab))
 	s.closed.connect(home.refresh)
 
 ## Switch the café to a room theme (built on first use; the splash already built the equipped one).
