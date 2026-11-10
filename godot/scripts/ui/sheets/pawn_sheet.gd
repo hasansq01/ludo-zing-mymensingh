@@ -30,13 +30,19 @@ func _init(pawn_id_ := "classic") -> void:
 	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
 	var well := PanelContainer.new()
 	well.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	well.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 	var ws := UIKit.box((Palette.CAT.pawns as Array)[0].lerp(Color.WHITE, 0.72), UIKit.R.lg)
 	UIKit.pad(ws, 0)
 	well.add_theme_stylebox_override("panel", ws)
-	stage = PawnStage.new(pawn_id, PawnStage.FOUR)
-	stage.custom_minimum_size = Vector2(0, STAGE_H)
-	well.add_child(stage)
+	# the skin's baked row (the four colours, as on the cards), each pawn bobbing on its own beat: no live 3D here.
+	# A transparent, multisampled SubViewport inside a clipped well made the whole screen flicker on some phones
+	# (only the café showed in alternate frames); the live stage is only the fallback for a skin without a bake.
+	if Thumbnailer.has_baked("pawnrow", pawn_id):
+		well.add_child(_baked_row())
+	else:
+		well.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+		stage = PawnStage.new(pawn_id, PawnStage.FOUR)
+		stage.custom_minimum_size = Vector2(0, STAGE_H)
+		well.add_child(stage)
 	body.add_child(well)
 	var kind := UIKit.caption(tr("Pawn skin · Ludo and Snakes & Ladders"))
 	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -184,3 +190,52 @@ func _on_act() -> void:
 
 static func _wallet() -> bool:
 	return Account.wallet_active() and is_same(Catalog.profile(), Save.profile)
+
+
+
+## The four pawns from the skin's baked row, side by side, each bobbing gently. Each pawn sits in a holder the layout
+## places; the bob moves the pawn inside it (0 to -6 px), so a resize never leaves the bob on a stale height.
+func _baked_row() -> Control:
+	var box := Control.new()
+	box.name = "Pawns"
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.custom_minimum_size = Vector2(0, STAGE_H)
+	var holders: Array[Control] = []
+	var pawns: Array[TextureRect] = []
+	for c in 4:
+		var cell := Thumbnailer.pawn_cell(pawn_id, c)
+		var at := AtlasTexture.new()
+		at.atlas = cell[0]
+		at.region = cell[1]
+		var holder := Control.new()
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(holder)
+		var t := TextureRect.new()
+		t.texture = at
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(t)
+		holders.append(holder)
+		pawns.append(t)
+	var lay := func() -> void:
+		var w := box.size.x / 4.0
+		var h := minf(box.size.y - 20.0, w * float(Thumbnailer.PAWN_CELL.y) / float(Thumbnailer.PAWN_CELL.x))
+		for i in 4:
+			holders[i].position = Vector2(i * w, (box.size.y - h) / 2.0 + 3.0)
+			holders[i].size = Vector2(w, h)
+			pawns[i].size = Vector2(w, h)
+	box.resized.connect(lay)
+	box.ready.connect(func() -> void:
+		if Sheet.reduce_motion():
+			return
+		for i in 4:          # each loop lasts 1.94 s; the pawns start 0.18 s apart
+			var tw := pawns[i].create_tween().set_loops()
+			if i > 0:
+				tw.tween_interval(0.18 * i)
+			tw.tween_property(pawns[i], "position:y", -6.0, 0.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_property(pawns[i], "position:y", 0.0, 0.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			if i < 3:
+				tw.tween_interval(0.54 - 0.18 * i))
+	return box
