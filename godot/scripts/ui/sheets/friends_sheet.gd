@@ -1,6 +1,6 @@
 class_name FriendsSheet
 extends Sheet
-## "Play with friends" (Home, Ludo or Snakes & Ladders), in three folder tabs over one pane (as How to play):
+## "Play with friends" (Home, Ludo or Snakes & Ladders) on the game card, three tabs (the Shop's filter buttons):
 ##   Room     make a room and share the code, or join a friend's room with theirs. The code field takes the
 ##            6-character room code: typed or pasted text is upper-cased and cleaned to the code alphabet
 ##            (NetClient.clean_code), and Join stays off until the code is complete. The sheet only asks; the caller
@@ -11,7 +11,7 @@ extends Sheet
 ## Every row has a star button before Invite: filled on a friend (a tap asks Remove from friends?), an outline on anyone
 ## else (a tap adds them at once; Social.star).
 ## The lists come from Social (server/PROTOCOL.md "Recent players, friends and invites"): Loading…, the offline note
-## with Try again, an empty note saying how people get there, or the rows (UIKit.list_row: avatar in its frame with the
+## with Try again, an empty note saying how people get there, or the rows (wood tiles: avatar in its frame with the
 ## level star, name, the line under it, Invite). Long-press a row to add the person to friends or remove them
 ## (Social.ask_friend) too. Invite asks Social, which brings them into the room you are in (in none, a new room is made
 ## first and its lobby opens, closing this sheet); the button then says "Invited", "Remind" after a minute without an answer, or "Not now" if they said so.
@@ -39,7 +39,8 @@ var tab := "room"                        ## the tab on show: "room" | "friends" 
 var social: Social                       ## the lists (default: Social.instance())
 var lists := {}                          ## "friends" | "recent" -> the VBoxContainer of its rows
 var list_state := ""                     ## what the lists show: "loading" | "offline" | "error" | "list"
-var _tabs: TabStrip
+var _tabs: HBoxContainer
+var _tab_btns := {}                      # key -> its tab Button
 var _panes := {}                         # key -> VBoxContainer
 var _busy := ""
 var _wired := false
@@ -48,11 +49,10 @@ var _wired := false
 func _init(game_ := "ludo", invite_mode_ := false) -> void:
 	game = game_ if game_ in ["ludo", "sl"] else "ludo"
 	invite_mode = invite_mode_
-	super(L10n.t("Invite friends") if invite_mode else L10n.t("Play with friends"), UIKit.W.form, true, Sheet.LOOK_PM)
+	super(L10n.t("Invite friends") if invite_mode else L10n.t("Play with friends"), UIKit.W.form, true, Sheet.LOOK_GAME)
+	SetupSheet.fit_title(self)
 	set_kicker(tr("Snakes & Ladders online") if game == "sl" else tr("Ludo online"))
-	var stack := UIKit.vbox(0)
-	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(stack)
+	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	var items := [
 		{key = "friends", text = tr("Friends"), icon = "ic_star"},
 		{key = "recent", text = tr("Recent"), icon = "ic_reset"},
@@ -60,35 +60,34 @@ func _init(game_ := "ludo", invite_mode_ := false) -> void:
 	if not invite_mode:
 		items.push_front({key = "room", text = tr("Room"), icon = "perk_friends"})
 	tab = "room" if not invite_mode else "friends"
-	_tabs = TabStrip.new(items, tab, "folder")
+	# the tabs: the Shop's filter buttons (the picked one a cream face), each with its icon
+	_tabs = HBoxContainer.new()
 	_tabs.name = "Tabs"
-	_tabs.picked.connect(show_tab)
-	stack.add_child(UIKit.margin(_tabs, 0, UIKit.SPACE.xs, 0, 0))
-	var pane := PanelContainer.new()
-	var ps := TabStrip.pane_style("folder")
-	ps.content_margin_left = UIKit.PAD.pane - 2
-	ps.content_margin_right = UIKit.PAD.pane - 2
-	ps.content_margin_top = UIKit.PAD.pane + TabStrip.F_EDGE     # under the pane's own top line
-	ps.content_margin_bottom = UIKit.SPACE.sm
-	pane.add_theme_stylebox_override("panel", ps)
-	_tabs.bind_pane(pane)
-	pane.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	stack.add_child(pane)
+	_tabs.add_theme_constant_override("separation", 8)
+	var group := ButtonGroup.new()
+	for it: Dictionary in items:
+		var b := ShopSheet.filter_button(str(it.text), group, float(UIKit.TAP), 16)
+		b.name = "Tab_" + str(it.key)
+		if it.icon == "ic_reset":                # a dark line glyph: drawn white, tinted cream on the card, brown when picked
+			b.icon = _white(str(it.icon))
+			for k in ["icon_normal_color", "icon_hover_color", "icon_disabled_color"]:
+				b.add_theme_color_override(k, GameUI.SUB)
+			for k in ["icon_pressed_color", "icon_hover_pressed_color"]:
+				b.add_theme_color_override(k, GameUI.BROWN)
+		else:
+			b.icon = UIKit.svg(str(it.icon))
+		b.expand_icon = false
+		b.add_theme_constant_override("icon_max_width", 20)
+		b.add_theme_constant_override("h_separation", 6)
+		b.button_pressed = it.key == tab
+		var key := str(it.key)
+		b.pressed.connect(func(): show_tab(key))
+		UIKit.wire_press(b)
+		_tab_btns[key] = b
+		_tabs.add_child(b)
+	body.add_child(_tabs)
 	var inner := add_scroll_body(UIKit.SPACE.md)
-	var wrap := scroll_box.get_parent()     # the scroll area lives in the folder pane, under the tabs
-	body.remove_child(wrap)
-	pane.add_child(wrap)
-	var fade := wrap.get_node_or_null("Fade") as TextureRect
-	if fade:                                 # the scroll fade blends into the pane's cream
-		var g := Gradient.new()
-		g.colors = PackedColorArray([Color(Palette.PANE, 0.0), Palette.PANE])
-		var gt := GradientTexture2D.new()
-		gt.gradient = g
-		gt.width = 4
-		gt.height = 32
-		gt.fill_from = Vector2(0.5, 0.0)
-		gt.fill_to = Vector2(0.5, 1.0)
-		fade.texture = gt
+	(scroll_box.get_parent() as Control).size_flags_vertical = Control.SIZE_EXPAND_FILL
 	fit(0.88, FIXED_H)
 	if not invite_mode:
 		_panes.room = _room_pane()
@@ -106,6 +105,26 @@ func _init(game_ := "ludo", invite_mode_ := false) -> void:
 		_refresh()
 	show_tab(tab)
 
+## A white copy of a line glyph (its shape in the alpha), so a theme colour can tint it any shade.
+static var _whites := {}
+static func _white(icon_name: String) -> Texture2D:
+	if _whites.has(icon_name):
+		return _whites[icon_name]
+	var src := UIKit.svg(icon_name)
+	if src == null:
+		return null
+	var img := src.get_image().duplicate() as Image
+	if img.has_mipmaps():
+		img.clear_mipmaps()
+	img.convert(Image.FORMAT_RGBA8)
+	for y in img.get_height():
+		for x in img.get_width():
+			img.set_pixel(x, y, Color(1, 1, 1, img.get_pixel(x, y).a))
+	img.generate_mipmaps()
+	var t := ImageTexture.create_from_image(img)
+	_whites[icon_name] = t
+	return t
+
 func _ready() -> void:
 	if tab != "room":
 		_load()
@@ -114,10 +133,9 @@ func _ready() -> void:
 func _room_pane() -> VBoxContainer:
 	var v := UIKit.vbox(UIKit.SPACE.sm)
 	v.name = "Room"
-	var intro := UIKit.paragraph(tr("Play with up to 3 friends on their own phones. Make a room and share the code, or join theirs."),
-		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var intro := SetupSheet.paragraph(tr("Play with up to 3 friends on their own phones. Make a room and share the code, or join theirs."), 16)
 	v.add_child(intro)
-	create_button = UIKit.button_with(tr("Create room"), UIKit.icon("perk_friends", 30), "honey", "lg")
+	create_button = GameUI.button(tr("Create room"), "gold", "lg", "perk_friends")
 	create_button.name = "Create"
 	create_button.pressed.connect(func():
 		if _busy == "":
@@ -125,7 +143,7 @@ func _room_pane() -> VBoxContainer:
 	v.add_child(create_button)
 	v.add_child(_or_rule(tr("or join a friend")))
 	var col := UIKit.vbox(UIKit.SPACE.sm)
-	var cap := UIKit.caption(tr("Room code"))
+	var cap := SetupSheet.caption(tr("Room code"))
 	col.add_child(cap)
 	var row := UIKit.hbox(UIKit.SPACE.sm)
 	code_edit = LineEdit.new()
@@ -133,24 +151,26 @@ func _room_pane() -> VBoxContainer:
 	code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	code_edit.custom_minimum_size = Vector2(0, UIKit.H.lg)
 	code_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	SetupSheet.field(code_edit)
 	code_edit.add_theme_font_override("font", UIKit.font_caps(900, 4))
 	code_edit.add_theme_font_size_override("font_size", UIKit.FS.h1 + 2)
 	code_edit.placeholder_text = tr("Enter code")
-	code_edit.add_theme_color_override("font_placeholder_color", Color(Palette.MUTED, 0.6))
 	code_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
 	code_edit.select_all_on_focus = true
 	code_edit.text_changed.connect(_on_code_changed)
 	code_edit.text_submitted.connect(func(_t: String): _join())
 	row.add_child(code_edit)
-	paste_button = UIKit.button(tr("Paste"), "white", "sm")
+	paste_button = GameUI.button(tr("Paste"), "cream", "md")
 	paste_button.name = "Paste"
-	paste_button.custom_minimum_size.x = 84
+	paste_button.custom_minimum_size.x = 96
+	paste_button.size_flags_horizontal = Control.SIZE_FILL
 	paste_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	SetupSheet.fit_button(paste_button)
 	paste_button.pressed.connect(paste)
 	row.add_child(paste_button)
 	col.add_child(row)
 	v.add_child(col)
-	join_button = UIKit.button(tr("Join room"), "teal", "lg")
+	join_button = GameUI.button(tr("Join room"), "teal", "lg")
 	join_button.name = "Join"
 	join_button.pressed.connect(_join)
 	v.add_child(join_button)
@@ -162,11 +182,11 @@ static func _or_rule(t: String) -> Control:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for k in 3:
 		if k == 1:
-			var l := UIKit.label(t, UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+			var l := UIKit.label(t, UIKit.FS.label, GameUI.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 			row.add_child(l)
 			continue
 		var line := ColorRect.new()
-		line.color = Palette.LINE_STRONG
+		line.color = Palette.GL_TILE_RIM
 		line.custom_minimum_size = Vector2(0, 2)
 		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -182,7 +202,8 @@ func show_tab(key: String) -> void:
 	if not _panes.has(key):
 		key = "friends"
 	tab = key
-	_tabs.select(key)
+	for k in _tab_btns:
+		(_tab_btns[k] as Button).set_pressed_no_signal(k == key)
 	for k in _panes:
 		(_panes[k] as Control).visible = k == key
 	if scroll_box:
@@ -244,7 +265,7 @@ func _render() -> void:
 				if people.is_empty():
 					l.add_child(_empty(key))
 					continue
-				var hint := UIKit.label(tr("Tap the star to add or remove a friend."), UIKit.FS.small, Palette.MUTED, UIKit.font_body(800))
+				var hint := UIKit.label(tr("Tap the star to add or remove a friend."), UIKit.FS.label, GameUI.SUB, UIKit.font_body(800))
 				hint.name = "Hint"
 				hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				hint.custom_minimum_size.x = 60
@@ -259,14 +280,14 @@ func _note(text: String, retry := false) -> Control:
 	v.name = "State"
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.custom_minimum_size.y = 200
-	var l := UIKit.paragraph(text, UIKit.FS.body_l, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := SetupSheet.paragraph(text, 17)
 	l.name = "Message"
 	v.add_child(l)
 	if retry:
-		var b := UIKit.btn(tr("Try again"), "honey", "sm")
+		var b := GameUI.button(tr("Try again"), "gold", "md")
 		b.name = "Retry"
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		b.custom_minimum_size.x = 160
+		b.custom_minimum_size.x = 180
 		b.pressed.connect(func(): _load(true))
 		v.add_child(b)
 	return v
@@ -279,13 +300,16 @@ func _empty(key: String) -> Control:
 	v.custom_minimum_size.y = 240
 	var ic := UIKit.icon("ic_star" if key == "friends" else "ic_reset", 52)
 	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	ic.modulate = Color(1, 1, 1, 0.6)
+	ic.modulate = Color(1, 1, 1, 0.75)
+	if key != "friends":                     # the line glyph in cream on the dark card
+		ic.texture = _white("ic_reset")
+		ic.modulate = Color(GameUI.SUB, 0.75)
 	v.add_child(ic)
-	var t := UIKit.label(tr("No friends yet") if key == "friends" else tr("No one here yet"), UIKit.FS.h3, Palette.INK, UIKit.font_body(900), HORIZONTAL_ALIGNMENT_CENTER)
+	var t := GameUI.outlined(tr("No friends yet") if key == "friends" else tr("No one here yet"), 22, GameUI.GOLD, 3, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(t)
 	var msg := tr("Tap the star next to a player in Recent, or long-press them in the lobby, a match or the leaderboard.") if key == "friends" \
 		else tr("Play an online match, and the people you meet show up here.")
-	var l := UIKit.paragraph(msg, UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := SetupSheet.paragraph(msg, 16)
 	l.name = "Message"
 	v.add_child(l)
 	return v
@@ -314,38 +338,39 @@ func _person_row(p: Dictionary, key: String) -> Control:
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var top := UIKit.hbox(UIKit.SPACE.xs)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var nm := UIKit.label(L10n.seat_name(str(p.get("name", "Player"))), UIKit.FS.h3, Palette.INK, UIKit.font_body(900))
+	var nm := GameUI.outlined(L10n.seat_name(str(p.get("name", "Player"))), 19, GameUI.TEXT, 2)
 	nm.name = "Name"
 	nm.clip_text = true
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(nm)
 	col.add_child(top)
-	var sub := UIKit.label(sub_text(p, key, s.now() if s != null else 0), UIKit.FS.small, Palette.SUB, UIKit.font_body(800))
+	var sub := UIKit.label(sub_text(p, key, s.now() if s != null else 0), UIKit.FS.label, GameUI.SUB, UIKit.font_body(800))
 	sub.name = "Sub"
 	sub.clip_text = true
 	sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	col.add_child(sub)
 	h.add_child(col)
 	var fav := key == "friends" or bool(p.get("friend", false)) or (s != null and s.is_friend(uid))
-	var star := UIKit.icon_button("ic_star" if fav else "ic_star_outline", "glass", UIKit.TAP, 26)
+	var star := UIKit.icon_button("ic_star" if fav else "ic_star_outline", "night", UIKit.TAP, 26)
 	star.name = "Star"
 	star.set_meta("friend", fav)
 	star.tooltip_text = tr("Remove from friends") if fav else tr("Add to friends")
 	star.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	star.pressed.connect(_star.bind(p, star))
 	h.add_child(star)
-	var inv := UIKit.btn(_invite_text(s.invite_state(uid) if s != null else ""), "honey", "xs")   # dense (a 48 px target): the name and its line get the room
+	var inv := GameUI.button(_invite_text(s.invite_state(uid) if s != null else ""), "gold", "sm")   # dense: the name and its line get the room
 	inv.name = "Invite"
+	inv.size_flags_horizontal = Control.SIZE_FILL
 	inv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	inv.custom_minimum_size.x = 76
-	UIKit.fit_text(inv, 12)
+	inv.custom_minimum_size = Vector2(88, UIKit.TAP)
+	SetupSheet.fit_button(inv)
 	if s != null and s.was_invited(uid):
 		inv.disabled = true
-		UIKit.set_kind(inv, "off")
 	inv.pressed.connect(_invite.bind(p, inv))
 	h.add_child(inv)
-	var row := UIKit.list_row(h)
+	var row := GameUI.tile(16.0, 10.0)
+	row.add_child(h)
 	row.name = "Row_" + uid
 	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	LongPress.attach(row, func():
@@ -399,7 +424,6 @@ func _invite(p: Dictionary, b: Button) -> void:
 	var done := s.was_invited(str(p.get("uid", "")))
 	b.text = _invite_text(s.invite_state(str(p.get("uid", ""))))
 	b.disabled = done
-	UIKit.set_kind(b, "off" if done else "honey")
 
 
 # ---------- the Room tab ----------
@@ -456,9 +480,5 @@ func _refresh() -> void:
 	join_button.disabled = _busy != "" or not ok
 	paste_button.disabled = _busy != ""
 	code_edit.editable = _busy == ""
-	var cl := create_button.find_child("Text", true, false) as Label
-	if cl:
-		cl.text = tr("Creating…") if _busy == "create" else tr("Create room")
-	join_button.text = tr("Joining…") if _busy == "join" else tr("Join room")
-	var join_off := join_button.disabled and _busy == ""        # can't be pressed yet: the off kind, not a faded teal
-	UIKit.set_kind(join_button, "off" if join_off else "teal")
+	create_button.text = tr("Creating…") if _busy == "create" else tr("Create room")
+	join_button.text = tr("Joining…") if _busy == "join" else tr("Join room")       # can't be pressed yet: its face greys

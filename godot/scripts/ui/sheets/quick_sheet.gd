@@ -63,14 +63,15 @@ func _init(game_ := "ludo", players_ := 2, table_ := "practice") -> void:
 	if _has_save():
 		level = Save.level_info(int(Save.profile.get("xp", 0))).level
 		coins = int(Save.profile.get("coins", 0))
-	super(L10n.t("Quick match"), UIKit.W.form, true, Sheet.LOOK_PM)
+	super(L10n.t("Quick match"), UIKit.W.form, true, Sheet.LOOK_GAME)
+	SetupSheet.fit_title(self)
 	dismissable = true
 	back_action = func(): _cancel()
 	set_kicker(tr("Snakes & Ladders online") if game == "sl" else tr("Ludo online"))
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	_build_pick()
 	_build_search()
-	note_label = UIKit.paragraph("", UIKit.FS.body, Palette.DANGER, HORIZONTAL_ALIGNMENT_CENTER)
+	note_label = SetupSheet.paragraph("", 16, Palette.GL_BTN_RED_HI)
 	note_label.name = "Note"
 	note_label.visible = false
 	body.add_child(note_label)
@@ -87,20 +88,19 @@ func _build_pick() -> void:
 	# the intro, players and tables scroll on a short screen (320x568); Find players stays under them
 	var list := add_scroll_body(UIKit.SPACE.md)
 	_scroll_wrap.reparent(_pick_box)
-	var intro := UIKit.paragraph(tr("Play people online. Pick a table and we’ll seat you in a few seconds."),
-		UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var intro := SetupSheet.paragraph(tr("Play people online. Pick a table and we’ll seat you in a few seconds."), 16)
 	list.add_child(intro)
-	list.add_child(UIKit.caption(tr("Players")))
-	picker = UIKit.segmented([[2, tr("2 players")], [4, tr("4 players")]], players, func(v):
+	list.add_child(UIKit.margin(SetupSheet.caption(tr("Players")), 0, UIKit.SPACE.xs, 0, 0))
+	picker = SetupSheet.choice([[2, tr("2 players")], [4, tr("4 players")]], players, func(v):
 		players = int(v)
 		_refresh_rows())
 	picker.name = "Players"
 	list.add_child(picker)
-	list.add_child(UIKit.caption(tr("Table")))
+	list.add_child(UIKit.margin(SetupSheet.caption(tr("Table")), 0, UIKit.SPACE.xs, 0, 0))
 	_table_box = UIKit.vbox(UIKit.SPACE.sm)            # the list-row gap
 	_table_box.name = "Tables"
 	list.add_child(_table_box)
-	find_button = UIKit.button_with(tr("Find players"), UIKit.icon("perk_friends", 30), "honey", "lg")
+	find_button = GameUI.button(tr("Find players"), "gold", "lg", "perk_friends")
 	find_button.name = "Find"
 	find_button.pressed.connect(func():
 		if stage in ["pick", "error"] and _table_ok(table):
@@ -110,18 +110,17 @@ func _build_pick() -> void:
 func _build_search() -> void:
 	_search_box = UIKit.vbox(UIKit.SPACE.sm)
 	_search_box.name = "Search"
-	status_label = UIKit.label(tr("Finding players…"), UIKit.FS.h1, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
+	status_label = GameUI.outlined(tr("Finding players…"), 30, GameUI.TEXT, 4, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.name = "Status"
-	status_label.add_theme_constant_override("outline_size", 0)
 	_search_box.add_child(status_label)
-	sub_label = UIKit.label("", UIKit.FS.label, Palette.MUTED, UIKit.font_body(800, true), HORIZONTAL_ALIGNMENT_CENTER)
+	sub_label = UIKit.label("", 16, GameUI.SUB, UIKit.font_body(800, true), HORIZONTAL_ALIGNMENT_CENTER)
 	sub_label.name = "Sub"
 	_search_box.add_child(sub_label)
 	slots_row = UIKit.hbox(int(SLOT_GAP))
 	slots_row.name = "Seats"
 	slots_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_search_box.add_child(UIKit.margin(slots_row, 0, UIKit.SPACE.sm, 0, UIKit.SPACE.sm))
-	cancel_button = UIKit.btn(tr("Cancel"), "ghost", "md")
+	_search_box.add_child(UIKit.margin(slots_row, 0, UIKit.SPACE.md, 0, UIKit.SPACE.md))
+	cancel_button = GameUI.button(tr("Cancel"), "cream", "md")
 	cancel_button.name = "Cancel"
 	cancel_button.pressed.connect(_cancel)
 	_search_box.add_child(cancel_button)
@@ -134,10 +133,7 @@ func _show(s: String) -> void:
 	note_label.visible = s == "error" and note_label.text != ""
 	cancel_button.visible = s in ["searching", "matched"]
 	cancel_button.disabled = s != "searching" and s != "matched"
-	find_button.text = ""
-	var fl := find_button.find_child("Text", true, false) as Label
-	if fl:
-		fl.text = tr("Try again") if s == "error" else tr("Find players")
+	find_button.text = tr("Try again") if s == "error" else tr("Find players")
 	if is_inside_tree():
 		fit_now()
 
@@ -353,16 +349,16 @@ class Slot extends VBoxContainer:
 		px = px_
 		add_theme_constant_override("separation", UIKit.SPACE.xs)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		custom_minimum_size = Vector2(px + 10.0, 0)
+		custom_minimum_size = Vector2(px + 18.0, 0)
 		ring = Control.new()
 		ring.custom_minimum_size = Vector2(px + 8.0, px + 8.0)
 		ring.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ring.draw.connect(_draw_ring)
 		add_child(ring)
-		name_label = UIKit.label(tr("Searching"), UIKit.FS.small, Palette.MUTED, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+		name_label = UIKit.label(tr("Searching"), 13, GameUI.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		name_label.custom_minimum_size = Vector2(px + 10.0, 0)
+		name_label.custom_minimum_size = Vector2(px + 18.0, 0)
 		add_child(name_label)
 
 	func fill_you(level_: int) -> void:
@@ -396,9 +392,9 @@ class Slot extends VBoxContainer:
 		_badge.set_level(level_)                      # the pill widens with the digits: place it after
 		_badge.place_under(px + 8.0, 6.0)
 		name_label.text = L10n.seat_name(nm)
-		name_label.add_theme_color_override("font_color", Palette.INK)
+		name_label.add_theme_color_override("font_color", GameUI.TEXT)
 		name_label.add_theme_font_override("font", UIKit.font_body(900))
-		name_label.add_theme_font_size_override("font_size", UIKit.FS.label)
+		name_label.add_theme_font_size_override("font_size", UIKit.FS.body_l)
 		set_process(false)
 		ring.queue_redraw()
 
@@ -416,75 +412,88 @@ class Slot extends VBoxContainer:
 			return
 		var reduce := PlayerTile._pref("reduce_motion")
 		var k := 0.5 + 0.5 * sin(_t * TAU / 1.6)
-		ring.draw_circle(c, r, Color(Palette.CHIP, 0.9 if reduce else 0.7 + 0.3 * k), true, -1.0, true)
-		ring.draw_arc(c, r - 1.5, 0.0, TAU, 48, Palette.LINE_STRONG, 2.0, true)
+		ring.draw_circle(c, r, Color(Palette.GL_CHIP_BG, 0.9 if reduce else 0.6 + 0.4 * k), true, -1.0, true)
+		ring.draw_arc(c, r - 1.5, 0.0, TAU, 48, Palette.GL_TILE_RIM, 2.0, true)
 		if not reduce:
 			var a0 := _t * TAU / 1.2
-			ring.draw_arc(c, r - 1.5, a0, a0 + PI * 0.6, 24, Palette.HONEY_LIP, 3.0, true)
+			ring.draw_arc(c, r - 1.5, a0, a0 + PI * 0.6, 24, Palette.GL_TITLE, 3.0, true)
 		var f := UIKit.font_display()
 		var fs := int(px * 0.42)
 		var w := f.get_string_size("?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		ring.draw_string(f, c + Vector2(-w / 2.0, fs * 0.36), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(Palette.MUTED, 0.55))
+		ring.draw_string(f, c + Vector2(-w / 2.0, fs * 0.36), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(Palette.GL_CREAM_TEXT, 0.6))
 
 
-## One coin table in the picker: the entry (coin and amount, "Practice" for the free one) and, at the right, the prize
-## ("Win 228"), "Free", or a lock with "Level 3". Selected: the gold ring; locked or unaffordable: greyed out.
+## One coin table in the picker, a wood tile: the coin and the entry in outlined type ("Practice" with a pawn for the
+## free one) and, at the right, a pill: the gold "Win 228", the teal "Free", or the dark lock pill "Level 3".
+## Selected: a gold rim and a warmer face; locked or unaffordable: dimmed.
 class TableRow extends PanelContainer:
 	signal picked
 
 	const PRIZE_W := 124.0                  ## the right column's minimum width: "Level 10", "Win 228"; it grows for "Win 150,000"
+	const ROW_H := 64.0
 	var row: Dictionary
 	var on := false
 	var title: Label
 	var prize_label: Label
+	var tile: GamePanel
 
 	func _init(row_: Dictionary, players_: int, on_: bool) -> void:
 		row = row_
 		on = on_
 		name = "Table_" + str(row.id)
-		custom_minimum_size = Vector2(0, UIKit.TAP + 8)
+		custom_minimum_size = Vector2(0, ROW_H)
 		mouse_filter = Control.MOUSE_FILTER_STOP
-		var h := UIKit.hbox(UIKit.SPACE.sm)
+		add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		tile = GameUI.tile(16.0, 0.0)
+		tile.name = "Tile"
+		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(tile)
+		var h := UIKit.hbox(UIKit.SPACE.md)
 		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		h.alignment = BoxContainer.ALIGNMENT_CENTER
 		var entry := int(row.entry)
-		if entry > 0:
-			h.add_child(UIKit.icon("coin", 26))
-		else:
-			h.add_child(UIKit.icon("pawn_icon", 26))
-		title = UIKit.label(tr("Practice") if entry <= 0 else Fmt.coins_full(entry), UIKit.FS.h2, Palette.INK, UIKit.font_display())
+		var ic := UIKit.icon("coin" if entry > 0 else "pawn_icon", 36)
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(ic)
+		title = GameUI.outlined(tr("Practice") if entry <= 0 else Fmt.coins_full(entry), 24, GameUI.TEXT, 3)
 		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		h.add_child(title)
-		# The right column has one width on every row and its content ends at the right edge: "Free" / "Win N" /
-		# "Level N" share one right edge whatever their length, and the lock sits right before "Level N".
-		var right := UIKit.hbox(UIKit.SPACE.xs)
+		# The right column has one width on every row and its pill ends at the right edge: "Free" / "Win N" / "Level N"
+		# share one right edge whatever their length, and the lock sits right before "Level N" inside its pill.
+		var right := UIKit.hbox(0)
 		right.custom_minimum_size = Vector2(PRIZE_W, 0)
 		right.alignment = BoxContainer.ALIGNMENT_END
 		right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var look := "dark" if bool(row.locked) else ("teal" if entry <= 0 else "gold")
+		var pill := SetupSheet.pill(look, 34.0)
+		pill.name = "Pill"
+		var inner := pill.find_child("Row", true, false) as HBoxContainer
 		if bool(row.locked):
-			var lock := UIKit.icon("ic_lock", 18)
+			var lock := UIKit.icon("ic_lock", 20)
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			right.add_child(lock)
-			prize_label = UIKit.label(tr("Level %d") % int(row.level), UIKit.FS.body, Palette.MUTED, UIKit.font_body(900))
+			inner.add_child(lock)
+			prize_label = SetupSheet.pill_label(tr("Level %d") % int(row.level), look, 15)
 		elif entry <= 0:
-			prize_label = UIKit.label(tr("Free"), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900))
+			prize_label = SetupSheet.pill_label(tr("Free"), look, 17)
 		else:
-			prize_label = UIKit.label(tr("Win %s") % Fmt.coins_full(int(row.get("total", row.prize))), UIKit.FS.body, Palette.TEAL_INK, UIKit.font_body(900, true))
-		prize_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			prize_label = SetupSheet.pill_label(tr("Win %s") % Fmt.coins_full(int(row.get("total", row.prize))), look, 17)
 		prize_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		prize_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		right.add_child(prize_label)
+		inner.add_child(prize_label)
+		right.add_child(pill)
 		h.add_child(right)
-		add_child(h)                                  # the shared row style brings its own padding
-		set_meta("kit_surface", "row")
+		tile.add_child(UIKit.margin(h, 14, 6, 12, 6))
 		set_on(on)
 		modulate.a = 1.0 if bool(row.ok) else 0.5
 
 	func set_on(v: bool) -> void:
 		on = v
-		UIKit.set_row_state(self, "on" if on else "")
+		tile.border = 3.0 if on else 2.0
+		tile.border_color = Palette.GL_TITLE if on else Palette.GL_TILE_RIM
+		tile.c0 = Palette.GL_CARD_GLOW if on else Palette.GL_TILE_HI      # the picked one a warmer face
+		tile.c1 = tile.c0.lerp(Palette.GL_TILE_LO, 0.5)
 
 	func _gui_input(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT):

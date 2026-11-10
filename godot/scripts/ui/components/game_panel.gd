@@ -72,7 +72,7 @@ void fragment() {
 	if (lip2 > 0.0) {
 		col = mix(col, lip2_color, clamp(d_lip + 0.5, 0.0, 1.0));
 	}
-	COLOR = vec4(col.rgb, col.a * a);
+	COLOR = vec4(col.rgb, col.a * a) * COLOR;   // COLOR in: the draw colour times modulate (a faded / disabled panel)
 }"""
 
 static var _shader: Shader

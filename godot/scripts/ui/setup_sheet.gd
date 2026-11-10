@@ -43,13 +43,14 @@ func _init(game_: String, mode_: String) -> void:
 	count = 3 if mode == "cpu" else 4
 	bot_level = _pref_level()
 	_load_last()
-	super((L10n.t("Play vs computer") if mode == "cpu" else L10n.t("Pass & Play")), UIKit.W.form, true, Sheet.LOOK_PM)
-	body.add_theme_constant_override("separation", UIKit.SPACE.sm)
+	super((L10n.t("Play vs computer") if mode == "cpu" else L10n.t("Pass & Play")), UIKit.W.form, true, Sheet.LOOK_GAME)
+	fit_title(self)
+	body.add_theme_constant_override("separation", UIKit.SPACE.md)
 	_box = add_scroll_body(UIKit.SPACE.sm)   # grows with its content; scrolls only on short screens (4 name rows, 320x568)
 	set_kicker(tr("Snakes & Ladders") if game == "sl" else tr("Ludo"))
 	if mode == "cpu":
 		_section(tr("Your colour"))
-		var row := UIKit.hbox(UIKit.SPACE.sm)
+		var row := UIKit.hbox(UIKit.SPACE.md)
 		for c in 4:
 			var b := Swatch.new(c, _colorblind())
 			b.button_pressed = c == color
@@ -57,12 +58,12 @@ func _init(game_: String, mode_: String) -> void:
 			UIKit.wire_press(b, "select")
 			row.add_child(b)
 			_swatches.append(b)
-		_box.add_child(UIKit.margin(row, 0, 0, 0, UIKit.SPACE.xs))
+		_box.add_child(UIKit.margin(row, 6, 8, 6, 6))   # room for the gold ring and the ✓ badge (the scroll area clips)
 		_section(tr("Opponents"))
-		_box.add_child(UIKit.segmented([[1, "1"], [2, "2"], [3, "3"]], count, func(v): count = v; _sync()))
+		_box.add_child(choice([[1, "1"], [2, "2"], [3, "3"]], count, func(v): count = v; _sync()))
 	else:
 		_section(tr("Players"))
-		_box.add_child(UIKit.segmented([[2, "2"], [3, "3"], [4, "4"]], count, func(v): count = v; _sync()))
+		_box.add_child(choice([[2, "2"], [3, "3"], [4, "4"]], count, func(v): count = v; _sync()))
 		var seats := UIKit.vbox(UIKit.SPACE.sm)
 		for i in 4:
 			seats.add_child(_seat_row(i))
@@ -72,20 +73,18 @@ func _init(game_: String, mode_: String) -> void:
 		var cap := _caption_row(tr("Mode"))
 		_mode_info = Info.icon("team" if teams else "ind")
 		cap.add_child(_mode_info)
-		_mode_box.add_child(cap)
-		_mode_seg = UIKit.segmented([[false, tr("Individual")], [true, tr("Teams (2 v 2)")]], teams, func(v): teams = v; _sync())
+		_mode_box.add_child(UIKit.margin(cap, 0, UIKit.SPACE.xs, 0, 0))   # the gap a _section() caption gets
+		_mode_seg = choice([[false, tr("Individual")], [true, tr("Teams (2 v 2)")]], teams, func(v): teams = v; _sync())
 		var tb := _mode_seg.get_child(1) as Button                # below 4 players: the same look, faded (see _sync)
-		tb.add_theme_stylebox_override("disabled", tb.get_theme_stylebox("normal"))
-		tb.add_theme_color_override("font_disabled_color", Palette.MUTED)
 		UIKit.deny_disabled(tb, func() -> String: return tr("Teams need 4 players."))
 		_mode_box.add_child(_mode_seg)
 		_box.add_child(_mode_box)
 		if mode == "cpu":
 			_section(tr("Difficulty"))
-			_box.add_child(UIKit.segmented([["easy", tr("Easy")], ["normal", tr("Normal")], ["hard", tr("Hard")]], bot_level, func(v): bot_level = str(v); _sync()))
-	_note = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+			_box.add_child(choice([["easy", tr("Easy")], ["normal", tr("Normal")], ["hard", tr("Hard")]], bot_level, func(v): bot_level = str(v); _sync()))
+	_note = paragraph("", 15, GameUI.SUB)
 	_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_note.custom_minimum_size.y = 44.0          # two lines reserved: the card never jumps when the note changes
+	_note.custom_minimum_size.y = 46.0          # two lines reserved: the card never jumps when the note changes
 	_box.add_child(_note)
 	add_button(tr("Start game"), "honey", _submit, "lg")
 	_sync()
@@ -99,8 +98,8 @@ func _ready() -> void:
 ## A row for a section caption (and an optional ⓘ after it).
 func _caption_row(text: String) -> HBoxContainer:
 	var h := UIKit.hbox(UIKit.SPACE.xs)
-	h.custom_minimum_size.y = 24.0
-	var l := UIKit.caption(text)
+	h.custom_minimum_size.y = 26.0
+	var l := caption(text)
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(l)
 	return h
@@ -119,9 +118,10 @@ func _seat_row(i: int) -> HBoxContainer:
 	e.name = "Name%d" % (i + 1)
 	e.max_length = MAX_NAME
 	e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	e.custom_minimum_size = Vector2(0, UIKit.TAP)
-	e.add_theme_font_override("font", UIKit.font_body(800))
-	e.add_theme_font_size_override("font_size", UIKit.FS.h3)
+	e.custom_minimum_size = Vector2(0, UIKit.TAP + 2)
+	field(e)
+	e.add_theme_font_override("font", UIKit.font_body(900))
+	e.add_theme_font_size_override("font_size", UIKit.FS.h3 + 1)
 	e.placeholder_text = L10n.seat_name(default_name(i))
 	e.text = str(names[i]) if i < names.size() else ""
 	e.select_all_on_focus = true
@@ -166,6 +166,145 @@ static func names_by_color(game_: String, count_: int, typed: Array) -> Array:
 		var t := clean_name(str(typed[i])) if i < typed.size() else ""
 		out[int(cols[i])] = t if t != "" else default_name(i)
 	return out
+
+
+# ---------- the game look's pieces (shared by the online setup sheets: Quick match, Friends, the lobby) ----------
+
+## A section caption on the game card: gold display type with the dark outline.
+static func caption(text: String) -> Label:
+	return GameUI.outlined(text, 18, GameUI.GOLD, 3)
+
+## A wrapping paragraph on the dark card (Nunito 800, cream by default).
+static func paragraph(text: String, fs := 16, col := GameUI.SUB, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:
+	var l := UIKit.paragraph(text, fs, col, align)
+	l.add_theme_font_override("font", UIKit.font_body(800))
+	return l
+
+## One-of-several choices (players, opponents, mode, difficulty, the game) as the Shop's filter buttons: the picked one
+## a cream face, the others outlined on the card. Same contract as UIKit.segmented: an HBoxContainer of toggle
+## Buttons, each with meta "value"; on_pick(value) when the pick changes.
+static func choice(options: Array, selected, on_pick: Callable, h := 48.0, fs := 17) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.custom_minimum_size.y = h
+	var group := ButtonGroup.new()
+	for o: Array in options:
+		var b := ShopSheet.filter_button(str(o[1]), group, h, fs)
+		b.add_theme_color_override("font_disabled_color", Color(GameUI.SUB, 0.7))
+		b.button_pressed = o[0] == selected
+		var value = o[0]
+		b.toggled.connect(func(on_: bool):
+			if on_:
+				on_pick.call(value))
+		b.set_meta("value", value)
+		UIKit.wire_press(b)
+		row.add_child(b)
+	return row
+
+## A text field on the dark card: a deep inset with the warm rim (gold while typing), white text, cream hint.
+static func field(e: LineEdit) -> void:
+	var st := UIKit.box(Palette.GL_CHIP_BG, 14, 2, Palette.GL_TILE_RIM)
+	st.content_margin_left = 14; st.content_margin_right = 14
+	var fo := st.duplicate() as StyleBoxFlat
+	fo.border_color = Palette.GL_GOLD
+	var ro := st.duplicate() as StyleBoxFlat
+	ro.bg_color = Color(Palette.GL_CHIP_BG, 0.6)
+	e.add_theme_stylebox_override("normal", st)
+	e.add_theme_stylebox_override("focus", fo)
+	e.add_theme_stylebox_override("read_only", ro)
+	e.add_theme_color_override("font_color", GameUI.TEXT)
+	e.add_theme_color_override("font_uneditable_color", Color(GameUI.TEXT, 0.6))
+	e.add_theme_color_override("font_placeholder_color", Color(GameUI.SUB, 0.6))
+	e.add_theme_color_override("caret_color", Palette.GL_GOLD)
+	e.add_theme_color_override("selection_color", Color(Palette.GL_GOLD, 0.35))
+
+## A small pill on a row ("Host", "Win 1,140", "Free", a lock and "Level 10"): look "gold" (the gold face with its
+## lip, brown text), "teal" (white text) or "dark" (the dark chip with the gold rim, cream text). The label is
+## added by the caller into the returned panel's HBox ("Row").
+static func pill(look := "gold", h := 30.0) -> GamePanel:
+	var p: GamePanel
+	match look:
+		"teal":
+			p = GamePanel.vertical(Palette.GL_BTN_TEAL_HI, Palette.GL_BTN_TEAL_LO)
+			p.lip = 3.0; p.lip_color = Palette.GL_TEAL_LIP
+		"dark":
+			p = GamePanel.vertical(Palette.GL_CHIP_BG, Palette.GL_CHIP_BG)
+			p.border = 2.0; p.border_color = Palette.GL_CHIP_RIM
+		_:
+			p = GamePanel.vertical(Palette.GL_BTN_GOLD_HI, Palette.GL_BTN_GOLD_LO)
+			p.lip = 3.0; p.lip_color = Palette.GL_GOLD_LIP
+	p.radius = h / 2.0
+	p.custom_minimum_size.y = h
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var m := MarginContainer.new()
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.add_theme_constant_override("margin_left", 11)
+	m.add_theme_constant_override("margin_right", 11)
+	var row := HBoxContainer.new()
+	row.name = "Row"
+	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.add_child(row)
+	p.add_child(m)
+	return p
+
+## The text colour (and outline) for a pill look.
+static func pill_label(t: String, look := "gold", fs := 15) -> Label:
+	match look:
+		"teal":
+			var l := GameUI.outlined(t, fs, GameUI.TEXT, 2)
+			l.add_theme_color_override("font_outline_color", Palette.GL_TEAL_LIP2)
+			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			return l
+		"dark":
+			var d := UIKit.label(t, fs, Palette.GL_CREAM_RIM, UIKit.font_body(900))
+			d.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			return d
+	var g := GameUI.outlined(t, fs, GameUI.BROWN, 0)
+	g.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return g
+
+## A pill with its text in one go (tags on rows).
+static func tag(t: String, look := "gold", fs := 13) -> GamePanel:
+	var p := pill(look, 26.0)
+	var l := pill_label(t, look, fs)
+	l.name = "Text"
+	p.find_child("Row", true, false).add_child(l)
+	return p
+
+## The big outlined title steps down (to min_fs) when it is wider than the room between the X and the edge (long
+## Bangla titles), instead of being cut with an ellipsis.
+static func fit_title(s: Sheet, min_fs := 18) -> void:
+	var l := s.title_label
+	if l == null:
+		return
+	var full := l.get_theme_font_size("font_size")
+	var fit := func():
+		var font := l.get_theme_font("font")
+		var room := l.size.x - 2.0 * float(l.get_theme_constant("outline_size"))
+		var fs := full
+		while fs > min_fs and room > 0.0 and font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+			fs -= 1
+		if fs != l.get_theme_font_size("font_size"):
+			l.add_theme_font_size_override("font_size", fs)
+	l.resized.connect(fit)
+
+## A game button's label shrinks (down to min_fs) when its text doesn't fit the face (long Bangla, a narrow card).
+static func fit_button(b: GameUI.GameButton, min_fs := 12) -> void:
+	var full: int = int((GameUI.SIZES[b.size_name] as Array)[1])
+	var fit := func():
+		var font := b.label.get_theme_font("font")
+		var room := b.size.x - 24.0 - (b.icon_rect.size.x + 8.0 if b.icon_rect else 0.0)
+		var t := b.text.to_upper()
+		var fs := full
+		while fs > min_fs and room > 0.0 and font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+			fs -= 1
+		if fs != b.label.get_theme_font_size("font_size"):
+			b.label.add_theme_font_size_override("font_size", fs)
+	b.resized.connect(fit)
+	b.draw.connect(fit)
 
 
 # ---------- changes ----------
@@ -323,10 +462,14 @@ func _save_last() -> void:
 
 # ---------- widgets ----------
 
-## A colour choice: the player colour face with a darker lip, the colour name (and the colour-blind symbol when
-## that setting is on). Selected: a 3 px honey ring 3 px outside the face and a ✓ badge on the corner.
+## A colour choice, as the Shop's item cards: a face in the player colour (a light top fading to the colour, a pale
+## rim, a deep lip) with the pawn of that colour over its name in outlined type (and the colour-blind symbol when that
+## setting is on). Selected: a gold ring around it and a gold ✓ badge on the corner; the others sit a little back.
 class Swatch extends Button:
 	var c := 0
+	var face: GamePanel
+	var _row: VBoxContainer
+	var _over: Control
 	var _ring: StyleBoxFlat
 	var _badge: StyleBoxFlat
 	var _check: Texture2D
@@ -335,71 +478,86 @@ class Swatch extends Button:
 		c = c_
 		toggle_mode = true
 		focus_mode = Control.FOCUS_NONE
+		flat = true
 		custom_minimum_size = Vector2(0, SetupSheet.SWATCH_H)
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tooltip_text = tr(Palette.NAMES[c])
-		var face: Color = Palette.PLAYER[c]
+		for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+			add_theme_stylebox_override(st, StyleBoxEmpty.new())
+		var col: Color = Palette.PLAYER[c]
 		var deep: Color = Palette.PLAYER_DARK[c]
-		# a light tint of the colour with its colour as the rim, so the real pawn in that colour reads on it
-		var normal := UIKit.box(face.lerp(Color.WHITE, 0.78), UIKit.R.md, UIKit.BW.line, face)
-		normal.border_width_bottom = UIKit.LIP.md
-		normal.border_color = face
-		normal.shadow_size = 3
-		normal.shadow_offset = Vector2(0, 3)
-		normal.shadow_color = Color(deep, 0.55)
-		var down := normal.duplicate() as StyleBoxFlat
-		down.border_width_bottom = UIKit.BW.line
-		down.shadow_offset = Vector2(0, 1)
-		down.expand_margin_top = -2
-		for st in ["normal", "hover"]:
-			add_theme_stylebox_override(st, normal)
-		for st in ["pressed", "hover_pressed"]:
-			add_theme_stylebox_override(st, normal)
-		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		button_down.connect(func(): add_theme_stylebox_override("normal", down); add_theme_stylebox_override("pressed", down))
-		button_up.connect(func(): add_theme_stylebox_override("normal", normal); add_theme_stylebox_override("pressed", normal))
+		face = GamePanel.vertical(col.lerp(Color.WHITE, 0.35), col)
+		face.name = "Face"
+		face.radius = 16.0
+		face.border = 2.0
+		face.border_color = col.lerp(Color.WHITE, 0.55)
+		face.lip = 5.0
+		face.lip_color = deep.darkened(0.25)
+		add_child(face)
+		face.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		# the pawn of this colour over its name (the colour-blind symbol rides on the pawn)
-		var row := UIKit.vbox(0)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		row.offset_bottom = -UIKit.LIP.md
+		_row = UIKit.vbox(0)
+		_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_row)
+		_place(false)
 		var pawn := SeatDot.new(symbols)
-		pawn.custom_minimum_size = Vector2(44, 56)
+		pawn.custom_minimum_size = Vector2(44, 54)
 		pawn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pawn.skin = Catalog.pawn_in_use()     # whichever colour you pick, your pawns wear your skin
 		pawn.set_color(c)
-		row.add_child(pawn)
-		var l := UIKit.label(tr(Palette.NAMES[c]), UIKit.FS.label, deep, UIKit.font_body(900))
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_row.add_child(pawn)
+		var l := GameUI.outlined(tr(Palette.NAMES[c]), 15, Color.WHITE, 2, HORIZONTAL_ALIGNMENT_CENTER)
+		l.add_theme_color_override("font_outline_color", deep.darkened(0.45))
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		l.clip_text = true
-		row.add_child(l)
-		add_child(row)
+		_row.add_child(l)
+		button_down.connect(func(): _place(true))
+		button_up.connect(func(): _place(false))
+		# the ring and the badge draw over the face (a child's drawing would cover the button's own)
+		_over = Control.new()
+		_over.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_over)
+		_over.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_over.draw.connect(_draw_over)
 		_ring = StyleBoxFlat.new()
 		_ring.draw_center = false
-		_ring.set_border_width_all(UIKit.BW.rim)
-		_ring.border_color = Palette.HONEY
-		_ring.set_corner_radius_all(UIKit.R.md + 6)
+		_ring.set_border_width_all(3)
+		_ring.border_color = Palette.GL_TITLE
+		_ring.set_corner_radius_all(21)
 		_ring.corner_detail = 10
 		_ring.anti_aliasing = true
-		_badge = UIKit.box(Palette.HONEY, UIKit.R.pill, UIKit.BW.line, Color.WHITE)
+		_badge = UIKit.box(Palette.GL_BTN_GOLD_LO, UIKit.R.pill, 2, Palette.GL_CREAM_RIM)
 		_badge.shadow_size = 2
 		_badge.shadow_offset = Vector2(0, 1)
-		_badge.shadow_color = Palette.shadow(0.3)
+		_badge.shadow_color = Color(Palette.GL_INK, 0.5)
 		_check = UIKit.svg("ic_check")
-		toggled.connect(func(_on: bool): queue_redraw())
+		toggled.connect(func(_on: bool): _restate())
+		_restate.call_deferred()
+
+	## The content rides on the face: pressed, it drops by the lip.
+	func _place(down: bool) -> void:
+		_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_row.offset_top = 3.0 if down else 0.0
+		_row.offset_bottom = -2.0 if down else -5.0
+
+	func _restate() -> void:
+		face.modulate = Color.WHITE if button_pressed else Color(0.78, 0.74, 0.72)
+		_over.queue_redraw()
 
 	func _draw() -> void:
+		_restate()                           # (set_pressed_no_signal() redraws without `toggled`)
+
+	func _draw_over() -> void:
 		if not button_pressed:
 			return
-		draw_style_box(_ring, Rect2(Vector2.ZERO, size).grow(6.0))
-		var d := 22.0
-		var p := Vector2(size.x - d + 7.0, -7.0)
-		draw_style_box(_badge, Rect2(p, Vector2(d, d)))
+		_over.draw_style_box(_ring, Rect2(Vector2.ZERO, size).grow(5.0))
+		var d := 24.0
+		var p := Vector2(size.x - d + 8.0, -8.0)
+		_over.draw_style_box(_badge, Rect2(p, Vector2(d, d)))
 		if _check:
-			draw_texture_rect(_check, Rect2(p + Vector2(5, 5), Vector2(d - 10, d - 10)), false, Palette.ON_HONEY)
+			_over.draw_texture_rect(_check, Rect2(p + Vector2(5, 5), Vector2(d - 10, d - 10)), false, Palette.GL_BROWN_TEXT)
 
 
 ## A seat's colour as the board's pawn in that colour (its baked picture, Thumbnailer.pawn_cell; with the colour-blind symbol on its body when that
