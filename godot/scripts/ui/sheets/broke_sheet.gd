@@ -6,7 +6,8 @@ extends Sheet
 ##   Watch a video: +500   the refill ad (AdFlow "refill"); hidden when no ad can run here
 ##   Play Practice instead the free table
 ## The server decides everything (the bonus, the ad's reward); this shows it. After a top-up that gets you to 100 coins
-## the sheet closes and `topped_up(coins)` says so (Online then opens the table picker).
+## the sheet closes and `topped_up(coins)` says so (Online then opens the table picker). A game-look popup: a chunky
+## gold bonus button (a quiet wood face with the time left once used), a teal video button, a cream Practice button.
 ##
 ##   var s := BrokeSheet.new()
 ##   s.practice_pressed.connect(...); s.topped_up.connect(func(coins): ...)
@@ -35,34 +36,35 @@ var _tick := 0.0
 
 
 func _init(bonus_ := {}) -> void:
-	super(L10n.t("Out of coins"), UIKit.W.form, true, Sheet.LOOK_PM)
+	super(L10n.t("Out of coins"), UIKit.W.form, true, Sheet.LOOK_GAME)
 	dismissable = true
 	set_kicker(tr("Coin tables"))
 	body.add_theme_constant_override("separation", UIKit.SPACE.md)
-	var intro := UIKit.paragraph("", UIKit.FS.body, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var intro := GameUI.text("", 16, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.name = "Intro"
 	body.add_child(intro)
-	bonus_button = UIKit.button_with(tr("Daily bonus +%d") % BONUS, UIKit.icon("coin", 28), "honey", "lg")
+	bonus_button = GameUI.button(tr("Daily bonus +%d") % BONUS, "gold", "lg", "coin")
 	bonus_button.name = "Bonus"
-	_bonus_text = bonus_button.find_child("Text", true, false) as Label
+	_bonus_text = (bonus_button as GameUI.GameButton).label
 	bonus_button.pressed.connect(_claim)
 	UIKit.deny_disabled(bonus_button, func() -> String:           # the daily bonus is used: say when it is back
 		if _busy or bool(bonus.available):
 			return ""
 		var left := int(bonus.next_at) - int(Time.get_unix_time_from_system())
 		return tr("Daily bonus is back in %s.") % Fmt.until(left) if left > 0 else tr("Daily bonus is back tomorrow."))
+	RewardsSheet.fit_game(bonus_button, 15)
 	body.add_child(bonus_button)
-	video_button = UIKit.button_with(tr("Watch a video: +%s coins") % Fmt.coins_full(REFILL), UIKit.icon("coin", 26), "teal", "md")
+	video_button = GameUI.button(tr("Watch a video: +%s coins") % Fmt.coins_full(REFILL), "teal", "lg", "coin")
 	video_button.name = "Video"
-	narrow_changed.connect(func(narrow: bool):      # the long video line shrinks to fit a 320 px card
-		(video_button.find_child("Text", true, false) as Label).add_theme_font_size_override("font_size", 15 if narrow else UIKit.BTN.md.fs))
+	RewardsSheet.fit_game(video_button, 14)   # the long video line shrinks to fit a narrow card
 	video_button.pressed.connect(_watch)
 	body.add_child(video_button)
-	note_label = UIKit.paragraph("", UIKit.FS.body, Palette.DANGER, HORIZONTAL_ALIGNMENT_CENTER)
+	note_label = UIKit.paragraph("", UIKit.FS.body, Palette.GL_BTN_RED_HI, HORIZONTAL_ALIGNMENT_CENTER)
 	note_label.name = "Note"
 	note_label.visible = false
 	body.add_child(note_label)
-	practice_button = UIKit.btn(tr("Play Practice instead"), "ghost", "md")
+	practice_button = GameUI.button(tr("Play Practice instead"), "cream", "md")
 	practice_button.name = "Practice"
 	practice_button.pressed.connect(func():
 		practice_pressed.emit()
@@ -113,24 +115,16 @@ func refresh() -> void:
 	intro.text = tr("You have %s coins. Tables start at %d. Top up, or play Practice for free.") % [Fmt.coins_full(balance()), CoinTables.BROKE_BELOW]
 	var avail := bool(bonus.available)
 	bonus_button.disabled = _busy or not avail
-	_bonus_kind("honey" if avail else "off")
+	RewardsSheet.relook(bonus_button as GameUI.GameButton, "gold" if avail else "wood")   # used: the quiet wood face
 	if avail:
-		_bonus_text.text = tr("Daily bonus +%d") % int(bonus.amount)
+		bonus_button.text = tr("Daily bonus +%d") % int(bonus.amount)
 	else:
 		var left := int(bonus.next_at) - int(Time.get_unix_time_from_system())
-		_bonus_text.text = tr("Daily bonus · %s") % (Fmt.until(left) if left > 0 else tr("tomorrow"))
+		bonus_button.text = tr("Daily bonus · %s") % (Fmt.until(left) if left > 0 else tr("tomorrow"))
+	RewardsSheet.refit(bonus_button as GameUI.GameButton)
 	video_button.visible = _ads()
 	video_button.disabled = _busy
 	practice_button.disabled = _busy
-
-## The bonus button's kind with its text colours (button_with's label keeps the colours it was made with).
-func _bonus_kind(kind: String) -> void:
-	if bonus_button.get_meta("kit_kind", "") == kind:
-		return
-	UIKit.set_kind(bonus_button, kind)
-	var k: Array = UIKit.KINDS[kind]
-	_bonus_text.add_theme_color_override("font_color", k[2])
-	_bonus_text.add_theme_color_override("font_outline_color", k[3])
 
 func _process(d: float) -> void:
 	_tick += d

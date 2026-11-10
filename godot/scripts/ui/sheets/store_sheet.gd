@@ -7,6 +7,8 @@ extends Sheet
 ## "Payment pending…" until it goes through (GemStore keeps it and retries at launch). Off Android (no Play Billing) the
 ## packs are replaced by "Gem packs are available in the Android app". Swapping asks first and goes through the server.
 ## Opening the sheet verifies what is still unverified and asks Play for purchases it still holds (GemStore.check).
+## A game-look popup: the balances on dark wallet chips, each pack and swap a wood tile with the art and outlined
+## figures, chunky gold price buttons and teal Swap buttons (a quiet wood "Need 40" while gems are short).
 ##
 ##   var s := StoreSheet.new(); s.open(layer)               # GemStore.instance() (main owns it); tests pass their own
 
@@ -25,30 +27,28 @@ var _busy := false
 
 
 func _init(store_: GemStore = null) -> void:
-	super(L10n.t("Store"), UIKit.W.form, true, LOOK_PM)
+	super(L10n.t("Store"), UIKit.W.form, true, LOOK_GAME)
 	store = store_ if store_ != null else GemStore.instance()
-	var list := add_scroll_body(UIKit.SPACE.sm)
-	# your balances
-	var bal := UIKit.hbox(UIKit.SPACE.sm)
-	coins_chip = CoinAmount.new(int(Save.profile.get("coins", 0)), "md", "chip")      # short form, as Home and the Shop
+	var list := add_scroll_body(UIKit.SPACE.sm + 2)
+	# your balances: two dark wallet chips with a gold rim (the Shop's)
+	var bal := UIKit.hbox(UIKit.SPACE.sm + 2)
+	coins_chip = CoinAmount.new(int(Save.profile.get("coins", 0)), "lg", "plain")      # short form, as Home and the Shop
 	coins_chip.name = "Coins"
-	gems_chip = CoinAmount.gems(int(Save.profile.get("gems", 0)), "md", "chip")
+	gems_chip = CoinAmount.gems(int(Save.profile.get("gems", 0)), "lg", "plain")
 	gems_chip.name = "Gems"
-	for c: Control in [coins_chip, gems_chip]:
-		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		(c as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
-		bal.add_child(c)
+	for c: CoinAmount in [coins_chip, gems_chip]:
+		bal.add_child(_wallet(c))
 	list.add_child(bal)
 	# Payment pending…
 	_pending = _pending_card()
 	list.add_child(_pending)
 	# the gem packs
-	list.add_child(UIKit.margin(UIKit.caption(tr("Gem packs")), 4, UIKit.SPACE.sm, 0, 0))
-	_pack_box = UIKit.vbox(UIKit.SPACE.sm)
+	list.add_child(UIKit.margin(GameUI.outlined(tr("Gem packs"), 17, GameUI.GOLD, 2), 4, UIKit.SPACE.sm, 0, 0))
+	_pack_box = UIKit.vbox(UIKit.SPACE.sm + 2)
 	_pack_box.name = "Packs"
 	list.add_child(_pack_box)
 	# gems -> coins
-	list.add_child(UIKit.margin(UIKit.caption(tr("Swap gems for coins")), 4, UIKit.SPACE.sm, 0, 0))
+	list.add_child(UIKit.margin(GameUI.outlined(tr("Swap gems for coins"), 17, GameUI.GOLD, 2), 4, UIKit.SPACE.sm, 0, 0))
 	for i in PACKS.size():
 		list.add_child(_swap_row(i))
 	fit()
@@ -75,13 +75,11 @@ func refresh() -> void:
 	_build_packs()
 	var have := int(p.get("gems", 0))
 	for i in _swap_buttons.size():
-		var b := _swap_buttons[i]
+		var b := _swap_buttons[i] as GameUI.GameButton
 		var need := int(PACKS[i][0]) - have
 		b.text = tr("Swap") if need <= 0 else tr("Need %d") % need
-		b.resized.emit()                         # re-fit the label (fit_text)
-		var kind := "teal" if need <= 0 else "off"
-		if b.get_meta("kit_kind", "") != kind:
-			UIKit.set_kind(b, kind)
+		RewardsSheet.relook(b, "teal" if need <= 0 else "wood")   # too few gems: the quiet wood face
+		RewardsSheet.refit(b)
 
 
 # ---------- gem packs ----------
@@ -127,26 +125,57 @@ func _pack_row(id: String, gems: int, price: String) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", UIKit.SPACE.md)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ic := UIKit.icon("gem", 40)
+	var ic := UIKit.icon("gem", 46)
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ic)
 	var col := UIKit.vbox(-1)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(UIKit.label(tr("%s gems") % Fmt.coins_full(gems), UIKit.FS.h3, Palette.INK, UIKit.font_body(900)))
-	var b := UIKit.btn(price if price != "" else "…", "honey", "sm")
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var t := GameUI.outlined(tr("%s gems") % Fmt.coins_full(gems), 22, GameUI.TEXT, 3)
+	t.clip_text = true
+	t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	col.add_child(t)
+	var b := GameUI.button(price if price != "" else "…", "gold", "md")
 	b.name = id
-	b.custom_minimum_size.x = 96
-	UIKit.fit_text(b, 12)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.custom_minimum_size.x = 112
+	RewardsSheet.fit_game(b, 12)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(func(): _on_pack(id))
 	row.add_child(col)
 	row.add_child(b)
 	_pack_buttons[id] = b
-	var p := UIKit.list_row(row)
+	var p := _tile(row)
 	p.name = "Pack_" + id
-	p.custom_minimum_size.y = ROW_H
 	return p
+
+## A row's wood tile (the game look).
+func _tile(content: Control) -> GamePanel:
+	var p := GameUI.tile(16.0, 0.0)
+	p.custom_minimum_size.y = ROW_H
+	var m := UIKit.margin(content, 12, 8, 12, 8)
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(m)
+	p.mouse_filter = Control.MOUSE_FILTER_PASS
+	return p
+
+## A balance: the art and outlined white figures on a dark wallet chip with a gold rim.
+func _wallet(a: CoinAmount) -> PanelContainer:
+	RewardsSheet.amount(a)
+	a.alignment = BoxContainer.ALIGNMENT_CENTER
+	var c := PanelContainer.new()
+	c.name = str(a.name) + "Chip"
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var st := UIKit.box(Palette.GL_CHIP_BG, 20, 2, Palette.GL_CHIP_RIM)
+	st.content_margin_top = 5; st.content_margin_bottom = 5
+	c.add_theme_stylebox_override("panel", st)
+	var cc := CenterContainer.new()
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cc.add_child(a)
+	c.add_child(cc)
+	return c
 
 func _on_pack(id: String) -> void:
 	if _busy or _closing or store == null:
@@ -168,23 +197,27 @@ func _on_rejected(_id: String) -> void:
 
 func _pending_card() -> PanelContainer:
 	var v := UIKit.vbox(2)
-	v.add_child(UIKit.label(tr("Payment pending…"), UIKit.FS.h3, Palette.ON_HONEY, UIKit.font_body(900)))
-	v.add_child(UIKit.paragraph(tr("The gems arrive as soon as your payment goes through."), UIKit.FS.small + 1, Palette.ON_HONEY))
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(GameUI.outlined(tr("Payment pending…"), 19, GameUI.GOLD, 2))
+	var l := GameUI.text(tr("The gems arrive as soon as your payment goes through."), 14)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(l)
 	var p := PanelContainer.new()
 	p.name = "Pending"
-	var st := UIKit.box(Palette.HONEY_TINT, UIKit.R.md, UIKit.BW.line, Palette.HONEY_TINT_EDGE)
-	UIKit.pad(st, UIKit.SPACE.md, UIKit.SPACE.sm)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Palette.GL_CHIP_BG, 16, 2, Palette.GL_TITLE)
+	UIKit.pad(st, UIKit.SPACE.md + 2, UIKit.SPACE.sm + 2)
 	p.add_theme_stylebox_override("panel", st)
 	p.add_child(v)
 	p.visible = false
 	return p
 
 func _note_card(text: String) -> Control:
-	var l := UIKit.paragraph(text, UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := GameUI.text(text, 15, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	l.name = "Note"
-	var p := UIKit.list_row(l)
-	p.custom_minimum_size.y = ROW_H
-	return p
+	return _tile(l)
 
 
 # ---------- gems -> coins ----------
@@ -199,25 +232,28 @@ func _swap_row(i: int) -> Control:
 	col.add_theme_constant_override("separation", UIKit.SPACE.xs)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.alignment = BoxContainer.ALIGNMENT_BEGIN
-	var g := CoinAmount.gems(gems, "sm", "plain")
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var g := RewardsSheet.amount(CoinAmount.gems(gems, "lg", "plain"))
 	g.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(g)
-	var arrow := UIKit.label("→", UIKit.FS.h3, Palette.SUB, UIKit.font_body(900))
+	var arrow := GameUI.outlined("→", 20, GameUI.SUB, 2)
 	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(arrow)
-	col.add_child(CoinAmount.new(coins, "sm", "plain"))
+	var c := RewardsSheet.amount(CoinAmount.new(coins, "lg", "plain"))
+	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_child(c)
 	row.add_child(col)
-	var b := UIKit.btn(tr("Swap"), "teal", "sm")
+	var b := GameUI.button(tr("Swap"), "teal", "md")
 	b.name = "Swap%d" % i
-	b.custom_minimum_size.x = 88
-	UIKit.fit_text(b, 13)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.custom_minimum_size.x = 100
+	RewardsSheet.fit_game(b, 12)
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(func(): _on_swap(i))
 	row.add_child(b)
 	_swap_buttons.append(b)
-	var p := UIKit.list_row(row)
+	var p := _tile(row)
 	p.name = "SwapRow%d" % i
-	p.custom_minimum_size.y = ROW_H
 	return p
 
 ## Swap: too few gems -> says how many are missing; else confirm -> POST /v1/gems/exchange -> "+1,000 coins".
