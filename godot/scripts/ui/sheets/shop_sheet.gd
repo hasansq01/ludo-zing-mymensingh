@@ -136,16 +136,28 @@ func _init(start_tab := "rooms", width := 400.0, owned_only_ := false, inventory
 	narrow_changed.connect(_on_narrow)
 
 
-## The page's ground: a warm radial glow at the top fading to deep café brown.
-static func _page_bg() -> StyleBox:
+## The page's ground: a warm radial glow at the top fading to deep café brown. `reach` (page fractions) and `at`
+## (page UV) make it the CSS "radial-gradient(<reach.x> <reach.y> at <at>)" ellipse instead (Ranks: 110% 55% at
+## 50% 22%): a GradientTexture2D's glow is a circle in its UV, so the box shows a region of it in the radii's ratio.
+static func _page_bg(reach := Vector2.ZERO, at := Vector2(0.5, 0.0)) -> StyleBox:
 	var g := GradientTexture2D.new()
-	g.width = 64; g.height = 128
 	g.fill = GradientTexture2D.FILL_RADIAL
-	g.fill_from = Vector2(0.5, 0.0); g.fill_to = Vector2(0.5, 0.75)
 	g.gradient = Gradient.new()
 	g.gradient.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
 	g.gradient.colors = PackedColorArray([Color("#8a4b26"), Color("#5a2c16"), Color("#2b140a")])
 	var st := StyleBoxTexture.new()
+	if reach == Vector2.ZERO:
+		g.width = 64; g.height = 128
+		g.fill_from = Vector2(0.5, 0.0); g.fill_to = Vector2(0.5, 0.75)
+	else:
+		g.gradient.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+		var px := 256.0
+		g.width = int(px); g.height = int(px)
+		var r := 0.9 * minf(1.0, minf(reach.x, reach.y))     # the glow's radius in texture UV
+		var region := Vector2(r / reach.x, r / reach.y)       # the page's share of the texture
+		var c := Vector2(0.5, at.y * region.y)                # the glow's centre; the region starts at the top
+		g.fill_from = c; g.fill_to = c + Vector2(0.0, r)
+		st.region_rect = Rect2(Vector2(c.x - at.x * region.x, 0.0) * px, region * px)
 	st.texture = g
 	st.content_margin_left = 14; st.content_margin_right = 14
 	st.content_margin_top = 14; st.content_margin_bottom = 8
@@ -203,28 +215,8 @@ func _show_filter(strip: String) -> void:
 		_sub.name = "Filter"
 		var group := ButtonGroup.new()
 		for l: Array in SUBS[strip]:
-			var b := Button.new()
-			b.text = L10n.t(l[1])
-			b.toggle_mode = true
-			b.button_group = group
-			b.focus_mode = Control.FOCUS_NONE
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			b.custom_minimum_size = Vector2(0, 36)
+			var b := filter_button(L10n.t(l[1]), group)
 			b.set_meta("value", l[0])
-			var off := UIKit.box(Color(0, 0, 0, 0), 12, 2, Color("#6b3a20"))
-			var on := UIKit.box(Color("#fff1dc"), 12, 0)
-			on.border_width_bottom = 3
-			on.border_color = Color("#d8b48a")
-			for k in ["normal", "hover", "disabled", "focus"]:
-				b.add_theme_stylebox_override(k, off)
-			for k in ["pressed", "hover_pressed"]:
-				b.add_theme_stylebox_override(k, on)
-			b.add_theme_font_override("font", UIKit.font_display())
-			b.add_theme_font_size_override("font_size", 15)
-			for k in ["font_color", "font_hover_color"]:
-				b.add_theme_color_override(k, Color("#e7c7a6"))
-			for k in ["font_pressed_color", "font_hover_pressed_color"]:
-				b.add_theme_color_override(k, Color("#4a2212"))
 			var v: String = l[0]
 			b.toggled.connect(func(x: bool): if x: show_tab(v))
 			UIKit.wire_press(b)
@@ -233,6 +225,32 @@ func _show_filter(strip: String) -> void:
 	for b in _sub.get_children():
 		if b is Button:
 			(b as Button).set_pressed_no_signal(b.get_meta("value", "") == tab)
+
+## One button of the game look's filter / segmented row: the picked one a cream face with a tan lip, the others an
+## outline on the ground (the Shop's categories, the Leaderboard's This week / All time). Toggles within `group`.
+static func filter_button(text: String, group: ButtonGroup, h := 36.0, fs := 15) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.toggle_mode = true
+	b.button_group = group
+	b.focus_mode = Control.FOCUS_NONE
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(0, h)
+	var off := UIKit.box(Color(0, 0, 0, 0), 12, 2, Color("#6b3a20"))
+	var on := UIKit.box(Color("#fff1dc"), 12, 0)
+	on.border_width_bottom = 3
+	on.border_color = Color("#d8b48a")
+	for k in ["normal", "hover", "disabled", "focus"]:
+		b.add_theme_stylebox_override(k, off)
+	for k in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(k, on)
+	b.add_theme_font_override("font", UIKit.font_display())
+	b.add_theme_font_size_override("font_size", fs)
+	for k in ["font_color", "font_hover_color"]:
+		b.add_theme_color_override(k, Color("#e7c7a6"))
+	for k in ["font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(k, Color("#4a2212"))
+	return b
 
 ## Show everything, or only what the player owns.
 func set_owned_only(on: bool) -> void:

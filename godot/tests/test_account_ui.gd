@@ -143,15 +143,29 @@ func _leaderboard() -> void:
 	var texts := []
 	_collect(s, texts)
 	check("leaderboard: names and value", texts.has("Player 1") and (texts.has("1K XP") or texts.has("1,000 XP") or texts.has("1.0K XP")), texts)
-	var lv_pill := s.find_child("Row1", true, false).find_child("Level", true, false) if s.find_child("Row1", true, false) else null
-	check("leaderboard: each row's level is the pill", lv_pill is LevelBadge and (lv_pill as LevelBadge).level == 10, lv_pill)
+	var lv_pill := s.find_child("Row4", true, false).find_child("Level", true, false) if s.find_child("Row4", true, false) else null
+	check("leaderboard: each row's level is the pill", lv_pill is LevelBadge and (lv_pill as LevelBadge).level == 7, lv_pill)
 	var r1 := s.find_child("Row1", true, false)
 	var medal := r1.find_child("Rank", true, false).get_child(0) if r1 else null
 	check("leaderboard: rank 1 has a medal, rank 4 a number", medal is PlayerTile.PlaceBadge and s.find_child("Row4", true, false).find_child("Rank", true, false).get_child(0) is Label)
+	# the screen: a page (no dim, no X); the top three on the podium (1st crowned), the rest wood rows
+	check("leaderboard: a screen, not a dialog", s.as_page and s.close_btn != null and not s.close_btn.visible)
+	var podium := s._podium
+	check("leaderboard: the first three stand on the podium, crowned #1", r1 != null and r1.get_parent() == podium and podium.find_child("Crown", true, false) != null
+		and s.find_child("Row2", true, false).get_parent() == podium and s.find_child("Row3", true, false).get_parent() == podium
+		and s.find_child("Row4", true, false).get_parent() == s._list)
+	var blocks := podium.find_children("Block", "GamePanel", true, false)
+	check("leaderboard: three podium blocks, 2 < 1 > 3", blocks.size() == 3 and s.find_child("Row1", true, false).find_child("Block", true, false).custom_minimum_size.y
+		> s.find_child("Row2", true, false).find_child("Block", true, false).custom_minimum_size.y
+		and s.find_child("Row2", true, false).find_child("Block", true, false).custom_minimum_size.y > s.find_child("Row3", true, false).find_child("Block", true, false).custom_minimum_size.y)
+	var you_note: Label = s.find_child("YouNote", true, false)
+	check("leaderboard: your bar says how far the next player up is", you_note.text == "841 XP to pass #5", you_note.text)
+	check("leaderboard: the weekly board shows the new-week countdown", s.week_pill.visible and (s.find_child("NewWeekText", true, false) as Label).text.begins_with("New week in "))
 	check("leaderboard: your row is pinned with your rank", s._me_bar.visible and s.find_child("YouRank", true, false).text == "#7" and s.find_child("YouValue", true, false).text.begins_with("120"))
 	# tabs
 	s.select("wins", "all")
 	check("leaderboard: switching to Online wins / All time asks again", calls[calls.size() - 1] == ["wins", "all"], calls)
+	check("leaderboard: no countdown on All time", not s.week_pill.visible)
 	var n := calls.size()
 	s.select("wins", "all")
 	check("leaderboard: a fresh answer is kept (no second call)", calls.size() == n)
@@ -175,6 +189,18 @@ func _leaderboard() -> void:
 	var note: Label = s.find_child("YouNote", true, false)
 	check("leaderboard: not listed -> play N more matches", note.text == "Play 3 more matches to appear", note.text)
 	check("leaderboard: no rank while not listed", not s.find_child("YouRank", true, false).visible)
+	# you on the podium: no one ahead at #1
+	answer.v = _board(3, {rank = 1, value = 1000, listed = true})
+	s._cache.clear()
+	await s.load_board()
+	check("leaderboard: you at #1", s.find_child("YouRank", true, false).text == "#1" and s.find_child("YouNote", true, false).text == "Top of the board!")
+	check("leaderboard: next_up: the nearest ahead, ties need one more", LeaderboardSheet.next_up([{rank = 1, value = 300}, {rank = 2, value = 120}, {rank = 3, value = 80}], 64) == [3, 17]
+		and LeaderboardSheet.next_up([{rank = 1, value = 64}], 64).is_empty())
+	var monday := int(Time.get_unix_time_from_datetime_string("2026-11-15T18:00:00"))     # Mon 16 Nov 00:00 in Dhaka
+	check("leaderboard: the week turns Monday 00:00 Bangladesh time", LeaderboardSheet.week_left(monday - 3600) == 3600 and LeaderboardSheet.week_left(monday) == 7 * 86400
+		and LeaderboardSheet.week_left(monday - 2 * 86400 - 6 * 3600 - 59) == 2 * 86400 + 6 * 3600 + 59)
+	check("leaderboard: the countdown reads 2d 6h, then hours and minutes", LeaderboardSheet.week_left_text(2 * 86400 + 6 * 3600 + 59) == "2d 6h"
+		and LeaderboardSheet.week_left_text(5 * 3600 + 20 * 60) == "5h 20m")
 	check("leaderboard: matches_to_go", LeaderboardSheet.matches_to_go(3, 2) == 1 and LeaderboardSheet.matches_to_go(3, 0) == 3 and LeaderboardSheet.matches_to_go(3, 9) == 1)
 	# no me (no session) and an unranked me
 	answer.v = _board(2, null)
@@ -191,7 +217,7 @@ func _leaderboard() -> void:
 	await s.load_board()
 	var et := []
 	_collect(s._list, et)
-	check("leaderboard: empty state", s.state == "empty" and s.rows_shown == 0 and et.size() > 0 and et[0].begins_with("No one is on the board yet"), et)
+	check("leaderboard: empty state", s.state == "empty" and s.rows_shown == 0 and et.filter(func(t: String) -> bool: return t.begins_with("No one is on the board yet")).size() == 1, et)
 	# offline, then retry
 	answer.v = {ok = false, error = "offline"}
 	s._cache.clear()
@@ -203,6 +229,8 @@ func _leaderboard() -> void:
 	answer.v = _board(2, null)
 	s.retry_button.pressed.emit()
 	check("leaderboard: Try again reloads", s.state == "list" and s.rows_shown == 2, s.state)
+	check("leaderboard: two players: the third place stays an empty block", s.find_child("Row2", true, false) != null and s.find_child("Place3", true, false) != null
+		and s.find_child("Place3", true, false).find_child("Avatar", true, false) == null)
 	# a failed refresh keeps the list
 	answer.v = {ok = false, error = "server"}
 	await s.load_board(true)
@@ -211,7 +239,10 @@ func _leaderboard() -> void:
 	s._cache.clear()
 	await s.load_board()
 	check("leaderboard: server error state", s.state == "error" and s.retry_button != null)
-	check("leaderboard: 48 px targets", s.refresh_button.custom_minimum_size.y >= UIKit.TAP and s.board_seg.custom_minimum_size.y >= UIKit.TAP and s.period_seg.custom_minimum_size.y >= UIKit.TAP)
+	check("leaderboard: the mock's 38 px This week / All time and a 32 px board switch", s.period_seg.custom_minimum_size.y >= 38.0 and s.board_seg.custom_minimum_size.y >= 32.0
+		and s.period_seg.get_child_count() == 2 and s.board_seg.get_child_count() == 2)
+	check("leaderboard: the podium keeps its empty blocks behind a state", s._podium.find_children("Block", "GamePanel", true, false).size() == 3
+		and s.find_child("Place1", true, false) != null and s.find_child("Crown", true, false) == null)
 	# 50 rows at most
 	answer.v = _board(60, null)
 	s._cache.clear()
@@ -383,7 +414,7 @@ func _misc() -> void:
 	check("result: a second note replaces the first", n == 1)
 	r.free()
 	var home := FileAccess.get_file_as_string("res://scripts/ui/home_screen.gd")
-	check("home: Ranks in the nav opens the leaderboard", home.contains("[\"leaderboard\", \"Ranks\"") and FileAccess.get_file_as_string("res://scripts/main.gd").contains("LeaderboardSheet.new().open(sheet_layer)"))
+	check("home: Ranks in the nav opens the leaderboard", home.contains("[\"leaderboard\", \"Ranks\"") and FileAccess.get_file_as_string("res://scripts/main.gd").contains("_open_page(LeaderboardSheet.new(), \"leaderboard\")"))
 
 func _texts_of(n: Node) -> Array:
 	var out := []

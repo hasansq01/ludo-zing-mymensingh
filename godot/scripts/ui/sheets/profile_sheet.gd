@@ -272,7 +272,7 @@ func _build_name() -> VBoxContainer:
 	_validate(false)
 	return v
 
-## The Leaderboard over the Profile.
+## The Leaderboard screen over the Profile (Back returns here), as the Inventory button opens its screen.
 func _open_leaderboard() -> void:
 	var layer := get_parent() as Control
 	if layer == null or _closing:

@@ -33,7 +33,7 @@ func _ready() -> void:
 	for k in 4:
 		await get_tree().create_timer(1.2).timeout
 		await _report(s, "load%d" % k)
-		s.refresh_button.pressed.emit()
+		s.load_board(true)
 	await get_tree().create_timer(1.2).timeout
 	await _report(s, "final")
 	get_tree().quit()
