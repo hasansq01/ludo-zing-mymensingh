@@ -17,6 +17,7 @@ extends Sheet
 
 signal profile_changed
 signal inventory_requested(tab: String)  ## main: close this screen and open the Inventory on this category
+signal ranks_requested                   ## main: close this screen and open the Ranks screen (with Home's bar)
 
 const MAX_NAME := 14
 const MEDAL_PX := 52.0
@@ -691,10 +692,14 @@ func _app() -> Node:
 	var app := get_tree().root.get_node_or_null("Main")
 	return app if app else get_tree().root.find_child("Main", true, false)
 
-## The Leaderboard over the Profile.
+## Ranks: main swaps this screen for the Ranks screen (Home's bar shows again, like Customise); without main
+## (previews) the Leaderboard opens over this sheet.
 func _open_leaderboard() -> void:
 	var layer := get_parent() as Control
 	if layer == null or _closing:
+		return
+	if not ranks_requested.get_connections().is_empty():
+		ranks_requested.emit()
 		return
 	LeaderboardSheet.new().open(layer)
 

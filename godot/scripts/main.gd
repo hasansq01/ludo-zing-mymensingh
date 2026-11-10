@@ -854,6 +854,7 @@ func _on_tab(tab: String) -> void:
 			var p := ProfileSheet.new()
 			p.profile_changed.connect(home.refresh)
 			p.inventory_requested.connect(open_inventory)
+			p.ranks_requested.connect(func(): _on_tab("leaderboard"))
 			_open_full_page(p)
 		"settings":
 			open_settings()
