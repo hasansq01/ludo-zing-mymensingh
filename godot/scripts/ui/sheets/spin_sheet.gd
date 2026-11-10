@@ -1,14 +1,17 @@
 class_name SpinSheet
 extends Sheet
-## Lucky Draw (index.html #spinSheet, buildWheel and the #spinGo handler) in the .pm sheet look (Sheet "pm" with the
-## "Lucky Draw" RibbonTitle; the 48 px X is the only dismiss control): the 8-segment prize wheel in the player
-## colours with a purple jackpot wedge ("1K" and a star), rim pegs, the coral pointer and the gold hub; one free
-## spin per local day, more with a video (the server grants them: Rewards.extra_spins), the chances shown. Spin picks the prize first (Rewards.spin: saved at once, so closing mid-spin can't give a
-## second spin), then the wheel turns and eases onto that segment (~4 s, cubic-bezier(.12,.75,.15,1); 1.4 s with
-## Reduce motion) with a soft tick per segment, a light haptic every second tick and a pointer flick.
-## On landing: the segment pulses, Haptics.success(), "You won 250 coins!" pops in, the coins fly to the home coin
-## counter (or burst out of the wheel with a Toast when there is no counter on screen) and the button turns into
-## a quiet "Next spin in 13h 20m" (live countdown).
+## Lucky Draw (index.html #spinSheet, buildWheel and the #spinGo handler) in the game look (Sheet LOOK_GAME: the dark
+## café card, "LUCKY DRAW" in big outlined gold, the round red X is the only dismiss control): the 3D-rendered prize
+## wheel (face, gold rim with chasing bulbs, hub, jewelled pointer) on a stage of warm light rays turning slowly
+## behind it (still with Reduce motion); the chunky gold SPIN, and once today's spin is used the teal "Draw again
+## with a video" (when videos are on) with the time to the next free spin as a dark chip; the chances under it.
+## One free spin per local day, more with a video (the server grants them: Rewards.extra_spins). Spin picks the
+## prize first (Rewards.spin: saved at once, so closing mid-spin can't give a second spin), then the wheel turns and
+## eases onto that segment (~4 s, cubic-bezier(.12,.75,.15,1); 1.4 s with Reduce motion) with a soft tick per
+## segment, a light haptic every second tick and a pointer flick.
+## On landing (the purchase reveal's style): the segment pulses, the rays flare, Haptics.success(), "YOU WON!" on a
+## dark chip and the amount in big outlined type pop in over the wheel, the coins fly to the home coin counter (or
+## burst out of the wheel with a Toast when there is no counter on screen) and the time to the next spin shows.
 ##
 ##   var s := SpinSheet.new(); s.spun.connect(func(prize): ...); s.open(layer)
 
@@ -22,15 +25,31 @@ const SPIN_SEC_REDUCED := 1.4
 const JACKPOT := 5
 ## What the jackpot pays on top of its coins (server ECON_V1.jackpot_gems).
 const JACKPOT_GEMS := 5
+const RAY_TURN_SEC := 90.0               ## one turn of the light rays
+const RAYS := 0.45                       ## the rays' strength at rest (they flare on a win)
+const POINTER_ROOM := 26.0               ## px above the wheel for its pointer (and the rays)
+const STAGE_BOTTOM := 16.0               ## px under the wheel (the rays; the rim chip hangs into it)
+const BTN_H := 76.0                      ## the action slot (SPIN / the video button / the countdown)
 
 var profile: Dictionary
 var rng := RandomNumberGenerator.new()
 var _day_override := ""
 var _width := float(UIKit.W.form)
 var wheel: Wheel
-var _note: Label
-var _go: Button
-var _again: Button
+var stage: Control                       ## the rays, the wheel, the prize and the rim chip
+var rays: GamePanel
+var _prize: VBoxContainer                ## YOU WON! + the amount, over the wheel
+var _pool: GamePanel                     ## a soft dark pool behind the prize (the wheel's labels step back)
+var _note: Label                         ## the amount ("+500")
+var _gems_row: HBoxContainer
+var _gems_l: Label
+var _slot: Control
+var _go: GameUI.GameButton
+var _again: GameUI.GameButton
+var _wait: PanelContainer                ## "Next spin in 13h 20m" in the slot (no video to offer)
+var _wait_l: Label
+var _rim_wait: PanelContainer            ## the same on the wheel's rim, above the video button
+var _rim_wait_l: Label
 var flow: AdFlow
 var _no_more := false                     # today's videos for a draw are used
 var _spinning := false
@@ -40,35 +59,115 @@ var _ticks := 0
 
 ## p: the profile to read and change (default: Save.profile). today: a fixed day key (previews), "" = the real day.
 func _init(p: Dictionary = {}, today := "", width := float(UIKit.W.form)) -> void:
-	super(L10n.t("Lucky Draw"), width, true, LOOK_PM)
+	super(L10n.t("Lucky Draw").to_upper(), width, true, LOOK_GAME)
 	profile = p if not p.is_empty() else Save.profile
 	_day_override = today
 	_width = width
 	rng.randomize()
+	header.custom_minimum_size.y = 48.0
+	if title_label:
+		title_label.add_theme_font_size_override("font_size", 34)
+		title_label.add_theme_constant_override("outline_size", 10)
+	body.add_theme_constant_override("separation", UIKit.SPACE.md)
+	# the stage: light rays, the wheel, the prize over it, the countdown chip on its rim
+	stage = Control.new()
+	stage.name = "Stage"
+	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.resized.connect(_layout_stage)
+	body.add_child(stage)
+	rays = GamePanel.radial(Color(Palette.GL_TITLE, 1.0), Color(Palette.GL_BTN_GOLD_LO, 0.7), Color(Palette.GL_BTN_GOLD_LO, 0.0))
+	rays.name = "Rays"
+	rays.mid = 0.72
+	rays.radius = 0.0
+	rays.rays = RAYS
+	rays.ray_count = 18.0
+	rays.ray_width = 0.42
+	rays.ray_center = Vector2(0.5, 0.5)
+	rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(rays)
 	wheel = Wheel.new()
 	wheel.ticked.connect(_on_tick)
-	body.add_child(UIKit.margin(wheel, 0, UIKit.SPACE.sm, 0, 0))
-	_note = UIKit.label("", UIKit.FS.h2, Palette.INK, UIKit.font_display(), HORIZONTAL_ALIGNMENT_CENTER)
-	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_note.custom_minimum_size.y = 28   # reserved: the card doesn't jump when the result shows
+	stage.add_child(wheel)
+	_pool = GamePanel.radial(Color(Palette.GL_INK, 0.95), Color(Palette.GL_INK, 0.88), Color(Palette.GL_INK, 0.0))
+	_pool.name = "PrizePool"
+	_pool.center = Vector2(0.5, 0.5)
+	_pool.reach = Vector2(0.5, 0.5)
+	_pool.mid = 0.62
+	_pool.radius = 0.0
+	_pool.visible = false
+	stage.add_child(_pool)
+	_prize = VBoxContainer.new()
+	_prize.name = "Prize"
+	_prize.alignment = BoxContainer.ALIGNMENT_CENTER
+	_prize.add_theme_constant_override("separation", -2)
+	_prize.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_prize.visible = false
+	var won := PanelContainer.new()
+	won.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	won.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var ws := UIKit.box(Palette.GL_INK, 12, 2, Palette.GL_CHIP_RIM)
+	ws.content_margin_left = 14; ws.content_margin_right = 14 - 3
+	ws.content_margin_top = 2; ws.content_margin_bottom = 3
+	won.add_theme_stylebox_override("panel", ws)
+	won.add_child(UIKit.label(L10n.t("You won!").to_upper(), 15, GameUI.GOLD, OfferSheet.spaced_display(3)))   # l10n
+	_prize.add_child(won)
+	var amount := UIKit.hbox(6)
+	amount.alignment = BoxContainer.ALIGNMENT_CENTER
+	amount.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var coin := UIKit.icon("coin", 46)
+	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	amount.add_child(coin)
+	_note = GameUI.outlined("", 60, GameUI.TEXT, 5)
+	_note.name = "Amount"
 	_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	body.add_child(_note)
-	_go = UIKit.button(tr("Spin"), "honey", "lg")
+	amount.add_child(_note)
+	_prize.add_child(amount)
+	_gems_row = UIKit.hbox(6)
+	_gems_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_gems_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gem := UIKit.icon("gem", 30)
+	gem.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_gems_row.add_child(gem)
+	_gems_l = GameUI.outlined("", 34, GameUI.TEXT, 4)
+	_gems_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_gems_row.add_child(_gems_l)
+	_gems_row.visible = false
+	_prize.add_child(_gems_row)
+	stage.add_child(_prize)
+	var rw := _wait_chip(17)
+	_rim_wait = rw[0]
+	_rim_wait_l = rw[1]
+	_rim_wait.name = "RimWait"
+	_rim_wait.visible = false
+	stage.add_child(_rim_wait)
+	# the action slot: one fixed height for SPIN, the video button and the countdown (the card never jumps)
+	_slot = Control.new()
+	_slot.name = "Actions"
+	_slot.custom_minimum_size.y = BTN_H
+	_slot.resized.connect(_layout_slot)
+	body.add_child(_slot)
+	_go = GameUI.button(tr("Spin"), "gold", "lg")
 	_go.name = "Spin"
-	_go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_go.clip_text = true
+	_go.label.add_theme_font_size_override("font_size", 38)
+	_go.label.add_theme_constant_override("outline_size", 0)
 	_go.pressed.connect(_spin)
-	_go.resized.connect(_fit_go_text)
-	body.add_child(_go)
-	_again = UIKit.button(tr("Draw again with a video"), "teal", "md")
+	_slot.add_child(_go)
+	_again = GameUI.button(tr("Draw again with a video"), "teal", "lg")
 	_again.name = "Again"
-	_again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_again.visible = false
-	UIKit.fit_text(_again, 13)
+	_again.label.get_parent().add_child(PlayGlyph.new())
+	_again.label.get_parent().move_child(_again.label.get_parent().get_child(-1), 0)
 	_again.pressed.connect(_watch)
-	body.add_child(_again)
+	_slot.add_child(_again)
+	var w := _wait_chip(21)
+	_wait = w[0]
+	_wait_l = w[1]
+	_wait.name = "Wait"
+	_wait.visible = false
+	_slot.add_child(_wait)
 	# fair and open: what you can win, and the chances
-	var odds := UIKit.label(tr("Every wedge has the same chance. The jackpot: %s coins and %d gems.") % [Fmt.coins_full(Rewards.PRIZES.max()), JACKPOT_GEMS], UIKit.FS.small, Palette.SUB, UIKit.font_body(800), HORIZONTAL_ALIGNMENT_CENTER)
+	var odds := GameUI.text(tr("Every wedge has the same chance. The jackpot: %s coins and %d gems.") % [Fmt.coins_full(Rewards.PRIZES.max()), JACKPOT_GEMS], 15, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	odds.name = "Odds"
 	odds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(odds)
 	if AdFlow.available() and is_same(profile, Save.profile):
@@ -89,6 +188,10 @@ func _ready() -> void:
 			_render())
 	add_child(t)
 	t.start()
+	if not Sheet.reduce_motion():               # the rays turn slowly; the bulbs chase at rest
+		var tw := rays.create_tween().set_loops()
+		tw.tween_property(rays, "ray_angle", TAU / rays.ray_count, RAY_TURN_SEC / rays.ray_count).from(0.0)
+		wheel.idle_chase = true
 
 func _exit_tree() -> void:
 	if _spinning:   # closed mid-spin: the prize is already saved; let the HUD show it now
@@ -105,46 +208,127 @@ func _fit() -> void:
 	var vp := get_viewport_rect().size
 	var cw := minf(_width, vp.x - 2.0 * UIKit.GUTTER)
 	card.custom_minimum_size.x = cw
-	var d := minf(290.0, cw - 2.0 * (UIKit.PAD.pane + 4) - 8.0)
-	d = minf(d, vp.y - 340.0)   # short screens: a smaller wheel
+	var inner := cw - 40.0                                   # GameUI.card_style() side margins
+	var d := minf(280.0, inner - 40.0)                       # room each side for the light rays
+	d = minf(d, vp.y - 440.0)   # short screens: a smaller wheel
+	d = maxf(d, 160.0)
+	stage.custom_minimum_size = Vector2(inner, d + POINTER_ROOM + STAGE_BOTTOM)
 	wheel.custom_minimum_size = Vector2(d, d)
-	_fit_go_text()
+	_layout_stage()
+	_fit_texts()
 
-## The button text at the largest size that fits (Spin 24; the countdown 20 down to 14).
-func _fit_go_text() -> void:
-	var room := _go.size.x
+## The stage's parts: the wheel centred under its pointer room, the rays a square of the card's width around it, the
+## prize over the wheel's lower half, the chip on the rim's bottom.
+func _layout_stage() -> void:
+	var w := stage.size.x
+	var d := wheel.custom_minimum_size.x
+	wheel.size = Vector2(d, d)
+	wheel.position = Vector2(roundf((w - d) / 2.0), POINTER_ROOM)
+	var c := wheel.position + Vector2(d, d) / 2.0
+	# the rays: the card's inner width, from the stage's top (never over the title) as far below the wheel's centre
+	var rw := card.custom_minimum_size.x - 6.0
+	rays.size = Vector2(rw, 2.0 * c.y)
+	rays.position = Vector2((w - rw) / 2.0, 0.0)
+	rays.center = Vector2(0.5, 0.5)
+	rays.reach = Vector2(0.5, 0.5)
+	rays.ray_center = Vector2(0.5, 0.5)
+	rays.ray_reach = maxf(rw, 2.0 * c.y) / 2.0
+	rays.pivot_offset = rays.size / 2.0
+	var pm := _prize.get_combined_minimum_size()
+	_prize.size = Vector2(d, pm.y)
+	_prize.position = Vector2(wheel.position.x, c.y + d * 0.24 - pm.y / 2.0)
+	_prize.pivot_offset = _prize.size / 2.0
+	_pool.size = Vector2(d * 1.05, pm.y + 70.0)
+	_pool.position = _prize.position + (_prize.size - _pool.size) / 2.0
+	var rm := _rim_wait.get_combined_minimum_size()
+	_rim_wait.size = rm
+	_rim_wait.position = Vector2(roundf((w - rm.x) / 2.0), c.y + d * 0.5 - rm.y / 2.0 - 2.0)
+
+func _layout_slot() -> void:
+	var s := _slot.size
+	for b: Control in [_go, _again]:
+		b.position = Vector2.ZERO
+		b.size = s
+	var wm := _wait.get_combined_minimum_size()
+	_wait.size = Vector2(minf(s.x, maxf(wm.x, s.x * 0.8)), wm.y)
+	_wait.position = Vector2(roundf((s.x - _wait.size.x) / 2.0), roundf((s.y - 6.0 - wm.y) / 2.0))
+	_fit_texts()
+
+## The video button's text and the countdowns at the largest size that fits.
+func _fit_texts() -> void:
+	var room := _slot.size.x
 	if room <= 0.0:
-		room = card.custom_minimum_size.x - 2.0 * (UIKit.PAD.pane + 4)
-	room -= 2.0 * float(UIKit.BTN.lg.pad)
+		room = card.custom_minimum_size.x - 40.0
 	var f := UIKit.font_display()
-	var fs := int(UIKit.BTN.lg.fs) if not _go.disabled or _spinning else UIKit.FS.h2
-	while fs > UIKit.FS.label and f.get_string_size(_go.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+	var fs := 24
+	while fs > 15 and f.get_string_size(_again.label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room - 20.0 - 40.0 - 8.0:
 		fs -= 1
-	if fs != _go.get_theme_font_size("font_size"):
-		_go.add_theme_font_size_override("font_size", fs)
+	if fs != _again.label.get_theme_font_size("font_size"):
+		_again.label.add_theme_font_size_override("font_size", fs)
+	for pair: Array in [[_wait_l, 21, room - 40.0], [_rim_wait_l, 17, room - 60.0]]:
+		var l: Label = pair[0]
+		var n: int = pair[1]
+		while n > 13 and f.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, n).x + 30.0 > pair[2]:
+			n -= 1
+		if n != l.get_theme_font_size("font_size"):
+			l.add_theme_font_size_override("font_size", n)
+
+## A dark chip with a gold rim, a small clock and the time to the next free spin: [chip, label].
+func _wait_chip(fs: int) -> Array:
+	var c := PanelContainer.new()
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st := UIKit.box(Palette.GL_CHIP_BG, 40, 2, Palette.GL_CHIP_RIM)
+	st.content_margin_left = 12; st.content_margin_right = 16
+	st.content_margin_top = 6 if fs > 18 else 3; st.content_margin_bottom = 7 if fs > 18 else 4
+	st.shadow_color = Color(0, 0, 0, 0.35)
+	st.shadow_size = 6
+	st.shadow_offset = Vector2(0, 3)
+	c.add_theme_stylebox_override("panel", st)
+	var h := UIKit.hbox(8)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var clock := ClockGlyph.new()
+	clock.custom_minimum_size = Vector2(fs + 2, fs + 2)
+	clock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(clock)
+	var l := UIKit.label("", fs, GameUI.SUB, UIKit.font_display())
+	l.name = "Text"
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(l)
+	c.add_child(h)
+	return [c, l]
 
 
 # ---------- state ----------
 
 func _render() -> void:
 	var ready_now := Rewards.can_spin(profile, _day())
-	if ready_now or _spinning:
-		if _go.get_meta("kit_kind", "") != "honey":
-			UIKit.style_button(_go, "honey", "lg")
-		_go.text = tr("Spin")
-		_go.disabled = _spinning
-	else:
-		if _go.get_meta("kit_kind", "") != "off":
-			UIKit.style_button(_go, "off", "lg")
-			_go.add_theme_color_override("font_disabled_color", Palette.SUB)
-		_go.text = tr("Next spin in %s") % Fmt.until(Rewards.sec_to_midnight())
-		_go.disabled = true
-	_again.visible = flow != null and not ready_now and not _spinning and not _no_more
-	_fit_go_text()
-	_note.visible = ready_now or _spinning or not _result.is_empty()   # no empty gap once today's spin is used
+	var video := flow != null and not ready_now and not _spinning and not _no_more
+	_go.visible = ready_now or _spinning
+	_go.disabled = _spinning
+	_go.text = tr("Spin")
+	_dim_face(_go, _spinning)                  # the face greys while the wheel turns
+	_again.visible = video
+	var wait_txt := tr("Next spin in %s") % Fmt.until(Rewards.sec_to_midnight())
+	_wait.visible = not _go.visible and not video
+	_rim_wait.visible = video
+	_wait_l.text = wait_txt
+	_rim_wait_l.text = wait_txt
+	_fit_texts()
+	if is_inside_tree():
+		_layout_slot.call_deferred()
+		_layout_stage.call_deferred()
 	if _spinning:
+		_prize.visible = false
+		_pool.visible = false
 		return
-	_note.text = (tr("You won %s coins!") % Fmt.coins_full(int(_result.prize))) if not _result.is_empty() else ""
+	_prize.visible = not _result.is_empty()
+	_pool.visible = _prize.visible
+	_note.text = Fmt.gain(int(_result.prize)) if not _result.is_empty() else ""
+	var gems := int(_result.get("gems", 0))
+	_gems_row.visible = gems > 0
+	_gems_l.text = "+%d" % gems
 
 func _spin() -> void:
 	if _spinning or _closing:
@@ -202,7 +386,7 @@ func _landed(r: Dictionary) -> void:
 	_render()
 	wheel.flash(int(r.index))
 	Haptics.success()
-	UIKit.pop_in(_note, 0.3)
+	_reveal()
 	var prize := int(r.prize)
 	if DailySheet.coin_target(self):
 		DailySheet.reward_coins(self, wheel.segment_center(int(r.index)), prize, false, int(profile.get("coins", -1)))
@@ -214,6 +398,41 @@ func _landed(r: Dictionary) -> void:
 	if int(r.get("gems", 0)) > 0:
 		Toast.show(self, tr("+%d gems") % int(r.gems), card, 2.2, "gem")
 	spun.emit(prize)
+
+## A GameButton's face greyed (or back to its look). GamePanel's shader writes its own colour, so the face's
+## modulate (GameButton's disabled grey) doesn't show on it: the gradient itself is toned down here.
+static func _dim_face(b: GameUI.GameButton, dim: bool) -> void:
+	var c: Array = GameUI.LOOKS[b.look]
+	var k := 0.62 if dim else 1.0
+	var top: Color = c[0]
+	var bottom: Color = c[1]
+	var lip: Color = c[2]
+	var lip2: Color = c[3]
+	b.face.c0 = Color(top.r * k, top.g * k * 0.97, top.b * k * 0.97)
+	b.face.c1 = Color(top.lerp(bottom, 0.5).r * k, top.lerp(bottom, 0.5).g * k * 0.97, top.lerp(bottom, 0.5).b * k * 0.97)
+	b.face.c2 = Color(bottom.r * k, bottom.g * k * 0.97, bottom.b * k * 0.97)
+	b.face.lip_color = Color(lip.r * k, lip.g * k, lip.b * k)
+	b.face.lip2_color = Color(lip2.r * k, lip2.g * k, lip2.b * k)
+	b.label.modulate = Color(1, 1, 1, 0.7) if dim else Color.WHITE
+
+## The win (the purchase reveal's moment): the rays flare and settle a little brighter, the prize pops in.
+func _reveal() -> void:
+	_layout_stage()
+	if Sheet.reduce_motion():
+		rays.rays = RAYS * 1.6
+		UIKit.pop_in(_prize, 0.2)
+		return
+
+	var tw := rays.create_tween()
+	tw.tween_property(rays, "rays", RAYS * 3.0, 0.16).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(rays, "scale", Vector2(1.08, 1.08), 0.16).set_ease(Tween.EASE_OUT)
+	tw.tween_property(rays, "rays", RAYS * 1.6, 0.9).set_trans(Tween.TRANS_SINE)
+	tw.parallel().tween_property(rays, "scale", Vector2.ONE, 0.9).set_trans(Tween.TRANS_SINE)
+	_prize.scale = Vector2(0.6, 0.6)
+	_prize.modulate.a = 0.0
+	var pt := _prize.create_tween()
+	pt.tween_property(_prize, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pt.parallel().tween_property(_prize, "modulate:a", 1.0, 0.14)
 
 
 ## index.html's CSS timing curve cubic-bezier(x1, y1, x2, y2) at progress x (0-1).
@@ -229,6 +448,7 @@ func _on_watched(ok: bool, info: Dictionary) -> void:
 		return
 	_again.disabled = false
 	_result = {}
+	rays.rays = RAYS
 	if ok:
 		Sound.sfx("buy")
 	else:
@@ -278,6 +498,14 @@ class Wheel extends Control:
 	var _kick := 0.0
 	var _flash_k := -1
 	var _flash_t := 0.0
+	## At rest the bulbs chase slowly (off with Reduce motion: SpinSheet sets it).
+	var idle_chase := false:
+		set(v):
+			idle_chase = v
+			if v:
+				set_process(true)
+	var _idle_t := 0.0
+	var _idle_step := 0
 
 	func _init() -> void:
 		custom_minimum_size = Vector2(280, 280)
@@ -328,6 +556,13 @@ class Wheel extends Control:
 				angle = fposmod(_to, 360.0)
 				if _done.is_valid():
 					_done.call()
+		elif idle_chase and _kick <= 0.0 and (_flash_k < 0 or _flash_t > 1.8):
+			_idle_t += delta                           # at rest: redraw only when the bulbs step
+			var step := int(_idle_t * 2.5)
+			if step != _idle_step:
+				_idle_step = step
+				queue_redraw()
+			return
 		elif _kick <= 0.0 and (_flash_k < 0 or _flash_t > 1.8):
 			set_process(false)
 		queue_redraw()
@@ -347,13 +582,14 @@ class Wheel extends Control:
 			_art[name] = load(path) if ResourceLoader.exists(path) else null
 		return _art[name]
 
-	## Which of the 16 rim bulbs are lit now: while spinning a fast chase (every fourth bulb), at rest every other one.
+	## Which of the 16 rim bulbs are lit now: while spinning a fast chase (every fourth bulb), on a win a quick
+	## blink, at rest every other one (stepping round slowly when idle_chase).
 	func _bulb_lit(k: int) -> bool:
 		if _dur > 0.0:
 			return (k + int(_t * 14.0)) % 4 == 0
-		if _flash_k >= 0:
+		if _flash_k >= 0 and _flash_t <= 1.8:
 			return (k + int(_flash_t * 6.0)) % 2 == 0
-		return k % 2 == 0
+		return (k + _idle_step) % 2 == 0
 
 	func _draw() -> void:
 		var d := minf(size.x, size.y)
@@ -421,7 +657,7 @@ class Wheel extends Control:
 				var out := -1.0 if tr == a else 1.0   # local "toward the rim"
 				_draw_star(Vector2(0, out * fs * 0.66), 8.5 * s)
 				y = base - out * fs * 0.18
-			draw_string_outline(f, Vector2(-60, y), txt, HORIZONTAL_ALIGNMENT_CENTER, 120, fs, int(round(5.0 * s)), Color(Palette.INK, 0.35))
+			draw_string_outline(f, Vector2(-60, y), txt, HORIZONTAL_ALIGNMENT_CENTER, 120, fs, int(round(6.0 * s)), Color(Palette.GL_INK, 0.8))
 			draw_string(f, Vector2(-60, y), txt, HORIZONTAL_ALIGNMENT_CENTER, 120, fs, Color.WHITE)
 		draw_set_transform(Vector2.ZERO)
 
@@ -463,3 +699,35 @@ class Wheel extends Control:
 		tri.append(tri[0])
 		draw_polyline(tri, Palette.CORAL, 1.0, true)
 		draw_circle(x * Vector2(0, 2 * k), 3.2 * k, Palette.GLOSS, true, -1.0, true)
+
+
+## The video button's mark: a white disc with a teal play triangle.
+class PlayGlyph extends Control:
+	func _init() -> void:
+		custom_minimum_size = Vector2(32, 32)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := size / 2.0
+		var r := minf(size.x, size.y) / 2.0
+		draw_circle(c + Vector2(0, 2), r, Color(Palette.GL_TEAL_LIP2, 0.6), true, -1.0, true)
+		draw_circle(c, r, Color.WHITE, true, -1.0, true)
+		var t := r * 0.46
+		draw_colored_polygon(PackedVector2Array([c + Vector2(-t * 0.7, -t), c + Vector2(t, 0), c + Vector2(-t * 0.7, t)]), Palette.GL_TEAL_LIP)
+
+
+## The countdown chip's clock: a gold ring, two hands.
+class ClockGlyph extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := size / 2.0
+		var r := minf(size.x, size.y) / 2.0 - 1.0
+		var w := maxf(2.0, r * 0.22)
+		draw_circle(c, r, Palette.GL_TITLE, true, -1.0, true)
+		draw_circle(c, r - w, Palette.GL_CHIP_BG, true, -1.0, true)
+		draw_line(c, c + Vector2(0, -(r - w) * 0.72), Palette.GL_TITLE, w * 0.8, true)
+		draw_line(c, c + Vector2((r - w) * 0.55, 0), Palette.GL_TITLE, w * 0.8, true)
+		draw_circle(c, w * 0.6, Palette.GL_TITLE, true, -1.0, true)
