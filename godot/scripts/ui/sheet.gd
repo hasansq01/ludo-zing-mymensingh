@@ -496,7 +496,7 @@ func add_scroll_body(gap: int = UIKit.SPACE.md) -> VBoxContainer:
 	_fade.size_flags_vertical = Control.SIZE_SHRINK_END
 	_fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_fade.stretch_mode = TextureRect.STRETCH_SCALE
-	var face := Palette.PM if sheet_look == LOOK_PM else Palette.CARD
+	var face := Palette.GL_DOCK if as_page else (Palette.PM if sheet_look == LOOK_PM else Palette.CARD)   # a screen: its dark ground
 	var g := Gradient.new()
 	g.colors = PackedColorArray([Color(face, 0.0), face])
 	var gt := GradientTexture2D.new()
