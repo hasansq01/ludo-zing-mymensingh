@@ -399,20 +399,9 @@ func _landed(r: Dictionary) -> void:
 		Toast.show(self, tr("+%d gems") % int(r.gems), card, 2.2, "gem")
 	spun.emit(prize)
 
-## A GameButton's face greyed (or back to its look). GamePanel's shader writes its own colour, so the face's
-## modulate (GameButton's disabled grey) doesn't show on it: the gradient itself is toned down here.
+## A GameButton greyed (or back): its face greys through GameButton's own disabled modulate (GamePanel honours
+## modulate since 200d40f); only the label is softened here.
 static func _dim_face(b: GameUI.GameButton, dim: bool) -> void:
-	var c: Array = GameUI.LOOKS[b.look]
-	var k := 0.62 if dim else 1.0
-	var top: Color = c[0]
-	var bottom: Color = c[1]
-	var lip: Color = c[2]
-	var lip2: Color = c[3]
-	b.face.c0 = Color(top.r * k, top.g * k * 0.97, top.b * k * 0.97)
-	b.face.c1 = Color(top.lerp(bottom, 0.5).r * k, top.lerp(bottom, 0.5).g * k * 0.97, top.lerp(bottom, 0.5).b * k * 0.97)
-	b.face.c2 = Color(bottom.r * k, bottom.g * k * 0.97, bottom.b * k * 0.97)
-	b.face.lip_color = Color(lip.r * k, lip.g * k, lip.b * k)
-	b.face.lip2_color = Color(lip2.r * k, lip2.g * k, lip2.b * k)
 	b.label.modulate = Color(1, 1, 1, 0.7) if dim else Color.WHITE
 
 ## The win (the purchase reveal's moment): the rays flare and settle a little brighter, the prize pops in.
