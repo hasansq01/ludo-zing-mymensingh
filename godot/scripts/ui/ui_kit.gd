@@ -959,6 +959,9 @@ class XButton extends Button:
 		var down := get_draw_mode() == DRAW_PRESSED or get_draw_mode() == DRAW_HOVER_PRESSED
 		var k := minf(size.x, size.y) / 48.0
 		var c := size / 2.0
+		if look == "game":
+			_draw_game(c, k, down)
+			return
 		if look == "soft":
 			var rs := 15.0 * k
 			draw_circle(c, rs, Palette.CHIP.darkened(0.06) if down else Palette.CHIP, true, -1.0, true)
@@ -1014,6 +1017,40 @@ class XButton extends Button:
 				var n := (i + 1) % seg
 				idx.append_array([a0 + i, a1 + i, a1 + n, a0 + i, a1 + n, a0 + n])
 		RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), idx, pts, cols)
+
+	## The game look's X (full-screen pages): a 44 px disc, a 3 px white rim, a red top-to-bottom gradient face with a
+	## 4 px darker lip inside its bottom edge, a soft drop under it and a white X of round strokes.
+	func _draw_game(c: Vector2, k: float, down: bool) -> void:
+		if down:
+			c.y += 1.5 * k
+		var rad := 22.0 * k
+		for i in 3:
+			draw_circle(c + Vector2(0, 3.0 * k), rad + (i * 1.5 - 0.5) * k, Color(0.16, 0.05, 0.02, 0.14), true, -1.0, true)
+		draw_circle(c, rad, Color.WHITE, true, -1.0, true)
+		var rf := rad - 3.0 * k
+		draw_circle(c, rf, Color("#a8262b"), true, -1.0, true)               # the lip shows under the face
+		var lip := (2.5 if down else 4.0) * k
+		var face := Geometry2D.intersect_polygons(_disc(c, rf), _disc(c - Vector2(0, lip), rf))
+		if not face.is_empty():
+			var pts: PackedVector2Array = face[0]
+			var cols := PackedColorArray()
+			for p in pts:
+				cols.append(Color("#ff7a7a").lerp(Color("#e5484d"), clampf((p.y - (c.y - rf)) / (2.0 * rf), 0.0, 1.0)))
+			draw_polygon(pts, cols)
+		var a := 4.5 * k                                                     # the X: two 3 px round strokes
+		var w := 3.0 * k
+		var o := c - Vector2(0, lip * 0.5)
+		for d: Vector2 in [Vector2(a, a), Vector2(a, -a)]:
+			draw_line(o - d, o + d, Color.WHITE, w, true)
+			draw_circle(o - d, w / 2.0, Color.WHITE, true, -1.0, true)
+			draw_circle(o + d, w / 2.0, Color.WHITE, true, -1.0, true)
+
+	static func _disc(c: Vector2, r: float) -> PackedVector2Array:
+		var pts := PackedVector2Array()
+		for i in 48:
+			var t := TAU * i / 48.0
+			pts.append(c + Vector2(cos(t), sin(t)) * r)
+		return pts
 
 	static func _grad(t: float) -> Color:
 		t = clampf(t, 0.0, 1.0)

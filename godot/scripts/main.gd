@@ -460,6 +460,28 @@ func _open_page(s: Sheet, tab: String) -> void:
 			home.set_nav("home"))
 	s.open(sheet_layer)
 
+## The Inventory screen (the Shop showing what you own) on a category, with Home's bar marking Inventory. Its "Open
+## shop" swaps it for the Shop there.
+func open_inventory(category: String) -> void:
+	var s := ShopSheet.new(category, 400.0, true, true)
+	_wire_shop(s)
+	s.shop_requested.connect(func(t: String):
+		var shop := ShopSheet.new(t)
+		_wire_shop(shop)
+		_open_page(shop, "shop"))
+	_open_page(s, "inventory")
+
+## Show a full screen without Home's bar (Sheet.make_page(bg, false): the Profile). Home's own UI hides under it, so
+## the café the screen shows through its top is the room alone; Home comes back when the screen goes (closed, or
+## removed by close_all_sheets).
+func _open_full_page(s: Sheet) -> void:
+	_close_pages()
+	home.modulate.a = 0.0
+	s.tree_exiting.connect(func():
+		if is_instance_valid(home):
+			home.modulate.a = 1.0)
+	s.open(sheet_layer)
+
 ## Close the screens opened from the bar (at once).
 func _close_pages() -> void:
 	for c in sheet_layer.get_children():
@@ -797,13 +819,7 @@ func _on_tab(tab: String) -> void:
 			_wire_shop(s)
 			_open_page(s, "shop")
 		"inventory", "collection", "owned":                 # the nav's Inventory: what you own, ready to use
-			var s := ShopSheet.new(_home_shop_tab(), 400.0, true, true)
-			_wire_shop(s)
-			s.shop_requested.connect(func(t: String):
-				var shop := ShopSheet.new(t)
-				_wire_shop(shop)
-				_open_page(shop, "shop"))
-			_open_page(s, "inventory")
+			open_inventory(_home_shop_tab())
 		"rewards":                                      # Home's gift: Free spin / Daily reward / Free coins
 			var s := RewardsSheet.new()
 			s.picked.connect(_on_tab)                   # each row does what its own button does (spin / daily / free)
@@ -837,7 +853,8 @@ func _on_tab(tab: String) -> void:
 		"profile":
 			var p := ProfileSheet.new()
 			p.profile_changed.connect(home.refresh)
-			p.open(sheet_layer)
+			p.inventory_requested.connect(open_inventory)
+			_open_full_page(p)
 		"settings":
 			open_settings()
 		"howto":

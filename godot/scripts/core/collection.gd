@@ -1168,9 +1168,16 @@ class PlateView extends PanelContainer:
 		material = null if plain else Collection.FrameArt.shine_material(0.45, sparks, "plate:" + plate_id)
 		queue_redraw()
 
-	## A plate's height for this font size (the band holds the name, the caps stand taller).
+	## A plate's height for this font size (the band holds the name, the caps stand taller). height_k: the plate's
+	## height in font sizes (the Profile's big plate sets a taller one, so the band holds the name with room around it).
+	var height_k := 2.1:
+		set(v):
+			height_k = v
+			if label:
+				set_look(label.text, plate_id, badge.ach_id)
+
 	func plate_height() -> float:
-		return roundf(_fs * 2.1)
+		return roundf(_fs * height_k)
 
 	func _draw() -> void:
 		var t := art(plate_id)
