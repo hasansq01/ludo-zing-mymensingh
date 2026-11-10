@@ -5408,6 +5408,11 @@ msgid "Open Store"
 msgstr "স্টোর খোলো"
 
 #. spin_sheet.gd _init()
+#: scripts/ui/sheets/spin_sheet.gd:112
+msgid "You won!"
+msgstr "তুমি জিতেছো!"
+
+#. spin_sheet.gd _init()
 #: scripts/ui/sheets/spin_sheet.gd:63
 msgid "Draw again with a video"
 msgstr "ভিডিও দেখে আবার ড্র করুন"
