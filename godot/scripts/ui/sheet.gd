@@ -32,6 +32,12 @@ signal narrow_changed(narrow: bool)      ## the card crossed 340 px (tighter lay
 
 const LOOK_CARD := "card"
 const LOOK_PM := "pm"
+## The game look (GameUI): a dark café card with a warm glow, gold rim and 3D lip, a big outlined gold title (no
+## ribbon), the round red game X inside the corner, a deeper dim. Content on it uses GameUI (light text, chunky
+## buttons, wood tiles).
+const LOOK_GAME := "game"
+const GAME_X := 44                       ## the game X's size; its corner GAME_X_INSET inside the card's
+const GAME_X_INSET := 12.0
 const NARROW_W := 340.0
 ## Centre of the close button, inset from the card's top-right corner (web .card .x-btn top/right -10 with a 2 px
 ## border; .pm .x-btn -16 with a 4 px rim: both put it over the corner, about 8 px outside the card).
@@ -98,7 +104,7 @@ const KB_MARGIN := 12.0                  # air kept between the card and the key
 
 
 func _init(title_text := "", width: float = UIKit.W.form, closable := true, look := LOOK_CARD) -> void:
-	sheet_look = LOOK_PM if look == LOOK_PM else LOOK_CARD
+	sheet_look = look if look in [LOOK_PM, LOOK_GAME] else LOOK_CARD
 	_sheet_w = width
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -117,7 +123,9 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 	add_child(center)
 	card = PanelContainer.new()
 	card.name = "Card"
-	card.add_theme_stylebox_override("panel", _pm_style() if sheet_look == LOOK_PM else _card_style())
+	card.add_theme_stylebox_override("panel", _pm_style() if sheet_look == LOOK_PM else (GameUI.card_style() if sheet_look == LOOK_GAME else _card_style()))
+	if sheet_look == LOOK_GAME:
+		backdrop.color = Color(Palette.GL_SCRIM, 0.72)
 	card.custom_minimum_size = Vector2(width, 0)
 	center.add_child(card)
 	_clampbox = ClampBox.new()
@@ -138,6 +146,18 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 			ribbon.name = "Ribbon"
 			header.add_child(ribbon)
 			title_label = ribbon.label
+	elif sheet_look == LOOK_GAME:
+		header.custom_minimum_size.y = 44.0 if title_text != "" or closable else 0.0
+		if title_text != "":
+			title_label = GameUI.outlined(title_text, 28, GameUI.GOLD, 4, HORIZONTAL_ALIGNMENT_CENTER)
+			title_label.name = "Title"
+			title_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			if closable:                      # centred, clear of the X on both sides
+				title_label.offset_left = float(GAME_X) - 8.0
+				title_label.offset_right = -(float(GAME_X) - 8.0)
+			title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			header.add_child(title_label)
 	else:
 		header.custom_minimum_size.y = 40.0 if title_text != "" or closable else 0.0
 		if title_text != "":
@@ -151,7 +171,7 @@ func _init(title_text := "", width: float = UIKit.W.form, closable := true, look
 			title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			header.add_child(title_label)
 	if closable:
-		close_btn = UIKit.close_button()
+		close_btn = UIKit.close_button("game", GAME_X) if sheet_look == LOOK_GAME else UIKit.close_button()
 		close_btn.name = "Close"
 		close_btn.tooltip_text = tr("Close")
 		# on its own layer over the card's content, so nothing the sheet adds later (a 3D preview, a grid) draws over
@@ -422,7 +442,11 @@ static func reduce_motion() -> bool:
 ## A full-width action button in the sheet body. size: a UIKit.BTN preset ("lg", "md", ...) or (old form) a font
 ## size int.
 func add_button(text: String, kind: String, on_press: Callable, font_size: Variant = 22) -> Button:
-	var b := UIKit.button(text, kind, font_size)
+	var b: Button
+	if sheet_look == LOOK_GAME:                  # the game look's chunky button for the same kind
+		b = GameUI.button(text, GameUI.look_for(kind), "lg" if str(font_size) == "lg" else "md")
+	else:
+		b = UIKit.button(text, kind, font_size)
 	b.pressed.connect(on_press)
 	body.add_child(b)
 	return b
@@ -438,7 +462,7 @@ func add_row(buttons: Array) -> HBoxContainer:
 
 ## A section label in the body (UIKit.caption: the one section-label style).
 func add_caption(text: String) -> Label:
-	var l := UIKit.caption(text)
+	var l := GameUI.outlined(text, 16, GameUI.GOLD, 3) if sheet_look == LOOK_GAME else UIKit.caption(text)
 	body.add_child(l)
 	return l
 
@@ -447,6 +471,8 @@ func add_caption(text: String) -> Label:
 func set_kicker(text: String) -> Label:
 	if kicker == null:
 		kicker = UIKit.eyebrow(text)
+		if sheet_look == LOOK_GAME:
+			kicker.add_theme_color_override("font_color", GameUI.SUB)
 		kicker.name = "Kicker"
 		kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		kicker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -472,7 +498,7 @@ func set_kicker(text: String) -> Label:
 
 ## A centred, wrapping line of text.
 func add_text(text: String, size := 16) -> Label:
-	var l := UIKit.label(text, size, Palette.INK, UIKit.font_body(700), HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, size, GameUI.SUB if sheet_look == LOOK_GAME else Palette.INK, UIKit.font_body(800 if sheet_look == LOOK_GAME else 700), HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(l)
 	return l
@@ -500,7 +526,7 @@ func add_scroll_body(gap: int = UIKit.SPACE.md) -> VBoxContainer:
 	_fade.size_flags_vertical = Control.SIZE_SHRINK_END
 	_fade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_fade.stretch_mode = TextureRect.STRETCH_SCALE
-	var face := Palette.GL_DOCK if as_page else (Palette.PM if sheet_look == LOOK_PM else Palette.CARD)   # a screen: its dark ground
+	var face := Palette.GL_DOCK if as_page else (Palette.PM if sheet_look == LOOK_PM else (Palette.GL_CARD_DEEP if sheet_look == LOOK_GAME else Palette.CARD))   # a screen / game card: its dark ground
 	var g := Gradient.new()
 	g.colors = PackedColorArray([Color(face, 0.0), face])
 	var gt := GradientTexture2D.new()
@@ -838,6 +864,8 @@ func _place_chrome() -> void:
 		close_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		if as_page and not page_bar:              # a full screen: the X sits inside the corner
 			close_btn.position = Vector2(card.size.x - PAGE_X_INSET - s.x, PAGE_X_INSET) - close_btn.get_parent().position
+		elif sheet_look == LOOK_GAME:             # the game card: inside its corner, like the offer's
+			close_btn.position = Vector2(card.size.x - GAME_X_INSET - s.x, GAME_X_INSET) - close_btn.get_parent().position
 		else:
 			close_btn.position = Vector2(card.size.x - CLOSE_INSET, CLOSE_INSET) - s / 2.0 - close_btn.get_parent().position
 		if _chrome and _chrome.get_index() != card.get_child_count() - 1:
@@ -869,22 +897,21 @@ static func confirm(host: Node, title_text: String, text: String, yes: String, n
 
 ## The confirm dialog itself, not opened yet (previews; Sheet.confirm opens it and waits).
 static func make_confirm(title_text: String, text: String, yes: String, no := "Cancel", danger := false) -> Sheet:  # l10n
-	var s := Sheet.new(title_text, UIKit.W.dialog, false)
+	var s := Sheet.new(title_text, UIKit.W.dialog, false, LOOK_GAME)
 	s.dismissable = true
 	s.set_meta("confirm", true)
 	s.body.add_theme_constant_override("separation", UIKit.SPACE.lg)
 	if title_text != "":
-		s.header.custom_minimum_size.y = 36.0
+		s.header.custom_minimum_size.y = 40.0
 	if text != "":
-		var l := UIKit.paragraph(text, UIKit.FS.body_l, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		var l := UIKit.paragraph(text, UIKit.FS.body_l, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+		l.add_theme_font_override("font", UIKit.font_body(800))
 		s.body.add_child(l)
 	var state := {value = false, done = false}
-	var nb := UIKit.btn(L10n.t(no), "ghost", "md")
+	var nb := GameUI.button(L10n.t(no), "cream", "md")
 	nb.name = "No"
-	var yb := UIKit.btn(L10n.t(yes), "red" if danger else "honey", "md")
+	var yb := GameUI.button(L10n.t(yes), "red" if danger else "gold", "md")
 	yb.name = "Yes"
-	for b: Button in [nb, yb]:
-		UIKit.fit_text(b, 14)
 	nb.pressed.connect(func():
 		state.value = false
 		s.close())

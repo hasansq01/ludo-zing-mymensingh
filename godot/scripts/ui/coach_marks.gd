@@ -250,8 +250,9 @@ func card(title_: String, text: String, play_text: String, home_text: String) ->
 	_hole = Rect2()
 	_fade_to(1.0)
 	_card = PanelContainer.new()
-	var st := UIKit.surface("card").duplicate() as StyleBoxFlat
-	UIKit.pad(st, UIKit.PAD.card + 4, UIKit.PAD.card)
+	var st := GameUI.card_style()                       # the game look's popup card
+	st.content_margin_left = UIKit.PAD.card + 4; st.content_margin_right = UIKit.PAD.card + 4
+	st.content_margin_top = UIKit.PAD.card + 2
 	_card.add_theme_stylebox_override("panel", st)
 	var col := UIKit.vbox(UIKit.SPACE.md)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -268,15 +269,16 @@ func card(title_: String, text: String, play_text: String, home_text: String) ->
 	cc.add_child(UIKit.icon("ic_trophy", 40))
 	badge.add_child(cc)
 	col.add_child(badge)
-	var t := UIKit.title(title_, UIKit.FS.title, Palette.INK)
+	var t := GameUI.outlined(title_, 30, GameUI.GOLD, 4, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(t)
-	var p := UIKit.paragraph(text, UIKit.FS.body_l, Palette.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	var p := UIKit.paragraph(text, UIKit.FS.body_l, GameUI.SUB, HORIZONTAL_ALIGNMENT_CENTER)
+	p.add_theme_font_override("font", UIKit.font_body(800))
 	p.custom_minimum_size.x = UIKit.W.dialog - 2.0 * (UIKit.PAD.card + 4)
 	col.add_child(p)
 	col.add_child(UIKit.spacer())
-	var play := UIKit.button(play_text, "honey", "lg")
+	var play := GameUI.button(play_text, "gold", "lg")
 	play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var home := UIKit.button(home_text, "ghost", "sm")
+	var home := GameUI.button(home_text, "cream", "md")
 	home.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(play)
 	col.add_child(home)
