@@ -54,6 +54,7 @@ var body: VBoxContainer
 var title_label: Label                   ## CARD: the title label; PM: the ribbon's label (null without a title)
 var header: Control                      ## body's first child: holds the title (CARD), the ribbon and the close button
 var close_btn: Button                    ## the red X (null when not closable)
+var as_page := false                     ## make_page(): the card fills the screen (under the status bar), no ribbon / X
 var _chrome: Control                     ## the card's top layer holding close_btn
 var ribbon: RibbonTitle                  ## PM look with a title
 var kicker: Label                        ## set_kicker()'s eyebrow (null until set)
@@ -300,7 +301,7 @@ static func _restack(layer: Node) -> void:
 		s._set_cover("" if top else ("hide" if under_pm else "dim"))
 		under_pm = under_pm or s.sheet_look == LOOK_PM
 		if s.close_btn:
-			s.close_btn.visible = top
+			s.close_btn.visible = top and not s.as_page
 		var d := s._scrim_by
 		if not (is_instance_valid(d) and d.is_inside_tree() and not d.is_queued_for_deletion()):
 			s._scrim_by = null
@@ -592,6 +593,16 @@ class ClampBox extends Container:
 ## height, then the content scrolls. fixed_px > 0: the card is always min(fixed_px, max_h of the screen) tall
 ## whatever the content (Shop: one size for every tab). Sheets without fit() still get the width rule unless they
 ## have their own _fit().
+## Turn this sheet into a full-screen page (the game look's Shop): the card fills the screen's width and height under
+## the status bar, wears `bg`, and has no ribbon or corner X (Back still closes it). Call after super().
+func make_page(bg: StyleBox) -> void:
+	as_page = true
+	card.add_theme_stylebox_override("panel", bg)
+	header.custom_minimum_size.y = 0.0
+	if close_btn:
+		close_btn.visible = false
+	fit(1.0, 100000.0)
+
 func fit(max_h := 0.88, fixed_px := 0.0) -> void:
 	_fit_on = true
 	_fit_max = max_h
@@ -605,7 +616,9 @@ func fit_now() -> void:
 	if not is_inside_tree() or card == null:
 		return
 	var vp := get_viewport_rect().size
-	var w := minf(_sheet_w, vp.x - 2.0 * UIKit.GUTTER)
+	var w := vp.x if as_page else minf(_sheet_w, vp.x - 2.0 * UIKit.GUTTER)
+	if as_page:
+		_center.offset_top = _safe_top()
 	if absf(card.custom_minimum_size.x - w) > 0.5:
 		card.custom_minimum_size.x = w
 	if absf(_clampbox.avail_w - (w - _card_pad_x())) > 0.5:
@@ -628,7 +641,9 @@ func fit_now() -> void:
 			cap += RIBBON_TOP                   # the ribbon stands above the card
 		var other := card.get_combined_minimum_size().y - _scroll_wrap.get_combined_minimum_size().y
 		var h: float
-		if _fit_fixed > 0.0:
+		if as_page:
+			h = vp.y - _safe_top() - other
+		elif _fit_fixed > 0.0:
 			h = minf(_fit_fixed, cap) - other
 		else:
 			h = minf(scroll_body.get_combined_minimum_size().y, cap - other)

@@ -839,6 +839,11 @@ func _wire_shop(s: Sheet) -> void:
 				_home_backdrop())
 	if s.has_signal("store_requested"):
 		s.connect("store_requested", open_store)
+	if s.has_signal("nav_picked"):                     # the Shop page's own bottom bar
+		s.connect("nav_picked", func(tab: String):
+			s.close()
+			if tab != "home":
+				_on_tab(tab))
 	s.closed.connect(home.refresh)
 
 ## Switch the café to a room theme (built on first use; the splash already built the equipped one).
