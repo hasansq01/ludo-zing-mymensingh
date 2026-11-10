@@ -40,6 +40,7 @@ float sd_box(vec2 p, vec2 b, float r) {
 }
 
 void fragment() {
+	vec4 tint = COLOR;                    // modulate / self_modulate (and any parent fade) arrive here
 	vec2 px = UV * size;
 	vec2 face_size = vec2(size.x, max(1.0, size.y - lip - lip2));
 	vec2 lip_size = vec2(size.x, max(1.0, size.y - lip2));
@@ -72,7 +73,7 @@ void fragment() {
 	if (lip2 > 0.0) {
 		col = mix(col, lip2_color, clamp(d_lip + 0.5, 0.0, 1.0));
 	}
-	COLOR = vec4(col.rgb, col.a * a);
+	COLOR = vec4(col.rgb, col.a * a) * tint;
 }"""
 
 static var _shader: Shader
