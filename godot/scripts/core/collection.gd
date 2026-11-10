@@ -983,6 +983,25 @@ class FrameArt extends Control:
 			_tex[id] = load(path) if ResourceLoader.exists(path) else null
 		return _tex[id]
 
+	## The shine material: a light sweep of strength `shine` and twinkles at `uv_pts` (texture UVs, at most 8). `key`
+	## staggers the sweep, so pieces on one screen don't flash in step. Also used by medals and nameplates.
+	static func shine_material(shine: float, uv_pts: Array, key: String) -> ShaderMaterial:
+		if _shader == null:
+			_shader = Shader.new()
+			_shader.code = SHADER
+		var m := ShaderMaterial.new()
+		m.shader = _shader
+		var pts := PackedVector2Array()
+		for p: Vector2 in uv_pts.slice(0, 8):
+			pts.append(p)
+		while pts.size() < 8:
+			pts.append(Vector2(-9, -9))
+		m.set_shader_parameter("shine", shine)
+		m.set_shader_parameter("pts", pts)
+		m.set_shader_parameter("n_pts", mini(uv_pts.size(), 8))
+		m.set_shader_parameter("phase", float(hash(key) % 1000) / 1000.0)
+		return m
+
 	func set_frame(id: String) -> void:
 		var f := Collection.frame(id)
 		var shine := float(f.get("shine", 0.0))
@@ -991,21 +1010,11 @@ class FrameArt extends Control:
 			_mat = null
 			material = null
 		else:
-			if _shader == null:
-				_shader = Shader.new()
-				_shader.code = SHADER
-			_mat = ShaderMaterial.new()
-			_mat.shader = _shader
 			var c := Collection.FRAME_CANVAS
-			var pts := PackedVector2Array()
-			for sp: Array in sparks.slice(0, 8):
-				pts.append(Vector2((float(sp[0]) + c) / (2.0 * c), (c - float(sp[1])) / (2.0 * c)))
-			while pts.size() < 8:
-				pts.append(Vector2(-9, -9))
-			_mat.set_shader_parameter("shine", shine)
-			_mat.set_shader_parameter("pts", pts)
-			_mat.set_shader_parameter("n_pts", mini(sparks.size(), 8))
-			_mat.set_shader_parameter("phase", float(hash(id) % 1000) / 1000.0)   # frames on one screen don't sweep in step
+			var uv := []
+			for sp: Array in sparks:
+				uv.append(Vector2((float(sp[0]) + c) / (2.0 * c), (c - float(sp[1])) / (2.0 * c)))
+			_mat = shine_material(shine, uv, id)
 			material = _mat
 		set_meta("frame", id)
 		queue_redraw()
@@ -1045,6 +1054,14 @@ void fragment() {
 ## A medal: the medal_<id>.svg art (or, without it, the plain disc with its mark in Lilita One).
 class BadgeView extends Control:
 	var ach_id := ""
+	## The glint on the medal's rim (texture UV): the sweep crosses the metal, the rim catches a star.
+	const MEDAL_SPARK := Vector2(0.68, 0.42)
+
+	## A 3D medal shines (light sweep + a twinkle on its rim), unless something else (the grey "not earned" look) has
+	## the material.
+	func _shine() -> void:
+		if material == null and ach_id != "":
+			material = Collection.FrameArt.shine_material(0.55, [MEDAL_SPARK], "medal:" + ach_id)
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1059,6 +1076,8 @@ class BadgeView extends Control:
 		var art := Collection.medal_texture(ach_id)
 		if art:
 			draw_texture_rect(art, Rect2(o, Vector2(side, side)), false)
+			if material == null and art is CompressedTexture2D:
+				_shine.call_deferred()
 			return
 		draw_texture_rect(Collection.badge_texture(ach_id), Rect2(o, Vector2(side, side)), false)
 		var a := Collection.ach(ach_id)
@@ -1075,6 +1094,14 @@ class BadgeView extends Control:
 ## The name on its plate, the badge after the name. A plate is 3D art in three slices (assets/ui3d/plate_<id>.webp:
 ## 512 x 128, square caps at both ends, a centre that stretches); Plain is no plate.
 class PlateView extends PanelContainer:
+	## Where a plate's stones twinkle (texture UV of the 512 x 128 art: caps are the outer quarters).
+	const PLATE_SPARKS := {
+		scroll = [Vector2(0.06, 0.5), Vector2(0.94, 0.5)],
+		crystal = [Vector2(0.11, 0.5), Vector2(0.89, 0.5), Vector2(0.15, 0.18), Vector2(0.85, 0.82)],
+		neon = [Vector2(0.08, 0.2), Vector2(0.92, 0.8)],
+		paint = [Vector2(0.11, 0.5), Vector2(0.89, 0.5)],
+		velvet = [Vector2(0.11, 0.42), Vector2(0.89, 0.42)],
+	}
 	var plate_id := Collection.DEFAULT_PLATE
 	var label: Label
 	var badge: BadgeView
@@ -1137,6 +1164,8 @@ class PlateView extends PanelContainer:
 			st.content_margin_top = roundf((hh - _fs * 1.25) / 2.0)
 			st.content_margin_bottom = st.content_margin_top
 		add_theme_stylebox_override("panel", st)
+		var sparks: Array = PLATE_SPARKS.get(plate_id, [])
+		material = null if plain else Collection.FrameArt.shine_material(0.45, sparks, "plate:" + plate_id)
 		queue_redraw()
 
 	## A plate's height for this font size (the band holds the name, the caps stand taller).

@@ -578,7 +578,6 @@ func _draw() -> void:
 	var card := Rect2(Vector2.ZERO, Vector2(CARD_W, CARD_H))
 	draw_style_box(_sb_card_on if active else _sb_card, card)
 	draw_style_box(_sb_slot, Rect2(_slot_pos(), Vector2(SLOT, SLOT)))
-	if kind == "you":                       # the equipped avatar has its own colours: a ring in the seat colour
-		draw_style_box(_sb_you, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(2))
+	# (no square behind an equipped avatar: its frame is the shape; the card's rim and nameplate carry the seat colour)
 	if mover:
 		draw_style_box(_sb_mover, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(3))

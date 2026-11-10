@@ -213,8 +213,7 @@ class Tile extends PlayerTile:
 			_sb_slot.bg_color = Color(_slot_bg, _slot_bg.a * k)
 			_sb_slot.border_color = Color(_slot_edge, _slot_edge.a * k)
 			draw_style_box(_sb_slot, Rect2(_slot_pos(), Vector2(SLOT, SLOT)))
-		if kind == "you":
-			draw_style_box(_sb_you, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(2))
+		# (no square behind an equipped avatar: its frame is the shape; the card's rim and nameplate carry the seat colour)
 		if mover:
 			draw_style_box(_sb_mover, Rect2(_ava_pos(), Vector2(AVA, AVA)).grow(3))
 

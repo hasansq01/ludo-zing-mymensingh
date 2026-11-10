@@ -92,6 +92,8 @@ var _chip_text: Control                  # its name + XP column
 var _name: Label
 var _avatar: Control
 var _level: LevelBadge
+var _wallet: PanelContainer
+var _wallet_rows: Array = []
 var _xp: Meter
 var _gift_badge: Label                   # the red count on the gift
 var _badge_tw: Tween
@@ -274,6 +276,13 @@ func _build_top_bar() -> void:
 	gem_amount = CoinAmount.gems(int(Save.profile.get("gems", 0)), "sm", "plain")
 	gem_amount.name = "GemAmount"
 	gr.add_child(gem_amount)
+	# the rows sit in Buttons, which don't size to their children: the chip widens itself to what they need, so a big
+	# balance ("130.1K" and the "+") never runs under the gift
+	_wallet = wallet
+	_wallet_rows = [cr, gr]
+	for row: Control in _wallet_rows:
+		row.minimum_size_changed.connect(_fit_wallet)
+	_fit_wallet.call_deferred()
 	# the gift: Free spin / Daily reward / Free coins (the Rewards sheet), with the count of those ready now
 	rewards_button = UIKit.icon_button(HI % "gift", "glass", int(BAR_H), 38)
 	rewards_button.name = "Rewards"
@@ -287,6 +296,16 @@ func _build_top_bar() -> void:
 	var gear := UIKit.icon_button(HI % "gear", "glass", int(BAR_H), 32)
 	gear.pressed.connect(func(): open_tab.emit("settings"))
 	_top.add_child(gear)
+
+
+## The wallet chip's width: its widest row plus its padding, never under WALLET_W.
+func _fit_wallet() -> void:
+	if not is_instance_valid(_wallet):
+		return
+	var need := WALLET_W
+	for row: Control in _wallet_rows:
+		need = maxf(need, row.get_combined_minimum_size().x + 12.0 + 8.0)
+	_wallet.custom_minimum_size.x = ceilf(need)
 
 
 func _build_dock() -> void:
