@@ -774,9 +774,10 @@ msgstr "%s লাগবে"
 
 # Time left (13h 20m) -> 13ঘ 20মি
 #. Numbers and times · fmt.gd until()
-#: scripts/core/fmt.gd:51
+#. leaderboard_sheet.gd left_text()
+#: scripts/core/fmt.gd:51 scripts/ui/sheets/leaderboard_sheet.gd:322
 msgid "%dh %dm"
-msgstr "%dঘ %dমি"
+msgstr "%d ঘণ্টা %d মিনিট"
 
 #. Numbers and times · fmt.gd until()
 #: scripts/core/fmt.gd:51
@@ -815,7 +816,7 @@ msgstr "%d দিন আগে"
 #. Result screen · result_screen.gd _vote_chip()
 #. Result screen · result_screen.gd card_data()
 #. leaderboard_sheet.gd _render_me()
-#: scripts/core/l10n.gd:60 scripts/game/sl_match.gd:387 scripts/game/sl_match.gd:698 scripts/game/sl_match.gd:1168 scripts/ui/components/result_screen.gd:660 scripts/ui/components/result_screen.gd:1025 scripts/ui/sheets/leaderboard_sheet.gd:302
+#: scripts/core/l10n.gd:60 scripts/game/sl_match.gd:387 scripts/game/sl_match.gd:698 scripts/game/sl_match.gd:1168 scripts/ui/components/result_screen.gd:660 scripts/ui/components/result_screen.gd:1025 scripts/ui/sheets/leaderboard_sheet.gd:421
 msgid "You"
 msgstr "তুমি"
 
@@ -841,8 +842,9 @@ msgstr "নীল"
 
 #. l10n.gd is_bn()
 #. conflict_sheet.gd summary_card()
+#. leaderboard_sheet.gd _podium_column()
 #. leaderboard_sheet.gd _row()
-#: scripts/core/l10n.gd:60 scripts/ui/sheets/conflict_sheet.gd:93 scripts/ui/sheets/leaderboard_sheet.gd:222
+#: scripts/core/l10n.gd:60 scripts/ui/sheets/conflict_sheet.gd:93 scripts/ui/sheets/leaderboard_sheet.gd:269 scripts/ui/sheets/leaderboard_sheet.gd:335
 msgid "Player"
 msgstr "প্লেয়ার"
 
@@ -892,7 +894,7 @@ msgstr "লুডু · এক ফোনে"
 #. profile_sheet.gd _build_stats()
 #. settings_sheet.gd _build()
 #. shop_sheet.gd
-#: scripts/core/match_store.gd:41 scripts/net/share.gd:16 scripts/ui/components/invite_banner.gd:94 scripts/ui/home_screen.gd:730 scripts/ui/setup_sheet.gd:49 scripts/ui/sheets/friends_sheet.gd:362 scripts/ui/sheets/howto_sheet.gd:58 scripts/ui/sheets/howto_sheet.gd:168 scripts/ui/sheets/lobby_sheet.gd:79 scripts/ui/sheets/profile_sheet.gd:504 scripts/ui/sheets/settings_sheet.gd:165 scripts/ui/sheets/shop_sheet.gd:54
+#: scripts/core/match_store.gd:41 scripts/net/share.gd:16 scripts/ui/components/invite_banner.gd:94 scripts/ui/home_screen.gd:730 scripts/ui/setup_sheet.gd:49 scripts/ui/sheets/friends_sheet.gd:362 scripts/ui/sheets/howto_sheet.gd:58 scripts/ui/sheets/howto_sheet.gd:168 scripts/ui/sheets/lobby_sheet.gd:79 scripts/ui/sheets/profile_sheet.gd:513 scripts/ui/sheets/settings_sheet.gd:165 scripts/ui/sheets/shop_sheet.gd:54
 msgid "Snakes & Ladders"
 msgstr "সাপ-সিঁড়ি"
 
@@ -2146,7 +2148,7 @@ msgstr "এটা এখন পাওয়া যাচ্ছে না। এ�
 # REVIEW: the quoted word “You” is the English reserved name the game blocks, kept Latin on purpose
 #. account.gd error_text()
 #. profile_sheet.gd _validate()
-#: scripts/net/account.gd:498 scripts/ui/sheets/profile_sheet.gd:797
+#: scripts/net/account.gd:498 scripts/ui/sheets/profile_sheet.gd:812
 msgid "Pick another name: “You” is how the game shows you to yourself."
 msgstr "অন্য নাম দাও: “You” নামটা গেম নিজেই তোমার জন্য ব্যবহার করে।"
 
@@ -3505,7 +3507,7 @@ msgstr "পরিবর্তন করা গেল না। আবার চ�
 #. profile_sheet.gd _ach_card()
 #. profile_sheet.gd _claim_width()
 #. rewards_sheet.gd
-#: scripts/ui/sheets/daily_sheet.gd:84 scripts/ui/sheets/daily_sheet.gd:110 scripts/ui/sheets/missions_sheet.gd:96 scripts/ui/sheets/profile_sheet.gd:610 scripts/ui/sheets/profile_sheet.gd:654 scripts/ui/sheets/rewards_sheet.gd:26 scripts/ui/sheets/rewards_sheet.gd:27
+#: scripts/ui/sheets/daily_sheet.gd:84 scripts/ui/sheets/daily_sheet.gd:110 scripts/ui/sheets/missions_sheet.gd:96 scripts/ui/sheets/profile_sheet.gd:624 scripts/ui/sheets/profile_sheet.gd:668 scripts/ui/sheets/rewards_sheet.gd:26 scripts/ui/sheets/rewards_sheet.gd:27
 msgid "Claim"
 msgstr "নাও"
 
@@ -3733,7 +3735,7 @@ msgstr "রুমে ঢোকো"
 #. friends_sheet.gd _render()
 #. leaderboard_sheet.gd load_board()
 #. missions_sheet.gd _init()
-#: scripts/ui/sheets/friends_sheet.gd:237 scripts/ui/sheets/leaderboard_sheet.gd:115 scripts/ui/sheets/missions_sheet.gd:31
+#: scripts/ui/sheets/friends_sheet.gd:237 scripts/ui/sheets/leaderboard_sheet.gd:129 scripts/ui/sheets/missions_sheet.gd:31
 msgid "Loading…"
 msgstr "লোড হচ্ছে…"
 
@@ -3755,7 +3757,7 @@ msgstr "বন্ধু যোগ করতে বা সরাতে তার�
 #. friends_sheet.gd _note()
 #. leaderboard_sheet.gd _show_state()
 #. quick_sheet.gd _show()
-#: scripts/ui/sheets/friends_sheet.gd:266 scripts/ui/sheets/leaderboard_sheet.gd:184 scripts/ui/sheets/quick_sheet.gd:140
+#: scripts/ui/sheets/friends_sheet.gd:266 scripts/ui/sheets/leaderboard_sheet.gd:198 scripts/ui/sheets/quick_sheet.gd:140
 msgid "Try again"
 msgstr "আবার চেষ্টা করো"
 
@@ -4018,73 +4020,83 @@ msgstr "চরিত্র · সব খেলায় তোমার ছব�
 
 #. leaderboard_sheet.gd _init()
 #. profile_sheet.gd _build_identity()
-#: scripts/ui/sheets/leaderboard_sheet.gd:43 scripts/ui/sheets/profile_sheet.gd:240
+#: scripts/ui/sheets/leaderboard_sheet.gd:44 scripts/ui/sheets/profile_sheet.gd:240
 msgid "Leaderboard"
 msgstr "লিডারবোর্ড"
 
 #. leaderboard_sheet.gd _init()
-#: scripts/ui/sheets/leaderboard_sheet.gd:45
+#: scripts/ui/sheets/leaderboard_sheet.gd:46
 msgid "Level"
 msgstr "লেভেল"
 
 #. leaderboard_sheet.gd _init()
-#: scripts/ui/sheets/leaderboard_sheet.gd:45
+#: scripts/ui/sheets/leaderboard_sheet.gd:46
 msgid "Online wins"
 msgstr "অনলাইন জয়"
 
 #. leaderboard_sheet.gd _init()
-#: scripts/ui/sheets/leaderboard_sheet.gd:49
+#: scripts/ui/sheets/leaderboard_sheet.gd:51
 msgid "Weekly"
 msgstr "সাপ্তাহিক"
 
 #. leaderboard_sheet.gd _init()
-#: scripts/ui/sheets/leaderboard_sheet.gd:49
+#: scripts/ui/sheets/leaderboard_sheet.gd:51
 msgid "All time"
 msgstr "সব সময়ের"
 
 #. leaderboard_sheet.gd load_board()
-#: scripts/ui/sheets/leaderboard_sheet.gd:138
+#: scripts/ui/sheets/leaderboard_sheet.gd:118
+msgid "New week in %s"
+msgstr "নতুন সপ্তাহ শুরু %s পরে"
+
+#. leaderboard_sheet.gd load_board()
+#: scripts/ui/sheets/leaderboard_sheet.gd:152
 msgid "The leaderboard isn’t available right now. Try again soon."
 msgstr "লিডারবোর্ড এখন পাওয়া যাচ্ছে না। একটু পরে আবার চেষ্টা করো।"
 
 #. leaderboard_sheet.gd _render()
-#: scripts/ui/sheets/leaderboard_sheet.gd:197
+#: scripts/ui/sheets/leaderboard_sheet.gd:211
 msgid "No one is on the board yet. Play online matches to be the first."
 msgstr "বোর্ডে এখনো কেউ নেই। অনলাইন ম্যাচ খেলে প্রথম হও।"
 
+#. leaderboard_sheet.gd left_text()
+#: scripts/ui/sheets/leaderboard_sheet.gd:321
+msgid "%dd %dh"
+msgstr "%d দিন %d ঘণ্টা"
+
 # same in Bangla
 #. leaderboard_sheet.gd value_text()
-#: scripts/ui/sheets/leaderboard_sheet.gd:284
+#: scripts/ui/sheets/leaderboard_sheet.gd:403
 msgid "%s XP"
 msgstr "%s XP"
 
 #. leaderboard_sheet.gd value_text()
-#: scripts/ui/sheets/leaderboard_sheet.gd:285
+#: scripts/ui/sheets/leaderboard_sheet.gd:404
 msgid "%s win"
 msgid_plural "%s wins"
 msgstr[0] "%s জয়"
 msgstr[1] "%s জয়"
 
 #. leaderboard_sheet.gd _render_me()
-#: scripts/ui/sheets/leaderboard_sheet.gd:316
+#: scripts/ui/sheets/leaderboard_sheet.gd:437
 msgid "Play %d more match to appear"
 msgid_plural "Play %d more matches to appear"
 msgstr[0] "লিস্টে আসতে আরও %d ম্যাচ খেলো।"
 msgstr[1] "লিস্টে আসতে আরও %d ম্যাচ খেলো।"
 
 #. leaderboard_sheet.gd _render_me()
-#: scripts/ui/sheets/leaderboard_sheet.gd:319
+#: scripts/ui/sheets/leaderboard_sheet.gd:440
 msgid "Not ranked yet"
 msgstr "এখনো র‍্যাঙ্ক নেই"
 
 #. leaderboard_sheet.gd _render_me()
 #. quick_sheet.gd _init()
-#: scripts/ui/sheets/leaderboard_sheet.gd:323 scripts/ui/sheets/quick_sheet.gd:470
+#: scripts/ui/sheets/leaderboard_sheet.gd:444 scripts/ui/sheets/quick_sheet.gd:470
 msgid "Level %d"
 msgstr "লেভেল %d"
 
 #. leaderboard_sheet.gd _render_me()
-#: scripts/ui/sheets/leaderboard_sheet.gd:326
+#: scripts/ui/sheets/leaderboard_sheet.gd:447
 msgid "Connect to see your rank"
 msgstr "র‍্যাঙ্ক দেখতে কানেক্ট করো"
 
@@ -4286,7 +4298,7 @@ msgstr "খুলতে তিনটিই শেষ করুন"
 #. profile_sheet.gd _claim()
 #. rewards_sheet.gd _on_watched()
 #. spin_sheet.gd _landed()
-#: scripts/ui/sheets/missions_sheet.gd:121 scripts/ui/sheets/profile_sheet.gd:720 scripts/ui/sheets/profile_sheet.gd:722 scripts/ui/sheets/rewards_sheet.gd:180 scripts/ui/sheets/spin_sheet.gd:215
+#: scripts/ui/sheets/missions_sheet.gd:121 scripts/ui/sheets/profile_sheet.gd:734 scripts/ui/sheets/profile_sheet.gd:736 scripts/ui/sheets/rewards_sheet.gd:180 scripts/ui/sheets/spin_sheet.gd:215
 msgid "+%d gems"
 msgstr "+%d জেম"
 
@@ -4360,7 +4372,7 @@ msgstr "অর্জন"
 #. profile_sheet.gd _build_identity()
 #. profile_sheet.gd _build_name()
 #. Welcome screen (first launch) · welcome.gd _build_card()
-#: scripts/ui/sheets/profile_sheet.gd:93 scripts/ui/sheets/profile_sheet.gd:224 scripts/ui/sheets/profile_sheet.gd:365 scripts/ui/welcome.gd:127
+#: scripts/ui/sheets/profile_sheet.gd:93 scripts/ui/sheets/profile_sheet.gd:224 scripts/ui/sheets/profile_sheet.gd:375 scripts/ui/welcome.gd:127
 msgid "Your name"
 msgstr "তোমার নাম"
 
@@ -4394,164 +4406,164 @@ msgid "Dice"
 msgstr "ডাইস"
 
 #. profile_sheet.gd _build_name()
-#: scripts/ui/sheets/profile_sheet.gd:375
+#: scripts/ui/sheets/profile_sheet.gd:385
 msgid "Save"
 msgstr "সেভ"
 
 #. profile_sheet.gd _build_account()
 #. profile_sheet.gd _refresh_account()
 #. settings_sheet.gd _account_line()
-#: scripts/ui/sheets/profile_sheet.gd:398 scripts/ui/sheets/profile_sheet.gd:456 scripts/ui/sheets/profile_sheet.gd:459 scripts/ui/sheets/settings_sheet.gd:340
+#: scripts/ui/sheets/profile_sheet.gd:408 scripts/ui/sheets/profile_sheet.gd:466 scripts/ui/sheets/profile_sheet.gd:469 scripts/ui/sheets/settings_sheet.gd:340
 msgid "Guest"
 msgstr "অতিথি"
 
 #. profile_sheet.gd _build_account()
 #. settings_sheet.gd _account_line()
-#: scripts/ui/sheets/profile_sheet.gd:407 scripts/ui/sheets/settings_sheet.gd:353
+#: scripts/ui/sheets/profile_sheet.gd:417 scripts/ui/sheets/settings_sheet.gd:353
 msgid "Synced"
 msgstr "সিঙ্ক হয়েছে"
 
 #. profile_sheet.gd _build_account()
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:416 scripts/ui/sheets/profile_sheet.gd:449
+#: scripts/ui/sheets/profile_sheet.gd:426 scripts/ui/sheets/profile_sheet.gd:459
 msgid "Sign in with Google Play Games"
 msgstr "Google Play Games দিয়ে সাইন ইন"
 
 #. profile_sheet.gd _build_account()
-#: scripts/ui/sheets/profile_sheet.gd:421
+#: scripts/ui/sheets/profile_sheet.gd:431
 msgid "You’re offline. Connect to sign in."
 msgstr "তুমি অফলাইন। সাইন ইন করতে কানেক্ট করো।"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:449
+#: scripts/ui/sheets/profile_sheet.gd:459
 msgid "Signing in…"
 msgstr "সাইন ইন হচ্ছে…"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:454
+#: scripts/ui/sheets/profile_sheet.gd:464
 msgid "Signed in with Google Play Games. Your progress is saved to your account."
 msgstr "Google Play Games দিয়ে সাইন ইন করা আছে। তোমার প্রোগ্রেস অ্যাকাউন্টে সেভ হচ্ছে।"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:457
+#: scripts/ui/sheets/profile_sheet.gd:467
 msgid "Sign in to keep your progress if you change phones."
 msgstr "ফোন বদলালেও প্রোগ্রেস রাখতে সাইন ইন করো।"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:460
+#: scripts/ui/sheets/profile_sheet.gd:470
 msgid "Your progress is saved on our server. Sign-in with Google Play Games is available on Android."
 msgstr "তোমার প্রোগ্রেস আমাদের সার্ভারে সেভ আছে। Google Play Games দিয়ে সাইন ইন Android-এ পাওয়া যায়।"
 
 #. profile_sheet.gd _refresh_account()
 #. settings_sheet.gd _account_line()
-#: scripts/ui/sheets/profile_sheet.gd:462 scripts/ui/sheets/settings_sheet.gd:346
+#: scripts/ui/sheets/profile_sheet.gd:472 scripts/ui/sheets/settings_sheet.gd:346
 msgid "Guest · offline"
 msgstr "অতিথি · অফলাইন"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:463
+#: scripts/ui/sheets/profile_sheet.gd:473
 msgid "You’re offline. Your progress will sync when you’re back online."
 msgstr "তুমি অফলাইন। অনলাইনে ফিরলে প্রোগ্রেস সিঙ্ক হবে।"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:465
+#: scripts/ui/sheets/profile_sheet.gd:475
 msgid "Account unavailable"
 msgstr "অ্যাকাউন্ট পাওয়া যাচ্ছে না"
 
 #. profile_sheet.gd _refresh_account()
-#: scripts/ui/sheets/profile_sheet.gd:466
+#: scripts/ui/sheets/profile_sheet.gd:476
 msgid "This account can’t play online right now."
 msgstr "এই অ্যাকাউন্ট এখন অনলাইনে খেলতে পারবে না।"
 
 #. profile_sheet.gd _sign_in_google()
-#: scripts/ui/sheets/profile_sheet.gd:483
+#: scripts/ui/sheets/profile_sheet.gd:492
 msgid "Signed in as %s"
 msgstr "%s হিসেবে সাইন ইন হয়েছে"
 
 #. profile_sheet.gd _sign_in_google()
-#: scripts/ui/sheets/profile_sheet.gd:483
+#: scripts/ui/sheets/profile_sheet.gd:492
 msgid "your Google account"
 msgstr "তোমার Google অ্যাকাউন্ট"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:501
+#: scripts/ui/sheets/profile_sheet.gd:510
 msgid "Finish a game to start your stats."
 msgstr "স্ট্যাটস শুরু করতে একটা খেলা শেষ করো।"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:503
+#: scripts/ui/sheets/profile_sheet.gd:512
 msgid "Ludo vs computer"
 msgstr "লুডু · কম্পিউটারের সাথে"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:503 scripts/ui/sheets/profile_sheet.gd:504
+#: scripts/ui/sheets/profile_sheet.gd:512 scripts/ui/sheets/profile_sheet.gd:513
 msgid "Played"
 msgstr "খেলেছো"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:503 scripts/ui/sheets/profile_sheet.gd:504
+#: scripts/ui/sheets/profile_sheet.gd:512 scripts/ui/sheets/profile_sheet.gd:513
 msgid "Wins"
 msgstr "জয়"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:503
+#: scripts/ui/sheets/profile_sheet.gd:512
 msgid "Win rate"
 msgstr "জয়ের হার"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:503
+#: scripts/ui/sheets/profile_sheet.gd:512
 msgid "Best streak"
 msgstr "সেরা স্ট্রিক"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:505
+#: scripts/ui/sheets/profile_sheet.gd:514
 msgid "Overall"
 msgstr "সব মিলিয়ে"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:505
+#: scripts/ui/sheets/profile_sheet.gd:514
 msgid "Pairs formed"
 msgstr "বাঁধা জোড়া"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:505
+#: scripts/ui/sheets/profile_sheet.gd:514
 msgid "Pass & Play games"
 msgstr "এক ফোনে খেলা"
 
 #. profile_sheet.gd _build_stats()
-#: scripts/ui/sheets/profile_sheet.gd:506
+#: scripts/ui/sheets/profile_sheet.gd:515
 msgid "Coins earned"
 msgstr "কয়েন আয় হয়েছে"
 
 # REVIEW: label before the coin chip of unclaimed achievement rewards
 #. profile_sheet.gd _build_ach()
-#: scripts/ui/sheets/profile_sheet.gd:552
+#: scripts/ui/sheets/profile_sheet.gd:562
 msgid "To claim"
 msgstr "নেওয়ার বাকি"
 
 #. profile_sheet.gd _ach_card()
-#: scripts/ui/sheets/profile_sheet.gd:596
+#: scripts/ui/sheets/profile_sheet.gd:610
 msgid "Claimed"
 msgstr "নেওয়া হয়েছে"
 
 #. profile_sheet.gd _claim()
-#: scripts/ui/sheets/profile_sheet.gd:722
+#: scripts/ui/sheets/profile_sheet.gd:736
 msgid "%s: %s coins"
 msgstr "%s: %s কয়েন"
 
 # REVIEW: placeholder order kept (earned, total), shows as 3 / 6 অর্জিত
 #. profile_sheet.gd _refresh()
-#: scripts/ui/sheets/profile_sheet.gd:776
+#: scripts/ui/sheets/profile_sheet.gd:790
 msgid "%d of %d earned"
 msgstr "%d / %d পেয়েছো"
 
 #. profile_sheet.gd _validate()
-#: scripts/ui/sheets/profile_sheet.gd:798
+#: scripts/ui/sheets/profile_sheet.gd:813
 msgid "Enter a name of 1 to %d characters."
 msgstr "1 থেকে %d অক্ষরের একটা নাম দাও।"
 
 #. profile_sheet.gd _save_name()
-#: scripts/ui/sheets/profile_sheet.gd:825
+#: scripts/ui/sheets/profile_sheet.gd:840
 msgid "Name saved"
 msgstr "নাম সেভ হয়েছে"
 
