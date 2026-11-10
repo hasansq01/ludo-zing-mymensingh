@@ -44,7 +44,7 @@ func _baked() -> void:
 	for f in DirAccess.get_files_at(Thumbnailer.BAKED_DIR):
 		if f.ends_with(".webp"):
 			total += FileAccess.get_file_as_bytes(Thumbnailer.BAKED_DIR + f).size()
-	check("baked pictures stay small (< 1.5 MB in all)", total > 0 and total < 1_572_864, total)
+	check("baked pictures stay small (< 2.5 MB in all; pawns and dice at 2x since the game-look Shop)", total > 0 and total < 2_621_440, total)
 	t = null
 	Thumbnailer._baked.clear()               # no textures held by static caches at exit
 	Thumbnailer._mem.clear()

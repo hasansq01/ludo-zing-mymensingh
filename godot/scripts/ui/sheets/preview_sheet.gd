@@ -1,8 +1,8 @@
 class_name PreviewSheet
-extends Sheet
-## The Shop's live 3D preview (index.html Preview / #pvSheet / .pv) of a Ludo room or a Snakes & Ladders scene, in
-## the PM look: the item's name on the ribbon, the live view, then what it is ("LUDO ROOM" / "S&L SCENE"), its
-## description and one action (Buy with its price, "Need 2.5K", Use, or the "In use" pill).
+extends OfferSheet
+## The Shop's offer of a Ludo room or a Snakes & Ladders scene (OfferSheet: the rarity card, "EPIC LUDO ROOM", the
+## name, its description on a chip, the chunky price, "or N gems", Use / In use) with its live 3D preview where the
+## art goes, in a rounded frame on the card's rim colour.
 ##   room   a SubViewport rendering the app's own World3D (the café, with this room switched in for the preview)
 ##          through its own orbit camera; drag to turn, pinch / wheel to zoom, the reset button goes back to the start
 ##          view. Closing switches the café back to the room in use.
@@ -15,25 +15,21 @@ extends Sheet
 ## the drag hint) work. On the "low" quality tier (Quality.tier()) it stays on the snapshot with a "Tap to view in
 ## 3D" chip that builds the live view on demand. If the view can't start, the snapshot stays with Retry. The
 ## SubViewport (and, for scenes, its world) is freed when the sheet closes.
-## Nothing about the player changes until Buy (asks first, then owns it and puts it in use) or Use. The X is the only
-## dismiss control (Back and a backdrop tap too).
+## Nothing about the player changes until the price (one tap buys it and puts it in use; then the RevealSheet) or Use.
+## The X, Back and a tap on the dim close it.
 ##   var pv := PreviewSheet.new("dream"); pv.room_changed.connect(app.apply_room); pv.open(layer)
 ##   var pv := PreviewSheet.new("frost", "scene"); pv.scene_changed.connect(app.apply_scene); pv.open(layer)
 
 signal room_changed(id: String)          ## room: Buy or Use, the room is in use now
 signal scene_changed(id: String)         ## scene: Buy or Use, the scene is in use now
 signal bought(id: String)                ## Buy: the item is owned now
-signal store_requested                   ## "Open Store" after "not enough gems" (the Shop passes it on to Main)
 
 ## Orbit limits, ray-checked on the web in all five rooms so no furniture comes between the camera and the table.
 const LIM := {az = [0.3, 0.9], el = [0.0, 0.62], zoom = [0.45, 1.0]}
 const HOME := {az = 0.72, el = 0.0, zoom = 1.0}
 const LOOK := Vector3(-2, 3, -2)
-const MAX_W := 440.0
 const LOAD_TIMEOUT := 25.0
 const HINT_SEC := 2.0                    # "Drag to look around" fades after this (or on the first drag)
-## l10n-keys: room, scene
-const KIND_TEXT := {room = "Ludo room", scene = "S&L scene"}
 const SPIN_PER_PX := 0.012               # scene: table turn (radians) per dragged px
 
 ## Tests: make the 3D start fail (shows the fallback + Retry).
@@ -42,8 +38,8 @@ static var debug_fail := false
 static var _want := ""
 static var _busy := false
 
-var kind := "room"                       ## "room" | "scene"
-var room_id := ""                        ## the item's id (a room id or a scene id)
+var room_id: String:                     ## the item's id (a room id or a scene id)
+	get: return item_id
 var ready_3d := false                    # the 3D view is drawing
 var failed := false
 var o := {}                              # orbit now (eases towards goal)
@@ -53,7 +49,6 @@ var _loading := false
 var _load_t := 0.0
 var _ended := false
 var _hint_faded := false
-var _asking := false                     # the Buy confirm is showing
 var _world: TableWorld
 var _baker: TexBaker
 var _vp: SubViewport
@@ -65,53 +60,45 @@ var _clip: PanelContainer
 var _view: Control
 var _fallback: Control
 var _hint: Label
-var _chip: Button                        # low tier: "Tap to view in 3D"
+var _chip3d: Button                        # low tier: "Tap to view in 3D"
 var _live_tw: Tween
 var _tools: Control                      # the reset button
 var _msg: PanelContainer
-var _info: VBoxContainer
-var _kind_l: Label
-var _name_l: Label                       ## the ribbon's label (the item's name)
-var _desc_l: Label
-var _act: Button                         # the action showing now (Buy / Need / Use), null when in use
-var _buy: Button
-var _need: Button
-var _use: Button
-var _on_pill: PanelContainer
-var _gem: Button                         # "or [gem] N": the same second price as the Shop card
-var _busy_gems := false
 var _pts := {}                           # pointer id -> last position (touch index, or MOUSE for the mouse)
 const MOUSE := 1000
 
 
 func _init(id: String, kind_ := "room") -> void:
-	super(L10n.t(str(_item_of(id, kind_).get("name", ""))), 390.0, true, LOOK_PM)
-	kind = "scene" if kind_ == "scene" else "room"
-	room_id = id
-	_name_l = title_label
+	var k := "scene" if kind_ == "scene" else "room"
+	super(k, id, str(_item_of(id, k).get("name", "")))
 	goal = HOME.duplicate()
 	o = {az = goal.az, el = goal.el + 0.3, zoom = goal.zoom * 0.8}   # glides in once drawing (inside the limits)
-	body.add_theme_constant_override("separation", UIKit.SPACE.md)
-	_clip = PanelContainer.new()
-	var cs := UIKit.box(Palette.CHIP, UIKit.R.lg)
-	UIKit.pad(cs, 0)
-	_clip.add_theme_stylebox_override("panel", cs)
-	_clip.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	_clip.add_child(_build_view())
-	body.add_child(_clip)
-	body.add_child(_build_panel())
 	process_priority = 10                # after the scene world's own _process (the sign is shrunk after its refit)
 	closed.connect(_end)
 	tree_exiting.connect(_end)
 
+## The live view in a rounded frame on the card's rim colour.
+func _make_art() -> Control:
+	_clip = PanelContainer.new()
+	_clip.name = "Frame"
+	var cs := UIKit.box(Color(colors[4], 0.9), 20, 3, colors[3])
+	UIKit.pad(cs, 3)
+	_clip.add_theme_stylebox_override("panel", cs)
+	_clip.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_clip.add_child(_build_view())
+	return _clip
+
+func _fact_list() -> Array:
+	var d := str(_item().get("desc", ""))
+	return [L10n.t(d)] if d != "" else []
+
 
 func _ready() -> void:
-	get_viewport().size_changed.connect(_fit)
-	_fit()
-	_panel()
+	super._ready()
 	_place()
 	if low_tier():
-		_chip.visible = true                 # the snapshot stays; the live view only on request
+		_chip3d.visible = true                 # the snapshot stays; the live view only on request
 		_place()
 	else:
 		_start_later()
@@ -168,9 +155,11 @@ func _place() -> void:
 		c.offset_top = dy - m.y * ay
 		c.offset_right = c.offset_left + m.x
 		c.offset_bottom = c.offset_top + m.y
+	if _hint == null:
+		return
 	put.call(_hint, 0.0, 1.0, 12.0, -14.0)
 	_hint.visible = _view.size.x >= 200.0 and ready_3d and not _hint_faded
-	put.call(_chip, 0.5, 1.0, 0.0, -12.0)
+	put.call(_chip3d, 0.5, 1.0, 0.0, -12.0)
 	put.call(_tools, 1.0, 1.0, -10.0, -10.0)
 	put.call(_msg, 0.5, 0.5, 0.0, 0.0)
 
@@ -215,14 +204,14 @@ func _build_view() -> Control:
 	_hint.visible = false
 	_view.add_child(_hint)
 	# low tier: the live view on request
-	_chip = UIKit.button_with(tr("Tap to view in 3D"), UIKit.icon("ic_eye", 20), "white", "sm")
-	_chip.name = "View3D"
-	_chip.custom_minimum_size.x = 196
-	_chip.visible = false
-	_chip.pressed.connect(func():
-		_chip.visible = false
+	_chip3d = UIKit.button_with(tr("Tap to view in 3D"), UIKit.icon("ic_eye", 20), "white", "sm")
+	_chip3d.name = "View3D"
+	_chip3d.custom_minimum_size.x = 196
+	_chip3d.visible = false
+	_chip3d.pressed.connect(func():
+		_chip3d.visible = false
 		start_3d())
-	_view.add_child(_chip)
+	_view.add_child(_chip3d)
 	# back to the start view (pinch / wheel zoom, drag turns)
 	var reset := UIKit.icon_button("ic_reset", "glass", UIKit.TAP, 24)
 	reset.name = "Reset"
@@ -247,58 +236,7 @@ func _build_view() -> Control:
 	_view.add_child(_msg)
 	return _view
 
-func _build_panel() -> Control:
-	_info = UIKit.vbox(UIKit.SPACE.xs)
-	_kind_l = UIKit.eyebrow(L10n.t(KIND_TEXT[kind]))
-	_kind_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_info.add_child(UIKit.margin(_kind_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
-	_desc_l = UIKit.paragraph("", UIKit.FS.body, Palette.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	_info.add_child(UIKit.margin(_desc_l, UIKit.SPACE.xs, 0, UIKit.SPACE.xs, 0))
-	var slot := MarginContainer.new()
-	slot.custom_minimum_size.y = UIKit.TAP + 4
-	slot.add_theme_constant_override("margin_top", UIKit.SPACE.sm)
-	var price := int(_item().get("price", 0))
-	_buy = UIKit.button_with(tr("Buy"), CoinAmount.new(price, "md", "plain"), "gold", "md")
-	_buy.name = "Buy"
-	var row := _buy.get_node("Content") as HBoxContainer
-	row.move_child(row.get_child(0), -1)  # "Buy  (coin) 3K"
-	_need = UIKit.btn("", "off", "md")
-	_need.name = "Need"
-	_use = UIKit.btn(tr("Use"), "teal", "md")
-	_use.name = "Use"
-	for b: Button in [_buy, _need, _use]:
-		b.pressed.connect(_on_act)
-		slot.add_child(b)
-	_on_pill = ShopSheet.in_use_pill()
-	_on_pill.custom_minimum_size.y = UIKit.H.md
-	slot.add_child(_on_pill)
-	_info.add_child(slot)
-	if price > 0:                            # the Shop card's "or [gem] N" line
-		_gem = ShopSheet.gem_option(Catalog.gem_price(price))
-		_gem.pressed.connect(_on_gems)
-		_info.add_child(_gem)
-	return _info
-
-
 # ---------- layout ----------
-
-## Width min(440, screen - 2 x GUTTER); the view square, at most 58% of the screen height and 440 px, giving way so
-## the whole card fits; short screens drop the kicker and description.
-func _fit() -> void:
-	if not is_inside_tree():
-		return
-	var vp := get_viewport_rect().size
-	_desc_l.visible = vp.y >= 520.0
-	_kind_l.visible = vp.y >= 520.0
-	var w := minf(MAX_W, vp.x - 2.0 * UIKit.GUTTER)
-	card.custom_minimum_size.x = w
-	var st := card.get_theme_stylebox("panel")
-	var vw := w - st.get_margin(SIDE_LEFT) - st.get_margin(SIDE_RIGHT)
-	var vh := minf(vw, minf(0.58 * (vp.y - 24.0), 440.0))
-	var other := (_info.get_combined_minimum_size().y + header.get_combined_minimum_size().y + st.get_margin(SIDE_TOP)
-		+ st.get_margin(SIDE_BOTTOM) + 2.0 * UIKit.SPACE.md + 24.0 - RIBBON_TOP)
-	vh = clampf(minf(vh, vp.y - other), minf(140.0, vw), vw)
-	_view.custom_minimum_size = Vector2(0, roundf(vh))
 
 ## The SubViewport renders in device pixels (the UI is scaled to the screen), so the view stays sharp.
 func _size_vp() -> void:
@@ -311,7 +249,7 @@ func _size_vp() -> void:
 		_vp.size = px
 
 
-# ---------- details + Buy / Use ----------
+# ---------- state ----------
 
 func _owns() -> bool:
 	return SLScenes.owns_scene(room_id) if kind == "scene" else Catalog.owns_room(room_id)
@@ -319,95 +257,29 @@ func _owns() -> bool:
 func _in_use() -> String:
 	return SLScenes.scene_in_use() if kind == "scene" else Catalog.room_in_use()
 
-func _panel() -> void:
-	var r := _item()
-	if r.is_empty():
+## The offer's state; no room switch (Buy / Use) while the preview is still building this room.
+func refresh() -> void:
+	super.refresh()
+	if not is_instance_valid(_buy):
 		return
-	var own := _owns()
-	var on := own and _in_use() == room_id
-	var short := int(r.price) - Catalog.coins()
-	if ribbon and ribbon.label.text != L10n.t(str(r.name)):
-		ribbon.set_text(L10n.t(str(r.name)))
-	_desc_l.text = L10n.t(r.desc)
-	_buy.visible = not own and short <= 0
-	_need.visible = not own and short > 0
-	_need.text = Fmt.shortfall(short)
-	_use.visible = own and not on
-	_on_pill.visible = on
-	if _gem:
-		_gem.visible = not own
-	_act = _buy if _buy.visible else _need if _need.visible else _use if _use.visible else null
-	for b: Button in [_buy, _use]:
-		b.disabled = _loading and kind == "room"   # no room switch while the preview is still building this one
+	for b: Button in [_buy, _use, _gem]:
+		if b:
+			b.disabled = not _can_act()
 
-## Buy with gems: the Shop's flow (wallet checks, confirm, purchase, toast).
-func _on_gems() -> void:
-	var r := _item()
-	if r.is_empty() or _busy_gems or _asking or _closing or _owns():
-		return
-	_busy_gems = true
-	_asking = true
-	var res: String = await ShopSheet.buy_with_gems(self, "scene" if kind == "scene" else "room", room_id, L10n.t(str(r.name)))
-	_asking = false
-	_busy_gems = false
-	if not is_instance_valid(self) or _closing:
-		return
-	if res == "store":
-		store_requested.emit()
-	elif res == "bought":
-		bought.emit(room_id)
-		_changed()
-	_panel()
-	_fit()
+func _can_act() -> bool:
+	return not (_loading and kind == "room")
 
-func _on_act() -> void:
-	var r := _item()
-	if r.is_empty() or (_loading and kind == "room") or _asking or _closing:
-		return
-	if _owns():
-		if _in_use() == room_id:
-			return
-		var ok := SLScenes.equip_scene(room_id) if kind == "scene" else Catalog.equip_room(room_id)
-		if ok:
-			Sound.sfx("select")
-			Toast.show(self, tr("%s is in use") % L10n.t(r.name), card, 1.6, "good")
-			_changed()
-		else:
-			Sound.sfx("error")
-			Haptics.error()
-			Toast.show(self, L10n.t(Catalog.SAVE_FAILED), card, 2.2, "bad")
-		_panel()
-		return
-	var price := int(r.price)
-	var short := price - Catalog.coins()
-	if short > 0:
-		Sound.sfx("error")
-		Haptics.error()
-		Toast.show(self, tr("Need %s more coins") % Fmt.coins(short), card, 1.8, "bad")
-		return
-	_asking = true
-	var yes: bool = await Sheet.confirm(self, tr("Buy %s?") % L10n.t(r.name), tr("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], tr("Buy"))
-	_asking = false
-	if not yes or not is_instance_valid(self) or _closing:
-		return
-	var err := SLScenes.buy_scene(room_id, true) if kind == "scene" else Catalog.buy_room(room_id, true)
-	if err == "":
-		Sound.sfx("buy")
-		Haptics.success()
-		Toast.show(self, tr("%s is yours!") % L10n.t(r.name), card, 1.8, "good")
-		bought.emit(room_id)
-		_changed()
-	else:
-		Sound.sfx("error")
-		Haptics.error()
-		Toast.show(self, err, card, 2.2, "bad")
-	_panel()
-
-func _changed() -> void:
+## Bought or put in use: the café / the S&L table follows (main applies it); bought also says so.
+func _announce() -> void:
 	if kind == "scene":
 		scene_changed.emit(room_id)
 	else:
 		room_changed.emit(room_id)
+	super._announce()
+
+func _bought(paid: int, gems: bool) -> void:
+	bought.emit(room_id)
+	super._bought(paid, gems)
 
 
 # ---------- the 3D view ----------
@@ -434,7 +306,7 @@ func start_3d() -> void:
 	_make_vp()
 	_loading = true
 	_load_t = 0.0
-	_panel()
+	refresh()
 	_want = room_id if Rooms.MOOD.has(room_id) else Rooms.DEFAULT
 	_sync(_world, _baker)
 
@@ -478,7 +350,7 @@ func _start_scene() -> void:
 	var run := _run
 	_loading = true
 	_load_t = 0.0
-	_panel()
+	refresh()
 	_vp = SubViewport.new()
 	_vp.name = "ScenePreview"
 	_vp.own_world_3d = true
@@ -545,9 +417,9 @@ func _fail() -> void:
 	_msg.visible = true
 	_hint.visible = false
 	_tools.visible = false
-	_chip.visible = false
+	_chip3d.visible = false
 	if is_inside_tree():
-		_panel()
+		refresh()
 
 ## The live view draws: once its first frame is rendered it crossfades over the snapshot, and only then can it be
 ## dragged (reset button, drag hint).
@@ -556,7 +428,7 @@ func _go_ready() -> void:
 	var run := _run
 	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_update_cam(0.0)
-	_panel()
+	refresh()
 	for i in 2:                              # the first frame rendered into the texture
 		await RenderingServer.frame_post_draw
 		if run != _run or not is_instance_valid(self) or _vp == null:

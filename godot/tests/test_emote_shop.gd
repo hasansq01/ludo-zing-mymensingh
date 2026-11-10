@@ -19,7 +19,8 @@ func run() -> void:
 	_helper()
 	_sandbox()
 	_shop_ui()
-	_wallet()
+	await _offer_flow()
+	await _wallet()
 	_restore()
 	Catalog.profile_source = keep_src
 	Catalog.writer = keep_writer
@@ -250,6 +251,79 @@ func _shop_ui() -> void:
 	check("view: a seamless emote just loops", seam.frame_at(seam.play_sec() + 0.01) < 2)
 	v.free()
 	v2.free()
+
+func _texts(n: Node, out: Array = []) -> Array:
+	if n is Label:
+		out.append((n as Label).text)
+	if n is Button and (n as Button).text != "":
+		out.append((n as Button).text)
+	for c in n.get_children():
+		_texts(c, out)
+	return out
+
+func _reveal_in(layer: Node) -> RevealSheet:
+	for c in layer.get_children():
+		if c is RevealSheet and not (c as Sheet)._closing:
+			return c
+	return null
+
+## The offer (the Buying mock-up): the card's chip and facts, one tap buys (no "Buy X?"), the reveal, USE NOW and
+## Keep shopping both back to the Shop; short coins: says so, buys nothing.
+func _offer_flow() -> void:
+	Save.profile.coins = 9000
+	Save.profile.emote_sets = ["starter"]
+	Save.profile.emote_set = "starter"
+	var layer := Control.new()
+	_root.add_child(layer)
+	var v := EmotePackSheet.new("pawns")
+	v.open(layer)
+	check("offer: the chip names the rarity and the kind", v._chip_l.text == "RARE EMOTE PACK", v._chip_l.text)
+	check("offer: its facts are its real data (how many emotes, Premium)", v._fact_labels.map(func(l: Label): return l.text) == ["8 animated emotes", "Premium"], v._fact_labels.map(func(l: Label): return l.text))
+	check("offer: the price in full and the gems, the line says one tap buys", _texts(v._buy).has("5,000") and v._gem != null and v._gem.visible and v._line.text == "You have 9K coins. One tap buys it.", [_texts(v._buy), v._line.text])
+	var changed := [0]
+	v.changed.connect(func(): changed[0] += 1)
+	await v._on_buy()
+	var asked := layer.get_children().filter(func(c: Node): return c.has_meta("confirm"))
+	check("offer: one tap buys: no question, owned and in use, the Shop is told", asked.is_empty() and Catalog.owns_emotes("pawns") and Catalog.emotes_in_use() == "pawns" and int(Save.profile.coins) == 4000 and changed[0] == 1, [asked.size(), Save.profile.coins, changed[0]])
+	var rv := _reveal_in(layer)
+	var rt := _texts(rv) if rv else []
+	check("reveal: NEW EMOTES!, the name, what it cost and what is left", rv != null and rt.has("NEW EMOTES!") and rt.has("Party Pack") and rt.has("−5,000 · 4K left") and rt.has("Use now") and rt.has("Keep shopping"), rt)
+	Catalog.equip_emotes("starter")                  # (as if it had been changed meanwhile)
+	await rv._on_use()
+	check("reveal: USE NOW puts it in use, then the reveal and the offer go (back to the Shop)", Catalog.emotes_in_use() == "pawns" and rv._closing and v._closing and changed[0] == 2)
+	# Keep shopping: back to the Shop, nothing else changes
+	Save.profile.dice_owned = ["classic"]
+	Save.profile.dice = "classic"
+	var d := ItemSheet.new("dice", "crema")
+	d.open(layer)
+	await d._on_buy()
+	var rv2 := _reveal_in(layer)
+	check("offer: a die bought in one tap shows its reveal", Catalog.owns_dice("crema") and rv2 != null and _texts(rv2).has("NEW DICE!") and _texts(rv2).has("−1,000 · 3K left"), _texts(rv2) if rv2 else [])
+	if rv2:
+		rv2.on_back()
+		check("reveal: Back is Keep shopping: both go", rv2._closing and d._closing)
+	# too few coins: "Need ...", nothing bought, no reveal
+	Save.profile.coins = 100
+	var t := EmotePackSheet.new("friends")
+	t.open(layer)
+	t.refresh()
+	check("offer: short of coins shows Need and says so on the line", t._need.visible and not t._buy.visible and t._need.text.begins_with("Need") and t._line.text == "You have 100 coins.", [t._need.text, t._line.text])
+	await t._on_buy()
+	check("offer: Need buys nothing and shows no reveal", not Catalog.owns_emotes("friends") and _reveal_in(layer) == null)
+	t.close()
+	# a room: one tap, the café follows (room_changed), then the reveal
+	Save.profile.coins = 9000
+	var pv := PreviewSheet.new("dream", "room")
+	var got: Array = []
+	pv.room_changed.connect(func(id: String): got.append(id))
+	pv.open(layer)
+	await pv._on_buy()
+	check("offer: a room bought in one tap is in use and the café follows", Catalog.owns_room("dream") and Catalog.room_in_use() == "dream" and got == ["dream"] and _reveal_in(layer) != null, got)
+	for c in layer.get_children():
+		if c is Sheet:
+			(c as Sheet).close()
+	await (Engine.get_main_loop() as SceneTree).create_timer(0.3).timeout
+	layer.queue_free()
 
 func _wallet() -> void:
 	var f := Fake.new()

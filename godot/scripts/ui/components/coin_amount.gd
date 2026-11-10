@@ -8,6 +8,7 @@ extends HBoxContainer
 ##         "md" coin 24 / Nunito 900 18   (balance chips, preview prices)
 ##         "lg" coin 30 / Lilita 22       (the home balance, result rewards)
 ##         "hero" coin 44 / Lilita 34     (big amounts: Earn coins hub, win reward)
+##         "xl"   coin 34 / Lilita 30     (the Shop offer's price button)
 ##   look  "plain" coin + INK text, no background
 ##         "chip"  honey-tint balance chip (HONEY_TINT, 2 px HONEY_TINT_EDGE, pill), ON_HONEY text
 ##         "night" web .h-bar .coins: the coin overlapping a dark INK pill with cream text (on the night lobby)
@@ -24,6 +25,7 @@ const SIZES := {
 	md = {coin = 24.0, fs = 18, display = false},
 	lg = {coin = 30.0, fs = 22, display = true},
 	hero = {coin = 44.0, fs = 34, display = true},
+	xl = {coin = 34.0, fs = 30, display = true},
 }
 const LOOKS := ["plain", "chip", "night", "price"]
 const COUNT_SEC := 0.5

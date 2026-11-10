@@ -72,7 +72,7 @@ const SUITES := [
 const ASYNC_SUITES := ["res://tests/test_reroll.gd", "res://tests/test_sheet_stack.gd", "res://tests/test_crash_watch.gd", "res://tests/test_pair_online.gd", "res://tests/test_share.gd",
 	"res://tests/test_social.gd", "res://tests/test_app_update.gd", "res://tests/test_app_rating.gd",
 	"res://tests/test_leak_probe.gd", "res://tests/test_unit_choice.gd",
-	"res://tests/test_redraw_free.gd"]
+	"res://tests/test_redraw_free.gd", "res://tests/test_emote_shop.gd"]
 
 func _initialize() -> void:
 	var save := root.get_node_or_null("Save")  # a suite that stops halfway can't write its throwaway profile to save.json

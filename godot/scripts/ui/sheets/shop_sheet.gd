@@ -18,8 +18,9 @@ extends Sheet
 ## Economy v1: every paid item can also be bought with gems (ceil(price / 100), Catalog.gem_price), offered by the
 ## preview; pawn skins sold for gems only show gems. Too few gems: "Not enough gems", the shortfall, and "Open Store".
 ## Gems only exist on the server: offline it says "Connect to the internet to buy".
-## Buying always asks first (Sheet.confirm), then goes through Catalog / SLScenes / Collection (coins checked, never
-## charged twice, rolled back when the save fails), puts the item in use and says "<Item> is yours!".
+## The preview is the offer (OfferSheet, the Buying mock-up): its price button buys at once (one tap; "Not enough gems"
+## still asks whether to open the Store) through Catalog / SLScenes / Collection or the server wallet (coins checked,
+## never charged twice, rolled back when the save fails), puts the item in use and shows the RevealSheet.
 ## Coins come from the Get coins sheet: the Rewards sheet (RewardsSheet.new("Get coins", true)), the same rows as
 ## Home's gift: Daily spin, Daily reward and Free coins with their live state, each opening its own sheet from Main.
 ##
@@ -645,8 +646,24 @@ static func rarity_chip(rar: String) -> PanelContainer:
 	chip.add_child(l)
 	return chip
 
-## A chunky price button face: gold with dark figures (coins) or teal with white figures (gems).
-static func price_button(amount: int, gems := false, big := false) -> Control:
+## A chunky price button face: gold with dark figures (coins) or teal with white figures (gems). xl: the offer's
+## big price (66 px, a 7 px inset lip over a 4 px outer one, the amount in full, centred).
+static func price_button(amount: int, gems := false, big := false, xl := false) -> Control:
+	if xl:
+		var f := OfferSheet._face(Color("#6ff0d6") if gems else Color("#ffe27a"), Color("#2fb39c") if gems else Color("#f7a928"),
+			Color("#1d7f6e") if gems else Color("#b86a0a"), Color("#0f4f44") if gems else Color("#6b3a06"))
+		var amt := CoinAmount.new(amount, "xl", "plain", "", true, "gem" if gems else "coin")
+		amt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		amt.set_color(Color.WHITE if gems else Color("#4a2212"))
+		if gems:
+			amt.text_label.add_theme_constant_override("outline_size", 5)
+			amt.text_label.add_theme_color_override("font_outline_color", Color("#1d4f45"))
+		var cc := CenterContainer.new()
+		cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cc.add_child(amt)
+		f.add_child(cc)
+		f.custom_minimum_size.y = 70.0
+		return f
 	var p := GamePanel.vertical(Color("#5fe0c8") if gems else Color("#ffd45e"), Color("#2fb39c") if gems else Color("#f7a928"))
 	p.radius = 14.0 if big else 10.0
 	p.lip = 5.0 if big else 4.0
@@ -1082,19 +1099,19 @@ func _player_name() -> String:
 # Actions
 # =====================================================================================================================
 
-## Buy with coins, from a preview: short -> "Need 2.5K more coins"; offline -> says so; else confirm -> buy and put in
-## use -> "<Item> is yours!" on `host`. True when bought.
-static func buy_with_coins(host: Sheet, kind: String, id: String, name_: String) -> bool:
+## Buy with coins, from an offer (OfferSheet): short -> "Need 2.5K more coins"; offline -> says so; else buys and puts
+## it in use at once (one tap buys: the offer's price button is the deliberate tap, no "Buy X?" question). True when
+## bought (the offer then shows the RevealSheet); a failure is said on `host`.
+static func buy_with_coins(host: Sheet, kind: String, id: String, _name: String) -> bool:
 	var price := _price(kind, id)
 	var short := price - Catalog.coins()
-	var title := _title(kind, name_)
 	if short > 0:
 		Sound.sfx("error")
 		Haptics.error()
 		Toast.show(host, L10n.t("Need %s more coins") % Fmt.coins(short), host.card, 1.8, "bad")
 		return false
 	if Account.wallet_active() and is_same(Collection.profile(), Save.profile):
-		var online: bool = await Account.instance().ensure_session()      # offline: say so before asking to confirm
+		var online: bool = await Account.instance().ensure_session()      # offline: say so, nothing is tried
 		if not is_instance_valid(host) or host._closing:
 			return false
 		if not online:
@@ -1102,9 +1119,6 @@ static func buy_with_coins(host: Sheet, kind: String, id: String, name_: String)
 			Haptics.error()
 			Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")
 			return false
-	var yes: bool = await Sheet.confirm(host, L10n.t("Buy %s?") % title, L10n.t("%s coins. You’ll have %s left.") % [Fmt.coins(price), Fmt.coins(Catalog.coins() - price)], L10n.t("Buy"))
-	if not yes or not is_instance_valid(host) or host._closing:
-		return false
 	var err: String = await _purchase(kind, id)
 	if not is_instance_valid(host) or host._closing:
 		return false
@@ -1113,9 +1127,7 @@ static func buy_with_coins(host: Sheet, kind: String, id: String, name_: String)
 		Haptics.error()
 		Toast.show(host, err, host.card, 2.2, "bad")
 		return false
-	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(host, _yours(kind, title), host.card, 1.8, "good")
 	return true
 
 ## The purchase itself: "" when bought, else the reason to show. With an Account (the game) the server sells and the
@@ -1150,9 +1162,9 @@ static func _yours(kind: String, title: String) -> String:
 static func gems_need_text(short: int) -> String:
 	return L10n.t("Not enough gems — you need %s more.") % Fmt.coins_full(short)
 
-## The gems purchase flow, shared with the Preview: checks the wallet, asks first, buys through _purchase and says so
-## on `host` (its toasts and confirms). Returns "" (nothing happened), "store" (not enough gems and "Open Store" was
-## chosen), "bought" or "failed".
+## The gems purchase flow, shared by the offers: checks the wallet (too few gems: a dialog with the shortfall and
+## "Open Store"), buys through _purchase at once (one tap buys) and says what went wrong on `host`. Returns ""
+## (nothing happened), "store" (not enough gems and "Open Store" was chosen), "bought" or "failed".
 static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) -> String:
 	var gems := _gems(kind, id)
 	if gems <= 0:
@@ -1177,9 +1189,6 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		Haptics.error()
 		Toast.show(host, Account.error_text("offline", "buy"), host.card, 2.2, "bad")
 		return ""
-	var yes: bool = await Sheet.confirm(host, L10n.t("Buy %s?") % title, L10n.t("%s gems. You’ll have %s left.") % [Fmt.coins_full(gems), Fmt.coins_full(have - gems)], L10n.t("Buy"))
-	if not yes or not is_instance_valid(host) or host._closing:
-		return ""
 	var err: String = await _purchase(kind, id, "gems")
 	if not is_instance_valid(host) or host._closing:
 		return ""
@@ -1188,9 +1197,7 @@ static func buy_with_gems(host: Sheet, kind: String, id: String, name_: String) 
 		Haptics.error()
 		Toast.show(host, err, host.card, 2.2, "bad")
 		return "failed"
-	Sound.sfx("buy")
 	Haptics.success()
-	Toast.show(host, _yours(kind, title), host.card, 1.8, "good")
 	return "bought"
 
 ## Put an owned item in use, through the server when there is an Account (the look is part of the profile it keeps;
