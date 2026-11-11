@@ -116,6 +116,7 @@ var _dock: Panel
 var _dock_fade: TextureRect              # the café fading into the dock
 var _nav_bg: GamePanel                   # the bar's wood
 var _nav_rim: ColorRect                  # its gold top edge
+var _page_floor: ColorRect               # while a screen shows over Home: covers the strip between it and the bar
 var _quick: Button                       # the Continue match pill
 var _quick_icon: TextureRect
 var _quick_title: Label
@@ -611,6 +612,15 @@ func _tile_button(text: String, icon_path: String, look := "friends") -> Button:
 
 
 func _build_nav() -> void:
+	# A screen opened from the bar ends where the picked tab's raised tile starts (Main: page_inset_bottom from
+	# nav_top), so Home's own buttons would show in the strip under it: this floor, the screens' bottom colour, covers
+	# it (and takes the taps) while one is open.
+	_page_floor = ColorRect.new()
+	_page_floor.name = "PageFloor"
+	_page_floor.color = Palette.GL_DOCK
+	_page_floor.mouse_filter = Control.MOUSE_FILTER_STOP
+	_page_floor.visible = false
+	add_child(_page_floor)
 	_nav_bg = GamePanel.vertical(Palette.GL_WOOD, Palette.GL_INK)
 	_nav_bg.radius = 0.0
 	_nav_bg.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -663,6 +673,8 @@ func _build_nav() -> void:
 ## white; the others a plain icon and a cream name. The bar itself never moves.
 func set_nav(tab: String) -> void:
 	nav_tab = tab
+	if _page_floor:
+		_page_floor.visible = tab != "home"
 	for id: String in _nav_parts:
 		var on := id == tab
 		var p: Dictionary = _nav_parts[id]
@@ -952,6 +964,8 @@ func _layout() -> void:
 	_nav_bg.size = Vector2(w, h - nav_y + 4)
 	_nav_rim.position = _nav_bg.position
 	_nav_rim.size = Vector2(w, 3)
+	_page_floor.position = Vector2(0, nav_y - 4 - NAV_POP - 8)
+	_page_floor.size = Vector2(w, NAV_POP + 12)
 	_rule.position = Vector2(x, nav_y - UIKit.SPACE.sm)
 	_rule.size = Vector2(cw, 2)
 	var mh := MODE_H - 4.0 if short else MODE_H

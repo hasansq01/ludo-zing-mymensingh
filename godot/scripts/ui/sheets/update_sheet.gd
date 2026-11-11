@@ -112,7 +112,7 @@ static func _chip(t: String) -> Control:
 	st.content_margin_left = 10; st.content_margin_right = 14; st.content_margin_top = 4; st.content_margin_bottom = 5
 	p.add_theme_stylebox_override("panel", st)
 	var h := UIKit.hbox(6)
-	h.add_child(UIKit.icon("ic_lock", 20))
+	h.add_child(UIKit.icon("ic_lock_gold", 20))
 	var l := UIKit.label(t.to_upper(), 14, Palette.GL_CREAM_RIM, UIKit.font_body(900))
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(l)

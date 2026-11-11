@@ -471,7 +471,7 @@ class TableRow extends PanelContainer:
 		pill.name = "Pill"
 		var inner := pill.find_child("Row", true, false) as HBoxContainer
 		if bool(row.locked):
-			var lock := UIKit.icon("ic_lock", 20)
+			var lock := UIKit.icon("ic_lock_gold", 20)
 			lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			inner.add_child(lock)
 			prize_label = SetupSheet.pill_label(tr("Level %d") % int(row.level), look, 15)

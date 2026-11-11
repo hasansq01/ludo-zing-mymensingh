@@ -31,6 +31,7 @@ const LOOKS := {
 }
 ## size -> [height, font size, radius, lip, outer lip]
 const SIZES := {
+	xs = [32.0, 15, 11.0, 4.0, 0.0],   # on a card, beside a price button or the In use pill
 	sm = [42.0, 17, 14.0, 4.0, 2.0],
 	md = [54.0, 21, 16.0, 5.0, 3.0],
 	lg = [66.0, 28, 20.0, 7.0, 4.0],
@@ -52,7 +53,7 @@ static func text(t: String, fs: int = UIKit.FS.body, col := SUB, align := HORIZO
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
-## A chunky game button: `look` (LOOKS) and `size` ("sm" | "md" | "lg"); optional icon (a res:// path) left of the
+## A chunky game button: `look` (LOOKS) and `size` ("xs" | "sm" | "md" | "lg"); optional icon (a res:// path) left of the
 ## text. It fills its width (SIZE_EXPAND_FILL) unless the caller says otherwise.
 static func button(t: String, look := "gold", size := "md", icon_path := "") -> GameButton:
 	return GameButton.new(t, look, size, icon_path)
@@ -131,6 +132,8 @@ class GameButton extends Button:
 			add_theme_color_override(k, Color(0, 0, 0, 0))
 		var c: Array = GameUI.LOOKS[look]
 		var z: Array = GameUI.SIZES[size_name]
+		if size_name == "xs":                    # the hidden Button text sets the width: measure it at the face's size
+			add_theme_font_size_override("font_size", int(z[1]))
 		face = GamePanel.vertical(c[0], c[1])
 		face.name = "Face"
 		face.radius = z[2]

@@ -40,7 +40,7 @@ signal shop_requested(tab: String)       ## Inventory: "Open shop" (main closes 
 const TABS := [
 	{key = "boards", text = "Rooms", icon = "cat_rooms", cat = "rooms"},
 	{key = "pieces", text = "Pieces", icon = "cat_pawns", cat = "pawns"},
-	{key = "emotes", text = "Emotes"},
+	{key = "emotes", text = "Emotes", icon = "cat_emotes"},
 	{key = "look", text = "Look", icon = "cat_avatars", cat = "avatars"},
 ]
 ## What each tab holds: [category, its label in the filter under the tabs].
@@ -57,6 +57,7 @@ const TAB_ALIAS := {chars = "avatars", characters = "avatars", nameplates = "pla
 	boards = "rooms", pieces = "pawns"}
 const MAX_H := 680.0                     ## one card height for every tab (web .shop-card min(100%, 680px))
 const ART_WIDE := 0.62                   ## card art height / width: rooms, scenes, emote packs
+const EYE := 34.0                       ## the preview eye's round button (px; plus its 3 px lip)
 const ART_PLATE := 0.4                   ## a nameplate is a strip
 const ART_SQUARE := 0.86                 ## dice, pawns, avatars, frames, badges
 const WIDE := ["room", "scene", "emotes", "text", "plate"]   ## two columns (the rest three)
@@ -575,8 +576,10 @@ func _card(it: Dictionary) -> Control:
 	var price_row := price_button(_gems(kind, id) if gems_only else _price(kind, id), gems_only)
 	price_row.name = "Price"
 	slot.add_child(price_row)
-	var use := UIKit.btn(tr("Use"), "teal", "xs")
+	var use := GameUI.button(tr("Use"), "teal", "xs")
 	use.name = "Use"
+	use.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	use.custom_minimum_size.x = 92.0
 	use.pressed.connect(func(): _on_use(kind, id))
 	slot.add_child(use)
 	var on_pill := equipped_pill()
@@ -585,7 +588,7 @@ func _card(it: Dictionary) -> Control:
 	lock_row.name = "Locked"
 	lock_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	lock_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var li := UIKit.icon("ic_lock", 14)
+	var li := UIKit.icon("ic_lock_gold", 14)
 	li.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lock_row.add_child(li)
 	var ll := UIKit.label(_unlock_note(kind, id), 11, Color("#fff1dc"), UIKit.font_body(900))
@@ -604,7 +607,8 @@ func _card(it: Dictionary) -> Control:
 		var vb := _view_button(kind, id)
 		root.add_child(vb)
 		vb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		vb.offset_bottom = -72
+		vb.offset_left = art.offset_left; vb.offset_right = art.offset_right    # the picture's own rect: the eye sits
+		vb.offset_top = art.offset_top; vb.offset_bottom = art.offset_bottom    # in its corner, like on every card
 	UIKit.on_tap(p, func() -> void: _on_card(kind, id, ll.text if lock_row.visible else "", p))
 	_cards.append(p)
 	_updaters.append(func():
@@ -995,7 +999,7 @@ func _well(kind: String) -> Control:
 	p.add_child(tr)
 	return p
 
-## Over a room's or a scene's picture: the whole picture opens the 3D preview; a small glass "View" chip says so.
+## Over a room's or a scene's picture: the whole picture opens the 3D preview; a round eye button in its corner says so.
 func _view_button(kind: String, id: String) -> Button:
 	var b := Button.new()
 	b.name = "View"
@@ -1006,20 +1010,23 @@ func _view_button(kind: String, id: String) -> Button:
 	for s in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		b.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var chip := PanelContainer.new()
+	# a round cream game button in the picture's bottom-right corner (6 px in), the eye centred on its face
+	var chip := GamePanel.vertical(Palette.GL_CREAM_HI, Palette.GL_CREAM_LO)
+	chip.name = "Eye"
+	chip.radius = EYE / 2.0
+	chip.border = 2.0
+	chip.border_color = Palette.GL_INK
+	chip.lip = 3.0
+	chip.lip_color = Palette.GL_CREAM_LIP
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cs := UIKit.box(Palette.GLASS, UIKit.R.pill, UIKit.BW.hair, Palette.LINE)
-	UIKit.shade(cs, "sm")
-	UIKit.pad(cs, 5, 3)
-	chip.add_theme_stylebox_override("panel", cs)
-	var h := UIKit.hbox(UIKit.SPACE.xs)
-	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	h.add_child(UIKit.icon("ic_eye", 15))
-	chip.add_child(h)
+	var cc := CenterContainer.new()
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cc.add_child(UIKit.icon("ic_eye", 22))
+	chip.add_child(cc)
 	b.add_child(chip)
-	chip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
-	chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	chip.anchor_left = 1.0; chip.anchor_right = 1.0; chip.anchor_top = 1.0; chip.anchor_bottom = 1.0
+	chip.offset_left = -EYE - 6.0; chip.offset_right = -6.0
+	chip.offset_top = -EYE - 3.0 - 6.0; chip.offset_bottom = -6.0
 	UIKit.wire_press(b)
 	b.pressed.connect(func(): _on_view(kind, id))
 	return b
@@ -1407,7 +1414,7 @@ class Tiles extends HBoxContainer:
 			t.texture = _icon(key)
 			t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			t.custom_minimum_size = Vector2(38, 30)
+			t.custom_minimum_size = Vector2(36, 34)
 			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 			col.add_child(t)
@@ -1450,11 +1457,12 @@ class Tiles extends HBoxContainer:
 			l.add_theme_font_size_override("font_size", 14 if on else 13)
 
 	static func _icon(key: String) -> Texture2D:
+		# the game look's icon set (tools/game_icons.py): one drawn style for every tab
 		match key:
-			"boards": return Thumbnailer.baked("room", Rooms.DEFAULT)
-			"pieces": return Thumbnailer.baked("pawn", "kitty")
-			"emotes": return EmoteArt.icon("happy")
-			"look": return Collection.medal_texture("first")
+			"boards": return load(UIKit.ICON_DIR + "cat_rooms.svg")
+			"pieces": return load(UIKit.ICON_DIR + "cat_pawns.svg")
+			"emotes": return load(UIKit.ICON_DIR + "cat_emotes.svg")
+			"look": return load(UIKit.ICON_DIR + "cat_avatars.svg")
 		return null
 
 

@@ -158,6 +158,12 @@ func _init() -> void:
 	_relayout()
 
 
+## A panel sized before it enters the tree (anchors / offsets set on a detached node) gets no `resized` there: give
+## the shader its size on entering.
+func _enter_tree() -> void:
+	_apply()
+
+
 func _relayout() -> void:
 	var st := StyleBoxEmpty.new()
 	st.content_margin_left = pad
