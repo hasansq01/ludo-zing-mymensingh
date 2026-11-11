@@ -15,6 +15,7 @@ const FRICTION := 4.5           ## fling decay per second (exponential)
 const MIN_FLING := 120.0        ## px/s; slower releases just stop
 const MAX_FLING := 4200.0
 const OFF := Vector2(-100000, -100000)
+const CATCH_VEL := 90.0         ## px/s: a press while the list still moves this fast only stops it (no tap)
 
 var _sc: ScrollContainer
 var _tracking := false
@@ -29,6 +30,7 @@ var _flinging := false
 var _ranges := {}               ## Range -> value at press (restored when the press turns into a scroll)
 var _synthetic := false
 var _press_at := Vector2.ZERO
+var _catch := false             ## this press stopped a moving list: it and its release never reach the GUI
 
 
 static func attach(sc: ScrollContainer) -> TouchScroll:
@@ -47,7 +49,25 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if _synthetic or not is_instance_valid(_sc):
 		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+	# A finger put down on a list that is still gliding stops it, like any phone list: that touch is not a tap on the
+	# card or button under it (the press and its release are kept from the GUI; touch and its emulated mouse both).
+	var is_touch := event is InputEventScreenTouch
+	var is_left: bool = event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT
+	if (is_touch or is_left) and event.pressed and not _catch and _flinging and absf(_vel) >= CATCH_VEL \
+			and _sc.is_visible_in_tree() and _sc.get_global_rect().has_point(event.position):
+		_catch = true
+	if _catch and (is_touch or is_left):
+		get_viewport().set_input_as_handled()
+		if is_left and not event.pressed:
+			_catch = false
+			_tracking = false
+			if _dragging:                     # caught, then dragged on: the drag scrolled; let it glide again
+				_dragging = false
+				_start_fling()
+			return
+		if not is_left:
+			return
+	if is_left:
 		if event.pressed:
 			_on_press(event.position)
 		elif _tracking:

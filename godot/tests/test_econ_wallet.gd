@@ -225,18 +225,35 @@ func _ad_flow() -> void:
 	await r.flow.watch("gems")
 	check("adflow: no videos left -> cap, and no ad is shown", not r.log[0][0] and r.log[0][1].error == "cap" and not r.plugin.calls.any(func(c): return str(c).begins_with("show_rewarded")), r.log)
 	free_rig(r)
-	# no ad loaded
+	# no ad loaded, and none loads while the tap waits
+	r = flow_rig()
+	await r.acc.sign_in_guest()
+	r.plugin.ready = false
+	r.plugin.load_fills = false
+	await r.flow.watch("gems")
+	check("adflow: no ad loaded and none comes -> the friendly line, and nothing is started", not r.log[0][0] and r.log[0][1].error == "no_fill" and r.log[0][1].text == "No video right now, try again in a minute." and r.fake.count("/v1/ads/start") == 0, r.log)
+	check("adflow: ...after asking for one", r.plugin.calls.has("load_rewarded"), r.plugin.calls)
+	free_rig(r)
+	# no ad held at the tap, one loads while it waits
 	r = flow_rig()
 	await r.acc.sign_in_guest()
 	r.plugin.ready = false
 	await r.flow.watch("gems")
-	check("adflow: no ad loaded -> the friendly line, and nothing is started", not r.log[0][0] and r.log[0][1].error == "no_fill" and r.log[0][1].text == "No video right now, try again in a minute." and r.fake.count("/v1/ads/start") == 0, r.log)
+	check("adflow: no ad held at the tap -> it loads one, waits, and the video plays", r.log[0][0] and r.log[0][1].amount == 2, r.log)
 	free_rig(r)
-	# the ad can't be shown
+	# the ad can't be shown (twice)
 	r = flow_rig("fail")
 	await r.acc.sign_in_guest()
 	await r.flow.watch("gems")
-	check("adflow: show failed -> no_fill", not r.log[0][0] and r.log[0][1].error == "no_fill" and r.fake.count("/v1/ads/status") == 0, r.log)
+	var shows: int = r.plugin.calls.filter(func(c): return str(c).begins_with("show_rewarded")).size()
+	check("adflow: show failed twice -> no_fill after one retry", not r.log[0][0] and r.log[0][1].error == "no_fill" and r.fake.count("/v1/ads/status") == 0 and shows == 2, [r.log, shows])
+	free_rig(r)
+	# an expired ad: the first show fails, a new ad loads and plays (same nonce)
+	r = flow_rig("fail_once")
+	await r.acc.sign_in_guest()
+	await r.flow.watch("gems")
+	shows = r.plugin.calls.filter(func(c): return str(c).begins_with("show_rewarded")).size()
+	check("adflow: an expired ad -> a new one loads and plays, the reward arrives", r.log[0][0] and shows == 2 and r.fake.count("/v1/ads/start") == 1, [r.log, r.plugin.calls])
 	free_rig(r)
 	# closed before the reward
 	r = flow_rig("early")

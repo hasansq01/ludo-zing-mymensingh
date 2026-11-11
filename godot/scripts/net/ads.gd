@@ -23,7 +23,8 @@ extends Node
 ##   #   4. `closed` = the ad is gone (after `earned`, or the player quit early: no reward). `show_failed` = no ad
 ##   #      was shown (not loaded, SDK error): tell the player, the start nonce just expires.
 ##   # `earned` can come before `closed`; treat closed without earned as "no reward".
-## A new ad is loaded by itself after one closes or fails to load / show, with backoff: 5 s, 15 s, 60 s (then 60 s
+## A held ad older than MAX_AGE_SEC is replaced (checked every AGE_CHECK_SEC, on resume and by is_ready()); a failed show
+## loads a new ad at once. A new ad is loaded by itself after one closes or fails to load / show, with backoff: 5 s, 15 s, 60 s (then 60 s
 ## again) between failures; a successful load starts the sequence over. Only once load_rewarded() has been called
 ## (so no ad traffic before consent) and only while the plugin exists. A load that fails with "consent" (code -2)
 ## is retried the same way, so the first ad comes as soon as the consent form has been answered.
@@ -60,6 +61,11 @@ const TEST_ADS_SETTING := "ludo_zing/ads/test_ad_devices"
 const UNAVAILABLE := "unavailable"
 ## Seconds before the next automatic load, by number of failures in a row (the last one repeats).
 const BACKOFF := [5.0, 15.0, 60.0]
+## A held ad older than this is treated as gone and replaced: networks expire a loaded ad (Unity Ads after a while)
+## while the SDK still calls it ready, and showing it fails ("The ad has expired").
+const MAX_AGE_SEC := 1800.0
+## How often a held ad's age is checked (and the expired one replaced) while the game runs.
+const AGE_CHECK_SEC := 120.0
 
 ## Seconds until the pending automatic load, -1 when none is waiting (tests read it; a timer runs it in the tree).
 var reload_in := -1.0
@@ -75,6 +81,9 @@ var _deferred := true
 var _wanted := false            # load_rewarded() was called: keep an ad ready
 var _privacy := false
 var _timer: SceneTreeTimer = null
+var _loaded_at := 0             # Time.get_ticks_msec() of the last `loaded` (when _held)
+var _held := false              # an ad's load time is known (cleared when it is shown, fails or is dropped)
+var _age_timer: SceneTreeTimer = null
 
 ## `singleton`: the Android plugin object; null = the one pick() chooses among the singletons that exist. Tests pass a
 ## fake with the same methods and signals (`kind` = which plugin it plays, default AdMob), and `deferred` false to
@@ -109,6 +118,12 @@ func _init(singleton: Object = null, deferred := true, kind := "") -> void:
 
 func _enter_tree() -> void:
 	_inst = self
+	_arm_age_check()
+
+## Back from the background (hours, sometimes): the held ad may have expired meanwhile.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		refresh_if_stale()
 
 func _exit_tree() -> void:
 	if _inst == self:
@@ -173,9 +188,33 @@ func load_rewarded() -> void:
 	_cancel_reload()
 	_pg.call("load_rewarded", unit_id(provider))
 
-## True when an ad is loaded and can be shown right now.
+## True when an ad is loaded and can be shown right now (one held too long counts as gone: it is replaced).
 func is_ready() -> bool:
-	return _pg != null and bool(_pg.call("is_rewarded_ready"))
+	if _pg == null or not bool(_pg.call("is_rewarded_ready")):
+		return false
+	if stale():
+		refresh_if_stale()
+		return false
+	return true
+
+## True when the held ad loaded more than MAX_AGE_SEC ago.
+func stale() -> bool:
+	return _held and float(Time.get_ticks_msec() - _loaded_at) / 1000.0 > MAX_AGE_SEC
+
+## Replaces the held ad when it is too old (see MAX_AGE_SEC). Nothing to do before load_rewarded() was called.
+func refresh_if_stale() -> void:
+	if _wanted and _pg != null and stale():
+		_force_load()
+
+## Drops the held ad and loads a new one (LevelPlay: reload_rewarded; AdMob, not used while LevelPlay is in the build:
+## a plain load_rewarded).
+func _force_load() -> void:
+	_held = false
+	_cancel_reload()
+	if provider == LEVELPLAY:
+		_pg.call("reload_rewarded", unit_id(provider))
+	else:
+		_pg.call("load_rewarded", unit_id(provider))
 
 ## Shows the loaded ad with the server-side verification options from POST /v1/ads/start (`user_id` = account id,
 ## `custom_data` = nonce). -> earned, closed; or show_failed. Call it only from a tap.
@@ -198,6 +237,9 @@ func _on_consent(can: bool, privacy: bool) -> void:
 
 func _on_loaded() -> void:
 	failures = 0
+	if not _held:                                # (an answer for the ad already held keeps its age)
+		_held = true
+		_loaded_at = Time.get_ticks_msec()
 	_cancel_reload()
 	loaded.emit()
 
@@ -210,17 +252,23 @@ func _on_earned(type: String, amount: int) -> void:
 	earned.emit(type, amount)
 
 func _on_closed() -> void:
+	_held = false
 	closed.emit()
 	# a fresh ad for the next tap: the first delay, as the player may want another one soon (not a failure)
 	failures = 0
 	_schedule_reload(backoff(1))
 
 func _on_show_failed(code: int, message: String) -> void:
-	show_failed.emit(code, message)
-	# "already showing" must not queue a load under the ad on screen; anything else means this ad is gone
+	# "already showing" must not queue a load under the ad on screen; anything else means this ad is gone: a new one
+	# at once (an expired ad is the usual cause, and the player is waiting for it), then the backoff
 	if message != "already showing":
+		_held = false
 		failures += 1
-		_schedule_reload(backoff(failures))
+		if failures == 1 and _wanted and _pg != null:
+			_force_load()
+		else:
+			_schedule_reload(backoff(failures))
+	show_failed.emit(code, message)
 
 
 # ---------- reload ----------
@@ -239,6 +287,16 @@ func _on_reload_timer() -> void:
 	reload_in = -1.0
 	if _wanted and _pg != null and not is_ready():
 		_pg.call("load_rewarded", unit_id(provider))
+
+## Every AGE_CHECK_SEC while in the tree: replace a held ad that got too old.
+func _arm_age_check() -> void:
+	if _pg == null or not is_inside_tree() or _age_timer != null:
+		return
+	_age_timer = get_tree().create_timer(AGE_CHECK_SEC)
+	_age_timer.timeout.connect(func() -> void:
+		_age_timer = null
+		refresh_if_stale()
+		_arm_age_check())
 
 func _cancel_reload() -> void:
 	reload_in = -1.0

@@ -1217,6 +1217,9 @@ func _start_account() -> void:
 	if account.enabled:
 		account.start()
 		gem_store.launch_check()              # a payment an earlier run left unverified, and what Play still holds
+		if ads.available():
+			ads.load_rewarded()                   # the first ad now when an earlier run's consent allows it (the plugin
+			                                      # asks UMP: without consent it answers "consent" and nothing loads)
 		_ads_consent()
 
 ## The ads consent form (UMP) and the first rewarded ad, once Home is quiet: after the notifications question (its soft

@@ -2,6 +2,7 @@ package com.flipfold.ludozing.levelplay
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.ump.ConsentDebugSettings
 import com.google.android.ump.ConsentInformation
@@ -73,6 +74,7 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
     private var ad: LevelPlayRewardedAd? = null
     private var loading = false
     @Volatile private var loaded = false
+    @Volatile private var loadedAt = 0L      // SystemClock.elapsedRealtime() of the last onAdLoaded
     @Volatile private var showing = false
     private var earnedThisShow = false
     private var testSuite = false
@@ -238,14 +240,32 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Loads a rewarded ad of `unit_id` (one at a time). -> rewarded_loaded or rewarded_failed(code, message). */
     @UsedByGodot
-    fun load_rewarded(unit_id: String) {
+    fun load_rewarded(unit_id: String) = requestLoad(unit_id, false)
+
+    /**
+     * Drops the held ad (it may have expired: networks such as Unity Ads expire a loaded ad after a while, and
+     * isAdReady() still says yes) and loads a new one. -> rewarded_loaded or rewarded_failed. Not while one shows.
+     */
+    @UsedByGodot
+    fun reload_rewarded(unit_id: String) = requestLoad(unit_id, true)
+
+    /** Milliseconds since the held ad loaded (-1: none held). */
+    @UsedByGodot
+    fun rewarded_age_ms(): Long = if (loaded) SystemClock.elapsedRealtime() - loadedAt else -1L
+
+    private fun requestLoad(unit_id: String, fresh: Boolean) {
         ui("load_rewarded") {
             val act = activity
+            if (fresh && !showing && !loading && pendingUnit == null) {
+                loaded = false
+                ad = null                          // a new ad object: never the stale one again
+            }
             when {
                 act == null -> emitSignal(SIG_FAILED.name, -1, "no activity")
                 !UserMessagingPlatform.getConsentInformation(act).canRequestAds() ->
                     emitSignal(SIG_FAILED.name, -2, "consent")
                 loading || pendingUnit != null -> Log.i(TAG, "load_rewarded: already loading")
+                showing -> Log.i(TAG, "load_rewarded: an ad is showing")
                 loaded && ad?.adUnitId == unit_id -> emitSignal(SIG_LOADED.name)
                 init == Init.READY -> loadNow(unit_id)
                 else -> {
@@ -270,6 +290,7 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
         override fun onAdLoaded(adInfo: LevelPlayAdInfo) {
             loading = false
             loaded = true
+            loadedAt = SystemClock.elapsedRealtime()
             Log.i(TAG, "rewarded ad loaded (${adInfo.adNetwork})")
             emitSignal(SIG_LOADED.name)
         }
@@ -293,6 +314,8 @@ class LevelPlayPlugin(godot: Godot) : GodotPlugin(godot) {
 
         override fun onAdDisplayFailed(error: LevelPlayAdError, adInfo: LevelPlayAdInfo) {
             showing = false
+            loaded = false
+            ad = null                              // (expired, most often): the next load makes a new ad object
             Log.i(TAG, "rewarded ad show failed: ${error.errorCode} ${error.errorMessage}")
             emitSignal(SIG_SHOW_FAILED.name, error.errorCode, error.errorMessage)
         }

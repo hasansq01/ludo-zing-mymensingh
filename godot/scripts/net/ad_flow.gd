@@ -8,10 +8,11 @@ extends Node
 ##   flow.watch("gems")                                          # kind: reroll | refill | double | gems; ref = match id for double
 ##   AdFlow.available()                                          # false off Android / without the plugin: hide the button
 ##
-## watch() 1. checks an ad is loaded, 2. POST /v1/ads/start (the server checks the daily cap), 3. shows the ad with the
+## watch() 1. checks an ad is loaded (none: asks for one and waits up to LOAD_WAIT_SEC), 2. POST /v1/ads/start (the server checks the daily cap), 3. shows the ad with the
 ## server-side-verification options, 4. after `earned` + `closed` polls GET /v1/ads/status every 1.5 s for up to 20 s,
 ## 5. emits done(true, {kind, amount}); the returned profile is already in Save.profile (Account writes it). Nothing is
 ## granted from the game's word: only a "granted" answer counts.
+## A show that fails (an expired ad, most often) loads a new ad and tries once more (SHOW_TRIES) with the same nonce.
 ## Failures: done(false, {kind, error, text}) with error: "unavailable" (no plugin), "no_fill" (nothing loaded or the
 ## ad couldn't be shown: "No video right now, try again in a minute"), "cap" / "not_eligible" / "offline" / ... (the
 ## server's code), "closed" (the video was closed before the reward), "rejected" (the server refused the reward) and
@@ -23,12 +24,18 @@ signal done(ok: bool, info: Dictionary)
 signal _wake
 
 const POLL_SEC := 1.5
+## A tap with no ad ready (or after a failed show) waits this long for one to load before saying "no video".
+const LOAD_WAIT_SEC := 10.0
+const READY_POLL_SEC := 0.25
+## Shows tried per tap: a failed show (an expired ad, most often) loads a new one and tries again.
+const SHOW_TRIES := 2
 const TIMEOUT_SEC := 20.0
 const NO_FILL_TEXT := "No video right now, try again in a minute."  # l10n (show it as L10n.t(AdFlow.NO_FILL_TEXT))
 
 var busy := false
 var poll_sec := POLL_SEC
 var timeout_sec := TIMEOUT_SEC
+var load_wait_sec := LOAD_WAIT_SEC
 ## Tests: (seconds) -> awaitable, in place of a scene-tree timer.
 var sleep_fn := Callable()
 
@@ -89,9 +96,8 @@ func _run(kind: String, ref: String) -> Dictionary:
 	var acc := account()
 	if ad == null or not ad.available() or acc == null or not acc.enabled:
 		return _fail(kind, "unavailable")
-	if not ad.is_ready():
-		ad.load_rewarded()                         # (the next try finds one)
-		return _fail(kind, "no_fill")
+	if not await _wait_ready(ad):
+		return _fail(kind, "no_fill") if is_instance_valid(self) else _fail(kind, "closed")
 	var st: Dictionary = await acc.ads_start(kind, ref)
 	if not is_instance_valid(self):
 		return _fail(kind, "closed")
@@ -99,23 +105,45 @@ func _run(kind: String, ref: String) -> Dictionary:
 		return _fail(kind, str(st.get("error", "server")))
 	_earned = false
 	_closed = false
-	_show_failed = false
 	ad.earned.connect(_on_earned)
 	ad.closed.connect(_on_closed)
 	ad.show_failed.connect(_on_show_failed)
-	ad.show_rewarded(str(st.get("user_id", "")), str(st.get("custom_data", "")))
-	while not _closed and not _show_failed:
-		await _wake
+	for attempt in SHOW_TRIES:
+		_show_failed = false
+		if attempt > 0 and not await _wait_ready(ad):   # (the failed show already asked Ads for a new ad)
+			break
 		if not is_instance_valid(self):
 			return _fail(kind, "closed")
+		ad.show_rewarded(str(st.get("user_id", "")), str(st.get("custom_data", "")))
+		while not _closed and not _show_failed:
+			await _wake
+			if not is_instance_valid(self):
+				return _fail(kind, "closed")
+		if not _show_failed:
+			break
 	ad.earned.disconnect(_on_earned)
 	ad.closed.disconnect(_on_closed)
 	ad.show_failed.disconnect(_on_show_failed)
-	if _show_failed:
+	if _show_failed or not _closed:
 		return _fail(kind, "no_fill")
 	if not _earned:
 		return _fail(kind, "closed")
 	return await _poll(acc, kind, str(st.get("nonce", "")))
+
+## True once an ad is ready to show: at once, or after asking for one and waiting up to load_wait_sec.
+func _wait_ready(ad: Ads) -> bool:
+	if ad.is_ready():
+		return true
+	ad.load_rewarded()
+	var waited := 0.0
+	while waited < load_wait_sec:
+		await _sleep(READY_POLL_SEC)
+		if not is_instance_valid(self) or not is_instance_valid(ad):
+			return false
+		if ad.is_ready():
+			return true
+		waited += READY_POLL_SEC
+	return false
 
 ## GET /v1/ads/status every poll_sec until the answer is final or timeout_sec has passed.
 func _poll(acc: Account, kind: String, nonce: String) -> Dictionary:

@@ -232,11 +232,33 @@ func _reload_backoff() -> void:
 	var n := fake.calls.size()
 	a._on_reload_timer()
 	check("reload: nothing is loaded twice", fake.calls.size() == n and a.is_ready(), fake.calls)
-	# a failed show also reloads
+	# a failed show loads a new ad at once (an expired ad, most often: the player is waiting)
 	fake.ready = false
+	var loads := fake.calls.count("load_rewarded:" + A.unit_id())
 	a.show_rewarded("a", "n")
-	check("reload: a failed show queues a reload (backoff step 1)", a.reload_in == 5.0 and a.failures == 1,
-		[a.reload_in, a.failures])
+	check("reload: a failed show loads a new ad at once", fake.calls.count("load_rewarded:" + A.unit_id()) == loads + 1
+		and a.reload_in < 0.0, [fake.calls, a.reload_in])
+	# a second failed show in a row waits (backoff)
+	fake.load_result = "fail"
+	fake.ready = false
+	a.failures = 1
+	a.show_rewarded("a", "n")
+	check("reload: failed shows in a row back off", a.reload_in > 0.0 and a.failures == 2, [a.reload_in, a.failures])
+	a.free()
+	_stale_ad()
+
+## A held ad older than MAX_AGE_SEC counts as gone: is_ready() says no and a new one is asked for.
+func _stale_ad() -> void:
+	var fake := FakePlugin.new()
+	var a := A.new(fake, false)
+	fake.load_result = "ok"
+	a.load_rewarded()
+	check("stale: a fresh ad is ready", a.is_ready() and not a.stale())
+	a._loaded_at -= int((A.MAX_AGE_SEC + 60.0) * 1000.0)
+	var loads := fake.calls.count("load_rewarded:" + A.unit_id())
+	check("stale: an ad held past MAX_AGE_SEC is not ready", not a.is_ready())
+	check("stale: ...and a new one was loaded", fake.calls.count("load_rewarded:" + A.unit_id()) == loads + 1 and a.is_ready()
+		and not a.stale(), fake.calls)
 	a.free()
 
 func _no_reload_unasked() -> void:

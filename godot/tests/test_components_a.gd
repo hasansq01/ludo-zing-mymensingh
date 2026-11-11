@@ -4,6 +4,7 @@ extends "res://tests/test_suite.gd"
 
 func run() -> void:
 	_on_tap_checks()
+	await _touch_scroll_catch()
 	# ---- CoinAmount: the text is Fmt's ----
 	var c := CoinAmount.new(5300, "md", "chip")
 	check("coin: short form", c.text() == Fmt.coins(5300) and c.text() == "5.3K", c.text())
@@ -217,3 +218,67 @@ func _on_tap_checks() -> void:
 	press.call(false, Vector2(50, 50))
 	check("on_tap: touch and its emulated mouse are one tap", n[0] == 2, n[0])
 	box.free()
+
+## TouchScroll: a finger put down on a list that is still gliding stops it; that press (touch and its emulated mouse)
+## and its release are kept from the GUI, so it is not a tap on the card or button under it (the "store item opened
+## while I scrolled" bug). A press on a list at rest is left to the GUI. (Headless, the GUI itself doesn't press
+## buttons from pushed events, so this checks TouchScroll's side: what it swallows.)
+func _touch_scroll_catch() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var sc := ScrollContainer.new()
+	sc.position = Vector2.ZERO
+	sc.size = Vector2(8000, 8000)                    # (headless, pushed events land scaled: cover wherever they land)
+	sc.mouse_filter = Control.MOUSE_FILTER_IGNORE    # nothing in the GUI takes the events: only TouchScroll can
+	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sc.add_child(col)
+	for i in 10:
+		var b := Control.new()
+		b.custom_minimum_size = Vector2(180, 2000)
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(b)
+	tree.root.add_child(sc)
+	var ts := TouchScroll.attach(sc)
+	# a probe after the GUI: counts the button events nothing kept back
+	var gd := GDScript.new()
+	gd.source_code = "extends Node\nvar n := 0\nfunc _unhandled_input(e: InputEvent) -> void:\n\tif e is InputEventMouseButton or e is InputEventScreenTouch:\n\t\tn += 1\n"
+	gd.reload()
+	var probe: Node = gd.new()
+	tree.root.add_child(probe)
+	for i in 3:
+		await tree.process_frame
+	var at := Vector2(90, 50)
+	# one event through the viewport; true when it was kept from the GUI (the probe never saw it)
+	var send := func(touch: bool, down: bool) -> bool:
+		var e: InputEvent
+		if touch:
+			e = InputEventScreenTouch.new()
+		else:
+			e = InputEventMouseButton.new()
+			e.button_index = MOUSE_BUTTON_LEFT
+			e.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+			e.global_position = at
+		e.pressed = down
+		e.position = at
+		var before: int = probe.n
+		tree.root.push_input(e)
+		return probe.n == before
+	var tap := func() -> Array:
+		return [send.call(true, true), send.call(false, true), send.call(true, false), send.call(false, false)]
+	var rest: Array = tap.call()
+	check("touch_scroll: a tap on a list at rest goes to the GUI", rest == [false, false, false, false], rest)
+	ts._flinging = true
+	ts._vel = 1500.0
+	ts.set_process(true)
+	var glide: Array = tap.call()
+	check("touch_scroll: a tap on a gliding list is kept from the GUI (presses nothing)", glide == [true, true, true, true], glide)
+	check("touch_scroll: ...and it stops the list", not ts._flinging)
+	var after: Array = tap.call()
+	check("touch_scroll: the next tap goes to the GUI again", after == [false, false, false, false], after)
+	ts._flinging = true
+	ts._vel = 40.0                                   # nearly stopped: a tap is a tap
+	var slow: Array = tap.call()
+	check("touch_scroll: a list barely moving does not swallow the tap", slow == [false, false, false, false], slow)
+	sc.queue_free()
+	probe.queue_free()
+	await tree.process_frame
