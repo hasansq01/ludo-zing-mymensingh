@@ -1,4 +1,6 @@
 extends SceneTree
+## OUT OF DATE since 2026-11-12: the launcher PNGs now come from the top-view icon art
+## (submission/play/icon-top-view.svg, PNGs made outside Godot). Running this brings back the old icon.
 ## Renders the Android launcher icon PNGs from the SVG sources in res://assets/icon/.
 ## Run from the repo root:
 ##   godot --headless --path godot --script res://tools/make_icons.gd
